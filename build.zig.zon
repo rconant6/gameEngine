@@ -1,0 +1,12 @@
+.{
+    .name = .crossPlatformDemo,
+    .version = "0.0.1",
+    .fingerprint = 0xd809ed075f431db6,
+    .minimum_zig_version = "0.15.1",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
