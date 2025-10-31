@@ -1,4 +1,4 @@
 .zig-cache
-src/*.DS_Store/
+.DS_Store
 zig-out
-src/platform/macos/.build
+src/platform/macos/MetalDemo.playground/

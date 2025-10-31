@@ -7,7 +7,6 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Build options
     const renderer_backend = b.option(
         RendererBackend,
         "renderer",
@@ -19,10 +18,8 @@ pub fn build(b: *std.Build) void {
         "Enable validation layers (default: debug builds)",
     ) orelse (optimize == .Debug);
 
-    // Determine default renderer if not specified
     const selected_renderer = renderer_backend orelse defaultRendererForTarget(target.result.os.tag);
 
-    // Create modules
     const core_module = b.addModule("core", .{
         .root_source_file = b.path("src/core/types.zig"),
     });
@@ -32,19 +29,16 @@ pub fn build(b: *std.Build) void {
     });
     renderer_module.addImport("core", core_module);
 
-    // Add renderer backend options
     const renderer_options = b.addOptions();
     renderer_options.addOption(RendererBackend, "backend", selected_renderer);
     renderer_options.addOption(bool, "enable_validation", enable_validation);
     renderer_module.addImport("build_options", renderer_options.createModule());
 
-    // Platform module
     const platform_module = b.addModule("platform", .{
         .root_source_file = b.path("src/platform/platform.zig"),
     });
     platform_module.addIncludePath(b.path("src/platform/macos/swift/include"));
 
-    // API module
     const api_module = b.addModule("api", .{
         .root_source_file = b.path("src/api/engine.zig"),
     });
@@ -52,7 +46,6 @@ pub fn build(b: *std.Build) void {
     api_module.addImport("platform", platform_module);
     api_module.addImport("renderer", renderer_module);
 
-    // Main module for executable
     const main_module = b.addModule("main", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
@@ -63,71 +56,24 @@ pub fn build(b: *std.Build) void {
     main_module.addImport("renderer", renderer_module);
     main_module.addImport("api", api_module);
 
-    // Main executable
     const exe = b.addExecutable(.{
         .name = "game-engine",
         .root_module = main_module,
     });
 
-    // Add imports to exe's root_module
     exe.root_module.addImport("core", core_module);
     exe.root_module.addImport("platform", platform_module);
     exe.root_module.addImport("renderer", renderer_module);
     exe.root_module.addImport("api", api_module);
 
-    // Configure platform-specific stuff on root_module
     configurePlatform(b, exe, main_module, target, optimize, selected_renderer);
 
-    if (target.result.os.tag == .macos) {
-        const swift_build_dir = switch (optimize) {
-            .Debug => "src/platform/macos/.build/debug/",
-            .ReleaseSafe, .ReleaseFast, .ReleaseSmall => "src/platform/macos/.build/release/",
-        };
-
-        std.debug.print("{s}\n", .{swift_build_dir});
-        const lib_path = b.pathJoin(&.{ swift_build_dir, "libMacPlatform.a" });
-        std.debug.print("{s}\n", .{lib_path});
-        exe.root_module.addLibraryPath(.{ .cwd_relative = swift_build_dir });
-        exe.root_module.addObjectFile(.{ .cwd_relative = lib_path });
-        // Swift runtime dependencies
-        exe.linkSystemLibrary("c++");
-        exe.linkFramework("Cocoa");
-        exe.linkFramework("Foundation");
-        exe.linkFramework("AppKit");
-
-        const sys_path = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.sdk/usr/lib/swift/";
-        const other_sys_path = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx";
-        exe.root_module.addLibraryPath(.{ .cwd_relative = sys_path });
-        exe.root_module.addLibraryPath(.{ .cwd_relative = other_sys_path });
-
-        exe.root_module.linkSystemLibrary("swiftObjectiveC", .{});
-        exe.root_module.linkSystemLibrary("swiftCore", .{});
-        exe.root_module.linkSystemLibrary("swiftAppKit", .{});
-        exe.root_module.linkSystemLibrary("swiftCoreFoundation", .{});
-        exe.root_module.linkSystemLibrary("swiftCompatibilityConcurrency", .{});
-        exe.root_module.linkSystemLibrary("swiftCompatibility50", .{});
-        exe.root_module.linkSystemLibrary("swiftCompatibility51", .{});
-        exe.root_module.linkSystemLibrary("swiftCompatibility56", .{});
-        exe.root_module.linkSystemLibrary("swiftCompatibilityDynamicReplacements", .{});
-        exe.root_module.linkSystemLibrary("swift_Concurrency", .{});
-        exe.root_module.linkSystemLibrary("swiftUniformTypeIdentifiers", .{});
-        exe.root_module.linkSystemLibrary("swift_StringProcessing", .{});
-        exe.root_module.linkSystemLibrary("swiftDispatch", .{});
-        exe.root_module.linkSystemLibrary("swiftObjectiveC", .{});
-        exe.root_module.linkSystemLibrary("swiftCoreGraphics", .{});
-        exe.root_module.linkSystemLibrary("swiftMetal", .{});
-        exe.root_module.linkSystemLibrary("swiftIOKit", .{});
-        exe.root_module.linkSystemLibrary("swiftXPC", .{});
-        exe.root_module.linkSystemLibrary("swiftDarwin", .{});
-        exe.root_module.linkSystemLibrary("swiftCoreImage", .{});
-        exe.root_module.linkSystemLibrary("swiftQuartzCore", .{});
-        exe.root_module.linkSystemLibrary("swiftOSLog", .{});
-        exe.root_module.linkSystemLibrary("swiftos", .{});
-        exe.root_module.linkSystemLibrary("swiftsimd", .{});
-    }
     b.installArtifact(exe);
 
-    // Run command
+    const clean_step = b.step("clean", "Remove all build artifacts");
+    const remove_swift = b.addRemoveDirTree(.{ .cwd_relative = "zig-out/swift-build" });
+    clean_step.dependOn(&remove_swift.step);
+
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
@@ -194,8 +140,44 @@ fn configureMacOS(
         .cpu => {},
     }
 
-    // Add include path
     exe.root_module.addIncludePath(b.path("src/platform/macos/include"));
+
+    module.linkFramework("AppKit", .{});
+    module.linkFramework("Metal", .{});
+    module.linkFramework("MetalKit", .{});
+    module.linkFramework("QuartzCore", .{});
+    module.linkFramework("CoreGraphics", .{});
+
+    const sys_path = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.sdk/usr/lib/swift/";
+    const other_sys_path = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx";
+    exe.root_module.addLibraryPath(.{ .cwd_relative = sys_path });
+    exe.root_module.addLibraryPath(.{ .cwd_relative = other_sys_path });
+
+    exe.linkSystemLibrary("c++");
+    exe.root_module.linkSystemLibrary("swiftObjectiveC", .{});
+    exe.root_module.linkSystemLibrary("swiftCore", .{});
+    exe.root_module.linkSystemLibrary("swiftAppKit", .{});
+    exe.root_module.linkSystemLibrary("swiftCoreFoundation", .{});
+    exe.root_module.linkSystemLibrary("swiftCompatibilityConcurrency", .{});
+    exe.root_module.linkSystemLibrary("swiftCompatibility50", .{});
+    exe.root_module.linkSystemLibrary("swiftCompatibility51", .{});
+    exe.root_module.linkSystemLibrary("swiftCompatibility56", .{});
+    exe.root_module.linkSystemLibrary("swiftCompatibilityDynamicReplacements", .{});
+    exe.root_module.linkSystemLibrary("swift_Concurrency", .{});
+    exe.root_module.linkSystemLibrary("swiftUniformTypeIdentifiers", .{});
+    exe.root_module.linkSystemLibrary("swift_StringProcessing", .{});
+    exe.root_module.linkSystemLibrary("swiftDispatch", .{});
+    exe.root_module.linkSystemLibrary("swiftObjectiveC", .{});
+    exe.root_module.linkSystemLibrary("swiftCoreGraphics", .{});
+    exe.root_module.linkSystemLibrary("swiftMetal", .{});
+    exe.root_module.linkSystemLibrary("swiftIOKit", .{});
+    exe.root_module.linkSystemLibrary("swiftXPC", .{});
+    exe.root_module.linkSystemLibrary("swiftDarwin", .{});
+    exe.root_module.linkSystemLibrary("swiftCoreImage", .{});
+    exe.root_module.linkSystemLibrary("swiftQuartzCore", .{});
+    exe.root_module.linkSystemLibrary("swiftOSLog", .{});
+    exe.root_module.linkSystemLibrary("swiftos", .{});
+    exe.root_module.linkSystemLibrary("swiftsimd", .{});
 }
 
 fn configureLinux(
@@ -254,29 +236,23 @@ fn buildMacOSSwift(
 
     const config = if (optimize == .Debug) "debug" else "release";
 
-    // Build using Swift Package Manager
+    const swift_scratch = b.fmt("zig-out/swift-build/{s}", .{config});
+
     const swift_build = b.addSystemCommand(&.{
         "swift",          "build",
         "--package-path", "src/platform/macos",
+        "--scratch-path", swift_scratch,
         "-c",             config,
         "--arch",         arch,
     });
     exe.step.dependOn(&swift_build.step);
 
-    // Path to the built library
-    const lib_path = b.fmt("src/platform/macos/.build/{s}/libMacPlatform.a", .{config});
+    const lib_src = b.fmt("{s}/arm64-apple-macosx/{s}/libMacPlatform.a", .{ swift_scratch, config });
+    const lib_dest = "lib/libMacPlatform.a";
 
-    // Link the library
-    module.addObjectFile(b.path(lib_path));
+    const install_lib = b.addInstallFile(.{ .cwd_relative = lib_src }, lib_dest);
+    install_lib.step.dependOn(&swift_build.step);
+    exe.step.dependOn(&install_lib.step);
 
-    // Add include path for bridging header
-    module.addIncludePath(b.path("src/platform/macos/include"));
-
-    // Link required frameworks
-    module.linkFramework("Foundation", .{});
-    module.linkFramework("AppKit", .{});
-    module.linkFramework("Metal", .{});
-    module.linkFramework("MetalKit", .{});
-    module.linkFramework("QuartzCore", .{});
-    module.linkFramework("CoreGraphics", .{});
+    module.addObjectFile(b.path(b.fmt("zig-out/{s}", .{lib_dest})));
 }
