@@ -119,7 +119,17 @@ pub const Renderer = struct {
             .y = 10.0 - (@as(f32, @floatFromInt(sp.y)) * 20.0 / fh),
         };
     }
+
+    pub fn getPixelBufferPtr(self: *const Renderer) ?[*]const u8 {
+        if (build_options.backend == .cpu) {
+            const buffer = self.backend.getRawFrameBuffer();
+            return @ptrCast(buffer.ptr);
+        }
+    }
     pub fn getRawFrameBuffer(self: *const Renderer) ?[]const Color {
-        self.backend.getRawFrameBuffer();
+        if (build_options == .cpu) {
+            return self.backend.getRawFrameBuffer();
+        }
+        return null;
     }
 };

@@ -55,7 +55,6 @@ pub fn clear(self: *CpuRenderer) void {
 
 pub fn setClearColor(self: *CpuRenderer, color: Color) void {
     self.clear_color = color;
-    std.log.debug("[CPUREND] setclearcolor {any}", .{color});
 }
 
 pub fn getRawFrameBuffer(self: *const CpuRenderer) []const Color {

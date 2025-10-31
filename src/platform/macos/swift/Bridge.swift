@@ -1,28 +1,29 @@
 import AppKit
 import Foundation
+
 @MainActor
 private var appDelegate: AppDelegate?
 @MainActor
 private var activeWindows: [OpaquePointer: GameWindow] = [:]
 
 @MainActor
-@_cdecl("platform_init")
-public func platform_init() {
+@_cdecl("init")
+public func _init() {
   NSApplication.shared.setActivationPolicy(.regular)
   appDelegate = AppDelegate()
   NSApp.delegate = appDelegate
 }
 
 @MainActor
-@_cdecl("platform_deinit")
-public func platform_deinit() {
+@_cdecl("deinit")
+public func _deinit() {
   activeWindows.removeAll()
   NSApp.terminate(nil)
 }
 
 @MainActor
-@_cdecl("platform_create_window")
-public func platform_create_window(
+@_cdecl("create_window")
+public func create_window(
   width: Int32,
   height: Int32,
   title: UnsafePointer<CChar>?
@@ -44,15 +45,15 @@ public func platform_create_window(
 }
 
 @MainActor
-@_cdecl("platform_destroy_window")
-public func platform_destroy_window(window: OpaquePointer?) {
+@_cdecl("destroy_window")
+public func destroy_window(window: OpaquePointer?) {
   guard let window = window else { return }
   activeWindows.removeValue(forKey: window)
 }
 
 @MainActor
-@_cdecl("platform_window_should_close")
-public func platform_window_should_close(window: OpaquePointer?) -> Bool {
+@_cdecl("window_should_close")
+public func window_should_close(window: OpaquePointer?) -> Bool {
   guard let window = window,
     let gameWindow = activeWindows[window]
   else { return true }
@@ -60,8 +61,8 @@ public func platform_window_should_close(window: OpaquePointer?) -> Bool {
 }
 
 @MainActor
-@_cdecl("platform_poll_events")
-public func platform_poll_events() {
+@_cdecl("poll_events")
+public func poll_events() {
   while let event = NSApp.nextEvent(
     matching: .any, until: nil, inMode: .default, dequeue: true
   ) {
@@ -70,8 +71,24 @@ public func platform_poll_events() {
 }
 
 @MainActor
-@_cdecl("platform_swap_buffers")
-public func platform_swap_buffers(window: OpaquePointer?) {
+@_cdecl("set_pixel_buffer")
+public func set_pixel_buffer(
+  window: OpaquePointer?,
+  pixels: UnsafePointer<UInt8>?,
+  width: Int32,
+  height: Int32,
+) {
+  guard let window = window,
+    let gameWindow = activeWindows[window],
+    let pixels = pixels
+  else { return }
+
+  gameWindow.setPixelBuffer(pixels: pixels, width: Int(width), height: Int(height))
+}
+
+@MainActor
+@_cdecl("swap_buffers")
+public func swap_buffers(window: OpaquePointer?) {
   guard let window = window,
     let gameWindow = activeWindows[window]
   else { return }

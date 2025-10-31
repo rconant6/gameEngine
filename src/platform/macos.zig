@@ -19,27 +19,27 @@ pub const Window = struct {
     handle: c.WindowHandle,
 
     pub fn deinit(self: *Window) void {
-        c.platform_destroy_window(self.handle);
+        c.destroy_window(self.handle);
     }
 
     pub fn shouldClose(self: *const Window) bool {
-        return c.platform_window_should_close(self.handle);
+        return c.window_should_close(self.handle);
     }
 
     pub fn swapBuffers(self: *Window) void {
-        c.platform_swap_buffers(self.handle);
+        c.swap_buffers(self.handle);
     }
 };
 
 pub fn init() !void {
-    c.platform_init();
+    c.init();
 }
 pub fn deinit() void {
-    c.platform_deinit();
+    c.deinit();
 }
 
 pub fn createWindow(options: WindowConfig) !*Window {
-    const handle = c.platform_create_window(
+    const handle = c.create_window(
         @intCast(options.width),
         @intCast(options.height),
         options.title.ptr,
@@ -55,8 +55,17 @@ pub fn createWindow(options: WindowConfig) !*Window {
     return window;
 }
 
+pub fn setPixelBuffer(window: *Window, pixels: []const u8, width: u32, height: u32) void {
+    set_pixel_buffer(
+        window.handle,
+        pixels.ptr,
+        @intCast(width),
+        @intCast(height),
+    );
+}
+
 pub fn pollEvent() ?Event {
-    _ = c.platform_poll_events();
+    _ = c.poll_events();
     return null;
 }
 pub fn waitEvent() Event {
@@ -156,6 +165,10 @@ pub fn saveFileDialog(
     _ = title;
     return null;
 }
-export fn engine_frame_callback(delta_time: f64) void {
-    _ = delta_time;
-}
+
+extern fn set_pixel_buffer(
+    window: c.WindowHandle,
+    pixels: [*]const u8,
+    width: i32,
+    height: i32,
+) void;

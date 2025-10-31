@@ -11,16 +11,16 @@ pub fn main() !void {
     };
     defer game.deinit();
 
-    // const player = engine.Circle{
-    //     .origin = .{ .x = 0, .y = 0 },
-    //     .radius = 0.5,
-    //     .fill_color = engine.Colors.RED,
-    // };
+    const player = engine.Circle{
+        .origin = .{ .x = 0, .y = 0 },
+        .radius = 0.5,
+        .fill_color = engine.Colors.RED,
+    };
 
     while (!game.shouldClose()) {
         try game.beginFrame();
-        game.clear(engine.Colors.RED);
-        // game.drawCircle(player);
+        game.clear(engine.Colors.DARK_GRAY);
+        game.drawCircle(player);
         try game.endFrame();
     }
 }

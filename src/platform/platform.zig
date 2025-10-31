@@ -200,6 +200,9 @@ pub fn deinit() void {
 pub fn createWindow(config: WindowConfig) !*Window {
     return try PlatformImpl.createWindow(config);
 }
+pub fn setPixelBuffer(window: *Window, pixels: []const u8, width: u32, height: u32) void {
+    PlatformImpl.setPixelBuffer(window, pixels, width, height);
+}
 
 pub fn pollEvent() ?Event {
     return PlatformImpl.pollEvent();

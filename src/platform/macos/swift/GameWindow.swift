@@ -3,6 +3,9 @@ import AppKit
 class GameWindow: NSWindow {
   var shouldClose = false
   private var gameView: GameView?
+  private var pixelBuffer: UnsafePointer<UInt8>?
+  private var pixelWidth: Int = 0
+  private var pixelHeight: Int = 0
 
   init(width: Int, height: Int, title: String) {
     let contentRect = NSRect(
@@ -24,6 +27,13 @@ class GameWindow: NSWindow {
     self.contentView = gameView
 
     self.delegate = self
+  }
+
+  func setPixelBuffer(pixels: UnsafePointer<UInt8>, width: Int, height: Int) {
+    self.pixelBuffer = pixels
+    self.pixelWidth = width
+    self.pixelHeight = height
+    gameView?.setPixelBuffer(pixels, width: width, height: height)
   }
 
   func swapBuffers() {

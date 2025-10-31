@@ -25,11 +25,13 @@ pub const Engine = struct {
 
     pub fn init(allocator: std.mem.Allocator, title: []const u8, width: u32, height: u32) !Engine {
         try platform.init();
+
         const window = try platform.createWindow(.{
             .title = title,
             .width = width,
             .height = height,
         });
+
         const rend = try renderer.Renderer.init(
             allocator,
             .{
@@ -38,18 +40,23 @@ pub const Engine = struct {
                 .native_handle = window.handle,
             },
         );
-        std.log.debug("post window and renderer init", .{});
-        const engine: Engine = .{
+
+        if (rend.getPixelBufferPtr()) |pixels| {
+            const total_bytes = width * height * 4;
+            platform.setPixelBuffer(
+                window,
+                pixels[0..total_bytes],
+                width,
+                height,
+            );
+        }
+
+        return .{
             .allocator = allocator,
             .renderer = rend,
             .window = window.*,
             .running = true,
         };
-
-        std.log.debug("return struct constructed", .{});
-
-        std.log.debug("returning", .{});
-        return engine;
     }
 
     pub fn deinit(self: *Engine) void {
@@ -58,7 +65,6 @@ pub const Engine = struct {
     }
 
     pub fn shouldClose(self: *const Engine) bool {
-        std.log.debug("engine.shouldClose\n", .{});
         return !self.running or self.window.shouldClose();
     }
 
