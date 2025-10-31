@@ -1,4 +1,4 @@
 .zig-cache
-.DS_Store/
+src/*.DS_Store/
 zig-out
 src/platform/macos/.build

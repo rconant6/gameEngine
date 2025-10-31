@@ -1,22 +1,26 @@
 const std = @import("std");
-const platform = @import("platform");
+const engine = @import("api");
 
 pub fn main() !void {
-    try platform.init();
-    defer platform.deinit();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
 
-    const window = try platform.createWindow(.{
-        .title = "Game Engine",
-        .width = 1280,
-        .height = 720,
-    });
-    defer window.destroy();
+    var game = engine.Engine.init(gpa.allocator(), "My Game", 800, 600) catch |err| {
+        std.debug.print("[MAIN] engine failed to initialize: {any}", .{err});
+        std.process.exit(2);
+    };
+    defer game.deinit();
 
-    while (!window.shouldClose()) {
-        platform.pollEvents();
+    // const player = engine.Circle{
+    //     .origin = .{ .x = 0, .y = 0 },
+    //     .radius = 0.5,
+    //     .fill_color = engine.Colors.RED,
+    // };
 
-        // Game shit
-
-        window.swapBuffers();
+    while (!game.shouldClose()) {
+        try game.beginFrame();
+        game.clear(engine.Colors.RED);
+        // game.drawCircle(player);
+        try game.endFrame();
     }
 }

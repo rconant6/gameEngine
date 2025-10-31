@@ -40,12 +40,7 @@ pub fn build(b: *std.Build) void {
 
     // Platform module
     const platform_module = b.addModule("platform", .{
-        .root_source_file = switch (target.result.os.tag) {
-            .macos => b.path("src/platform/macos.zig"),
-            .linux => b.path("src/platform/linux.zig"),
-            .windows => b.path("src/platform/windows.zig"),
-            else => @panic("Unsupported OS"),
-        },
+        .root_source_file = b.path("src/platform/platform.zig"),
     });
     platform_module.addIncludePath(b.path("src/platform/macos/swift/include"));
 
