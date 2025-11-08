@@ -74,7 +74,7 @@ public func poll_events() {
 @_cdecl("set_pixel_buffer")
 public func set_pixel_buffer(
   window: OpaquePointer?,
-  pixels: UnsafePointer<UInt8>?,
+  pixels: UnsafeMutablePointer<UInt8>?,
   width: Int32,
   height: Int32,
 ) {
@@ -83,7 +83,7 @@ public func set_pixel_buffer(
     let pixels = pixels
   else { return }
 
-  gameWindow.setPixelBuffer(pixels: pixels, width: Int(width), height: Int(height))
+  gameWindow.setPixelBuffer(buffer: pixels, width: Int(width), height: Int(height))
 }
 
 @MainActor

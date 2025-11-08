@@ -1,9 +1,10 @@
 import AppKit
+import MetalKit
 
 class GameWindow: NSWindow {
   var shouldClose = false
-  private var gameView: GameView?
-  private var pixelBuffer: UnsafePointer<UInt8>?
+  private var metalRenderer: MetalDisplayRenderer? = nil
+  private var pixelBuffer: UnsafeMutablePointer<UInt8>? = nil
   private var pixelWidth: Int = 0
   private var pixelHeight: Int = 0
 
@@ -23,21 +24,30 @@ class GameWindow: NSWindow {
     self.title = title
     self.center()
 
-    gameView = GameView(frame: contentRect)
-    self.contentView = gameView
-
-    self.delegate = self
+    let metalView = MTKView(frame: contentRect)
+    metalView.layer?.contentsScale = 1.0
+    metalView.isPaused = true
+    metalView.enableSetNeedsDisplay = true
+    self.contentView = metalView
   }
 
-  func setPixelBuffer(pixels: UnsafePointer<UInt8>, width: Int, height: Int) {
-    self.pixelBuffer = pixels
-    self.pixelWidth = width
-    self.pixelHeight = height
-    gameView?.setPixelBuffer(pixels, width: width, height: height)
+  func setPixelBuffer(buffer: UnsafeMutablePointer<UInt8>?, width: Int, height: Int) {
+    guard let metalView = self.contentView as? MTKView else { return }
+    guard let pixels = buffer else { return }
+
+    metalRenderer = MetalDisplayRenderer(
+      view: metalView,
+      pixelBufferPointer: pixels,
+      width: width,
+      height: height,
+    )
+
+    metalView.delegate = metalRenderer
+    metalView.device = metalRenderer?.device
   }
 
   func swapBuffers() {
-    gameView?.needsDisplay = true
+    self.contentView?.needsDisplay = true
   }
 }
 

@@ -170,6 +170,8 @@ fn configureMacOS(
     exe.root_module.linkSystemLibrary("swiftObjectiveC", .{});
     exe.root_module.linkSystemLibrary("swiftCoreGraphics", .{});
     exe.root_module.linkSystemLibrary("swiftMetal", .{});
+    exe.root_module.linkSystemLibrary("swiftMetalKit", .{});
+    exe.root_module.linkSystemLibrary("swiftModelIO", .{});
     exe.root_module.linkSystemLibrary("swiftIOKit", .{});
     exe.root_module.linkSystemLibrary("swiftXPC", .{});
     exe.root_module.linkSystemLibrary("swiftDarwin", .{});
