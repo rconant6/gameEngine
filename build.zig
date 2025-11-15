@@ -247,7 +247,10 @@ fn buildMacOSSwift(
         "-c",             config,
         "--arch",         arch,
     });
+
+    const swift_clean = b.addSystemCommand(&.{ "rm", "-rf", "./src/platform/macos/.build/" });
     exe.step.dependOn(&swift_build.step);
+    exe.step.dependOn(&swift_clean.step);
 
     const lib_src = b.fmt("{s}/arm64-apple-macosx/{s}/libMacPlatform.a", .{ swift_scratch, config });
     const lib_dest = "lib/libMacPlatform.a";
