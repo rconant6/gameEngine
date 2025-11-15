@@ -32,22 +32,31 @@ pub const Engine = struct {
             .height = height,
         });
 
+        const scale_factor = platform.getWindowScaleFactor(window);
+
+        const f_width: f32 = @floatFromInt(width);
+        const f_height: f32 = @floatFromInt(height);
+
+        const scaled_width: u32 = @intFromFloat(f_width * scale_factor);
+        const scaled_height: u32 = @intFromFloat(f_height * scale_factor);
+
+        std.log.info("Scaled width: {d} Scaled height: {d}", .{ scaled_width, scaled_height });
         const rend = try renderer.Renderer.init(
             allocator,
             .{
-                .width = width,
-                .height = height,
+                .width = scaled_width,
+                .height = scaled_height,
                 .native_handle = window.handle,
             },
         );
 
         if (rend.getPixelBufferPtr()) |pixels| {
-            const total_bytes = width * height * 4;
+            const total_bytes: usize = scaled_width * scaled_height * 4;
             platform.setPixelBuffer(
                 window,
                 pixels[0..total_bytes],
-                width,
-                height,
+                scaled_width,
+                scaled_height,
             );
         }
 

@@ -61,6 +61,16 @@ public func window_should_close(window: OpaquePointer?) -> Bool {
 }
 
 @MainActor
+@_cdecl("get_window_scale_factor")
+public func get_window_get_scale_factor(window: OpaquePointer?) -> Float {
+  guard let window = window,
+    let gameWindow = activeWindows[window]
+  else { return 3.0 }
+
+  return Float(gameWindow.backingScaleFactor)
+}
+
+@MainActor
 @_cdecl("poll_events")
 public func poll_events() {
   while let event = NSApp.nextEvent(

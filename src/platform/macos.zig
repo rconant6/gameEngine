@@ -121,8 +121,7 @@ pub fn getDisplays(allocator: std.mem.Allocator) ![]DisplayInfo {
 }
 
 pub fn getWindowScaleFactor(window: *Window) f32 {
-    _ = window;
-    return 1.0;
+    return c.get_window_scale_factor(window.handle);
 }
 
 pub fn getClipboardText(allocator: std.mem.Allocator) ![]const u8 {
