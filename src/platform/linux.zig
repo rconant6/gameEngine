@@ -8,51 +8,15 @@ const KeyModifiers = plat.KeyModifiers;
 const MouseButton = plat.MouseButton;
 const WindowConfig = plat.WindowConfig;
 
-// TODO: MacOS keymapping map?
+pub const Window = struct {};
 
-pub const Window = struct {
-    handle: c.WindowHandle,
+pub fn init() !void {}
+pub fn deinit() void {}
 
-    pub fn deinit(self: *Window) void {
-        c.platform_destroy_window(self.handle);
-    }
-
-    pub fn shouldClose(self: *const Window) bool {
-        return c.platform_window_should_close(self.handle);
-    }
-
-    pub fn swapBuffers(self: *Window) void {
-        c.platform_swap_buffers(self.handle);
-    }
-};
-
-pub fn init() !void {
-    c.platform_init();
-}
-pub fn deinit() void {
-    c.platform_deinit();
-}
-
-pub fn createWindow(options: WindowConfig) !*Window {
-    const handle = c.platform_create_window(
-        @intCast(options.width),
-        @intCast(options.height),
-        options.title.ptr,
-    );
-
-    if (handle == null) {
-        return error.WindowCreationFailed;
-    }
-
-    const window = try std.heap.c_allocator.create(Window);
-    window.* = Window{ .handle = handle };
-
-    return window;
-}
+pub fn createWindow(options: WindowConfig) !*Window {}
 
 pub fn pollEvent() ?Event {
-    _ = c.platform_poll_events();
-    return null;
+    return Null;
 }
 pub fn waitEvent() Event {
     return .NullEvent;
