@@ -51,7 +51,7 @@ pub const Engine = struct {
         );
 
         if (rend.getPixelBufferPtr()) |pixels| {
-            const total_bytes: usize = scaled_width * scaled_height * 4;
+            const total_bytes: usize = scaled_width * scaled_height * 4 * 3;
             platform.setPixelBuffer(
                 window,
                 pixels[0..total_bytes],
@@ -83,7 +83,8 @@ pub const Engine = struct {
     }
     pub fn endFrame(self: *Engine) !void {
         try self.renderer.endFrame();
-        self.window.swapBuffers();
+        const offset = self.renderer.getDisplayBufferOffset();
+        self.window.swapBuffers(offset);
     }
 
     pub fn clear(self: *Engine, color: Color) void {

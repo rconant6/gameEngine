@@ -203,6 +203,9 @@ pub fn createWindow(config: WindowConfig) !*Window {
 pub fn setPixelBuffer(window: *Window, pixels: []const u8, width: u32, height: u32) void {
     PlatformImpl.setPixelBuffer(window, pixels, width, height);
 }
+pub fn swapBuffers(window: *Window, offset: u32) void {
+    PlatformImpl.swapBuffers(window, offset);
+}
 
 pub fn pollEvent() ?Event {
     return PlatformImpl.pollEvent();

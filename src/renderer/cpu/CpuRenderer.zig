@@ -46,7 +46,7 @@ pub fn beginFrame(self: *CpuRenderer) !void {
 }
 
 pub fn endFrame(self: *CpuRenderer) !void {
-    self.frame_buffer.swapBuffers();
+    self.frame_buffer.rotateBuffers();
 }
 
 pub fn clear(self: *CpuRenderer) void {
@@ -58,7 +58,11 @@ pub fn setClearColor(self: *CpuRenderer, color: Color) void {
 }
 
 pub fn getRawFrameBuffer(self: *const CpuRenderer) []const Color {
-    return self.frame_buffer.frontBuffer;
+    return self.frame_buffer.bufferMemory;
+}
+
+pub fn getDisplayBufferOffset(self: *const CpuRenderer) u32 {
+    return self.frame_buffer.getDisplayBufferOffset();
 }
 
 pub fn drawShape(

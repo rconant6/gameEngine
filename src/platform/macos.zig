@@ -11,6 +11,7 @@ const Event = plat.Event;
 const Key = plat.Key;
 const KeyModifiers = plat.KeyModifiers;
 const MouseButton = plat.MouseButton;
+const PlatformImpl = plat.PlatformImpl;
 const WindowConfig = plat.WindowConfig;
 
 // TODO: MacOS keymapping map?
@@ -26,13 +27,13 @@ pub const Window = struct {
         return c.window_should_close(self.handle);
     }
 
-    pub fn swapBuffers(self: *Window) void {
-        c.swap_buffers(self.handle);
+    pub fn swapBuffers(self: *const Window, offset: u32) void {
+        c.swap_buffers(self.handle, offset);
     }
 };
 
 pub fn init() !void {
-    c.init();
+    return c.init();
 }
 pub fn deinit() void {
     c.deinit();
@@ -59,6 +60,7 @@ pub fn setPixelBuffer(window: *Window, pixels: []const u8, width: u32, height: u
     set_pixel_buffer(
         window.handle,
         pixels.ptr,
+        pixels.len,
         @intCast(width),
         @intCast(height),
     );
@@ -168,6 +170,9 @@ pub fn saveFileDialog(
 extern fn set_pixel_buffer(
     window: c.WindowHandle,
     pixels: [*]const u8,
+    buffer_length: usize,
     width: i32,
     height: i32,
 ) void;
+
+extern fn swap_buffers(window: c.WindowHandle, offset: usize) void;

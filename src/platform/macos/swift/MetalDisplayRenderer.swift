@@ -5,10 +5,12 @@ class MetalDisplayRenderer: NSObject, MTKViewDelegate {
   private let commandQueue: MTLCommandQueue
   private let texture: MTLTexture
   private let wrappedBuffer: MTLBuffer
+  private var offset: UInt32 = 0
 
   public init?(
     view: MTKView,
     pixelBufferPointer: UnsafeMutableRawPointer,
+    pixelBufferLen: Int,
     width: Int,
     height: Int,
   ) {
@@ -18,11 +20,10 @@ class MetalDisplayRenderer: NSObject, MTKViewDelegate {
     guard let queue = device.makeCommandQueue() else { return nil }
     self.commandQueue = queue
 
-    let length = width * height * 4
     guard
       let buffer = device.makeBuffer(
         bytesNoCopy: pixelBufferPointer,
-        length: length,
+        length: pixelBufferLen,
         options: .storageModeShared,
         deallocator: nil)
     else { return nil }
@@ -31,7 +32,7 @@ class MetalDisplayRenderer: NSObject, MTKViewDelegate {
     let descriptor = MTLTextureDescriptor()
     descriptor.pixelFormat = .rgba8Unorm
     descriptor.width = width
-    descriptor.height = height
+    descriptor.height = height * 3
     descriptor.usage = .shaderRead
     descriptor.storageMode = .shared
 
@@ -45,24 +46,29 @@ class MetalDisplayRenderer: NSObject, MTKViewDelegate {
 
     super.init()
 
+    print("Buffer size: \(pixelBufferLen) bytes")
+    print("Texture dimensions: \(descriptor.width)×\(descriptor.height)")
+    print("Expected to see: \(pixelBufferLen / 4) pixels")
+    print("Texture sees: \(descriptor.width * descriptor.height) pixels")
+  }
+
+  public func setOffset(_ offset: UInt32) {
+    self.offset = offset
   }
 
   public func draw(in view: MTKView) {
-
     guard let drawable = view.currentDrawable,
       let commandBuffer = commandQueue.makeCommandBuffer(),
       let encoder = commandBuffer.makeBlitCommandEncoder()
     else { return }
 
-    // TODO: need to get the right scale factor for the display back to the engine
-    // print("Texture size: \(texture.width)×\(texture.height)")
-    // print("Drawable size: \(drawable.texture.width)×\(drawable.texture.height)")
-    // print("View size: \(view.bounds.size)")
+    let sourceY = (Int(offset) / 4) / self.texture.width
+
     encoder.copy(
       from: self.texture,
       sourceSlice: 0,
       sourceLevel: 0,
-      sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
+      sourceOrigin: MTLOrigin(x: 0, y: sourceY, z: 0),
       sourceSize: MTLSize(width: texture.width, height: texture.height, depth: 1),
       to: drawable.texture,
       destinationSlice: 0,

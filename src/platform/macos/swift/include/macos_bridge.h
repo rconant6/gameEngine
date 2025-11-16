@@ -14,7 +14,7 @@ void destroy_window(WindowHandle window);
 float get_window_scale_factor(WindowHandle window);
 bool window_should_close(WindowHandle window);
 void poll_events();
-void swap_buffers(WindowHandle window);
+void swap_buffers(WindowHandle window, uint32_t offest);
 void set_pixel_buffer(WindowHandle window, void *pixels, uint32_t width,
                       uint32_t height);
 

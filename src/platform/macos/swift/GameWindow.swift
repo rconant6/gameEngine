@@ -31,13 +31,15 @@ class GameWindow: NSWindow {
     self.contentView = metalView
   }
 
-  func setPixelBuffer(buffer: UnsafeMutablePointer<UInt8>?, width: Int, height: Int) {
+  func setPixelBuffer(buffer: UnsafeMutablePointer<UInt8>?, bufferLen: Int, width: Int, height: Int)
+  {
     guard let metalView = self.contentView as? MTKView else { return }
     guard let pixels = buffer else { return }
 
     metalRenderer = MetalDisplayRenderer(
       view: metalView,
       pixelBufferPointer: pixels,
+      pixelBufferLen: bufferLen,
       width: width,
       height: height,
     )
@@ -46,7 +48,8 @@ class GameWindow: NSWindow {
     metalView.device = metalRenderer?.device
   }
 
-  func swapBuffers() {
+  func swapBuffers(toOffset offset: UInt32) {
+    metalRenderer?.setOffset(offset)
     self.contentView?.needsDisplay = true
   }
 }

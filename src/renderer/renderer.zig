@@ -127,8 +127,14 @@ pub const Renderer = struct {
         }
     }
     pub fn getRawFrameBuffer(self: *const Renderer) ?[]const Color {
-        if (build_options == .cpu) {
+        if (build_options.backend == .cpu) {
             return self.backend.getRawFrameBuffer();
+        }
+        return null;
+    }
+    pub fn getDisplayBufferOffset(self: *const Renderer) u32 {
+        if (build_options.backend == .cpu) {
+            return self.backend.getDisplayBufferOffset();
         }
         return null;
     }
