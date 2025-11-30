@@ -83,7 +83,7 @@ pub const Engine = struct {
     }
     pub fn endFrame(self: *Engine) !void {
         try self.renderer.endFrame();
-        const offset = self.renderer.getDisplayBufferOffset();
+        const offset = self.renderer.getDisplayBufferOffset() orelse 0;
         self.window.swapBuffers(offset);
     }
 

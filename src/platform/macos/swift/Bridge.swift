@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import MetalKit
 
 @MainActor
 private var appDelegate: AppDelegate?
@@ -105,4 +106,16 @@ public func swap_buffers(window: OpaquePointer?, offset: UInt32) {
     let gameWindow = activeWindows[window]
   else { return }
   gameWindow.swapBuffers(toOffset: offset)
+}
+
+@MainActor
+@_cdecl("get_metal_layer")
+public func get_metal_layer(window: OpaquePointer?) -> UnsafeMutableRawPointer? {
+  guard let window = window,
+    let gameWindow = activeWindows[window],
+    let metalView = gameWindow.contentView as? MTKView,
+    let layer = metalView.layer as? CAMetalLayer
+  else { return nil }
+
+  return Unmanaged.passUnretained(layer).toOpaque()
 }
