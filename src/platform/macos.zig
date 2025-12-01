@@ -117,6 +117,10 @@ pub fn getNativeWindowHandle(window: *Window) *anyopaque {
 //     return PlatformImpl.getNativeHandles(window);
 // }
 
+pub fn getMetalLayer(window: *Window) ?*anyopaque {
+    return c.get_metal_layer(window.handle);
+}
+
 pub fn getDisplays(allocator: std.mem.Allocator) ![]DisplayInfo {
     _ = allocator;
     return std.Error.NotImplemented;

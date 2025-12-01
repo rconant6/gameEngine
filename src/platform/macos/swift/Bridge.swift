@@ -113,8 +113,7 @@ public func swap_buffers(window: OpaquePointer?, offset: UInt32) {
 public func get_metal_layer(window: OpaquePointer?) -> UnsafeMutableRawPointer? {
   guard let window = window,
     let gameWindow = activeWindows[window],
-    let metalView = gameWindow.contentView as? MTKView,
-    let layer = metalView.layer as? CAMetalLayer
+    let layer = gameWindow.getMetalLayer()
   else { return nil }
 
   return Unmanaged.passUnretained(layer).toOpaque()

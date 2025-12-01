@@ -3,6 +3,8 @@ const core = @import("core");
 const renderer = @import("renderer");
 const platform = @import("platform");
 
+const build_options = @import("build_options");
+
 pub const V2 = core.V2;
 pub const V2I = core.V2I;
 
@@ -50,14 +52,16 @@ pub const Engine = struct {
             },
         );
 
-        if (rend.getPixelBufferPtr()) |pixels| {
-            const total_bytes: usize = scaled_width * scaled_height * 4 * 3;
-            platform.setPixelBuffer(
-                window,
-                pixels[0..total_bytes],
-                scaled_width,
-                scaled_height,
-            );
+        if (build_options.backend == .cpu) {
+            if (rend.getPixelBufferPtr()) |pixels| {
+                const total_bytes: usize = scaled_width * scaled_height * 4 * 3;
+                platform.setPixelBuffer(
+                    window,
+                    pixels[0..total_bytes],
+                    scaled_width,
+                    scaled_height,
+                );
+            }
         }
 
         return .{
@@ -83,8 +87,10 @@ pub const Engine = struct {
     }
     pub fn endFrame(self: *Engine) !void {
         try self.renderer.endFrame();
-        const offset = self.renderer.getDisplayBufferOffset() orelse 0;
-        self.window.swapBuffers(offset);
+        if (build_options.backend == .cpu) {
+            const offset = self.renderer.getDisplayBufferOffset() orelse 0;
+            self.window.swapBuffers(offset);
+        }
     }
 
     pub fn clear(self: *Engine, color: Color) void {

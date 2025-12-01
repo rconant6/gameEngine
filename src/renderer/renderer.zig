@@ -29,7 +29,7 @@ pub const RenderContext = @import("RenderContext.zig");
 const CpuRenderer = if (build_options.backend == .cpu)
     @import("./cpu/CpuRenderer.zig");
 const MetalRenderer = if (build_options.backend == .metal)
-    @import("./gpu/metal/metal_renderer.zig").MetalRenderer
+    @import("./gpu/metal/MetalRenderer.zig")
 else
     void;
 const VulkanRenderer = if (build_options.backend == .vulkan)
@@ -40,15 +40,6 @@ const OpenGLRenderer = if (build_options.backend == .opengl)
     @import("./gpu/opengl/opengl_renderer.zig").OpenGLRenderer
 else
     unreachable;
-
-// pub const ShapeData = union(enum) {
-//     Circle: Circle,
-//     Ellipse: Ellipse,
-//     Line: Line,
-//     Rectangle: Rectangle,
-//     Triangle: Triangle,
-//     Polygon: Polygon,
-// };
 
 pub const RendererConfig = struct {
     width: u32,
@@ -72,7 +63,10 @@ pub const Renderer = struct {
     };
 
     pub fn init(allocator: std.mem.Allocator, config: RendererConfig) !Renderer {
-        const backend = try BackendImpl.init(allocator, config.width, config.height);
+        const backend = BackendImpl.init(allocator, config) catch |err| {
+            std.log.err("Unable to create a rendering backend {any}\n", .{err});
+            return err;
+        };
         return .{
             .backend = backend,
             .width = config.width,

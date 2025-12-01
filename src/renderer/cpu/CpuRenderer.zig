@@ -1,5 +1,6 @@
 const std = @import("std");
 const shapes = @import("../../renderer/shapes.zig");
+const RenderConfig = @import("../../renderer/renderer.zig").RendererConfig;
 const Circle = shapes.Circle;
 const Color = @import("../color.zig").Color;
 const Ellipse = shapes.Ellipse;
@@ -26,15 +27,19 @@ fh: f32,
 allocator: std.mem.Allocator,
 clear_color: Color,
 
-pub fn init(allocator: std.mem.Allocator, width: u32, height: u32) !CpuRenderer {
-    const frame_buffer = try FrameBuffer.init(allocator, width, height);
+pub fn init(allocator: std.mem.Allocator, config: RenderConfig) !CpuRenderer {
+    const frame_buffer = try FrameBuffer.init(
+        allocator,
+        config.width,
+        config.height,
+    );
 
     return CpuRenderer{
         .frame_buffer = frame_buffer,
-        .width = width,
-        .height = height,
-        .fw = @floatFromInt(width),
-        .fh = @floatFromInt(height),
+        .width = config.width,
+        .height = config.height,
+        .fw = @floatFromInt(config.width),
+        .fh = @floatFromInt(config.height),
         .allocator = allocator,
         .clear_color = Color.init(0, 0, 0, 1),
     };

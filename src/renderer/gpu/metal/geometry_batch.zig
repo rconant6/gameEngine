@@ -10,6 +10,7 @@ const Circle = rend.Circle;
 const Rectangle = rend.Rectangle;
 const Triangle = rend.Triangle;
 const Line = rend.Line;
+const Ellipse = rend.Ellipse;
 const Polygon = rend.Polygon;
 const core = @import("core");
 const GamePoint = core.GamePoint;
@@ -30,7 +31,7 @@ pub const GeometryBatch = struct {
     pub fn init(allocator: std.mem.Allocator) GeometryBatch {
         return .{
             .vertices = .empty,
-            .draw_call = .empty,
+            .draw_calls = .empty,
             .allocator = allocator,
         };
     }
@@ -126,7 +127,7 @@ pub const GeometryBatch = struct {
     }
     fn addRectangle(
         self: *GeometryBatch,
-        shape: ShapeData,
+        shape: Rectangle,
         transform: ?Transform,
         ctx: *const RenderContext,
     ) !void {
@@ -137,7 +138,7 @@ pub const GeometryBatch = struct {
     }
     fn addCircle(
         self: *GeometryBatch,
-        shape: ShapeData,
+        shape: Circle,
         transform: ?Transform,
         ctx: *const RenderContext,
     ) !void {
@@ -148,7 +149,7 @@ pub const GeometryBatch = struct {
     }
     fn addEllipse(
         self: *GeometryBatch,
-        shape: ShapeData,
+        shape: Ellipse,
         transform: ?Transform,
         ctx: *const RenderContext,
     ) !void {

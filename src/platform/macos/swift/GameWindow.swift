@@ -52,6 +52,14 @@ class GameWindow: NSWindow {
     metalRenderer?.setOffset(offset)
     self.contentView?.needsDisplay = true
   }
+
+  public func getMetalLayer() -> CAMetalLayer? {
+    guard let metalView = self.contentView as? MTKView,
+      let metalLayer = metalView.layer as? CAMetalLayer
+    else { return nil }
+
+    return metalLayer
+  }
 }
 
 extension GameWindow: NSWindowDelegate {
