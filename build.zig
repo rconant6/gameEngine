@@ -32,7 +32,9 @@ pub fn build(b: *std.Build) void {
     const renderer_options = b.addOptions();
     renderer_options.addOption(RendererBackend, "backend", selected_renderer);
     renderer_options.addOption(bool, "enable_validation", enable_validation);
-    renderer_module.addImport("build_options", renderer_options.createModule());
+
+    const build_options_module = renderer_options.createModule();
+    renderer_module.addImport("build_options", build_options_module);
 
     const platform_module = b.addModule("platform", .{
         .root_source_file = b.path("src/platform/platform.zig"),
@@ -45,6 +47,7 @@ pub fn build(b: *std.Build) void {
     api_module.addImport("core", core_module);
     api_module.addImport("platform", platform_module);
     api_module.addImport("renderer", renderer_module);
+    api_module.addImport("build_options", build_options_module);
 
     const main_module = b.addModule("main", .{
         .root_source_file = b.path("src/main.zig"),
