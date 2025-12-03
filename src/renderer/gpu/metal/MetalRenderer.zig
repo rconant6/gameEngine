@@ -1,19 +1,23 @@
 const std = @import("std");
-const types = @import("metal_types.zig");
+const metal = @import("metal_types.zig");
 const bridge = @import("metal_bridge.zig");
+const BridgeError = bridge.BridgeError;
 const MetalBridge = bridge.MetalBridge;
 const GeometryBatch = @import("geometry_batch.zig").GeometryBatch;
 
-const MTLDevice = types.MTLDevice;
-const MTLCommandQueue = types.MTLCommandQueue;
-const MTLCommandBuffer = types.MTLCommandBuffer;
-const CAMetalLayer = types.CAMetalLayer;
-const CAMetalDrawable = types.CAMetalDrawable;
-const MTLRenderPipelineState = types.MTLRenderPipelineState;
-const MTLBuffer = types.MTLBuffer;
-const MTLLibrary = types.MTLLibrary;
-const MTLPixelFormat = types.MTLPixelFormat;
-const ClearColor = types.ClearColor;
+const MTLDevice = metal.MTLDevice;
+const MTLCommandQueue = metal.MTLCommandQueue;
+const MTLCommandBuffer = metal.MTLCommandBuffer;
+const CAMetalLayer = metal.CAMetalLayer;
+const CAMetalDrawable = metal.CAMetalDrawable;
+const MTLRenderPipelineState = metal.MTLRenderPipelineState;
+const MTLBuffer = metal.MTLBuffer;
+const MTLLibrary = metal.MTLLibrary;
+const MTLPixelFormat = metal.MTLPixelFormat;
+const ClearColor = metal.ClearColor;
+const Vertex = metal.Vertex;
+const MTLResourceOptions = metal.MTLResourceOptions;
+const MTLError = metal.MetalError;
 
 const Color = @import("../../color.zig").Color;
 const shapes = @import("../../shapes.zig");
@@ -45,39 +49,71 @@ last_frame_time: f64,
 
 allocator: std.mem.Allocator,
 
-pub fn init(allocator: std.mem.Allocator, config: RenderConfig) !Self {
+pub fn init(allocator: std.mem.Allocator, config: RenderConfig) (MTLError || std.mem.Allocator.Error)!Self {
     const layer = try MetalBridge.getLayerFromView(config.native_handle.?);
+    const device = try MetalBridge.createDevice();
+    const queue = try MetalBridge.createCommandQueue(device);
+    const pipeline_state = try createPipelineState(allocator, device);
 
-    // const device = try MetalBridge.createDevice();
-
-    // const queue = try MetalBridge.createCommandQueue(device);
-
-    // const pipeline = try createPipelineState(device); // TODO: setup shaders
-
-    const initial_buffer_size = 1024 * 1024; // 1MB initial size
-    // const vertex_buffer = try MetalBridge.createBuffer(device, initial_buffer_size, 0);
+    const vertex_size = @sizeOf(Vertex);
+    const max_vertices = 10000;
+    const buffer_size = max_vertices * vertex_size;
+    const options = @intFromEnum(MTLResourceOptions.storageModeShared);
+    const vertex_buffer = try MetalBridge.createBuffer(device, buffer_size, options);
 
     const batch = GeometryBatch.init(allocator);
 
     return Self{
-        .device = undefined, // TODO: from bridge
-        .command_queue = undefined, // TODO: from bridge
+        .device = device,
+        .command_queue = queue,
         .layer = layer,
-        .pipeline_state = undefined, // TODO: need to set up shaders
-        .vertex_buffer = undefined, // TODO: from bridge
-        .vertex_buffer_size = initial_buffer_size,
+        .pipeline_state = pipeline_state,
+        .vertex_buffer = vertex_buffer,
+        .vertex_buffer_size = buffer_size,
         .batch = batch,
         .current_drawable = null,
         .current_command_buffer = null,
         .width = config.width,
         .height = config.height,
         .scale_factor = 1.0, // TODO: get from platform
-        .clear_color = Color.init(0, 0, 0, 255),
+        .clear_color = Color.init(0, 0, 255, 255), // black for now
         .frame_number = 0,
         .start_time = 0.0, // TODO: get time from platform
         .last_frame_time = 0.0,
         .allocator = allocator,
     };
+}
+fn getShaderPath(allocator: std.mem.Allocator) ![]const u8 {
+    const exe_dir = std.fs.selfExeDirPathAlloc(allocator) catch |err| {
+        std.log.err("Failed to get exe dir: {}", .{err});
+        return MTLError.ShaderPathError;
+    };
+    defer allocator.free(exe_dir);
+
+    return std.fs.path.join(allocator, &.{ exe_dir, "default.metallib" }) catch |err| {
+        std.log.err("Failed to join path: {}", .{err});
+        return MTLError.ShaderPathError;
+    };
+}
+fn createPipelineState(allocator: std.mem.Allocator, device: *MTLDevice) !*MTLRenderPipelineState {
+    const shader_path = try getShaderPath(allocator);
+    defer allocator.free(shader_path);
+    const shader_path_z = try allocator.dupeZ(u8, shader_path);
+    defer allocator.free(shader_path_z);
+
+    const library = try MetalBridge.createLibraryFromFile(device, shader_path_z);
+
+    const vertex_fn = try MetalBridge.createFunction(library, "vertex_main");
+    const fragment_fn = try MetalBridge.createFunction(library, "fragment_main");
+
+    // const pixel_format = @intFromEnum(MTLPixelFormat.bgra8Unorm);
+
+    return try MetalBridge.createRenderPipelineState(
+        device,
+        vertex_fn,
+        fragment_fn,
+        MTLPixelFormat.bgra8Unorm,
+    );
 }
 
 pub fn deinit(self: *Self) void {
@@ -133,7 +169,7 @@ pub fn drawShape(
 ) void {
     const ctx = self.getRenderContext();
     self.batch.addShape(shape, transform, &ctx) catch |err| {
-        std.log.err("Failed to add shape to batch: {e}\n", .{err});
+        std.log.err("Failed to add shape to batch: {any}\n", .{err});
     };
 }
 fn flushBatch(self: *Self) !void {

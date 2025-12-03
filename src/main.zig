@@ -19,16 +19,26 @@ pub fn main() !void {
     };
     defer game.deinit();
 
-    const player = engine.Circle{
-        .origin = .{ .x = 0, .y = 0 },
-        .radius = 0.5,
+    // const player = engine.Circle{
+    //     .origin = .{ .x = 0, .y = 0 },
+    //     .radius = 0.5,
+    //     .fill_color = engine.Colors.RED,
+    // };
+
+    const player = engine.Triangle{
+        .vertices = [3]engine.V2{
+            .{ .x = 0.0, .y = 2.0 }, // Top
+            .{ .x = -2.0, .y = -2.0 }, // Bottom left
+            .{ .x = 2.0, .y = -2.0 }, // Bottom right
+        },
         .fill_color = engine.Colors.RED,
+        .outline_color = null,
     };
 
     while (!game.shouldClose()) {
         try game.beginFrame();
         game.clear(engine.Colors.DARK_GRAY);
-        game.drawCircle(player);
+        game.renderer.drawShape(.{ .Triangle = player }, null);
         try game.endFrame();
     }
 }

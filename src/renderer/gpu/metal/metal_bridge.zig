@@ -1,22 +1,23 @@
 const std = @import("std");
-const types = @import("metal_types.zig");
-const CAMetalDrawable = types.CAMetalDrawable;
-const CAMetalLayer = types.CAMetalLayer;
-const ClearColor = types.ClearColor;
-const MTLBuffer = types.MTLBuffer;
-const MTLCommandBuffer = types.MTLCommandBuffer;
-const MTLCommandQueue = types.MTLCommandQueue;
-const MTLDevice = types.MTLDevice;
-const MTLFunction = types.MTLFunction;
-const MTLLibrary = types.MTLLibrary;
-const MTLLoadAction = types.MTLLoadAction;
-const MTLPixelFormat = types.MTLPixelFormat;
-const MTLPrimitiveType = types.MTLPrimitiveType;
-const MTLRenderCommandEncoder = types.MTLRenderCommandEncoder;
-const MTLRenderPassDescriptor = types.MTLRenderPassDescriptor;
-const MTLRenderPipelineState = types.MTLRenderPipelineState;
-const MTLStoreAction = types.MTLStoreAction;
-const MTLTexture = types.MTLTexture;
+const metal = @import("metal_types.zig");
+const CAMetalDrawable = metal.CAMetalDrawable;
+const CAMetalLayer = metal.CAMetalLayer;
+const ClearColor = metal.ClearColor;
+const MTLBuffer = metal.MTLBuffer;
+const MTLCommandBuffer = metal.MTLCommandBuffer;
+const MTLCommandQueue = metal.MTLCommandQueue;
+const MTLDevice = metal.MTLDevice;
+const MTLFunction = metal.MTLFunction;
+const MTLLibrary = metal.MTLLibrary;
+const MTLLoadAction = metal.MTLLoadAction;
+const MTLPixelFormat = metal.MTLPixelFormat;
+const MTLPrimitiveType = metal.MTLPrimitiveType;
+const MTLRenderCommandEncoder = metal.MTLRenderCommandEncoder;
+const MTLRenderPassDescriptor = metal.MTLRenderPassDescriptor;
+const MTLRenderPipelineState = metal.MTLRenderPipelineState;
+const MTLStoreAction = metal.MTLStoreAction;
+const MTLTexture = metal.MTLTexture;
+const MTLError = metal.MetalError;
 
 extern fn metal_create_device() ?*MTLDevice;
 extern fn metal_create_command_queue(device: *MTLDevice) ?*MTLCommandQueue;
@@ -32,13 +33,20 @@ extern fn metal_set_pipeline_state(
     encoder: *MTLRenderCommandEncoder,
     state: *MTLRenderPipelineState,
 ) void;
+extern fn metal_device_create_library_from_file(
+    device: *MTLDevice,
+    path: [*:0]const u8,
+) ?*MTLLibrary;
 extern fn metal_create_render_pass_descriptor() ?*MTLRenderPassDescriptor;
 extern fn metal_render_pass_set_color_attachment(
     desc: *MTLRenderPassDescriptor,
     texture: *MTLTexture,
     load_action: u64,
     store_action: u64,
-    clear: ClearColor,
+    r: f64,
+    g: f64,
+    b: f64,
+    a: f64,
 ) void;
 extern fn metal_command_buffer_create_render_encoder(
     buffer: *MTLCommandBuffer,
@@ -84,51 +92,54 @@ extern fn metal_buffer_length(buffer: *MTLBuffer) u64;
 // MARK: Zig wrappers for extern functions
 pub const MetalBridge = struct {
     pub fn createDevice() !*MTLDevice {
-        return metal_create_device() orelse error.MTLDeviceCreationFailed;
+        return metal_create_device() orelse MTLError.DeviceCreationFailed;
     }
     pub fn createCommandQueue(device: *MTLDevice) !*MTLCommandQueue {
         return metal_create_command_queue(device) orelse
-            error.MTLCommandQueueCreationFailed;
+            MTLError.CommandQueueCreationFailed;
     }
     pub fn getLayerFromView(view: *anyopaque) !*CAMetalLayer {
-        return metal_get_layer_from_view(view) orelse error.MTLLayerNotFound;
+        return metal_get_layer_from_view(view) orelse MTLError.LayerUnavailable;
     }
     pub fn nextDrawable(layer: *CAMetalLayer) !*CAMetalDrawable {
         return metal_layer_next_drawable(layer) orelse
-            error.MTLDrawableAcquisisitonFailed;
+            MTLError.DrawableUnavailable;
     }
     pub fn getDrawableTexture(drawable: *CAMetalDrawable) !*MTLTexture {
-        return metal_drawable_get_texture(drawable) orelse error.MTLTextureUnavailable;
+        return metal_drawable_get_texture(drawable) orelse MTLError.TextureUnavailable;
     }
     pub fn createCommandBuffer(queue: *MTLCommandQueue) !*MTLCommandBuffer {
         return metal_create_command_buffer(queue) orelse
-            error.CommandBufferCreationFailed;
+            MTLError.CommandBufferCreationFailed;
     }
     pub fn createRenderPassDescriptor() !*MTLRenderPassDescriptor {
         return metal_create_render_pass_descriptor() orelse
-            error.RenderPassCreationFailed;
+            MTLError.RenderPassCreationFailed;
     }
     pub fn createRenderEncoder(
         buffer: *MTLCommandBuffer,
         descriptor: *MTLRenderPassDescriptor,
     ) !*MTLRenderCommandEncoder {
         return metal_command_buffer_create_render_encoder(buffer, descriptor) orelse
-            error.EncoderCreationFailed;
+            MTLError.EncoderCreationFailed;
     }
     pub fn createBuffer(device: *MTLDevice, length: u64, options: u64) !*MTLBuffer {
         return metal_device_create_buffer(device, length, options) orelse
-            error.BufferCreationFailed;
+            MTLError.BufferCreationFailed;
     }
     pub fn getBufferContents(buffer: *MTLBuffer) !*anyopaque {
-        return metal_buffer_contents(buffer) orelse error.BufferContentsUnavailable;
+        return metal_buffer_contents(buffer) orelse MTLError.BufferContentsUnavailable;
     }
     pub fn createDefaultLibrary(device: *MTLDevice) !*MTLLibrary {
         return metal_device_create_default_library(device) orelse
-            error.LibraryCreationFailed;
+            MTLError.LibraryCreationFailed;
+    }
+    pub fn createLibraryFromFile(device: *MTLDevice, path: [*:0]const u8) !*MTLLibrary {
+        return metal_device_create_library_from_file(device, path) orelse MTLError.LibraryCreationFailed;
     }
     pub fn createFunction(library: *MTLLibrary, name: [*:0]const u8) !*MTLFunction {
         return metal_library_create_function(library, name) orelse
-            error.FunctionNotFound;
+            MTLError.FunctionNotFound;
     }
     pub fn createRenderPipelineState(
         device: *MTLDevice,
@@ -136,12 +147,13 @@ pub const MetalBridge = struct {
         fragment_function: *MTLFunction,
         pixel_format: MTLPixelFormat,
     ) !*MTLRenderPipelineState {
+        std.log.debug("Here in createRenderPipelineState\n", .{});
         return metal_create_render_pipeline_state(
             device,
             vertex_function,
             fragment_function,
             @intFromEnum(pixel_format),
-        ) orelse error.PipelineStateCreationFailed;
+        ) orelse MTLError.PipelineCreationFailed;
     }
     pub fn setColorAttachment(
         desc: *MTLRenderPassDescriptor,
@@ -155,7 +167,10 @@ pub const MetalBridge = struct {
             texture,
             @intFromEnum(load_action),
             @intFromEnum(store_action),
-            clear,
+            clear.r,
+            clear.g,
+            clear.b,
+            clear.a,
         );
     }
     pub fn setVertexBuffer(

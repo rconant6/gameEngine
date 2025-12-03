@@ -13,6 +13,27 @@ pub const MTLRenderPassDescriptor = opaque {};
 pub const MTLRenderPipelineState = opaque {};
 pub const MTLTexture = opaque {};
 
+pub const MetalError = error{
+    DeviceCreationFailed,
+    CommandQueueCreationFailed,
+    CommandBufferCreationFailed,
+
+    BufferCreationFailed,
+    BufferContentsUnavailable,
+
+    LibraryCreationFailed,
+    FunctionNotFound,
+    PipelineCreationFailed,
+    ShaderPathError,
+
+    LayerUnavailable,
+    DrawableUnavailable,
+    TextureUnavailable,
+
+    RenderPassCreationFailed,
+    RenderEncoderCreationFailed,
+};
+
 pub const Vertex = extern struct {
     position: [2]f32, // x, y, in clip space [-1, 1]
     color: [4]f32, // r, g, b, a in range [0, 1]
@@ -22,6 +43,31 @@ pub const VertexBufferPool = struct {
     current_index: usize,
     buffer_size: usize,
     allocator: std.mem.Allocator,
+};
+
+const MTLStorageMode = enum(u32) {
+    shared = 0x00,
+    managed = 0x10,
+    private = 0x20,
+    memoryless = 0x30,
+};
+const MTLCPUCacheMode = enum(u32) {
+    defaultCache = 0x00,
+    writeCombined = 0x01,
+};
+const MTLHazardTrackingMode = enum(u32) {
+    tracked = 0x00,
+    untracked = 0x100,
+};
+pub const MTLResourceOptions = enum(u32) {
+    storageModeShared = @intFromEnum(MTLStorageMode.shared),
+    // storageModeManaged = @intFromEnum(MTLStorageMode.managed),
+    // storageModePrivate = @intFromEnum(MTLStorageMode.private),
+    // storageModeMemoryless = @intFromEnum(MTLStorageMode.memoryless),
+    // cpuCacheModeDefaultCache = @intFromEnum(MTLCPUCacheMode.defaultCache),
+    // cpuCacheModeWriteCombined = @intFromEnum(MTLCPUCacheMode.writeCombined),
+    // hazardTrackingModeTracked = @intFromEnum(MTLHazardTrackingMode.tracked),
+    // hazardTrackingModeUntracked = @intFromEnum(MTLHazardTrackingMode.untracked),
 };
 
 pub const MTLPixelFormat = enum(u64) {

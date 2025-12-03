@@ -55,7 +55,7 @@ pub const GeometryBatch = struct {
         ctx: *const RenderContext,
     ) !void {
         switch (shape) {
-            .Rectangle => |rect| try addRectangle(self, rect, transform, ctx),
+            .Triangle => |tri| try addTriangle(self, tri, transform, ctx.*),
             // TODO: need to add the rest
             else => unreachable,
         }
@@ -113,13 +113,13 @@ pub const GeometryBatch = struct {
 
             const screen_pos = utils.gameToScreenF32(transformed, ctx);
 
-            try batch.vertices.append(.{
+            try batch.vertices.append(batch.allocator, .{
                 .position = screen_pos,
                 .color = color,
             });
         }
 
-        try batch.draw_calls.append(.{
+        try batch.draw_calls.append(batch.allocator, .{
             .primitive_type = .triangle,
             .vertex_start = start_vertex_idx,
             .vertex_count = 3,
