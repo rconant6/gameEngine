@@ -251,6 +251,21 @@ fn buildMacOSSwift(
         "--arch",         arch,
     });
 
+    const metal_compile = b.addSystemCommand(&.{
+        "xcrun", "-sdk",                                    "macosx", "metal",
+        "-c",    "src/platform//macos/swift/shaders.metal", "-o",     "zig-out/shaders.air",
+    });
+    metal_compile.step.dependOn(&swift_build.step);
+
+    const metal_lib = b.addSystemCommand(&.{
+        "xcrun",               "-sdk", "macosx",                       "metallib",
+        "zig-out/shaders.air", "-o",   "zig-out/lib/default.metallib",
+    });
+    metal_lib.step.dependOn(&metal_compile.step);
+
+    const install_metallib = b.addInstallFile(.{ .cwd_relative = "zig-out/lib/default.metallib" }, "bin/default.metallib");
+    install_metallib.step.dependOn(&metal_lib.step);
+
     const swift_clean = b.addSystemCommand(&.{ "rm", "-rf", "./src/platform/macos/.build/" });
     exe.step.dependOn(&swift_build.step);
     exe.step.dependOn(&swift_clean.step);
@@ -261,6 +276,7 @@ fn buildMacOSSwift(
     const install_lib = b.addInstallFile(.{ .cwd_relative = lib_src }, lib_dest);
     install_lib.step.dependOn(&swift_build.step);
     exe.step.dependOn(&install_lib.step);
+    exe.step.dependOn(&install_metallib.step);
 
     module.addObjectFile(b.path(b.fmt("zig-out/{s}", .{lib_dest})));
 }
