@@ -13,6 +13,8 @@ pub const MTLRenderPassDescriptor = opaque {};
 pub const MTLRenderPipelineState = opaque {};
 pub const MTLTexture = opaque {};
 
+const Color = @import("../../color.zig").Color;
+
 pub const MetalError = error{
     DeviceCreationFailed,
     CommandQueueCreationFailed,
@@ -111,6 +113,20 @@ pub const ClearColor = struct {
     g: f64,
     b: f64,
     a: f64,
+
+    pub fn fromColor(c: Color) ClearColor {
+        const rf: f64 = @floatFromInt(c.r);
+        const gf: f64 = @floatFromInt(c.g);
+        const bf: f64 = @floatFromInt(c.b);
+        const af: f64 = @floatFromInt(c.a);
+
+        return .{
+            .r = rf / 255.0,
+            .g = gf / 255.0,
+            .b = bf / 255.0,
+            .a = af / 255.0,
+        };
+    }
 };
 
 // TODO: helper functions

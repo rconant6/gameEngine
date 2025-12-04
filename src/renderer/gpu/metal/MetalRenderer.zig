@@ -18,6 +18,8 @@ const ClearColor = metal.ClearColor;
 const Vertex = metal.Vertex;
 const MTLResourceOptions = metal.MTLResourceOptions;
 const MTLError = metal.MetalError;
+const MTLLoadAction = metal.MTLLoadAction;
+const MTLStoreAction = metal.MTLStoreAction;
 
 const Color = @import("../../color.zig").Color;
 const shapes = @import("../../shapes.zig");
@@ -123,11 +125,9 @@ pub fn deinit(self: *Self) void {
 
 pub fn beginFrame(self: *Self) !void {
     self.batch.clear();
-    // TODO: get the drawable
-    // self.current_drawable = try MetalBridge.nextDrawable(self.layer);
 
-    // TODO: create the command buffer
-    // self.current_command_buffer = try MetalBridge.createCommandBuffer(self.comamndBuffer);
+    self.current_drawable = try MetalBridge.nextDrawable(self.layer);
+    self.current_command_buffer = try MetalBridge.createCommandBuffer(self.command_queue);
 
     self.frame_number += 1;
 }
@@ -135,14 +135,12 @@ pub fn beginFrame(self: *Self) !void {
 pub fn endFrame(self: *Self) !void {
     try self.flushBatch();
 
-    // TODO: Present the drawable
-    if (self.current_drawable) |drawable| {
-        if (self.current_command_buffer) |cmd_buf| {
+    if (self.current_command_buffer) |cmd_buf| {
+        if (self.current_drawable) |drawable| {
             MetalBridge.presentDrawable(cmd_buf, drawable);
-            MetalBridge.commitCommandBuffer(cmd_buf);
         }
+        MetalBridge.commitCommandBuffer(cmd_buf);
     }
-
     self.current_drawable = null;
     self.current_command_buffer = null;
 }
@@ -168,44 +166,49 @@ pub fn drawShape(
     transform: ?Transform,
 ) void {
     const ctx = self.getRenderContext();
-    self.batch.addShape(shape, transform, &ctx) catch |err| {
+    self.batch.addShape(shape, transform, ctx) catch |err| {
         std.log.err("Failed to add shape to batch: {any}\n", .{err});
     };
 }
 fn flushBatch(self: *Self) !void {
-    const vertices = self.batch.getVertexSlice();
-    if (vertices.len == 0) return; // Nothing to draw
+    const vertices = self.batch.vertices.items;
+    if (vertices.len == 0) return;
 
-    // TODO: Upload vertices to GPU buffer (Phase 2)
-    // const vertex_data = std.mem.sliceAsBytes(vertices);
-    // const buffer_contents = try MetalBridge.getBufferContents(self.vertex_buffer);
-    // @memcpy(buffer_contents, vertex_data);
+    const buffer_ptr = try MetalBridge.getBufferContents(self.vertex_buffer);
+    const vertex_size = @sizeOf(Vertex);
+    const bytes_to_copy = vertices.len * vertex_size;
+    @memcpy(
+        @as([*]u8, @ptrCast(buffer_ptr))[0..bytes_to_copy],
+        @as([*]const u8, @ptrCast(vertices.ptr))[0..bytes_to_copy],
+    );
 
-    // TODO: Create render pass (Phase 2)
-    // const render_pass = try MetalBridge.createRenderPassDescriptor();
-    // Set clear color, texture, etc.
+    const render_pass = try MetalBridge.createRenderPassDescriptor();
 
-    // TODO: Create render encoder (Phase 2)
-    // const encoder = try MetalBridge.createRenderEncoder(cmd_buf, render_pass);
+    const drawable_texture = try MetalBridge.getDrawableTexture(self.current_drawable.?);
 
-    // TODO: Set pipeline state (Phase 2)
-    // MetalBridge.setPipelineState(encoder, self.pipeline_state);
+    MetalBridge.setColorAttachment(
+        render_pass,
+        drawable_texture,
+        MTLLoadAction.clear,
+        MTLStoreAction.store,
+        ClearColor.fromColor(self.clear_color),
+    );
 
-    // TODO: Set vertex buffer (Phase 2)
-    // MetalBridge.setVertexBuffer(encoder, self.vertex_buffer, 0, 0);
+    const encoder = try MetalBridge.createRenderEncoder(self.current_command_buffer.?, render_pass);
+    MetalBridge.setPipelineState(encoder, self.pipeline_state);
+    MetalBridge.setVertexBuffer(encoder, self.vertex_buffer, 0, 0);
 
-    // TODO: Issue draw calls (Phase 2)
-    // for (self.batch.draw_calls.items) |draw_call| {
-    //     MetalBridge.drawPrimitives(
-    //         encoder,
-    //         draw_call.primitive_type,
-    //         draw_call.vertex_start,
-    //         draw_call.vertex_count,
-    //     );
-    // }
+    const draw_calls = self.batch.draw_calls.items;
+    for (draw_calls) |call| {
+        MetalBridge.drawPrimitives(
+            encoder,
+            call.primitive_type,
+            call.vertex_start,
+            call.vertex_count,
+        );
+    }
 
-    // TODO: End encoding (Phase 2)
-    // MetalBridge.endEncoding(encoder);
+    MetalBridge.endEncoding(encoder);
 }
 
 fn getRenderContext(self: *const Self) RenderContext {

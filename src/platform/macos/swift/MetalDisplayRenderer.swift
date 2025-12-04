@@ -30,7 +30,7 @@ class MetalDisplayRenderer: NSObject, MTKViewDelegate {
     self.wrappedBuffer = buffer
 
     let descriptor = MTLTextureDescriptor()
-    descriptor.pixelFormat = .rgba8Unorm
+    descriptor.pixelFormat = .bgra8Unorm
     descriptor.width = width
     descriptor.height = height * 3
     descriptor.usage = .shaderRead

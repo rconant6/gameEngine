@@ -85,8 +85,19 @@ pub fn screenToClip(screen_x: f32, screen_y: f32, ctx: *const RenderContext) [2]
     return .{ x_clip, y_clip };
 }
 
-pub fn toClip(point: GamePoint, ctx: *const RenderContext) [2]f32 {
-    return ctx.screenToClip(point.x, point.y);
+// pub fn toClip(point: GamePoint, ctx: *const RenderContext) [2]f32 {
+//     return ctx.screenToClip(point.x, point.y);
+// }
+pub fn gameToClipSpace(point: GamePoint, ctx: RenderContext) [2]f32 {
+    const screen = gameToScreenF32(point, ctx);
+
+    const fw: f32 = @floatFromInt(ctx.width);
+    const fh: f32 = @floatFromInt(ctx.height);
+
+    const clip_x = (screen[0] / fw) * 2.0 - 1.0;
+    const clip_y = 1.0 - (screen[1] / fh) * 2.0;
+
+    return .{ clip_x, clip_y };
 }
 
 pub fn colorToFloat(color: Color) [4]f32 {
