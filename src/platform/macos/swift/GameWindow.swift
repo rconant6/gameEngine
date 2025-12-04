@@ -24,7 +24,11 @@ class GameWindow: NSWindow {
     self.title = title
     self.center()
 
-    let metalView = MTKView(frame: contentRect)
+    guard let device = MTLCreateSystemDefaultDevice() else {
+      fatalError("Metal is not supported on this device")
+    }
+
+    let metalView = MTKView(frame: contentRect, device: device)
     metalView.layer?.contentsScale = 1.0
     metalView.isPaused = true
     metalView.enableSetNeedsDisplay = true
@@ -58,6 +62,17 @@ class GameWindow: NSWindow {
       let metalLayer = metalView.layer as? CAMetalLayer
     else { return nil }
 
+    if metalLayer.device == nil {
+      metalLayer.device = metalView.device
+    }
+
+    metalLayer.pixelFormat = .bgra8Unorm
+
+    let scale = self.backingScaleFactor
+    metalLayer.drawableSize = CGSize(
+      width: self.frame.width * scale,
+      height: self.frame.height * scale
+    )
     return metalLayer
   }
 }

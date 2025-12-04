@@ -111,7 +111,7 @@ pub const GeometryBatch = struct {
             else
                 vertex;
 
-            const screen_pos = utils.gameToScreenF32(transformed, ctx);
+            const screen_pos = utils.gameToClipSpace(transformed, ctx);
 
             try batch.vertices.append(batch.allocator, .{
                 .position = screen_pos,

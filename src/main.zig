@@ -27,11 +27,11 @@ pub fn main() !void {
 
     const player = engine.Triangle{
         .vertices = [3]engine.V2{
-            .{ .x = 0.0, .y = 2.0 }, // Top
-            .{ .x = -2.0, .y = -2.0 }, // Bottom left
-            .{ .x = 2.0, .y = -2.0 }, // Bottom right
+            .{ .x = 0.0, .y = 9.0 }, // Top
+            .{ .x = -9.0, .y = -9.0 }, // Bottom left
+            .{ .x = 9.0, .y = -9.0 }, // Bottom right
         },
-        .fill_color = engine.Colors.RED,
+        .fill_color = engine.Colors.DARK_ORANGE,
         .outline_color = null,
     };
 

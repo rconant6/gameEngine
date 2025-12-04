@@ -121,7 +121,7 @@ pub const MetalBridge = struct {
         descriptor: *MTLRenderPassDescriptor,
     ) !*MTLRenderCommandEncoder {
         return metal_command_buffer_create_render_encoder(buffer, descriptor) orelse
-            MTLError.EncoderCreationFailed;
+            MTLError.RenderEncoderCreationFailed;
     }
     pub fn createBuffer(device: *MTLDevice, length: u64, options: u64) !*MTLBuffer {
         return metal_device_create_buffer(device, length, options) orelse
@@ -147,7 +147,6 @@ pub const MetalBridge = struct {
         fragment_function: *MTLFunction,
         pixel_format: MTLPixelFormat,
     ) !*MTLRenderPipelineState {
-        std.log.debug("Here in createRenderPipelineState\n", .{});
         return metal_create_render_pipeline_state(
             device,
             vertex_function,
