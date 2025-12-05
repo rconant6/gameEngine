@@ -12,13 +12,24 @@ pub const Ellipse = shape.Ellipse;
 pub const Line = shape.Line;
 pub const Polygon = shape.Polygon;
 pub const Rectangle = shape.Rectangle;
+pub const ShapeData = shape.ShapeData;
 pub const Triangle = shape.Triangle;
 pub const FrameBuffer = @import("cpu/frameBuffer.zig").FrameBuffer;
+const utils = @import("geometry_utils.zig");
+pub const Transform = utils.Transform;
+pub const scalePt = utils.scalePt;
+pub const rotatePt = utils.rotatePt;
+pub const movePt = utils.movePt;
+pub const gameToScreen = utils.gameToScreen;
+pub const screenToGame = utils.screenToGame;
+pub const screenToClip = utils.screenToClip;
+pub const toClip = utils.toClip;
+pub const RenderContext = @import("RenderContext.zig");
 
 const CpuRenderer = if (build_options.backend == .cpu)
     @import("./cpu/CpuRenderer.zig");
 const MetalRenderer = if (build_options.backend == .metal)
-    @import("./gpu/metal/metal_renderer.zig").MetalRenderer
+    @import("./gpu/metal/MetalRenderer.zig")
 else
     void;
 const VulkanRenderer = if (build_options.backend == .vulkan)
@@ -29,21 +40,6 @@ const OpenGLRenderer = if (build_options.backend == .opengl)
     @import("./gpu/opengl/opengl_renderer.zig").OpenGLRenderer
 else
     unreachable;
-
-pub const Transform = struct {
-    offset: ?GamePoint = null,
-    rotation: ?f32 = null,
-    scale: ?f32 = null,
-};
-
-pub const ShapeData = union(enum) {
-    Circle: Circle,
-    Ellipse: Ellipse,
-    Line: Line,
-    Rectangle: Rectangle,
-    Triangle: Triangle,
-    Polygon: Polygon,
-};
 
 pub const RendererConfig = struct {
     width: u32,
@@ -67,7 +63,10 @@ pub const Renderer = struct {
     };
 
     pub fn init(allocator: std.mem.Allocator, config: RendererConfig) !Renderer {
-        const backend = try BackendImpl.init(allocator, config.width, config.height);
+        const backend = BackendImpl.init(allocator, config) catch |err| {
+            std.log.err("Unable to create a rendering backend {any}\n", .{err});
+            return err;
+        };
         return .{
             .backend = backend,
             .width = config.width,
@@ -102,29 +101,13 @@ pub const Renderer = struct {
         self.backend.drawShape(shape_data, transform);
     }
 
-    pub fn gameToScreen(renderer: *const Renderer, p: GamePoint) ScreenPoint {
-        const x: i32 = @intFromFloat((p.x + 10.0) * 0.05 * renderer.fw);
-        const y: i32 = @intFromFloat((10.0 - p.y) * 0.05 * renderer.fh);
-
-        return .{ .x = x, .y = y };
-    }
-
-    pub fn screenToGame(renderer: *const Renderer, sp: ScreenPoint) GamePoint {
-        const fw: f32 = @floatFromInt(renderer.width);
-        const fh: f32 = @floatFromInt(renderer.height);
-
-        // TODO: remove the @as in here
-        return GamePoint{
-            .x = (@as(f32, @floatFromInt(sp.x)) * 20.0 / fw) - 10.0,
-            .y = 10.0 - (@as(f32, @floatFromInt(sp.y)) * 20.0 / fh),
-        };
-    }
-
+    // TODO: All of these need to return errors/nil if called for the wrong backend
     pub fn getPixelBufferPtr(self: *const Renderer) ?[*]const u8 {
         if (build_options.backend == .cpu) {
             const buffer = self.backend.getRawFrameBuffer();
             return @ptrCast(buffer.ptr);
         }
+        return null;
     }
     pub fn getRawFrameBuffer(self: *const Renderer) ?[]const Color {
         if (build_options.backend == .cpu) {
@@ -132,7 +115,7 @@ pub const Renderer = struct {
         }
         return null;
     }
-    pub fn getDisplayBufferOffset(self: *const Renderer) u32 {
+    pub fn getDisplayBufferOffset(self: *const Renderer) ?u32 {
         if (build_options.backend == .cpu) {
             return self.backend.getDisplayBufferOffset();
         }

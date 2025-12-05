@@ -1,18 +1,21 @@
 const std = @import("std");
-const rend = @import("../renderer.zig");
-const Circle = rend.Circle;
-const Color = rend.Color;
-const Ellipse = rend.Ellipse;
-const FrameBuffer = rend.FrameBuffer;
-const Line = rend.Line;
-const Polygon = rend.Polygon;
-const Rectangle = rend.Rectangle;
-const ScreenPoint = rend.ScreenPoint;
-const ShapeData = rend.ShapeData;
-const Transform = rend.Transform;
-const Triangle = rend.Triangle;
+const shapes = @import("../../renderer/shapes.zig");
+const RenderConfig = @import("../../renderer/renderer.zig").RendererConfig;
+const Circle = shapes.Circle;
+const Color = @import("../color.zig").Color;
+const Ellipse = shapes.Ellipse;
+const Line = shapes.Line;
+const Polygon = shapes.Polygon;
+const Rectangle = shapes.Rectangle;
+const ShapeData = shapes.ShapeData;
+const Triangle = shapes.Triangle;
 const core = @import("core");
 const GamePoint = core.GamePoint;
+const ScreenPoint = core.ScreenPoint;
+const utils = @import("../../renderer/geometry_utils.zig");
+const Transform = utils.Transform;
+const FrameBuffer = @import("../cpu/frameBuffer.zig").FrameBuffer;
+const RenderContext = @import("../RenderContext.zig");
 
 const CpuRenderer = @This();
 
@@ -24,15 +27,19 @@ fh: f32,
 allocator: std.mem.Allocator,
 clear_color: Color,
 
-pub fn init(allocator: std.mem.Allocator, width: u32, height: u32) !CpuRenderer {
-    const frame_buffer = try FrameBuffer.init(allocator, width, height);
+pub fn init(allocator: std.mem.Allocator, config: RenderConfig) !CpuRenderer {
+    const frame_buffer = try FrameBuffer.init(
+        allocator,
+        config.width,
+        config.height,
+    );
 
     return CpuRenderer{
         .frame_buffer = frame_buffer,
-        .width = width,
-        .height = height,
-        .fw = @floatFromInt(width),
-        .fh = @floatFromInt(height),
+        .width = config.width,
+        .height = config.height,
+        .fw = @floatFromInt(config.width),
+        .fh = @floatFromInt(config.height),
         .allocator = allocator,
         .clear_color = Color.init(0, 0, 0, 1),
     };
@@ -63,6 +70,16 @@ pub fn getRawFrameBuffer(self: *const CpuRenderer) []const Color {
 
 pub fn getDisplayBufferOffset(self: *const CpuRenderer) u32 {
     return self.frame_buffer.getDisplayBufferOffset();
+}
+
+pub fn gameToScreen(renderer: *const CpuRenderer, p: GamePoint) ScreenPoint {
+    const ctx = RenderContext{ .width = renderer.width, .height = renderer.height };
+    return utils.gameToScreen(p, ctx);
+}
+
+pub fn screenToGame(renderer: *const CpuRenderer, sp: ScreenPoint) GamePoint {
+    const ctx = RenderContext{ .width = renderer.width, .height = renderer.height };
+    return utils.screenToGame(sp, ctx);
 }
 
 pub fn drawShape(
@@ -116,57 +133,6 @@ pub fn drawShape(
         }
     }
 }
-pub fn gameToScreen(renderer: *const CpuRenderer, p: GamePoint) ScreenPoint {
-    const x: i32 = @intFromFloat((p.x + 10.0) * 0.05 * renderer.fw);
-    const y: i32 = @intFromFloat((10.0 - p.y) * 0.05 * renderer.fh);
-
-    return .{ .x = x, .y = y };
-}
-
-pub fn screenToGame(renderer: *const CpuRenderer, sp: ScreenPoint) GamePoint {
-    const fw: f32 = @floatFromInt(renderer.width);
-    const fh: f32 = @floatFromInt(renderer.height);
-
-    // TODO: remove the @as in here
-    return GamePoint{
-        .x = (@as(f32, @floatFromInt(sp.x)) * 20.0 / fw) - 10.0,
-        .y = 10.0 - (@as(f32, @floatFromInt(sp.y)) * 20.0 / fh),
-    };
-}
-
-// MARK: Internal drawing helpers
-fn scalePt(point: GamePoint, scale: f32) GamePoint {
-    return .{ .x = point.x * scale, .y = point.y * scale };
-}
-
-fn rotatePt(point: GamePoint, rot: f32) GamePoint {
-    const cos_r = std.math.cos(rot);
-    const sin_r = std.math.sin(rot);
-    const oldX = point.x;
-    return .{
-        .x = oldX * cos_r - point.y * sin_r,
-        .y = oldX * sin_r + point.y * cos_r,
-    };
-}
-
-fn movePt(point: GamePoint, pos: GamePoint) GamePoint {
-    return .{
-        .x = point.x + pos.x,
-        .y = point.y + pos.y,
-    };
-}
-
-fn transformPoint(point: GamePoint, transform: Transform) GamePoint {
-    var result = point;
-
-    if (transform.scale) |s| result = scalePt(result, s);
-
-    if (transform.rotation) |rot| result = rotatePt(result, rot);
-
-    if (transform.offset) |pos| result = movePt(result, pos);
-
-    return result;
-}
 
 fn drawOutlineWithTransform(
     renderer: *CpuRenderer,
@@ -178,7 +144,7 @@ fn drawOutlineWithTransform(
         const len = pts.len;
         switch (len) {
             0 => return,
-            1 => drawPoint(renderer, transformPoint(pts[0], xform), color),
+            1 => drawPoint(renderer, utils.transformPoint(pts[0], xform), color),
             2 => drawLineWithTransform(renderer, Line{ .start = pts[0], .end = pts[1], .color = color }, xform),
             else => {
                 // draw them all
@@ -226,8 +192,8 @@ fn drawPoint(renderer: *CpuRenderer, point: GamePoint, color: ?Color) void {
 
 // MARK: Lines
 fn drawLineWithTransform(renderer: *CpuRenderer, line: Line, xform: Transform) void {
-    const start = transformPoint(line.start, xform);
-    const end = transformPoint(line.end, xform);
+    const start = utils.transformPoint(line.start, xform);
+    const end = utils.transformPoint(line.end, xform);
     renderer.drawLine(start, end, line.color);
 }
 
@@ -311,7 +277,7 @@ fn drawLine(renderer: *CpuRenderer, start: GamePoint, end: GamePoint, color: ?Co
 
 // MARK: Circle drawing
 fn drawCircleWithTransform(renderer: *CpuRenderer, circle: Circle, xform: Transform) void {
-    const newOrigin = transformPoint(circle.origin, xform);
+    const newOrigin = utils.transformPoint(circle.origin, xform);
     const newRadius = if (xform.scale) |scale| circle.radius * scale else circle.radius;
     const newCircle = Circle{
         .origin = newOrigin,
@@ -450,10 +416,10 @@ fn drawRectFilled(renderer: *CpuRenderer, rect: Rectangle, transform: ?Transform
     var c2 = corners[2];
     var c3 = corners[3];
     if (transform) |xform| {
-        c0 = transformPoint(c0, xform);
-        c1 = transformPoint(c1, xform);
-        c2 = transformPoint(c2, xform);
-        c3 = transformPoint(c3, xform);
+        c0 = utils.transformPoint(c0, xform);
+        c1 = utils.transformPoint(c1, xform);
+        c2 = utils.transformPoint(c2, xform);
+        c3 = utils.transformPoint(c3, xform);
 
         if (xform.rotation) |_| {
             var verts1: [3]GamePoint = .{ c0, c1, c2 };
@@ -503,10 +469,10 @@ fn drawRectFilled(renderer: *CpuRenderer, rect: Rectangle, transform: ?Transform
 fn drawRectOutline(renderer: *CpuRenderer, rect: Rectangle, transform: ?Transform) void {
     const corners = rect.getCorners();
 
-    const c0 = if (transform) |xform| transformPoint(corners[0], xform) else corners[0];
-    const c1 = if (transform) |xform| transformPoint(corners[1], xform) else corners[1];
-    const c2 = if (transform) |xform| transformPoint(corners[2], xform) else corners[2];
-    const c3 = if (transform) |xform| transformPoint(corners[3], xform) else corners[3];
+    const c0 = if (transform) |xform| utils.transformPoint(corners[0], xform) else corners[0];
+    const c1 = if (transform) |xform| utils.transformPoint(corners[1], xform) else corners[1];
+    const c2 = if (transform) |xform| utils.transformPoint(corners[2], xform) else corners[2];
+    const c3 = if (transform) |xform| utils.transformPoint(corners[3], xform) else corners[3];
     const xformexCorners: [4]GamePoint = .{ c0, c1, c2, c3 };
 
     for (0..4) |i| {
@@ -533,9 +499,9 @@ fn drawTriangle(renderer: *CpuRenderer, tri: Triangle, transform: ?Transform) vo
 fn drawTriangleFilled(renderer: *CpuRenderer, verts: []const GamePoint, transform: ?Transform, color: Color) void {
     std.debug.assert(verts.len == 3);
 
-    var v0 = if (transform) |xform| transformPoint(verts[0], xform) else verts[0];
-    var v1 = if (transform) |xform| transformPoint(verts[1], xform) else verts[1];
-    var v2 = if (transform) |xform| transformPoint(verts[2], xform) else verts[2];
+    var v0 = if (transform) |xform| utils.transformPoint(verts[0], xform) else verts[0];
+    var v1 = if (transform) |xform| utils.transformPoint(verts[1], xform) else verts[1];
+    var v2 = if (transform) |xform| utils.transformPoint(verts[2], xform) else verts[2];
 
     if (transform) |xform| {
         if (xform.rotation) |_| {
@@ -664,11 +630,11 @@ fn drawPolygonFilled(renderer: *CpuRenderer, poly: Polygon, transform: ?Transfor
     var v1: GamePoint = undefined;
     var v2: GamePoint = undefined;
 
-    const center = if (transform) |xform| transformPoint(poly.center, xform) else poly.center;
+    const center = if (transform) |xform| utils.transformPoint(poly.center, xform) else poly.center;
     for (0..poly.vertices.len) |i| {
-        v1 = if (transform) |xform| transformPoint(poly.vertices[i], xform) else poly.vertices[i];
+        v1 = if (transform) |xform| utils.transformPoint(poly.vertices[i], xform) else poly.vertices[i];
         const idx = (i + 1) % poly.vertices.len;
-        v2 = if (transform) |xform| transformPoint(poly.vertices[idx], xform) else poly.vertices[idx];
+        v2 = if (transform) |xform| utils.transformPoint(poly.vertices[idx], xform) else poly.vertices[idx];
         sortedVerts = .{ center, v1, v2 };
         std.mem.sort(GamePoint, &sortedVerts, {}, sortPointByY);
         drawTriangleFilled(renderer, &sortedVerts, null, poly.fill_color.?);
