@@ -16,6 +16,10 @@ pub const Rectangle = renderer.Rectangle;
 pub const Triangle = renderer.Triangle;
 pub const Polygon = renderer.Polygon;
 pub const Line = renderer.Line;
+pub const RenderContext = renderer.RenderContext;
+
+pub const GamePoint = core.GamePoint;
+pub const ScreenPoint = core.ScreenPoint;
 
 pub const Transform = renderer.Transform;
 
@@ -109,7 +113,103 @@ pub const Engine = struct {
         self.renderer.drawShape(.{ .Rectangle = rect }, null);
     }
 
-    // TODO: more convenience methods
+    pub fn getGameBounds(ctx: RenderContext) struct { width: f32, height: f32 } {
+        const aspect = @as(f32, @floatFromInt(ctx.width)) / @as(f32, @floatFromInt(ctx.height));
+        return .{
+            .width = 10.0 * aspect * 2.0, // Full width
+            .height = 20.0, // Full height
+        };
+    }
+    // Dimensions
+    pub fn getGameWidth(self: *const Engine) f32 {
+        const aspect = @as(f32, @floatFromInt(self.renderer.width)) /
+            @as(f32, @floatFromInt(self.renderer.height));
+        return 20.0 * aspect;
+    }
+    pub fn getGameHeight(self: *const Engine) f32 {
+        _ = self;
+        return 20.0;
+    }
+
+    // Corners
+    pub fn getTopLeft(self: *const Engine) V2 {
+        return .{ .x = self.getLeftEdge(), .y = self.getTopEdge() };
+    }
+
+    pub fn getTopRight(self: *const Engine) V2 {
+        return .{ .x = self.getRightEdge(), .y = self.getTopEdge() };
+    }
+
+    pub fn getBottomLeft(self: *const Engine) V2 {
+        return .{ .x = self.getLeftEdge(), .y = self.getBottomEdge() };
+    }
+
+    pub fn getBottomRight(self: *const Engine) V2 {
+        return .{ .x = self.getRightEdge(), .y = self.getBottomEdge() };
+    }
+
+    pub fn getCenter(self: *const Engine) V2 {
+        _ = self;
+        return .{ .x = 0.0, .y = 0.0 };
+    }
+
+    // Edges
+    pub fn getLeftEdge(self: *const Engine) f32 {
+        return -self.getGameWidth() / 2.0;
+    }
+    pub fn getRightEdge(self: *const Engine) f32 {
+        return self.getGameWidth() / 2.0;
+    }
+    pub fn getTopEdge(self: *const Engine) f32 {
+        _ = self;
+        return 10.0;
+    }
+    pub fn getBottomEdge(self: *const Engine) f32 {
+        _ = self;
+        return -10.0;
+    }
+
+    // Bounds checking
+    pub fn isInBounds(self: *const Engine, point: V2) bool {
+        return point.x >= self.getLeftEdge() and
+            point.x <= self.getRightEdge() and
+            point.y >= self.getBottomEdge() and
+            point.y <= self.getTopEdge();
+    }
+
+    // Wrapping
+    pub fn wrapPosition(self: *const Engine, point: V2) V2 {
+        var wrapped = point;
+        const width = self.getGameWidth();
+        const left = self.getLeftEdge();
+        const right = self.getRightEdge();
+        const top = self.getTopEdge();
+        const bottom = self.getBottomEdge();
+
+        if (wrapped.x < left) wrapped.x += width;
+        if (wrapped.x > right) wrapped.x -= width;
+
+        if (wrapped.y < bottom) wrapped.y += 20.0;
+        if (wrapped.y > top) wrapped.y -= 20.0;
+
+        return wrapped;
+    }
+
+    // Normalized coords
+    pub fn normalizedToGame(self: *const Engine, nx: f32, ny: f32) V2 {
+        const hw = self.getGameWidth() / 2.0;
+        return .{
+            .x = (nx * 2.0 - 1.0) * hw, // [0,1] -> [-hw, hw]
+            .y = (ny * 2.0 - 1.0) * 10.0, // [0,1] -> [-10, 10]
+        };
+    }
+    pub fn gameToNormalized(self: *const Engine, point: V2) struct { x: f32, y: f32 } {
+        const hw = self.getGameWidth() / 2.0;
+        return .{
+            .x = (point.x / hw + 1.0) / 2.0, // [-hw, hw] -> [0,1]
+            .y = (point.y / 10.0 + 1.0) / 2.0, // [-10, 10] -> [0,1]
+        };
+    }
 };
 
 // Input (from platform)

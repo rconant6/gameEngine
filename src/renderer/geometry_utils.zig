@@ -3,6 +3,7 @@ const types = @import("core");
 const Color = @import("../renderer/color.zig").Color;
 const GamePoint = types.GamePoint;
 const ScreenPoint = types.ScreenPoint;
+const V2 = types.V2;
 const RenderContext = @import("../renderer/RenderContext.zig");
 
 pub const Transform = struct {
@@ -45,24 +46,23 @@ pub fn transformPoint(point: GamePoint, transform: Transform) GamePoint {
     return result;
 }
 
-pub fn gameToScreen(point: GamePoint, ctx: RenderContext) ScreenPoint {
+pub fn gameToScreenF32(point: GamePoint, ctx: RenderContext) V2 {
     const fw: f32 = @floatFromInt(ctx.width);
     const fh: f32 = @floatFromInt(ctx.height);
+    const aspect = fw / fh;
 
-    const x: i32 = @intFromFloat((point.x + 10.0) * 0.05 * fw);
-    const y: i32 = @intFromFloat((10.0 - point.y) * 0.05 * fh);
+    const game_height: f32 = 10.0;
+    const game_width = game_height * aspect;
+
+    const x = (point.x + game_width) / (2.0 * game_width) * fw;
+    const y = (game_height - point.y) / (2.0 * game_height) * fh;
 
     return .{ .x = x, .y = y };
 }
 
-pub fn gameToScreenF32(point: GamePoint, ctx: RenderContext) [2]f32 {
-    const fw: f32 = @floatFromInt(ctx.width);
-    const fh: f32 = @floatFromInt(ctx.height);
-
-    const x: f32 = (point.x + 10.0) * 0.05 * fw;
-    const y: f32 = (10.0 - point.y) * 0.05 * fh;
-
-    return .{ x, y };
+pub fn gameToScreen(point: GamePoint, ctx: RenderContext) ScreenPoint {
+    const f = gameToScreenF32(point, ctx);
+    return .{ .x = @intFromFloat(f.x), .y = @intFromFloat(f.y) };
 }
 
 pub fn screenToGame(screen: ScreenPoint, ctx: RenderContext) GamePoint {
@@ -85,21 +85,21 @@ pub fn screenToClip(screen_x: f32, screen_y: f32, ctx: *const RenderContext) [2]
     return .{ x_clip, y_clip };
 }
 
-// pub fn toClip(point: GamePoint, ctx: *const RenderContext) [2]f32 {
-//     return ctx.screenToClip(point.x, point.y);
-// }
 pub fn gameToClipSpace(point: GamePoint, ctx: RenderContext) [2]f32 {
-    const screen = gameToScreenF32(point, ctx);
-
     const fw: f32 = @floatFromInt(ctx.width);
     const fh: f32 = @floatFromInt(ctx.height);
+    const aspect = fw / fh;
 
-    const clip_x = (screen[0] / fw) * 2.0 - 1.0;
-    const clip_y = 1.0 - (screen[1] / fh) * 2.0;
+    // Vertical game space is always [-10, 10] (20 units tall)
+    // Horizontal game space adapts: [-10*aspect, 10*aspect]
+    const game_height: f32 = 10.0;
+    const game_width = game_height * aspect;
 
-    return .{ clip_x, clip_y };
+    const x = point.x / game_width; // Maps to [-1, 1] in clip space
+    const y = point.y / game_height; // Maps to [-1, 1] in clip space
+
+    return .{ x, y };
 }
-
 pub fn colorToFloat(color: Color) [4]f32 {
     const r: f32 = @floatFromInt(color.r);
     const g: f32 = @floatFromInt(color.g);

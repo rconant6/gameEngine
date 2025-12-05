@@ -20,15 +20,15 @@ pub fn main() !void {
     defer game.deinit();
 
     const test_circle = engine.Circle{
-        .origin = .{ .x = 0, .y = 0 },
+        .origin = game.getCenter(),
         .radius = 2.0,
         .fill_color = engine.Colors.RED,
         .outline_color = engine.Colors.WHITE,
     };
 
     const test_line = engine.Line{
-        .start = .{ .x = -10.0, .y = 10.0 },
-        .end = .{ .x = 10.0, .y = -10.0 },
+        .start = game.getTopLeft(),
+        .end = game.getBottomRight(),
         .color = engine.Colors.RED,
     };
     const test_tri = engine.Triangle{
