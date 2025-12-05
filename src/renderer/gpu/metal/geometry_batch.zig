@@ -44,108 +44,188 @@ pub const GeometryBatch = struct {
         self.draw_calls.clearRetainingCapacity();
     }
 
-    pub fn getVertexSlice(self: *const GeometryBatch) []const Vertex {
-        return self.vertices.items;
-    }
-
     pub fn addShape(
         self: *GeometryBatch,
         shape: ShapeData,
         transform: ?Transform,
-        ctx: *const RenderContext,
+        ctx: RenderContext,
     ) !void {
         switch (shape) {
-            .Triangle => |tri| try addTriangle(self, tri, transform, ctx.*),
+            .Triangle => |tri| try addTriangle(self, tri, transform, ctx),
+            .Line => |l| try addLine(self, l, transform, ctx),
+            .Rectangle => |rect| try addRectangle(self, rect, transform, ctx),
+            .Polygon => |poly| try addPolygon(self, poly, transform, ctx),
+            .Circle => |circ| try addCircle(self, circ, transform, ctx),
             // TODO: need to add the rest
+            // Ellipse
             else => unreachable,
         }
     }
-
+    inline fn makeVertex(
+        point: GamePoint,
+        xform: ?Transform,
+        ctx: RenderContext,
+        color: [4]f32,
+    ) Vertex {
+        const transformed = if (xform) |t| utils.transformPoint(point, t) else point;
+        const clip_pos = utils.gameToClipSpace(transformed, ctx);
+        return .{ .position = clip_pos, .color = color };
+    }
     fn addLine(
-        batch: *GeometryBatch,
+        self: *GeometryBatch,
         line: Line,
         transform: ?Transform,
         ctx: RenderContext,
     ) !void {
         if (line.color == null) return;
 
-        const start_vertex_idx: u32 = @intCast(batch.vertices.items.len);
-
-        const start = if (transform) |t|
-            utils.transformPoint(line.start, t)
-        else
-            line.start;
-        const end = if (transform) |t|
-            utils.transformPoint(line.end, t)
-        else
-            line.end;
-
-        const start_screen = utils.gameToScreenF32(start, ctx);
-        const end_screen = utils.gameToScreenF32(end, ctx);
-
+        const batch_offset: u32 = @intCast(self.vertices.items.len);
         const color = utils.colorToFloat(line.color.?);
 
-        try batch.vertices.append(.{ .position = start_screen, .color = color });
-        try batch.vertices.append(.{ .position = end_screen, .color = color });
+        const vertices = [_]Vertex{
+            makeVertex(line.start, transform, ctx, color),
+            makeVertex(line.end, transform, ctx, color),
+        };
+        try self.vertices.appendSlice(self.allocator, &vertices);
 
-        try batch.draw_calls.append(.{
-            .primitive_type = .line,
-            .vertex_start = start_vertex_idx,
-            .vertex_count = 2,
-        });
+        try self.draw_calls.append(
+            self.allocator,
+            .{
+                .primitive_type = .line,
+                .vertex_start = batch_offset,
+                .vertex_count = 2,
+            },
+        );
     }
     fn addTriangle(
-        batch: *GeometryBatch,
+        self: *GeometryBatch,
         tri: Triangle,
         transform: ?Transform,
         ctx: RenderContext,
     ) !void {
         if (tri.fill_color == null) return; // TODO: Draw the outline
 
-        const start_vertex_idx: u32 = @intCast(batch.vertices.items.len);
+        const batch_offset: u32 = @intCast(self.vertices.items.len);
         const color = utils.colorToFloat(tri.fill_color.?);
 
-        for (tri.vertices) |vertex| {
-            const transformed = if (transform) |t|
-                utils.transformPoint(vertex, t)
-            else
-                vertex;
+        const vertices = [_]Vertex{
+            makeVertex(tri.vertices[0], transform, ctx, color),
+            makeVertex(tri.vertices[1], transform, ctx, color),
+            makeVertex(tri.vertices[2], transform, ctx, color),
+        };
+        try self.vertices.appendSlice(self.allocator, &vertices);
 
-            const screen_pos = utils.gameToClipSpace(transformed, ctx);
-
-            try batch.vertices.append(batch.allocator, .{
-                .position = screen_pos,
-                .color = color,
-            });
-        }
-
-        try batch.draw_calls.append(batch.allocator, .{
+        try self.draw_calls.append(self.allocator, .{
             .primitive_type = .triangle,
-            .vertex_start = start_vertex_idx,
+            .vertex_start = batch_offset,
             .vertex_count = 3,
         });
     }
     fn addRectangle(
         self: *GeometryBatch,
-        shape: Rectangle,
+        rect: Rectangle,
         transform: ?Transform,
-        ctx: *const RenderContext,
+        ctx: RenderContext,
     ) !void {
-        _ = self;
-        _ = shape;
-        _ = transform;
-        _ = ctx;
+        if (rect.fill_color == null) return; // TODO: Draw the outline
+
+        const corners = rect.getCorners();
+        const color = utils.colorToFloat(rect.fill_color.?);
+        const batch_offset: u32 = @intCast(self.vertices.items.len);
+
+        try self.vertices.ensureTotalCapacity(self.allocator, batch_offset + 6);
+        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + 2);
+
+        self.vertices.appendSliceAssumeCapacity(&.{
+            makeVertex(corners[0], transform, ctx, color),
+            makeVertex(corners[1], transform, ctx, color),
+            makeVertex(corners[2], transform, ctx, color),
+            makeVertex(corners[0], transform, ctx, color),
+            makeVertex(corners[2], transform, ctx, color),
+            makeVertex(corners[3], transform, ctx, color),
+        });
+
+        self.draw_calls.appendSliceAssumeCapacity(&.{
+            .{ .primitive_type = .triangle, .vertex_start = batch_offset, .vertex_count = 3 },
+            .{ .primitive_type = .triangle, .vertex_start = batch_offset + 3, .vertex_count = 3 },
+        });
+    }
+    fn addPolygon(
+        self: *GeometryBatch,
+        poly: Polygon,
+        transform: ?Transform,
+        ctx: RenderContext,
+    ) !void {
+        if (poly.fill_color == null) return; // TODO: Draw the outline
+
+        const batch_offset: u32 = @intCast(self.vertices.items.len);
+        var tri_offset: u32 = 0;
+        const color = utils.colorToFloat(poly.fill_color.?);
+        const num_tris = poly.vertices.len;
+
+        try self.vertices.ensureTotalCapacity(self.allocator, batch_offset + num_tris * 3);
+        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + num_tris);
+
+        for (0..num_tris) |i| {
+            const v1 = poly.vertices[i];
+            const v2 = poly.vertices[(i + 1) % num_tris];
+            self.vertices.appendSliceAssumeCapacity(&.{
+                makeVertex(poly.center, transform, ctx, color),
+                makeVertex(v1, transform, ctx, color),
+                makeVertex(v2, transform, ctx, color),
+            });
+
+            tri_offset = @intCast(i * 3);
+            self.draw_calls.appendAssumeCapacity(.{
+                .primitive_type = .triangle,
+                .vertex_start = batch_offset + tri_offset,
+                .vertex_count = 3,
+            });
+        }
     }
     fn addCircle(
         self: *GeometryBatch,
-        shape: Circle,
+        circle: Circle,
         transform: ?Transform,
-        ctx: *const RenderContext,
+        ctx: RenderContext,
     ) !void {
-        _ = self;
-        _ = shape;
-        _ = transform;
-        _ = ctx;
+        if (circle.fill_color == null) return; // TODO: Draw the outline
+
+        const segments = 32; // TODO: adapt to screen space (16, 32, 64)
+        const angle_step = std.math.tau / @as(f32, @floatFromInt(segments));
+        const batch_offset: u32 = @intCast(self.vertices.items.len);
+        const color = utils.colorToFloat(circle.fill_color.?);
+
+        try self.vertices.ensureTotalCapacity(self.allocator, batch_offset + segments * 3);
+        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + segments);
+
+        for (0..segments) |i| {
+            const i_f: f32 = @floatFromInt(i);
+            const angle1 = i_f * angle_step;
+            const angle2 = (i_f + 1.0) * angle_step;
+
+            const p1 = GamePoint{
+                .x = circle.origin.x + circle.radius * @cos(angle1),
+                .y = circle.origin.y + circle.radius * @sin(angle1),
+            };
+            const p2 = GamePoint{
+                .x = circle.origin.x + circle.radius * @cos(angle2),
+                .y = circle.origin.y + circle.radius * @sin(angle2),
+            };
+
+            self.vertices.appendSliceAssumeCapacity(&.{
+                makeVertex(circle.origin, transform, ctx, color),
+                makeVertex(p1, transform, ctx, color),
+                makeVertex(p2, transform, ctx, color),
+            });
+
+            const i_u32: u32 = @intCast(i);
+            self.draw_calls.appendAssumeCapacity(.{
+                .primitive_type = .triangle,
+                .vertex_start = batch_offset + i_u32 * 3,
+                .vertex_count = 3,
+            });
+        }
     }
     fn addEllipse(
         self: *GeometryBatch,

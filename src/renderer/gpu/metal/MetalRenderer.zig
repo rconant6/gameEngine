@@ -166,24 +166,13 @@ pub fn drawShape(
     transform: ?Transform,
 ) void {
     const ctx = self.getRenderContext();
-    self.batch.addShape(shape, transform, &ctx) catch |err| {
+    self.batch.addShape(shape, transform, ctx) catch |err| {
         std.log.err("Failed to add shape to batch: {any}\n", .{err});
     };
 }
 fn flushBatch(self: *Self) !void {
-    const vertices = self.batch.getVertexSlice();
+    const vertices = self.batch.vertices.items;
     if (vertices.len == 0) return;
-
-    // DEBUG: Log what we're drawing
-    std.log.debug("Flushing batch: {} vertices", .{vertices.len});
-    std.log.debug("First vertex: pos=({d:.2}, {d:.2}) color=({d:.2}, {d:.2}, {d:.2}, {d:.2})", .{
-        vertices[0].position[0],
-        vertices[0].position[1],
-        vertices[0].color[0],
-        vertices[0].color[1],
-        vertices[0].color[2],
-        vertices[0].color[3],
-    });
 
     const buffer_ptr = try MetalBridge.getBufferContents(self.vertex_buffer);
     const vertex_size = @sizeOf(Vertex);
