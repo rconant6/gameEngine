@@ -56,9 +56,7 @@ pub const GeometryBatch = struct {
             .Rectangle => |rect| try addRectangle(self, rect, transform, ctx),
             .Polygon => |poly| try addPolygon(self, poly, transform, ctx),
             .Circle => |circ| try addCircle(self, circ, transform, ctx),
-            // TODO: need to add the rest
-            // Ellipse
-            else => unreachable,
+            .Ellipse => @panic("TODO: Ellipse not supported"),
         }
     }
     inline fn makeVertex(
@@ -103,23 +101,59 @@ pub const GeometryBatch = struct {
         transform: ?Transform,
         ctx: RenderContext,
     ) !void {
-        if (tri.fill_color == null) return; // TODO: Draw the outline
+        const has_fill = tri.fill_color != null;
+        const has_outline = tri.outline_color != null;
+        if (!has_fill and !has_outline) return;
+
+        const vertex_count: u32 = blk: {
+            var count: u32 = 0;
+            if (has_fill) count += 3;
+            if (has_outline) count += 6;
+            break :blk count;
+        };
+        const call_count: u32 = blk: {
+            var count: u32 = 0;
+            if (has_fill) count += 1;
+            if (has_outline) count += 3;
+            break :blk count;
+        };
+
+        try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
+        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
+
+        const fill_color = if (has_fill) utils.colorToFloat(tri.fill_color.?) else undefined;
+        const outline_color = if (has_outline) utils.colorToFloat(tri.outline_color.?) else undefined;
 
         const batch_offset: u32 = @intCast(self.vertices.items.len);
-        const color = utils.colorToFloat(tri.fill_color.?);
+        if (has_fill) {
+            const vertices = [_]Vertex{
+                makeVertex(tri.vertices[0], transform, ctx, fill_color),
+                makeVertex(tri.vertices[1], transform, ctx, fill_color),
+                makeVertex(tri.vertices[2], transform, ctx, fill_color),
+            };
+            try self.vertices.appendSlice(self.allocator, &vertices);
+            try self.draw_calls.append(self.allocator, .{
+                .primitive_type = .triangle,
+                .vertex_start = batch_offset,
+                .vertex_count = 3,
+            });
+        }
 
-        const vertices = [_]Vertex{
-            makeVertex(tri.vertices[0], transform, ctx, color),
-            makeVertex(tri.vertices[1], transform, ctx, color),
-            makeVertex(tri.vertices[2], transform, ctx, color),
-        };
-        try self.vertices.appendSlice(self.allocator, &vertices);
-
-        try self.draw_calls.append(self.allocator, .{
-            .primitive_type = .triangle,
-            .vertex_start = batch_offset,
-            .vertex_count = 3,
-        });
+        if (has_outline) {
+            self.vertices.appendSliceAssumeCapacity(&.{
+                makeVertex(tri.vertices[0], transform, ctx, outline_color),
+                makeVertex(tri.vertices[1], transform, ctx, outline_color),
+                makeVertex(tri.vertices[1], transform, ctx, outline_color),
+                makeVertex(tri.vertices[2], transform, ctx, outline_color),
+                makeVertex(tri.vertices[2], transform, ctx, outline_color),
+                makeVertex(tri.vertices[0], transform, ctx, outline_color),
+            });
+            self.draw_calls.appendSliceAssumeCapacity(&.{
+                .{ .primitive_type = .line, .vertex_start = batch_offset + 3, .vertex_count = 2 },
+                .{ .primitive_type = .line, .vertex_start = batch_offset + 5, .vertex_count = 2 },
+                .{ .primitive_type = .line, .vertex_start = batch_offset + 7, .vertex_count = 2 },
+            });
+        }
     }
     fn addRectangle(
         self: *GeometryBatch,
@@ -127,28 +161,66 @@ pub const GeometryBatch = struct {
         transform: ?Transform,
         ctx: RenderContext,
     ) !void {
-        if (rect.fill_color == null) return; // TODO: Draw the outline
+        const has_fill = rect.fill_color != null;
+        const has_outline = rect.outline_color != null;
+        if (!has_fill and !has_outline) return;
+
+        const vertex_count: u32 = blk: {
+            var count: u32 = 0;
+            if (has_fill) count += 6;
+            if (has_outline) count += 8;
+            break :blk count;
+        };
+        const call_count: u32 = blk: {
+            var count: u32 = 0;
+            if (has_fill) count += 2;
+            if (has_outline) count += 4;
+            break :blk count;
+        };
+
+        try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
+        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
+
+        const fill_color = if (has_fill) utils.colorToFloat(rect.fill_color.?) else undefined;
+        const outline_color = if (has_outline) utils.colorToFloat(rect.outline_color.?) else undefined;
 
         const corners = rect.getCorners();
-        const color = utils.colorToFloat(rect.fill_color.?);
-        const batch_offset: u32 = @intCast(self.vertices.items.len);
-
-        try self.vertices.ensureTotalCapacity(self.allocator, batch_offset + 6);
-        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + 2);
-
-        self.vertices.appendSliceAssumeCapacity(&.{
-            makeVertex(corners[0], transform, ctx, color),
-            makeVertex(corners[1], transform, ctx, color),
-            makeVertex(corners[2], transform, ctx, color),
-            makeVertex(corners[0], transform, ctx, color),
-            makeVertex(corners[2], transform, ctx, color),
-            makeVertex(corners[3], transform, ctx, color),
-        });
-
-        self.draw_calls.appendSliceAssumeCapacity(&.{
-            .{ .primitive_type = .triangle, .vertex_start = batch_offset, .vertex_count = 3 },
-            .{ .primitive_type = .triangle, .vertex_start = batch_offset + 3, .vertex_count = 3 },
-        });
+        var batch_offset: u32 = @intCast(self.vertices.items.len);
+        if (has_fill) {
+            self.vertices.appendSliceAssumeCapacity(&.{
+                // Tri 1
+                makeVertex(corners[0], transform, ctx, fill_color),
+                makeVertex(corners[1], transform, ctx, fill_color),
+                makeVertex(corners[2], transform, ctx, fill_color),
+                // Tri 2
+                makeVertex(corners[0], transform, ctx, fill_color),
+                makeVertex(corners[2], transform, ctx, fill_color),
+                makeVertex(corners[3], transform, ctx, fill_color),
+            });
+            self.draw_calls.appendSliceAssumeCapacity(&.{
+                .{ .primitive_type = .triangle, .vertex_start = batch_offset, .vertex_count = 3 },
+                .{ .primitive_type = .triangle, .vertex_start = batch_offset + 3, .vertex_count = 3 },
+            });
+        }
+        batch_offset += 6;
+        if (has_outline) {
+            self.vertices.appendSliceAssumeCapacity(&.{
+                makeVertex(corners[0], transform, ctx, outline_color),
+                makeVertex(corners[1], transform, ctx, outline_color),
+                makeVertex(corners[1], transform, ctx, outline_color),
+                makeVertex(corners[2], transform, ctx, outline_color),
+                makeVertex(corners[2], transform, ctx, outline_color),
+                makeVertex(corners[3], transform, ctx, outline_color),
+                makeVertex(corners[3], transform, ctx, outline_color),
+                makeVertex(corners[0], transform, ctx, outline_color),
+            });
+            self.draw_calls.appendSliceAssumeCapacity(&.{
+                .{ .primitive_type = .line, .vertex_start = batch_offset, .vertex_count = 2 },
+                .{ .primitive_type = .line, .vertex_start = batch_offset + 2, .vertex_count = 2 },
+                .{ .primitive_type = .line, .vertex_start = batch_offset + 4, .vertex_count = 2 },
+                .{ .primitive_type = .line, .vertex_start = batch_offset + 6, .vertex_count = 2 },
+            });
+        }
     }
     fn addPolygon(
         self: *GeometryBatch,
@@ -156,31 +228,59 @@ pub const GeometryBatch = struct {
         transform: ?Transform,
         ctx: RenderContext,
     ) !void {
-        if (poly.fill_color == null) return; // TODO: Draw the outline
+        const has_fill = poly.fill_color != null;
+        const has_outline = poly.outline_color != null;
+        if (!has_fill and !has_outline) return;
 
-        const batch_offset: u32 = @intCast(self.vertices.items.len);
-        var tri_offset: u32 = 0;
-        const color = utils.colorToFloat(poly.fill_color.?);
+        const vertex_count: u32 = blk: {
+            var count: u32 = 0;
+            if (has_fill) count += @intCast(self.vertices.items.len * 3);
+            if (has_outline) count += @intCast(self.vertices.items.len * 2);
+            break :blk count;
+        };
+        const call_count: u32 = blk: {
+            var count: u32 = 0;
+            if (has_fill) count += @intCast(self.vertices.items.len);
+            if (has_outline) count += @intCast(self.vertices.items.len);
+            break :blk count;
+        };
+
+        try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
+        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
+
+        const fill_color = if (has_fill) utils.colorToFloat(poly.fill_color.?) else undefined;
+        const outline_color = if (has_outline) utils.colorToFloat(poly.outline_color.?) else undefined;
+
         const num_tris = poly.vertices.len;
-
-        try self.vertices.ensureTotalCapacity(self.allocator, batch_offset + num_tris * 3);
-        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + num_tris);
-
         for (0..num_tris) |i| {
             const v1 = poly.vertices[i];
             const v2 = poly.vertices[(i + 1) % num_tris];
-            self.vertices.appendSliceAssumeCapacity(&.{
-                makeVertex(poly.center, transform, ctx, color),
-                makeVertex(v1, transform, ctx, color),
-                makeVertex(v2, transform, ctx, color),
-            });
+            if (has_fill) {
+                const current_offset: u32 = @intCast(self.vertices.items.len);
+                self.vertices.appendSliceAssumeCapacity(&.{
+                    makeVertex(poly.center, transform, ctx, fill_color),
+                    makeVertex(v1, transform, ctx, fill_color),
+                    makeVertex(v2, transform, ctx, fill_color),
+                });
 
-            tri_offset = @intCast(i * 3);
-            self.draw_calls.appendAssumeCapacity(.{
-                .primitive_type = .triangle,
-                .vertex_start = batch_offset + tri_offset,
-                .vertex_count = 3,
-            });
+                self.draw_calls.appendAssumeCapacity(.{
+                    .primitive_type = .triangle,
+                    .vertex_start = current_offset,
+                    .vertex_count = 3,
+                });
+            }
+            if (has_outline) {
+                const current_offset: u32 = @intCast(self.vertices.items.len);
+                self.vertices.appendSliceAssumeCapacity(&.{
+                    makeVertex(v1, transform, ctx, outline_color),
+                    makeVertex(v2, transform, ctx, outline_color),
+                });
+                self.draw_calls.appendAssumeCapacity(.{
+                    .primitive_type = .line,
+                    .vertex_start = current_offset,
+                    .vertex_count = 2,
+                });
+            }
         }
     }
     fn addCircle(
@@ -189,15 +289,31 @@ pub const GeometryBatch = struct {
         transform: ?Transform,
         ctx: RenderContext,
     ) !void {
-        if (circle.fill_color == null) return; // TODO: Draw the outline
+        const has_fill = circle.fill_color != null;
+        const has_outline = circle.outline_color != null;
+        if (!has_fill and !has_outline) return;
 
-        const segments = 32; // TODO: adapt to screen space (16, 32, 64)
+        const segments = 32; // TODO: adapt to screen space (16, 32, 64, 128)
         const angle_step = std.math.tau / @as(f32, @floatFromInt(segments));
-        const batch_offset: u32 = @intCast(self.vertices.items.len);
-        const color = utils.colorToFloat(circle.fill_color.?);
 
-        try self.vertices.ensureTotalCapacity(self.allocator, batch_offset + segments * 3);
-        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + segments);
+        const vertex_count: u32 = blk: {
+            var count: u32 = 0;
+            if (has_fill) count += segments * 3;
+            if (has_outline) count += segments * 2;
+            break :blk count;
+        };
+        const call_count: u32 = blk: {
+            var count: u32 = 0;
+            if (has_fill) count += segments * 2;
+            if (has_outline) count += segments;
+            break :blk count;
+        };
+
+        try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
+        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
+
+        const fill_color = if (has_fill) utils.colorToFloat(circle.fill_color.?) else undefined;
+        const outline_color = if (has_outline) utils.colorToFloat(circle.outline_color.?) else undefined;
 
         for (0..segments) |i| {
             const i_f: f32 = @floatFromInt(i);
@@ -213,18 +329,32 @@ pub const GeometryBatch = struct {
                 .y = circle.origin.y + circle.radius * @sin(angle2),
             };
 
-            self.vertices.appendSliceAssumeCapacity(&.{
-                makeVertex(circle.origin, transform, ctx, color),
-                makeVertex(p1, transform, ctx, color),
-                makeVertex(p2, transform, ctx, color),
-            });
+            if (has_fill) {
+                const current_offset: u32 = @intCast(self.vertices.items.len);
+                self.vertices.appendSliceAssumeCapacity(&.{
+                    makeVertex(circle.origin, transform, ctx, fill_color),
+                    makeVertex(p1, transform, ctx, fill_color),
+                    makeVertex(p2, transform, ctx, fill_color),
+                });
+                self.draw_calls.appendAssumeCapacity(.{
+                    .primitive_type = .triangle,
+                    .vertex_start = current_offset,
+                    .vertex_count = 3,
+                });
+            }
 
-            const i_u32: u32 = @intCast(i);
-            self.draw_calls.appendAssumeCapacity(.{
-                .primitive_type = .triangle,
-                .vertex_start = batch_offset + i_u32 * 3,
-                .vertex_count = 3,
-            });
+            if (has_outline) {
+                const current_offset: u32 = @intCast(self.vertices.items.len);
+                self.vertices.appendSliceAssumeCapacity(&.{
+                    makeVertex(p1, transform, ctx, outline_color),
+                    makeVertex(p2, transform, ctx, outline_color),
+                });
+                self.draw_calls.appendAssumeCapacity(.{
+                    .primitive_type = .line,
+                    .vertex_start = current_offset,
+                    .vertex_count = 2,
+                });
+            }
         }
     }
     fn addEllipse(

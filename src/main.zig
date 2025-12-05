@@ -21,8 +21,9 @@ pub fn main() !void {
 
     const test_circle = engine.Circle{
         .origin = .{ .x = 0, .y = 0 },
-        .radius = 1.0,
+        .radius = 2.0,
         .fill_color = engine.Colors.RED,
+        .outline_color = engine.Colors.WHITE,
     };
 
     const test_line = engine.Line{
@@ -32,18 +33,18 @@ pub fn main() !void {
     };
     const test_tri = engine.Triangle{
         .vertices = [3]engine.V2{
-            .{ .x = 0.0, .y = 5.0 }, // Top
-            .{ .x = -5.0, .y = -5.0 }, // Bottom left
-            .{ .x = 5.0, .y = -5.0 }, // Bottom right
+            .{ .x = 0.0, .y = 5.0 },
+            .{ .x = -5.0, .y = -5.0 },
+            .{ .x = 5.0, .y = -5.0 },
         },
-        .fill_color = engine.Colors.PASTEL_CYAN,
-        .outline_color = engine.Colors.DARK_ORANGE,
+        .fill_color = engine.Colors.BLUE,
+        .outline_color = engine.Colors.WHITE,
     };
     const test_rect = engine.Rectangle{
         .center = .{ .x = 0.0, .y = 0.0 },
         .half_width = 3.0,
         .half_height = 2.0,
-        .fill_color = engine.Colors.BLUE,
+        .fill_color = engine.Colors.ORANGE,
         .outline_color = engine.Colors.WHITE,
     };
     const points = [_]engine.V2{
@@ -56,7 +57,7 @@ pub fn main() !void {
     };
     var purple_poly = try engine.Polygon.init(gpa.allocator(), &points); // TODO: update this init w/ wrapper
     purple_poly.fill_color = engine.Colors.NEON_PURPLE;
-    purple_poly.outline_color = engine.Colors.NEON_CYAN;
+    purple_poly.outline_color = engine.Colors.WHITE;
     while (!game.shouldClose()) {
         try game.beginFrame();
         game.clear(engine.Colors.DARK_GRAY);
