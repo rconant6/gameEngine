@@ -37,6 +37,7 @@ pub fn build(b: *std.Build) void {
     const renderer_options = b.addOptions();
     renderer_options.addOption(RendererBackend, "backend", selected_renderer);
     renderer_options.addOption(bool, "enable_validation", enable_validation);
+    renderer_module.addImport("asset", asset_module);
 
     const build_options_module = renderer_options.createModule();
     renderer_module.addImport("build_options", build_options_module);
