@@ -19,6 +19,7 @@ pub fn main() !void {
     };
     defer game.deinit();
 
+    // MARK: Renderer testing
     const test_circle = engine.Circle{
         .origin = game.getCenter(),
         .radius = 2.0,
@@ -56,8 +57,17 @@ pub fn main() !void {
         .{ .x = -1.7, .y = 1.0 },
     };
     var purple_poly = try engine.Polygon.init(gpa.allocator(), &points); // TODO: update this init w/ wrapper
+    errdefer purple_poly.deinit(gpa.allocator());
     purple_poly.fill_color = engine.Colors.NEON_PURPLE;
     purple_poly.outline_color = engine.Colors.WHITE;
+
+    // MARK: Font Testing
+    _ = try game.assets.fonts.setFontPath("assets/fonts");
+    const font_handle = try game.assets.fonts.loadFont("Orbitron.ttf");
+    const font_handle2 = try game.assets.fonts.loadFont("arcadeFont.ttf");
+    std.log.info("Same handle? {}", .{font_handle.id == font_handle2.id});
+    const font = game.assets.fonts.getFont(font_handle);
+
     while (!game.shouldClose()) {
         try game.beginFrame();
         game.clear(engine.Colors.DARK_GRAY);
@@ -68,6 +78,60 @@ pub fn main() !void {
         game.renderer.drawShape(.{ .Circle = test_circle }, .{
             .offset = .{ .x = 0, .y = -3 },
         });
+
+        if (font) |f| {
+            // Draw 'E' at center
+            drawGlyph(&game, f, 'E', 5.0, .{ .x = 0, .y = 5 }, engine.Colors.NEON_BLUE);
+
+            // Draw other letters for testing
+            drawGlyph(&game, f, 'A', 3.0, .{ .x = -5, .y = 6 }, engine.Colors.WHITE);
+            drawGlyph(&game, f, 'B', 3.0, .{ .x = 5, .y = 6 }, engine.Colors.WHITE);
+        }
         try game.endFrame();
+    }
+}
+fn drawGlyph(
+    game: *engine.Engine,
+    font: *const engine.Font,
+    char: u32,
+    scale: f32,
+    pos: engine.V2,
+    color: engine.Color,
+) void {
+    // Look up glyph
+    const glyph_index = font.char_to_glyph.get(char) orelse return;
+    const glyph = font.glyph_shapes.get(glyph_index) orelse return;
+
+    // Draw each contour
+    var start_idx: usize = 0;
+    for (glyph.contour_ends) |end_idx| {
+        const contour_points = glyph.points[start_idx .. end_idx + 1];
+
+        // Draw lines connecting points in this contour
+        for (contour_points, 0..) |point, i| {
+            const next_point = if (i == contour_points.len - 1)
+                contour_points[0] // Close the loop
+            else
+                contour_points[i + 1];
+
+            // Transform from normalized [0,1] to game space
+            const p1 = engine.V2{
+                .x = point.x * scale + pos.x,
+                .y = point.y * scale + pos.y,
+            };
+            const p2 = engine.V2{
+                .x = next_point.x * scale + pos.x,
+                .y = next_point.y * scale + pos.y,
+            };
+
+            // Draw line
+            game.renderer.drawShape(.{ .Line = .{
+                .start = p1,
+                .end = p2,
+                .color = color,
+            } }, null);
+        }
+
+        start_idx = end_idx + 1;
     }
 }

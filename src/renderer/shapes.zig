@@ -128,6 +128,9 @@ pub const Polygon = struct {
             .fill_color = null,
         };
     }
+    pub fn deinit(self: *Polygon, alloc: std.mem.Allocator) void {
+        alloc.free(self.vertices);
+    }
 };
 
 pub const Circle = struct {

@@ -24,6 +24,11 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/core/types.zig"),
     });
 
+    const asset_module = b.addModule("asset", .{
+        .root_source_file = b.path("src/assets/assets.zig"),
+    });
+    asset_module.addImport("core", core_module);
+
     const renderer_module = b.addModule("renderer", .{
         .root_source_file = b.path("src/renderer/renderer.zig"),
     });
@@ -41,6 +46,7 @@ pub fn build(b: *std.Build) void {
     });
     platform_module.addIncludePath(b.path("src/platform/macos/swift/include"));
 
+    // TODO: This is probably the end for the engine 'library'
     const api_module = b.addModule("api", .{
         .root_source_file = b.path("src/api/engine.zig"),
     });
@@ -48,7 +54,9 @@ pub fn build(b: *std.Build) void {
     api_module.addImport("platform", platform_module);
     api_module.addImport("renderer", renderer_module);
     api_module.addImport("build_options", build_options_module);
+    api_module.addImport("asset", asset_module);
 
+    // Main is floating around for dev/testing
     const main_module = b.addModule("main", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,

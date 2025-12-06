@@ -1,31 +1,33 @@
 const std = @import("std");
-const core = @import("core");
-const renderer = @import("renderer");
 const platform = @import("platform");
-
 const build_options = @import("build_options");
 
+const core = @import("core");
+pub const GamePoint = core.GamePoint;
+pub const ScreenPoint = core.ScreenPoint;
 pub const V2 = core.V2;
 pub const V2I = core.V2I;
 
+const renderer = @import("renderer");
 pub const Color = renderer.Color;
 pub const Colors = renderer.Colors;
-
 pub const Circle = renderer.Circle;
 pub const Rectangle = renderer.Rectangle;
 pub const Triangle = renderer.Triangle;
 pub const Polygon = renderer.Polygon;
 pub const Line = renderer.Line;
 pub const RenderContext = renderer.RenderContext;
-
-pub const GamePoint = core.GamePoint;
-pub const ScreenPoint = core.ScreenPoint;
-
 pub const Transform = renderer.Transform;
+
+const assets = @import("asset");
+pub const AssetManager = assets.AssetManager;
+pub const FontHandle = assets.FontHandle;
+pub const Font = assets.Font;
 
 pub const Engine = struct {
     allocator: std.mem.Allocator,
     renderer: renderer.Renderer,
+    assets: assets.AssetManager,
     window: platform.Window,
     running: bool,
 
@@ -68,8 +70,11 @@ pub const Engine = struct {
             }
         }
 
+        const asset_manager = try AssetManager.init(allocator);
+
         return .{
             .allocator = allocator,
+            .assets = asset_manager,
             .renderer = rend,
             .window = window.*,
             .running = true,
@@ -79,6 +84,7 @@ pub const Engine = struct {
     pub fn deinit(self: *Engine) void {
         self.renderer.deinit();
         self.window.deinit();
+        self.assets.deinit();
     }
 
     pub fn shouldClose(self: *const Engine) bool {
