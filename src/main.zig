@@ -1,8 +1,8 @@
 const std = @import("std");
 const engine = @import("api");
 
-const logical_width = 800;
-const logical_height = 600;
+const logical_width = 800 * 2;
+const logical_height = 600 * 2;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -20,47 +20,51 @@ pub fn main() !void {
     defer game.deinit();
 
     // MARK: Renderer testing
-    const test_circle = engine.Circle{
-        .origin = game.getCenter(),
-        .radius = 2.0,
-        .fill_color = engine.Colors.RED,
-        .outline_color = engine.Colors.WHITE,
-    };
+    const test_circle = game.create(engine.Circle, .{
+        game.getCenter(),
+        2.0,
+        engine.Colors.RED,
+        engine.Colors.WHITE,
+    });
 
-    const test_line = engine.Line{
-        .start = game.getTopLeft(),
-        .end = game.getBottomRight(),
-        .color = engine.Colors.RED,
-    };
-    const test_tri = engine.Triangle{
-        .vertices = [3]engine.V2{
+    const test_line = game.create(engine.Line, .{
+        game.getTopLeft(),
+        game.getBottomRight(),
+        engine.Colors.RED,
+    });
+
+    const test_tri = game.create(engine.Triangle, .{
+        &[3]engine.V2{
             .{ .x = 0.0, .y = 5.0 },
             .{ .x = -5.0, .y = -5.0 },
             .{ .x = 5.0, .y = -5.0 },
         },
-        .fill_color = engine.Colors.BLUE,
-        .outline_color = engine.Colors.WHITE,
+        engine.Colors.BLUE,
+        engine.Colors.WHITE,
+    });
+
+    const test_rect = game.create(engine.Rectangle, .{
+        3,
+        2,
+        6,
+        4,
+        engine.Colors.NEON_GREEN,
+        engine.Colors.WHITE,
+    });
+
+    const points = &[_]engine.V2{
+        .{ .x = 0.0, .y = 2.0 },
+        .{ .x = 1.7, .y = 1.0 },
+        .{ .x = 1.7, .y = -1.0 },
+        .{ .x = 0.0, .y = -2.0 },
+        .{ .x = -1.7, .y = -1.0 },
+        .{ .x = -1.7, .y = 1.0 },
     };
-    const test_rect = engine.Rectangle{
-        .center = .{ .x = 0.0, .y = 0.0 },
-        .half_width = 3.0,
-        .half_height = 2.0,
-        .fill_color = engine.Colors.ORANGE,
-        .outline_color = engine.Colors.WHITE,
-    };
-    const points = try gpa.allocator().alloc(engine.V2, 6);
-    points[0] = .{ .x = 0.0, .y = 2.0 };
-    points[1] = .{ .x = 1.7, .y = 1.0 };
-    points[2] = .{ .x = 1.7, .y = -1.0 };
-    points[3] = .{ .x = 0.0, .y = -2.0 };
-    points[4] = .{ .x = -1.7, .y = -1.0 };
-    points[5] = .{ .x = -1.7, .y = 1.0 };
-    errdefer gpa.allocator().free(points);
-    // TODO: wrapper api update
-    var purple_poly = try engine.Polygon.init(gpa.allocator(), points);
-    defer purple_poly.deinit();
-    purple_poly.fill_color = engine.Colors.NEON_PURPLE;
-    purple_poly.outline_color = engine.Colors.WHITE;
+    const purple_poly = game.create(engine.Polygon, .{
+        points,
+        engine.Colors.NEON_PURPLE,
+        engine.Colors.WHITE,
+    });
 
     // MARK: Font Testing
     _ = try game.assets.fonts.setFontPath("assets/fonts");
@@ -72,13 +76,12 @@ pub fn main() !void {
     while (!game.shouldClose()) {
         try game.beginFrame();
         game.clear(engine.Colors.DARK_GRAY);
-        game.renderer.drawShape(.{ .Line = test_line }, null);
-        game.renderer.drawShape(.{ .Triangle = test_tri }, null);
-        game.renderer.drawShape(.{ .Rectangle = test_rect }, null);
-        game.renderer.drawShape(.{ .Polygon = purple_poly }, null);
-        game.renderer.drawShape(.{ .Circle = test_circle }, .{
-            .offset = .{ .x = 0, .y = -3 },
-        });
+        game.draw(test_line, null);
+        game.draw(test_tri, null);
+        game.draw(test_rect, null);
+        game.draw(purple_poly, null);
+        game.draw(test_circle, .{ .offset = .{ .x = 0, .y = -3 } });
+
         if (font) |f| {
             game.renderer.drawText(
                 f,

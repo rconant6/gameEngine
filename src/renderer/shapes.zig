@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const core = @import("core");
 const Point = core.GamePoint;
 const col = @import("color.zig");
@@ -20,7 +21,7 @@ pub const ShapeType = enum {
     Polygon,
 };
 
-pub const ShapeData = union(ShapeType) {
+pub const Shape = union(ShapeType) {
     Circle: Circle,
     Ellipse: Ellipse,
     Line: Line,
@@ -28,31 +29,74 @@ pub const ShapeData = union(ShapeType) {
     Triangle: Triangle,
     Polygon: Polygon,
 };
+
 pub const Line = struct {
     start: Point,
     end: Point,
     color: ?Color = null,
+
+    pub fn init(
+        alloc: Allocator,
+        start: Point,
+        end: Point,
+        c: ?Color,
+    ) !Line {
+        _ = alloc;
+        return .{
+            .start = start,
+            .end = end,
+            .color = c,
+        };
+    }
 };
 
 pub const Triangle = struct {
-    vertices: [3]Point,
+    allocator: Allocator,
+    vertices: []Point,
     outline_color: ?Color = null,
     fill_color: ?Color = null,
 
-    pub fn init(points: []Point) Triangle {
-        std.mem.sort(Point, points, {}, sortPointByYThenX);
+    pub fn init(alloc: Allocator, points: []const Point, fc: ?Color, oc: ?Color) !Triangle {
+        const owned_points: []Point = try alloc.dupe(Point, points);
+        std.debug.assert(owned_points.len == 3);
+        std.mem.sort(Point, owned_points, {}, sortPointByYThenX);
         return .{
-            .vertices = points,
+            .allocator = alloc,
+            .vertices = owned_points,
+            .outline_color = oc,
+            .fill_color = fc,
         };
+    }
+    pub fn deinit(tri: *Triangle) void {
+        try .allocator.free(tri.vertices);
     }
 };
 
 pub const Rectangle = struct {
     center: Point,
-    half_width: f32,
-    half_height: f32,
-    outline_color: ?Color = null,
     fill_color: ?Color = null,
+    half_height: f32,
+    half_width: f32,
+    outline_color: ?Color = null,
+
+    pub fn init(
+        alloc: Allocator,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        fc: ?Color,
+        oc: ?Color,
+    ) !Rectangle {
+        _ = alloc;
+        return .{
+            .center = .{ .x = x - w / 2, .y = y - h / 2 },
+            .half_width = w / 2,
+            .half_height = h / 2,
+            .outline_color = oc,
+            .fill_color = fc,
+        };
+    }
 
     pub fn initSquare(center: Point, size: f32) Rectangle {
         return .{
@@ -111,17 +155,22 @@ pub const Rectangle = struct {
 };
 
 pub const Polygon = struct {
-    allocator: std.mem.Allocator,
-    points: []const Point,
+    allocator: Allocator,
     center: Point,
-    outline_color: ?Color = null,
+    fill_call_count: usize = 0,
     fill_color: ?Color = null,
+    outline_call_count: usize = 0,
+    outline_color: ?Color = null,
+    points: []const Point,
     triangle_cache: ?[][3]Point = null,
     vertex_count: usize = 0,
-    fill_call_count: usize = 0,
-    outline_call_count: usize = 0,
 
-    pub fn init(alloc: std.mem.Allocator, points: []const Point) !Polygon {
+    pub fn init(
+        alloc: Allocator,
+        points: []const Point,
+        fc: ?Color,
+        oc: ?Color,
+    ) !Polygon {
         const owned_points = try alloc.dupe(Point, points);
         errdefer alloc.free(owned_points);
         const center = calculateCentroid(owned_points);
@@ -130,8 +179,8 @@ pub const Polygon = struct {
             .allocator = alloc,
             .points = owned_points,
             .center = center,
-            .outline_color = null,
-            .fill_color = null,
+            .outline_color = oc,
+            .fill_color = fc,
             .triangle_cache = null,
         };
 
@@ -163,12 +212,29 @@ pub const Polygon = struct {
 };
 
 pub const Circle = struct {
-    origin: Point,
-    radius: f32,
-    outline_color: ?Color = null,
     fill_color: ?Color = null,
+    origin: Point,
+    outline_color: ?Color = null,
+    radius: f32,
+
+    pub fn init(
+        alloc: Allocator,
+        origin: Point,
+        r: f32,
+        fc: ?Color,
+        oc: ?Color,
+    ) !Circle {
+        _ = alloc;
+        return .{
+            .fill_color = fc,
+            .origin = origin,
+            .outline_color = oc,
+            .radius = r,
+        };
+    }
 };
 
+// TODO: NOT IMPLEMENTED
 pub const Ellipse = struct {
     origin: Point,
     semi_minor: f32,
@@ -212,17 +278,4 @@ fn calculateCentroid(points: []const Point) Point {
         .x = sum_x / flen,
         .y = sum_y / flen,
     };
-}
-
-const PolygonSortContext = struct {
-    centroid: Point,
-};
-
-fn sortPointsClockwise(context: PolygonSortContext, a: Point, b: Point) bool {
-    const center = context.centroid;
-
-    const angle_a = std.math.atan2(a.y - center.y, a.x - center.x);
-    const angle_b = std.math.atan2(b.y - center.y, b.x - center.x);
-
-    return angle_a > angle_b;
 }

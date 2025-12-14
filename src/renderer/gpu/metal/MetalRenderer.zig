@@ -23,7 +23,7 @@ const MTLStoreAction = metal.MTLStoreAction;
 
 const Color = @import("../../color.zig").Color;
 const shapes = @import("../../shapes.zig");
-const ShapeData = shapes.ShapeData;
+const ShapeData = shapes.Shape;
 const RenderContext = @import("../../RenderContext.zig");
 const utils = @import("../../geometry_utils.zig");
 const Transform = utils.Transform;

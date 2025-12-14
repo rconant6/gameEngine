@@ -3,6 +3,7 @@ const platform = @import("platform");
 const build_options = @import("build_options");
 
 const core = @import("core");
+pub const Point = core.V2;
 pub const GamePoint = core.GamePoint;
 pub const ScreenPoint = core.ScreenPoint;
 pub const V2 = core.V2;
@@ -17,6 +18,9 @@ pub const Triangle = renderer.Triangle;
 pub const Polygon = renderer.Polygon;
 pub const Line = renderer.Line;
 pub const RenderContext = renderer.RenderContext;
+// pub const ShapeData = renderer.ShapeData;
+// pub const ShapeType = renderer.ShapeType;
+pub const Shape = renderer.Shape;
 pub const Transform = renderer.Transform;
 
 const assets = @import("asset");
@@ -80,8 +84,8 @@ pub const Engine = struct {
             .running = true,
         };
     }
-
     pub fn deinit(self: *Engine) void {
+        std.log.info("Engine is shutdown...Renderer/Window/Assets deinit()", .{});
         self.renderer.deinit();
         self.window.deinit();
         self.assets.deinit();
@@ -108,15 +112,28 @@ pub const Engine = struct {
         self.renderer.clear();
     }
 
-    pub fn drawCircle(self: *Engine, circle: Circle) void {
-        self.renderer.drawShape(.{ .Circle = circle }, null);
+    // Creating shapes
+    pub fn create(self: *Engine, comptime Data: type, args: anytype) Data {
+        return @call(.auto, Data.init, .{self.allocator} ++ args) catch |err| {
+            std.debug.panic(
+                "Engine.create({s}) failed: {}\n memory leaking or to large",
+                .{ @typeName(Shape), err },
+            );
+        };
     }
-    pub fn drawCircleAt(self: *Engine, circle: Circle, x: f32, y: f32) void {
-        const transform = Transform{ .offset = .{ .x = x, .y = y } };
-        self.renderer.drawShape(.{ .Circle = circle }, transform);
-    }
-    pub fn drawRectangle(self: *Engine, rect: Rectangle) void {
-        self.renderer.drawShape(.{ .Rectangle = rect }, null);
+
+    // Drawing shapes
+    pub fn draw(self: *Engine, shape: anytype, xform: ?Transform) void {
+        const T = @TypeOf(shape);
+        const shape_union = switch (T) {
+            Polygon => Shape{ .Polygon = shape },
+            Rectangle => Shape{ .Rectangle = shape },
+            Circle => Shape{ .Circle = shape },
+            Triangle => Shape{ .Triangle = shape },
+            Line => Shape{ .Line = shape },
+            else => @compileError("Unsupported shape type: " ++ @typeName(T)),
+        };
+        self.renderer.drawShape(shape_union, xform);
     }
 
     pub fn getGameBounds(ctx: RenderContext) struct { width: f32, height: f32 } {
