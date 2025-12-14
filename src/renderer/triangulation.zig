@@ -1,7 +1,7 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const Point = @import("core").V2;
-const Contour = @import("shapes.zig").Contour;
 
 // MARK: Data structures
 pub const Triangle = struct {
@@ -9,17 +9,36 @@ pub const Triangle = struct {
     idx2: usize,
     idx3: usize,
 };
-
 const Diagonal = struct {
     v1: usize,
     v2: usize,
 };
-
 const EdgeKey = struct {
     from: usize,
     to: usize,
 };
+const TurnDirection = enum {
+    Left,
+    Right,
+    Collinear,
+};
+const ChainType = enum {
+    Left,
+    Right,
+};
+const VertexType = enum {
+    Start, // both neighbors below, convex
+    End, // both neighbors above, convex
+    Split, // both neighbors below, reflex
+    Merge, // both neighbors above, reflex
+    Regular, // one above, one below
+};
 
+const VertexEvent = struct {
+    point: Point,
+    index: usize,
+    vert_type: VertexType,
+};
 const AdjacencyList = std.AutoHashMap(usize, ArrayList(usize));
 const UsedEdges = std.AutoHashMap(EdgeKey, bool);
 
@@ -51,9 +70,9 @@ const Edge = struct {
 const StatusStructure = struct {
     edges: ArrayList(Edge),
     sweep_y: f32 = 0,
-    allocator: std.mem.Allocator,
+    allocator: Allocator,
 
-    pub fn init(allocator: std.mem.Allocator) StatusStructure {
+    pub fn init(allocator: Allocator) StatusStructure {
         return .{
             .allocator = allocator,
             .edges = .empty,
@@ -116,38 +135,14 @@ const StatusStructure = struct {
     }
 };
 
-const TurnDirection = enum {
-    Left,
-    Right,
-    Collinear,
-};
-const ChainType = enum {
-    Left,
-    Right,
-};
-
-const VertexType = enum {
-    Start, // both neighbors below, convex
-    End, // both neighbors above, convex
-    Split, // both neighbors below, reflex
-    Merge, // both neighbors above, reflex
-    Regular, // one above, one below
-};
-
-const VertexEvent = struct {
-    point: Point,
-    index: usize,
-    vert_type: VertexType,
-};
-
 const PartitionContext = struct {
-    allocator: std.mem.Allocator,
+    allocator: Allocator,
     vertices: []const Point,
     events: ArrayList(VertexEvent),
     status: StatusStructure,
     diagonals: ArrayList(Diagonal),
 
-    pub fn init(allocator: std.mem.Allocator, vertices: []const Point) !PartitionContext {
+    pub fn init(allocator: Allocator, vertices: []const Point) !PartitionContext {
         var events = try ArrayList(VertexEvent).initCapacity(allocator, vertices.len);
         const n = vertices.len;
         for (0..n) |idx| {
@@ -229,7 +224,6 @@ fn handleEnd(self: *PartitionContext, event: VertexEvent) !void {
             if (count == 2) break;
         }
     }
-
     if (count != 2) return error.NotEnoughEdges;
 
     const edge0 = self.status.edges.items[found_edges[0]];
@@ -447,30 +441,20 @@ fn classifyVertex(prev: Point, current: Point, next: Point) VertexType {
 }
 
 pub fn triangulate(
-    allocator: std.mem.Allocator,
-    contours: []const Contour,
+    allocator: Allocator,
+    points: []const Point,
 ) ![][3]Point {
-    // TODO: only handles single contour (no holes)
-    if (contours.len == 0) return error.EmptyContours;
-    if (contours.len > 1) return error.MultipleContoursNotImplemented;
+    if (points.len == 0) return error.EmptyPoints;
 
-    const vertices = contours[0].points;
-    if (vertices.len < 3) return error.NotEnoughVertices;
+    if (points.len < 3) return error.NotEnoughVertices;
 
-    var ctx = try PartitionContext.init(allocator, vertices);
+    var ctx = try PartitionContext.init(allocator, points);
     defer ctx.deinit();
 
-    std.debug.print("\n=== Starting partition ===\n", .{});
     const diagonals = try ctx.partition();
     defer allocator.free(diagonals);
-    std.debug.print("\n=== Partition Complete fount {d} diagonals ===\n", .{diagonals.len});
 
-    for (diagonals, 0..) |diag, i| {
-        std.debug.print("Diagonal {}: {} -> {}\n", .{ i, diag.v1, diag.v2 });
-    }
-
-    std.debug.print("\n=== Extracting monotone polygons ===\n", .{});
-    const monotone_pieces = try extractMonotonePolygons(allocator, vertices, diagonals);
+    const monotone_pieces = try extractMonotonePolygons(allocator, points, diagonals);
     defer {
         for (monotone_pieces) |piece| {
             allocator.free(piece);
@@ -478,31 +462,19 @@ pub fn triangulate(
         allocator.free(monotone_pieces);
     }
 
-    for (monotone_pieces, 0..) |piece, i| {
-        std.debug.print("Piece {}: ", .{i});
-        for (piece) |pt| {
-            std.debug.print("({d:.2}, {d:.2}) ", .{ pt.x, pt.y });
-        }
-
-        std.debug.print("\n", .{});
-    }
-
-    std.debug.print("\n=== Found {d} monotone pieces ===\n", .{monotone_pieces.len});
-    var all_triangles: std.ArrayList([3]Point) = .empty;
+    var all_triangles: ArrayList([3]Point) = .empty;
     errdefer all_triangles.deinit(allocator);
-    for (monotone_pieces, 0..) |piece, i| {
-        std.debug.print("\n=== Triangulating piece {d} ({d} vertices) ===\n", .{ i, piece.len });
+    for (monotone_pieces) |piece| {
         const piece_triangles = try triangulateMonotone(allocator, piece);
         defer allocator.free(piece_triangles);
         try all_triangles.appendSlice(allocator, piece_triangles);
-        std.debug.print("\n=== Piece {d} created {d} triangles ===\n", .{ i, piece_triangles.len });
     }
 
     return try all_triangles.toOwnedSlice(allocator);
 }
 
 fn triangulateMonotone(
-    allocator: std.mem.Allocator,
+    allocator: Allocator,
     vertices: []const Point,
 ) ![][3]Point {
     var stack: ArrayList(usize) = .empty;
@@ -599,7 +571,7 @@ fn triangulateMonotone(
             }
             _ = stack.pop();
             try stack.append(allocator, sorted_indices[idx - 1]);
-            try stack.append(allocator, sorted_indices[current_idx]);
+            try stack.append(allocator, current_idx);
         }
     }
 
@@ -647,7 +619,7 @@ fn sortNeighborsByAngle(
 }
 
 fn buildAdjacencyGraph(
-    allocator: std.mem.Allocator,
+    allocator: Allocator,
     vertices: []const Point,
     diagonals: []const Diagonal,
 ) !AdjacencyList {
@@ -680,13 +652,13 @@ fn buildAdjacencyGraph(
 }
 
 fn extractCycle(
-    allocator: std.mem.Allocator,
+    allocator: Allocator,
     adjacency: *AdjacencyList,
     used_edges: *UsedEdges,
     start_vertex: usize,
     n_vertices: usize,
 ) ![]usize {
-    var polygon: std.ArrayList(usize) = try .initCapacity(allocator, 2 * n_vertices);
+    var polygon: ArrayList(usize) = try .initCapacity(allocator, 2 * n_vertices);
     errdefer polygon.deinit(allocator);
 
     var current = start_vertex;
@@ -721,7 +693,7 @@ fn findFirstUnusedEdge(
 }
 
 fn extractMonotonePolygons(
-    allocator: std.mem.Allocator,
+    allocator: Allocator,
     vertices: []const Point,
     diagonals: []const Diagonal,
 ) ![][]Point {

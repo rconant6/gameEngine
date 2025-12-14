@@ -232,18 +232,11 @@ pub const GeometryBatch = struct {
         const has_outline = poly.outline_color != null;
         if (!has_fill and !has_outline) return;
 
-        const vertex_count: u32 = blk: {
-            var count: u32 = 0;
-            if (has_fill) count += @intCast(self.vertices.items.len * 3);
-            if (has_outline) count += @intCast(self.vertices.items.len * 2);
-            break :blk count;
-        };
-        const call_count: u32 = blk: {
-            var count: u32 = 0;
-            if (has_fill) count += @intCast(self.vertices.items.len);
-            if (has_outline) count += @intCast(self.vertices.items.len);
-            break :blk count;
-        };
+        const cache = poly.triangle_cache orelse return error.InvalidPolygon;
+
+        const vertex_count = poly.vertex_count;
+        const call_count = (if (has_fill) poly.fill_call_count else 0) +
+            (if (has_outline) poly.outline_call_count else 0);
 
         try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
         try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
@@ -251,33 +244,35 @@ pub const GeometryBatch = struct {
         const fill_color = if (has_fill) utils.colorToFloat(poly.fill_color.?) else undefined;
         const outline_color = if (has_outline) utils.colorToFloat(poly.outline_color.?) else undefined;
 
-        const num_tris = poly.vertices.len;
-        for (0..num_tris) |i| {
-            const v1 = poly.vertices[i];
-            const v2 = poly.vertices[(i + 1) % num_tris];
-            if (has_fill) {
-                const current_offset: u32 = @intCast(self.vertices.items.len);
+        const fill_start = self.vertices.items.len;
+        if (has_fill) {
+            for (cache) |tris| {
                 self.vertices.appendSliceAssumeCapacity(&.{
-                    makeVertex(poly.center, transform, ctx, fill_color),
-                    makeVertex(v1, transform, ctx, fill_color),
-                    makeVertex(v2, transform, ctx, fill_color),
-                });
-
-                self.draw_calls.appendAssumeCapacity(.{
-                    .primitive_type = .triangle,
-                    .vertex_start = current_offset,
-                    .vertex_count = 3,
+                    makeVertex(tris[0], transform, ctx, fill_color),
+                    makeVertex(tris[1], transform, ctx, fill_color),
+                    makeVertex(tris[2], transform, ctx, fill_color),
                 });
             }
-            if (has_outline) {
-                const current_offset: u32 = @intCast(self.vertices.items.len);
+
+            self.draw_calls.appendAssumeCapacity(.{
+                .primitive_type = .triangle,
+                .vertex_start = @intCast(fill_start),
+                .vertex_count = @intCast(cache.len * 3),
+            });
+        }
+
+        if (has_outline) {
+            for (poly.points, 0..) |point, i| {
+                const edge_start = self.vertices.items.len;
+                const v1 = point;
+                const v2 = poly.points[(i + 1) % poly.points.len];
                 self.vertices.appendSliceAssumeCapacity(&.{
                     makeVertex(v1, transform, ctx, outline_color),
                     makeVertex(v2, transform, ctx, outline_color),
                 });
                 self.draw_calls.appendAssumeCapacity(.{
                     .primitive_type = .line,
-                    .vertex_start = current_offset,
+                    .vertex_start = @intCast(edge_start),
                     .vertex_count = 2,
                 });
             }

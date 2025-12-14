@@ -8,6 +8,7 @@ const col = @import("color.zig");
 pub const Color = col.Color;
 pub const Colors = col.Colors;
 const shape = @import("shapes.zig");
+pub const Contour = shape.Contour;
 pub const Circle = shape.Circle;
 pub const Ellipse = shape.Ellipse;
 pub const Line = shape.Line;

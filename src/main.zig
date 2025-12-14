@@ -48,16 +48,17 @@ pub fn main() !void {
         .fill_color = engine.Colors.ORANGE,
         .outline_color = engine.Colors.WHITE,
     };
-    const points = [_]engine.V2{
-        .{ .x = 0.0, .y = 2.0 },
-        .{ .x = 1.7, .y = 1.0 },
-        .{ .x = 1.7, .y = -1.0 },
-        .{ .x = 0.0, .y = -2.0 },
-        .{ .x = -1.7, .y = -1.0 },
-        .{ .x = -1.7, .y = 1.0 },
-    };
-    var purple_poly = try engine.Polygon.init(gpa.allocator(), &points); // TODO: update this init w/ wrapper
-    errdefer purple_poly.deinit(gpa.allocator());
+    const points = try gpa.allocator().alloc(engine.V2, 6);
+    points[0] = .{ .x = 0.0, .y = 2.0 };
+    points[1] = .{ .x = 1.7, .y = 1.0 };
+    points[2] = .{ .x = 1.7, .y = -1.0 };
+    points[3] = .{ .x = 0.0, .y = -2.0 };
+    points[4] = .{ .x = -1.7, .y = -1.0 };
+    points[5] = .{ .x = -1.7, .y = 1.0 };
+    errdefer gpa.allocator().free(points);
+    // TODO: wrapper api update
+    var purple_poly = try engine.Polygon.init(gpa.allocator(), points);
+    defer purple_poly.deinit();
     purple_poly.fill_color = engine.Colors.NEON_PURPLE;
     purple_poly.outline_color = engine.Colors.WHITE;
 
@@ -78,7 +79,6 @@ pub fn main() !void {
         game.renderer.drawShape(.{ .Circle = test_circle }, .{
             .offset = .{ .x = 0, .y = -3 },
         });
-
         if (font) |f| {
             game.renderer.drawText(
                 f,

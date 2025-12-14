@@ -614,7 +614,7 @@ fn drawPolygon(renderer: *CpuRenderer, poly: Polygon, transform: ?Transform) voi
         drawPolygonFilled(renderer, poly, transform);
     }
     if (poly.outline_color) |oc| {
-        drawOutlineWithTransform(renderer, poly.vertices, transform, oc);
+        drawOutlineWithTransform(renderer, poly.contours[0].points, transform, oc);
     }
 }
 
@@ -631,10 +631,10 @@ fn drawPolygonFilled(renderer: *CpuRenderer, poly: Polygon, transform: ?Transfor
     var v2: GamePoint = undefined;
 
     const center = if (transform) |xform| utils.transformPoint(poly.center, xform) else poly.center;
-    for (0..poly.vertices.len) |i| {
-        v1 = if (transform) |xform| utils.transformPoint(poly.vertices[i], xform) else poly.vertices[i];
-        const idx = (i + 1) % poly.vertices.len;
-        v2 = if (transform) |xform| utils.transformPoint(poly.vertices[idx], xform) else poly.vertices[idx];
+    for (0..poly.contours[0].points.len) |i| {
+        v1 = if (transform) |xform| utils.transformPoint(poly.contours[0].points[i], xform) else poly.contours[0].points[i];
+        const idx = (i + 1) % poly.contours[0].points.len;
+        v2 = if (transform) |xform| utils.transformPoint(poly.contours[0].points[idx], xform) else poly.contours[0].points[idx];
         sortedVerts = .{ center, v1, v2 };
         std.mem.sort(GamePoint, &sortedVerts, {}, sortPointByY);
         drawTriangleFilled(renderer, &sortedVerts, null, poly.fill_color.?);

@@ -11,7 +11,6 @@ pub const V2I = core.V2I;
 const renderer = @import("renderer");
 pub const Color = renderer.Color;
 pub const Colors = renderer.Colors;
-pub const Contour = renderer.Contour;
 pub const Circle = renderer.Circle;
 pub const Rectangle = renderer.Rectangle;
 pub const Triangle = renderer.Triangle;

@@ -3,6 +3,7 @@ const core = @import("core");
 const Point = core.GamePoint;
 const col = @import("color.zig");
 const Color = col.Color;
+const tris = @import("triangulation.zig");
 
 pub const Transform = struct {
     offset: ?Point = null,
@@ -110,26 +111,54 @@ pub const Rectangle = struct {
 };
 
 pub const Polygon = struct {
-    vertices: []const Point,
+    allocator: std.mem.Allocator,
+    points: []const Point,
     center: Point,
     outline_color: ?Color = null,
     fill_color: ?Color = null,
+    triangle_cache: ?[][3]Point = null,
+    vertex_count: usize = 0,
+    fill_call_count: usize = 0,
+    outline_call_count: usize = 0,
 
     pub fn init(alloc: std.mem.Allocator, points: []const Point) !Polygon {
-        const center = calculateCentroid(points);
-        const new_points = try alloc.dupe(Point, points);
-        const sort_context = PolygonSortContext{ .centroid = center };
-        std.mem.sort(Point, new_points, sort_context, sortPointsClockwise);
+        const owned_points = try alloc.dupe(Point, points);
+        errdefer alloc.free(owned_points);
+        const center = calculateCentroid(owned_points);
 
-        return .{
+        var poly: Polygon = .{
+            .allocator = alloc,
+            .points = owned_points,
             .center = center,
-            .vertices = new_points,
             .outline_color = null,
             .fill_color = null,
+            .triangle_cache = null,
         };
+
+        const cache = try poly.getTriangles();
+        const fill_vertex_count = cache.len * 3;
+        const outline_count = points.len * 2;
+
+        poly.triangle_cache = cache;
+        poly.vertex_count = fill_vertex_count + outline_count;
+        poly.fill_call_count = 1;
+        poly.outline_call_count = outline_count;
+
+        return poly;
     }
-    pub fn deinit(self: *Polygon, alloc: std.mem.Allocator) void {
-        alloc.free(self.vertices);
+
+    pub fn deinit(self: *Polygon) void {
+        if (self.triangle_cache) |triangles| self.allocator.free(triangles);
+        self.allocator.free(self.points);
+    }
+
+    pub fn getTriangles(self: *Polygon) ![][3]Point {
+        if (self.triangle_cache) |triangles| return triangles;
+
+        const triangles = try tris.triangulate(self.allocator, self.points);
+
+        self.triangle_cache = triangles;
+        return triangles;
     }
 };
 
