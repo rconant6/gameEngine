@@ -12,7 +12,7 @@ pub const Ellipse = shape.Ellipse;
 pub const Line = shape.Line;
 pub const Polygon = shape.Polygon;
 pub const Rectangle = shape.Rectangle;
-pub const ShapeData = shape.ShapeData;
+pub const Shape = shape.ShapeData;
 pub const Triangle = shape.Triangle;
 pub const FrameBuffer = @import("cpu/frameBuffer.zig").FrameBuffer;
 const utils = @import("geometry_utils.zig");
@@ -97,7 +97,7 @@ pub const Renderer = struct {
         self.backend.setClearColor(color);
     }
 
-    pub fn drawShape(self: *Renderer, shape_data: ShapeData, transform: ?Transform) void {
+    pub fn drawShape(self: *Renderer, shape_data: Shape, transform: ?Transform) void {
         self.backend.drawShape(shape_data, transform);
     }
 

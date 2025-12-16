@@ -29,6 +29,12 @@ pub fn build(b: *std.Build) void {
     });
     renderer_module.addImport("core", core_module);
 
+    const entity_module = b.addModule("entity", .{
+        .root_source_file = b.path("src/ecs/ecs.zig"),
+    });
+    entity_module.addImport("core", core_module);
+    entity_module.addImport("renderer", renderer_module);
+
     const renderer_options = b.addOptions();
     renderer_options.addOption(RendererBackend, "backend", selected_renderer);
     renderer_options.addOption(bool, "enable_validation", enable_validation);
@@ -48,7 +54,10 @@ pub fn build(b: *std.Build) void {
     api_module.addImport("platform", platform_module);
     api_module.addImport("renderer", renderer_module);
     api_module.addImport("build_options", build_options_module);
+    api_module.addImport("entity", entity_module);
 
+    // Main module is just for testing....the library should be the api_module that
+    // gets exported.
     const main_module = b.addModule("main", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
@@ -58,6 +67,7 @@ pub fn build(b: *std.Build) void {
     main_module.addImport("platform", platform_module);
     main_module.addImport("renderer", renderer_module);
     main_module.addImport("api", api_module);
+    api_module.addImport("entity", entity_module);
 
     const exe = b.addExecutable(.{
         .name = "game-engine",
@@ -68,7 +78,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("platform", platform_module);
     exe.root_module.addImport("renderer", renderer_module);
     exe.root_module.addImport("api", api_module);
-
+    exe.root_module.addImport("entity", entity_module);
     configurePlatform(b, exe, main_module, target, optimize, selected_renderer);
 
     b.installArtifact(exe);
@@ -84,6 +94,53 @@ pub fn build(b: *std.Build) void {
     }
     const run_step = b.step("run", "Run the engine");
     run_step.dependOn(&run_cmd.step);
+
+    // ========================================
+    // Test Frameworks
+    // ========================================
+    // TODO: go back and start testing each component
+    const test_step = b.step("test", "Run all tests");
+
+    // ECS Component Storage Tests
+    const ecs_test_module = b.addModule("ecs_tests", .{
+        .root_source_file = b.path("tests/ecs/test_component_storage.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    ecs_test_module.addImport("core", core_module);
+    ecs_test_module.addAnonymousImport("ComponentStorage", .{
+        .root_source_file = b.path("src/ecs/ComponentStorage.zig"),
+    });
+
+    const ecs_tests = b.addTest(.{
+        .name = "ecs-tests",
+        .root_module = ecs_test_module,
+    });
+
+    const run_ecs_tests = b.addRunArtifact(ecs_tests);
+    test_step.dependOn(&run_ecs_tests.step);
+
+    // Query Tests
+    const query_test_module = b.addModule("query_tests", .{
+        .root_source_file = b.path("tests/ecs/test_query.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    query_test_module.addImport("core", core_module);
+    query_test_module.addAnonymousImport("ComponentStorage", .{
+        .root_source_file = b.path("src/ecs/ComponentStorage.zig"),
+    });
+    query_test_module.addAnonymousImport("Query", .{
+        .root_source_file = b.path("src/ecs/Query.zig"),
+    });
+
+    const query_tests = b.addTest(.{
+        .name = "query-tests",
+        .root_module = query_test_module,
+    });
+
+    const run_query_tests = b.addRunArtifact(query_tests);
+    test_step.dependOn(&run_query_tests.step);
 }
 
 fn defaultRendererForTarget(os_tag: std.Target.Os.Tag) RendererBackend {

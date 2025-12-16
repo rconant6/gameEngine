@@ -1,5 +1,8 @@
 const std = @import("std");
 const engine = @import("api");
+const ecs = @import("entity");
+const rend = @import("renderer");
+const Shape = rend.Shape;
 
 const logical_width = 800;
 const logical_height = 600;
@@ -58,6 +61,10 @@ pub fn main() !void {
     var purple_poly = try engine.Polygon.init(gpa.allocator(), &points); // TODO: update this init w/ wrapper
     purple_poly.fill_color = engine.Colors.NEON_PURPLE;
     purple_poly.outline_color = engine.Colors.WHITE;
+
+    var shapes = try ecs.ComponentStorage(Shape).init(gpa.allocator());
+    defer shapes.deinit();
+
     while (!game.shouldClose()) {
         try game.beginFrame();
         game.clear(engine.Colors.DARK_GRAY);
