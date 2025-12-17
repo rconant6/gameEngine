@@ -118,7 +118,6 @@ pub fn build(b: *std.Build) void {
     });
 
     const run_ecs_tests = b.addRunArtifact(ecs_tests);
-    test_step.dependOn(&run_ecs_tests.step);
 
     // Query Tests
     const query_test_module = b.addModule("query_tests", .{
@@ -138,9 +137,37 @@ pub fn build(b: *std.Build) void {
         .name = "query-tests",
         .root_module = query_test_module,
     });
-
     const run_query_tests = b.addRunArtifact(query_tests);
+
+    // World Tests
+    const world_test_module = b.addModule("world_tests", .{
+        .root_source_file = b.path("tests/ecs/test_world.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    world_test_module.addImport("core", core_module);
+    world_test_module.addAnonymousImport("World", .{
+        .root_source_file = b.path("src/ecs/World.zig"),
+    });
+    world_test_module.addAnonymousImport("Entity", .{
+        .root_source_file = b.path("src/ecs/Entity.zig"),
+    });
+    world_test_module.addAnonymousImport("ComponentStorage", .{
+        .root_source_file = b.path("src/ecs/ComponentStorage.zig"),
+    });
+    world_test_module.addAnonymousImport("Query", .{
+        .root_source_file = b.path("src/ecs/Query.zig"),
+    });
+    const world_tests = b.addTest(.{
+        .name = "world-tests",
+        .root_module = world_test_module,
+    });
+    const run_world_tests = b.addRunArtifact(world_tests);
+
+    // test steps
+    test_step.dependOn(&run_ecs_tests.step);
     test_step.dependOn(&run_query_tests.step);
+    test_step.dependOn(&run_world_tests.step);
 }
 
 fn defaultRendererForTarget(os_tag: std.Target.Os.Tag) RendererBackend {

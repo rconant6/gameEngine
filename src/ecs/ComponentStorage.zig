@@ -63,17 +63,17 @@ pub fn ComponentStorage(comptime T: type) type {
                 try self.sparse.resize(self.gpa, entity_id + 1);
                 @memset(self.sparse.items[old_len..], null);
             }
-            if (self.sparse.items[entity_id] != null) return error.EntityAlreadyExists;
+            if (self.sparse.items[entity_id] != null) return error.ComponentAlreadyExists;
 
             const dense_index = self.dense.items.len;
             try self.dense.append(self.gpa, component);
             try self.entities.append(self.gpa, entity_id);
             self.sparse.items[entity_id] = dense_index;
         }
-        pub fn remove(self: *@This(), entity_id: usize) !void {
+        pub fn remove(self: *@This(), entity_id: usize) void {
             if (entity_id >= self.sparse.items.len or
                 self.sparse.items[entity_id] == null)
-                return error.EntityNotFound;
+                return;
 
             const last_index = self.dense.items.len - 1;
             std.debug.assert(last_index == self.entities.items.len - 1);
@@ -95,7 +95,7 @@ pub fn ComponentStorage(comptime T: type) type {
             const dense_index = self.sparse.items[entity_id] orelse return null;
             return &self.dense.items[dense_index];
         }
-        pub fn getMutable(self: *@This(), entity_id: usize) ?*T {
+        pub fn getMut(self: *@This(), entity_id: usize) ?*T {
             if (entity_id >= self.sparse.items.len) return null;
             const dense_index = self.sparse.items[entity_id] orelse return null;
             return &self.dense.items[dense_index];

@@ -1,23 +1,9 @@
-const ecs = @import("ecs.zig");
-const Shape = ecs.Shape;
-const Transform = ecs.Transform;
-const V2 = ecs.V2;
-
-pub const ComponentTag = enum {
-    Control,
-    Player,
-    Render,
-    Transform,
-    Velocity,
-};
-
-pub const ComponentType = union(ComponentTag) {
-    Control: ControlComp,
-    Player: PlayerComp,
-    Render: RenderComp,
-    Transform: TransformComp,
-    Velocity: VelocityComp,
-};
+const rend = @import("renderer");
+const Color = rend.Color;
+const Shape = rend.Shape;
+const Transform = rend.Transform;
+const core = @import("core");
+const V2 = core.V2;
 
 pub const TextComp = struct {
     char: u8 = 0,
@@ -25,6 +11,12 @@ pub const TextComp = struct {
 
 pub const PlayerComp = struct {
     playerID: u8 = 0,
+};
+
+pub const Sprite = struct {
+    color: Color,
+    outline_color: ?Color = null,
+    shape: Shape,
 };
 
 pub const ControlComp = struct {

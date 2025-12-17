@@ -31,19 +31,16 @@ pub fn Query(comptime ComponentTypes: type) type {
 
         pub fn next(self: *@This()) ?Entry {
             @setEvalBranchQuota(10000);
-            // const num_storages = @typeInfo(ComponentTypes).@"struct".fields.len;
             const num_storages = std.meta.fields(ComponentTypes).len;
 
             inline for (0..num_storages) |i| {
                 if (i == self.primary_index) {
                     const primary_storage = @field(self.storages, std.fmt.comptimePrint("{d}", .{i}));
 
-                    // Keep looking for valid entities
                     while (self.current_index < primary_storage.dense.items.len) {
                         const entity_id = primary_storage.entities.items[self.current_index];
                         self.current_index += 1;
 
-                        // Check if entity exists in ALL storages
                         var valid = true;
                         inline for (std.meta.fields(ComponentTypes), 0..) |field, j| {
                             if (j == i) continue; // Skip primary
@@ -56,11 +53,10 @@ pub fn Query(comptime ComponentTypes: type) type {
 
                         if (!valid) continue;
 
-                        // Build component pointers tuple
                         var component_ptrs: ComponentPointers = undefined;
                         inline for (std.meta.fields(ComponentTypes), 0..) |field, j| {
                             const store = @field(self.storages, field.name);
-                            const ptr = store.get(entity_id).?;
+                            const ptr = store.getMut(entity_id).?;
                             @field(component_ptrs, std.fmt.comptimePrint("{d}", .{j})) = ptr;
                         }
 
@@ -99,7 +95,7 @@ pub fn Query(comptime ComponentTypes: type) type {
                 const StorageType = std.meta.Child(field.type);
                 result_fields[i] = .{
                     .name = std.fmt.comptimePrint("{d}", .{i}),
-                    .type = *const StorageType.ComponentType,
+                    .type = *StorageType.ComponentType,
                     .default_value_ptr = null,
                     .is_comptime = false,
                     .alignment = @alignOf(*const StorageType.ComponentType),
