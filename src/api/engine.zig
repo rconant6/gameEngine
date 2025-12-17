@@ -18,8 +18,6 @@ pub const Triangle = renderer.Triangle;
 pub const Polygon = renderer.Polygon;
 pub const Line = renderer.Line;
 pub const RenderContext = renderer.RenderContext;
-// pub const ShapeData = renderer.ShapeData;
-// pub const ShapeType = renderer.ShapeType;
 pub const Shape = renderer.Shape;
 pub const Transform = renderer.Transform;
 
@@ -27,6 +25,27 @@ const assets = @import("asset");
 pub const AssetManager = assets.AssetManager;
 pub const FontHandle = assets.FontHandle;
 pub const Font = assets.Font;
+
+const ecs = @import("entity");
+pub const World = ecs.World;
+pub const Entity = ecs.Entity;
+pub const Query = ecs.Query;
+pub const ComponentStorage = ecs.ComponentStorage;
+pub const TransformComp = ecs.Transform;
+pub const Velocity = ecs.Velocity;
+pub const Sprite = ecs.Sprite;
+pub const Text = ecs.Text;
+pub const RenderLayer = ecs.RenderLayer;
+pub const CircleCollider = ecs.CircleCollider;
+pub const RectCollider = ecs.RectCollider;
+pub const Lifetime = ecs.Lifetime;
+pub const ScreenWrap = ecs.ScreenWrap;
+pub const ScreenClamp = ecs.ScreenClamp;
+const movementSystem = ecs.movementSystem;
+const renderSystem = ecs.renderSystem;
+const lifetimeSystem = ecs.lifetimeSystem;
+const screenWrapSystem = ecs.screenWrapSystem;
+const screenClampSystem = ecs.screenClampSystem;
 
 pub const Engine = struct {
     allocator: std.mem.Allocator,
