@@ -1,5 +1,4 @@
 const Self = @This();
-
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Storages = std.StringHashMap(StorageInterface);
@@ -32,7 +31,6 @@ pub fn createEntity(self: *Self) !Entity {
     self.next_entity_id += 1;
     return entity;
 }
-
 pub fn destroyEntity(self: *Self, entity: Entity) void {
     var iter = self.component_storages.valueIterator();
     while (iter.next()) |interface| {
@@ -42,12 +40,7 @@ pub fn destroyEntity(self: *Self, entity: Entity) void {
     }
 }
 
-pub fn addComponent(
-    self: *Self,
-    entity: Entity,
-    comptime T: type,
-    value: T,
-) !void {
+pub fn addComponent(self: *Self, entity: Entity, comptime T: type, value: T) !void {
     if (!self.component_storages.contains(@typeName(T))) {
         try self.registerComponent(T);
     }
@@ -55,6 +48,14 @@ pub fn addComponent(
     const storage = self.getStorage(T);
     try storage.add(entity.id, value);
 }
+pub fn removeComponent(self: *Self, entity: Entity, comptime T: type) void {
+    const name = @typeName(T);
+    if (!self.component_storages.contains(name)) return;
+
+    const storage = self.getStorage(T);
+    storage.remove(entity.id);
+}
+
 pub fn hasComponent(self: *Self, entity: Entity, comptime T: type) bool {
     const name = @typeName(T);
     if (!self.component_storages.contains(name)) return false;
@@ -62,7 +63,6 @@ pub fn hasComponent(self: *Self, entity: Entity, comptime T: type) bool {
     const storage = self.getStorage(T);
     return storage.has(entity.id);
 }
-
 pub fn getComponent(self: *Self, entity: Entity, comptime T: type) ?*const T {
     const name = @typeName(T);
     if (!self.component_storages.contains(name)) return null;
@@ -70,7 +70,6 @@ pub fn getComponent(self: *Self, entity: Entity, comptime T: type) ?*const T {
     const storage = self.getStorage(T);
     return storage.get(entity.id);
 }
-
 pub fn getComponentMut(self: *Self, entity: Entity, comptime T: type) ?*T {
     const name = @typeName(T);
     if (!self.component_storages.contains(name)) return null;
@@ -79,13 +78,6 @@ pub fn getComponentMut(self: *Self, entity: Entity, comptime T: type) ?*T {
     return storage.getMut(entity.id);
 }
 
-pub fn removeComponent(self: *Self, entity: Entity, comptime T: type) void {
-    const name = @typeName(T);
-    if (!self.component_storages.contains(name)) return;
-
-    const storage = self.getStorage(T);
-    storage.remove(entity.id);
-}
 pub fn query(self: *Self, comptime component_types: anytype) Query(buildStorageTupleType(component_types)) {
     inline for (0..std.meta.fields(@TypeOf(component_types)).len) |i| {
         const T = component_types[i];

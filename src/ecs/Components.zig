@@ -1,39 +1,55 @@
-const rend = @import("renderer");
-const Color = rend.Color;
-const Shape = rend.Shape;
-const Transform = rend.Transform;
 const core = @import("core");
 const V2 = core.V2;
 
-pub const TextComp = struct {
-    char: u8 = 0,
+const rend = @import("renderer");
+const Color = rend.Color;
+const Shape = rend.Shape;
+
+const asset = @import("asset");
+const FontHandle = asset.FontHandle;
+
+// MARK: Spatial Components
+pub const Transfrom = struct {
+    offset: V2,
+    rotation: f32,
+    scale: f32,
+};
+pub const Velocity = struct {
+    linear: V2,
+    angular: f32,
 };
 
-pub const PlayerComp = struct {
-    playerID: u8 = 0,
-};
-
+// MARK: Rendering Components
 pub const Sprite = struct {
+    shape: Shape,
     color: Color,
-    outline_color: ?Color = null,
-    shape: Shape,
-};
-
-pub const ControlComp = struct {
-    rotationRate: ?f32 = null,
-    thrustForce: ?f32 = null,
-    shotRate: ?f32 = null,
-};
-
-pub const TransformComp = struct {
-    transform: Transform,
-};
-
-pub const RenderComp = struct {
-    shape: Shape,
+    outline: ?Color,
     visible: bool,
 };
-
-pub const VelocityComp = struct {
-    velocity: V2 = V2.ZERO,
+pub const Text = struct {
+    text: []const u8,
+    font: FontHandle,
+    scale: f32,
+    color: Color,
 };
+pub const RenderLayer = struct {
+    z_order: i32 = 0,
+};
+
+// MARK: Physics Components
+pub const CircleCollider = struct {
+    radius: f32,
+};
+pub const RectCollider = struct {
+    half_width: f32,
+    half_height: f32,
+};
+
+// MARK: Utility Components
+pub const Lifetime = struct {
+    remaining: f32,
+};
+
+// MARK: Tagging Comonents
+pub const ScreenWrap = struct {};
+pub const ScreenClamp = struct {};
