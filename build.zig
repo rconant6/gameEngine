@@ -39,6 +39,7 @@ pub fn build(b: *std.Build) void {
     });
     entity_module.addImport("core", core_module);
     entity_module.addImport("renderer", renderer_module);
+    entity_module.addImport("asset", asset_module);
 
     const renderer_options = b.addOptions();
     renderer_options.addOption(RendererBackend, "backend", selected_renderer);
@@ -62,6 +63,7 @@ pub fn build(b: *std.Build) void {
     api_module.addImport("renderer", renderer_module);
     api_module.addImport("build_options", build_options_module);
     api_module.addImport("asset", asset_module);
+    api_module.addImport("entity", entity_module);
 
     // Main is floating around for dev/testing
     const main_module = b.addModule("main", .{
@@ -73,6 +75,7 @@ pub fn build(b: *std.Build) void {
     main_module.addImport("platform", platform_module);
     main_module.addImport("renderer", renderer_module);
     main_module.addImport("api", api_module);
+    api_module.addImport("asset", asset_module);
     api_module.addImport("entity", entity_module);
 
     const exe = b.addExecutable(.{
@@ -84,6 +87,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("platform", platform_module);
     exe.root_module.addImport("renderer", renderer_module);
     exe.root_module.addImport("api", api_module);
+    exe.root_module.addImport("asset", asset_module);
     exe.root_module.addImport("entity", entity_module);
     configurePlatform(b, exe, main_module, target, optimize, selected_renderer);
 
