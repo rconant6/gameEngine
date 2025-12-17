@@ -4,7 +4,7 @@ const Vertex = types.Vertex;
 const MTLPrimitiveType = types.MTLPrimitiveType;
 const rend = @import("../../renderer.zig");
 const Color = rend.Color;
-const ShapeData = rend.Shape;
+const Shape = rend.Shape;
 const Transform = rend.Transform;
 const Circle = rend.Circle;
 const Rectangle = rend.Rectangle;
@@ -46,7 +46,7 @@ pub const GeometryBatch = struct {
 
     pub fn addShape(
         self: *GeometryBatch,
-        shape: ShapeData,
+        shape: Shape,
         transform: ?Transform,
         ctx: RenderContext,
     ) !void {

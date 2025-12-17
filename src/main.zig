@@ -1,5 +1,8 @@
 const std = @import("std");
 const engine = @import("api");
+const ecs = @import("entity");
+const rend = @import("renderer");
+const Shape = rend.Shape;
 
 const logical_width = 800 * 2;
 const logical_height = 600 * 2;
