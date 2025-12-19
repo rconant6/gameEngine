@@ -1,4 +1,5 @@
 const std = @import("std");
+const Entity = @import("Entity.zig");
 
 // ComponentTypes = .{*ComponentStorage(Transform), *ComponentStorage(Velocity)}
 pub fn Query(comptime ComponentTypes: type) type {
@@ -6,7 +7,7 @@ pub fn Query(comptime ComponentTypes: type) type {
         const ComponentPointers = buildComponentPointers(ComponentTypes);
 
         pub const Entry = struct {
-            entity: usize,
+            entity: Entity,
             components: ComponentPointers, // Tuple of component pointers
 
             pub fn get(
@@ -61,7 +62,7 @@ pub fn Query(comptime ComponentTypes: type) type {
                         }
 
                         return Entry{
-                            .entity = entity_id,
+                            .entity = Entity{ .id = entity_id },
                             .components = component_ptrs,
                         };
                     }

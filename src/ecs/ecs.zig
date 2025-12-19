@@ -11,11 +11,7 @@ pub const RenderLayer = comps.RenderLayer;
 pub const CircleCollider = comps.CircleCollider;
 pub const RectCollider = comps.RectCollider;
 pub const Lifetime = comps.Lifetime;
+// Mark: Tags
 pub const ScreenWrap = comps.ScreenWrap;
 pub const ScreenClamp = comps.ScreenClamp;
-const systs = @import("Systems.zig");
-pub const movementSystem = systs.movementSystem;
-pub const renderSystem = systs.renderSystem;
-pub const lifetimeSystem = systs.lifetimeSystem;
-pub const screenWrapSystem = systs.screenWrapSystem;
-pub const screenClampSystem = systs.screenClampSystem;
+pub const Destroy = comps.Destroy;

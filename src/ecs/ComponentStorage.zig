@@ -1,12 +1,13 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
+const Entity = @import("Entity.zig");
 
 pub fn ComponentStorage(comptime T: type) type {
     return struct {
         pub const Iterator = struct {
             pub const Entry = struct {
-                entity: usize,
+                entity: Entity,
                 component: *const T,
             };
 

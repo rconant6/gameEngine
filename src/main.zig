@@ -1,8 +1,5 @@
 const std = @import("std");
-const engine = @import("api");
-const ecs = @import("entity");
-const rend = @import("renderer");
-const Shape = rend.Shape;
+const engine = @import("engine");
 
 const logical_width = 800 * 2;
 const logical_height = 600 * 2;
@@ -10,90 +7,120 @@ const logical_height = 600 * 2;
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
-    var game = engine.Engine.init(
-        gpa.allocator(),
-        "My Game",
+    var game = try engine.Engine.init(
+        allocator,
+        "ECS Demo",
         logical_width,
         logical_height,
-    ) catch |err| {
-        std.debug.print("[MAIN] engine failed to initialize: {any}", .{err});
-        std.process.exit(2);
-    };
+    );
     defer game.deinit();
 
-    // MARK: Renderer testing
-    const test_circle = game.create(engine.Circle, .{
-        game.getCenter(),
-        2.0,
-        engine.Colors.RED,
-        engine.Colors.WHITE,
-    });
-
-    const test_line = game.create(engine.Line, .{
-        game.getTopLeft(),
-        game.getBottomRight(),
-        engine.Colors.RED,
-    });
-
-    const test_tri = game.create(engine.Triangle, .{
-        &[3]engine.V2{
-            .{ .x = 0.0, .y = 5.0 },
-            .{ .x = -5.0, .y = -5.0 },
-            .{ .x = 5.0, .y = -5.0 },
-        },
-        engine.Colors.BLUE,
-        engine.Colors.WHITE,
-    });
-
-    const test_rect = game.create(engine.Rectangle, .{
-        3,
-        2,
-        6,
-        4,
-        engine.Colors.NEON_GREEN,
-        engine.Colors.WHITE,
-    });
-
-    const points = &[_]engine.V2{
-        .{ .x = 0.0, .y = 2.0 },
-        .{ .x = 1.7, .y = 1.0 },
-        .{ .x = 1.7, .y = -1.0 },
-        .{ .x = 0.0, .y = -2.0 },
-        .{ .x = -1.7, .y = -1.0 },
-        .{ .x = -1.7, .y = 1.0 },
-    };
-    const purple_poly = game.create(engine.Polygon, .{
-        points,
-        engine.Colors.NEON_PURPLE,
-        engine.Colors.WHITE,
-    });
-
-    // MARK: Font Testing
-    _ = try game.assets.fonts.setFontPath("assets/fonts");
-    const font_handle = try game.assets.fonts.loadFont("Orbitron.ttf");
-    const font_handle2 = try game.assets.fonts.loadFont("arcadeFont.ttf");
-    std.log.info("Same handle? {}", .{font_handle.id == font_handle2.id});
+    // Setup font
+    try game.assets.setFontPath("assets/fonts");
+    const font_handle = try game.assets.loadFont("Orbitron.ttf");
     const font = game.assets.fonts.getFont(font_handle);
 
+    // Create bouncing circle (clamps to screen edges)
+    const bouncer = try game.createEntity();
+    try game.addComponent(bouncer, engine.TransformComp, .{
+        .position = .{ .x = 0.0, .y = 0.0 },
+        .rotation = 0.0,
+        .scale = 1.0,
+    });
+    try game.addComponent(bouncer, engine.Velocity, .{
+        .linear = .{ .x = 5.0, .y = 3.0 },
+        .angular = 0.0,
+    });
+    try game.addComponent(bouncer, engine.Sprite, .{
+        .shape = .{ .Circle = game.create(engine.Circle, .{
+            engine.V2{ .x = 0.0, .y = 0.0 },
+            2.0,
+            engine.Colors.NEON_GREEN,
+            engine.Colors.WHITE,
+        }) },
+        .color = engine.Colors.NEON_GREEN,
+        .visible = true,
+    });
+    try game.addComponent(bouncer, engine.ScreenClamp, .{});
+
+    // Create wrapping rectangle (wraps around screen)
+    const wrapper = try game.createEntity();
+    try game.addComponent(wrapper, engine.TransformComp, .{
+        .position = .{ .x = -5.0, .y = -5.0 },
+        .rotation = 0.0,
+        .scale = 1.0,
+    });
+    try game.addComponent(wrapper, engine.Velocity, .{
+        .linear = .{ .x = 2.0, .y = 1.5 },
+        .angular = 1.0, // Rotate while moving
+    });
+    try game.addComponent(wrapper, engine.Sprite, .{
+        .shape = .{ .Rectangle = game.create(engine.Rectangle, .{
+            0.0,
+            0.0,
+            3.0,
+            2.0,
+            engine.Colors.NEON_PURPLE,
+            engine.Colors.WHITE,
+        }) },
+        .color = engine.Colors.NEON_PURPLE,
+        .visible = true,
+    });
+    try game.addComponent(wrapper, engine.ScreenWrap, .{});
+
+    // Create static triangle
+    const static_tri = try game.createEntity();
+    try game.addComponent(static_tri, engine.TransformComp, .{
+        .position = .{ .x = 0.0, .y = 5.0 },
+        .rotation = 0.0,
+        .scale = 1.0,
+    });
+    try game.addComponent(static_tri, engine.Sprite, .{
+        .shape = .{ .Triangle = game.create(engine.Triangle, .{
+            &[3]engine.V2{
+                .{ .x = 0.0, .y = 1.0 },
+                .{ .x = -1.0, .y = -1.0 },
+                .{ .x = 1.0, .y = -1.0 },
+            },
+            engine.Colors.BLUE,
+            engine.Colors.WHITE,
+        }) },
+        .color = engine.Colors.BLUE,
+        .visible = true,
+    });
+    try game.addComponent(static_tri, engine.Lifetime, .{ .remaining = 2 });
+
+    // Create text entity
+    if (font) |_| {
+        const text_entity = try game.createEntity();
+        try game.addComponent(text_entity, engine.TransformComp, .{
+            .position = .{ .x = game.getLeftEdge() + 0.5, .y = game.getTopEdge() - 1.0 },
+            .rotation = 0.0,
+            .scale = 1.0,
+        });
+        try game.addComponent(text_entity, engine.Text, .{
+            .text = "ECS DEMO - Bouncing & Wrapping",
+            .font = font_handle,
+            .scale = 0.5,
+            .color = engine.Colors.NEON_ORANGE,
+        });
+    }
+
+    var last_time = std.time.milliTimestamp();
     while (!game.shouldClose()) {
+        const current_time = std.time.milliTimestamp();
+        const dt: f32 = @as(f32, @floatFromInt(current_time - last_time)) / 1000.0;
+        last_time = current_time;
+
         try game.beginFrame();
         game.clear(engine.Colors.DARK_GRAY);
-        game.draw(test_line, null);
-        game.draw(test_tri, null);
-        game.draw(test_rect, null);
-        game.draw(purple_poly, null);
-        game.draw(test_circle, .{ .offset = .{ .x = 0, .y = -3 } });
 
-        if (font) |f| {
-            game.renderer.drawText(
-                f,
-                "THE QUICK BROWN FOX JUMPED OVER A SLEEPING DOG 1234567890",
-                .{ .x = game.getLeftEdge() + 0.1, .y = 8.0 },
-                0.65,
-                engine.Colors.NEON_ORANGE,
-            );
-        }
+        // Run ECS systems
+        game.update(dt);
+        game.render();
+
         try game.endFrame();
     }
 }

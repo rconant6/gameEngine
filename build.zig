@@ -55,15 +55,15 @@ pub fn build(b: *std.Build) void {
     platform_module.addIncludePath(b.path("src/platform/macos/swift/include"));
 
     // TODO: This is probably the end for the engine 'library'
-    const api_module = b.addModule("api", .{
+    const engine_module = b.addModule("engine", .{
         .root_source_file = b.path("src/api/engine.zig"),
     });
-    api_module.addImport("core", core_module);
-    api_module.addImport("platform", platform_module);
-    api_module.addImport("renderer", renderer_module);
-    api_module.addImport("build_options", build_options_module);
-    api_module.addImport("asset", asset_module);
-    api_module.addImport("entity", entity_module);
+    engine_module.addImport("core", core_module);
+    engine_module.addImport("platform", platform_module);
+    engine_module.addImport("renderer", renderer_module);
+    engine_module.addImport("build_options", build_options_module);
+    engine_module.addImport("asset", asset_module);
+    engine_module.addImport("entity", entity_module);
 
     // Main is floating around for dev/testing
     const main_module = b.addModule("main", .{
@@ -74,9 +74,9 @@ pub fn build(b: *std.Build) void {
     main_module.addImport("core", core_module);
     main_module.addImport("platform", platform_module);
     main_module.addImport("renderer", renderer_module);
-    main_module.addImport("api", api_module);
-    api_module.addImport("asset", asset_module);
-    api_module.addImport("entity", entity_module);
+    main_module.addImport("engine", engine_module);
+    main_module.addImport("asset", asset_module);
+    main_module.addImport("entity", entity_module);
 
     const exe = b.addExecutable(.{
         .name = "game-engine",
@@ -86,9 +86,9 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("core", core_module);
     exe.root_module.addImport("platform", platform_module);
     exe.root_module.addImport("renderer", renderer_module);
-    exe.root_module.addImport("api", api_module);
     exe.root_module.addImport("asset", asset_module);
     exe.root_module.addImport("entity", entity_module);
+    exe.root_module.addImport("engine", engine_module);
     configurePlatform(b, exe, main_module, target, optimize, selected_renderer);
 
     b.installArtifact(exe);

@@ -10,8 +10,8 @@ const Self = @This();
 allocator: std.mem.Allocator,
 fonts: FontManager,
 
-pub fn setFontPath(self: *Self, path: []const u8) void {
-    self.fonts.setFontPath(path);
+pub fn setFontPath(self: *Self, path: []const u8) !void {
+    try self.fonts.setFontPath(path);
 }
 
 pub fn loadFont(self: *Self, name: []const u8) !FontHandle {

@@ -41,17 +41,15 @@ pub const RectCollider = ecs.RectCollider;
 pub const Lifetime = ecs.Lifetime;
 pub const ScreenWrap = ecs.ScreenWrap;
 pub const ScreenClamp = ecs.ScreenClamp;
-const movementSystem = ecs.movementSystem;
-const renderSystem = ecs.renderSystem;
-const lifetimeSystem = ecs.lifetimeSystem;
-const screenWrapSystem = ecs.screenWrapSystem;
-const screenClampSystem = ecs.screenClampSystem;
+
+const Systems = @import("Systems.zig");
 
 pub const Engine = struct {
     allocator: std.mem.Allocator,
     renderer: renderer.Renderer,
     assets: assets.AssetManager,
     window: platform.Window,
+    world: ecs.World,
     running: bool,
 
     pub fn init(allocator: std.mem.Allocator, title: []const u8, width: u32, height: u32) !Engine {
@@ -94,24 +92,39 @@ pub const Engine = struct {
         }
 
         const asset_manager = try AssetManager.init(allocator);
+        const world = try World.init(allocator);
 
         return .{
             .allocator = allocator,
             .assets = asset_manager,
             .renderer = rend,
             .window = window.*,
+            .world = world,
             .running = true,
         };
     }
     pub fn deinit(self: *Engine) void {
         std.log.info("Engine is shutdown...Renderer/Window/Assets deinit()", .{});
         self.renderer.deinit();
-        self.window.deinit();
         self.assets.deinit();
+        self.world.deinit();
+        self.window.deinit();
     }
 
     pub fn shouldClose(self: *const Engine) bool {
         return !self.running or self.window.shouldClose();
+    }
+
+    pub fn update(self: *Engine, dt: f32) void {
+        Systems.lifetimeSystem(self, dt);
+        Systems.screenWrapSystem(self);
+        Systems.screenClampSystem(self);
+        Systems.movementSystem(self, dt);
+
+        Systems.cleanupSystem(self);
+    }
+    pub fn render(self: *Engine) void {
+        Systems.renderSystem(self);
     }
 
     pub fn beginFrame(self: *Engine) !void {
@@ -125,7 +138,6 @@ pub const Engine = struct {
             self.window.swapBuffers(offset);
         }
     }
-
     pub fn clear(self: *Engine, color: Color) void {
         self.renderer.setClearColor(color);
         self.renderer.clear();
@@ -193,6 +205,17 @@ pub const Engine = struct {
     pub fn getCenter(self: *const Engine) V2 {
         _ = self;
         return .{ .x = 0.0, .y = 0.0 };
+    }
+
+    // ECS
+    pub fn createEntity(self: *Engine) !Entity {
+        return self.world.createEntity();
+    }
+    pub fn destroyEntity(self: *Engine, entity: Entity) void {
+        self.world.destroyEntity(entity);
+    }
+    pub fn addComponent(self: *Engine, entity: Entity, comptime T: type, value: T) !void {
+        try self.world.addComponent(entity, T, value);
     }
 
     // Edges

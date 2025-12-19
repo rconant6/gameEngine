@@ -9,8 +9,8 @@ const asset = @import("asset");
 const FontHandle = asset.FontHandle;
 
 // MARK: Spatial Components
-pub const Transfrom = struct {
-    offset: V2,
+pub const Transform = struct {
+    position: V2,
     rotation: f32,
     scale: f32,
 };
@@ -23,7 +23,7 @@ pub const Velocity = struct {
 pub const Sprite = struct {
     shape: Shape,
     color: Color,
-    outline: ?Color,
+    outline: ?Color = null,
     visible: bool,
 };
 pub const Text = struct {
@@ -47,9 +47,10 @@ pub const RectCollider = struct {
 
 // MARK: Utility Components
 pub const Lifetime = struct {
-    remaining: f32,
+    remaining: f32, // seconds
 };
 
 // MARK: Tagging Comonents
-pub const ScreenWrap = struct {};
-pub const ScreenClamp = struct {};
+pub const ScreenWrap = struct { _dummy: u8 = 0 };
+pub const ScreenClamp = struct { _dummy: u8 = 0 };
+pub const Destroy = struct { _dummy: u8 = 0 };
