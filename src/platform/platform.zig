@@ -1,5 +1,12 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const id = @import("input_device.zig");
+pub const Keyboard = id.Keyboard;
+pub const KeyCode = id.KeyCode;
+pub const KeyModifiers = id.KeyModifiers;
+pub const Mouse = id.Mouse;
+pub const MouseButton = id.MouseButton;
+pub const Window = PlatformImpl.Window;
 
 const PlatformImpl = switch (builtin.os.tag) {
     .macos => @import("macos.zig"),
@@ -24,123 +31,16 @@ pub const DisplayInfo = struct {
     is_primary: bool,
 };
 
-pub const Window = PlatformImpl.Window;
-
 pub const WindowConfig = struct {
     title: []const u8,
     width: u32,
     height: u32,
-    resizable: bool = true,
+    resizable: bool = false,
     vsync: bool = true,
     fullscreen: bool = false,
 };
-pub const KeyModifiers = packed struct {
-    shift: bool = false,
-    control: bool = false,
-    alt: bool = false,
-    caps_lock: bool = false,
-};
 
-pub const Key = enum(u16) {
-    A,
-    B,
-    C,
-    D,
-    E,
-    F,
-    G,
-    H,
-    I,
-    J,
-    K,
-    L,
-    M,
-    N,
-    O,
-    P,
-    Q,
-    R,
-    S,
-    T,
-    U,
-    V,
-    W,
-    X,
-    Y,
-    Z,
-
-    pad0,
-    pad1,
-    pad2,
-    pad3,
-    pad4,
-    pad5,
-    pad6,
-    pad7,
-    pad8,
-    pad9,
-
-    Num0,
-    Num1,
-    Num2,
-    Num3,
-    Num4,
-    Num5,
-    Num6,
-    Num7,
-    Num8,
-    Num9,
-
-    F1,
-    F2,
-    F3,
-    F4,
-    F5,
-    F6,
-    F7,
-    F8,
-    F9,
-    F10,
-    F11,
-    F12,
-
-    Space,
-    Enter,
-    Escape,
-    Tab,
-    Backspace,
-    Delete,
-    Insert,
-
-    Left,
-    Right,
-    Up,
-    Down,
-
-    LeftShift,
-    RightShift,
-    LeftControl,
-    RightControl,
-    LeftAlt,
-    RightAlt,
-    RightSuper,
-
-    Home,
-    End,
-    PageUp,
-    PageDown,
-
-    Unknown,
-};
-
-pub const MouseButton = enum(u8) {
-    Left,
-    Right,
-    Middle,
-    Extra1,
-    Extra2,
-};
-
+// TODO: This needs to be evicted
 pub const Event = union(enum) {
     NullEvent,
     WindowClose,
@@ -153,12 +53,12 @@ pub const Event = union(enum) {
     },
 
     KeyPress: struct {
-        key: Key,
+        key: KeyCode,
         modifiers: KeyModifiers,
     },
 
     KeyRelease: struct {
-        key: Key,
+        key: KeyCode,
         modifiers: KeyModifiers,
     },
 
@@ -214,7 +114,7 @@ pub fn waitEvent() Event {
     return PlatformImpl.waitEvent();
 }
 
-pub fn isKeyDown(window: *Window, key: Key) bool {
+pub fn isKeyDown(window: *Window, key: KeyCode) bool {
     return PlatformImpl.isKeyDown(window, key);
 }
 

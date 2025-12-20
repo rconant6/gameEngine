@@ -42,10 +42,14 @@ pub const Lifetime = ecs.Lifetime;
 pub const ScreenWrap = ecs.ScreenWrap;
 pub const ScreenClamp = ecs.ScreenClamp;
 
+const control = @import("input");
+const Input = control.Input;
+
 const Systems = @import("Systems.zig");
 
 pub const Engine = struct {
     allocator: std.mem.Allocator,
+    input: control.Input,
     renderer: renderer.Renderer,
     assets: assets.AssetManager,
     window: platform.Window,

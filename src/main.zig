@@ -115,9 +115,36 @@ pub fn main() !void {
         last_time = current_time;
 
         try game.beginFrame();
-        game.clear(engine.Colors.DARK_GRAY);
+        game.clear(engine.Colors.NEON_PURPLE);
 
-        // Run ECS systems
+        // TEST: finally quit!
+        if (game.input.isKeyDown(.Esc)) {
+            game.running = false;
+        }
+        // TEST: spawn an entity
+        if (game.input.wasKeyPressed(.Space)) {
+            // TODO: lets just let the game add enties simply
+            const test_tri = try game.createEntity();
+            try game.addComponent(test_tri, engine.TransformComp, .{
+                .position = .{ .x = 0.0, .y = 5.0 },
+                .rotation = 0.0,
+                .scale = 1.0,
+            });
+            try game.addComponent(test_tri, engine.Sprite, .{
+                .shape = .{ .Triangle = game.create(engine.Triangle, .{
+                    &[3]engine.V2{
+                        .{ .x = 3.0, .y = 1.0 },
+                        .{ .x = 1.0, .y = 1.0 },
+                        .{ .x = -1.0, .y = -1.0 },
+                    },
+                    engine.Colors.BLUE,
+                    engine.Colors.WHITE,
+                }) },
+                .color = engine.Colors.BLUE,
+                .visible = true,
+            });
+            try game.addComponent(test_tri, engine.Lifetime, .{ .remaining = 2 });
+        }
         game.update(dt);
         game.render();
 
