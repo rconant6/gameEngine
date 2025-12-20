@@ -1,5 +1,6 @@
 const std = @import("std");
 const engine = @import("engine");
+const KeyCode = engine.KeyCode;
 
 const logical_width = 800 * 2;
 const logical_height = 600 * 2;
@@ -115,14 +116,14 @@ pub fn main() !void {
         last_time = current_time;
 
         try game.beginFrame();
-        game.clear(engine.Colors.NEON_PURPLE);
+        game.clear(engine.Colors.DARK_GRAY);
 
         // TEST: finally quit!
-        if (game.input.isKeyDown(.Esc)) {
+        if (game.input.isPressed(KeyCode.Esc)) {
             game.running = false;
         }
         // TEST: spawn an entity
-        if (game.input.wasKeyPressed(.Space)) {
+        if (game.input.wasJustPressed(KeyCode.Space)) {
             // TODO: lets just let the game add enties simply
             const test_tri = try game.createEntity();
             try game.addComponent(test_tri, engine.TransformComp, .{

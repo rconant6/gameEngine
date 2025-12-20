@@ -6,6 +6,7 @@ pub const KeyCode = id.KeyCode;
 pub const KeyModifiers = id.KeyModifiers;
 pub const Mouse = id.Mouse;
 pub const MouseButton = id.MouseButton;
+pub const mapToGameKeyCode = id.mapToGameKeyCode;
 pub const Window = PlatformImpl.Window;
 
 const PlatformImpl = switch (builtin.os.tag) {
@@ -39,6 +40,17 @@ pub const WindowConfig = struct {
     vsync: bool = true,
     fullscreen: bool = false,
 };
+
+pub fn getKeyboard() *Keyboard {
+    return PlatformImpl.getKeyboard();
+}
+pub fn getMouse() *Mouse {
+    return PlatformImpl.getMouse();
+}
+pub fn clearInputFrameStates() void {
+    PlatformImpl.getKeyboard().clearFrameStates();
+    PlatformImpl.getMouse().clearFrameStates();
+}
 
 // TODO: This needs to be evicted
 pub const Event = union(enum) {

@@ -1,5 +1,6 @@
 const Self = @This();
 const std = @import("std");
+const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const Storages = std.StringHashMap(StorageInterface);
 const Entity = @import("Entity.zig");
@@ -18,8 +19,12 @@ pub fn init(alloc: Allocator) !Self {
     };
 }
 pub fn deinit(self: *Self) void {
-    var iter = self.component_storages.valueIterator();
-    while (iter.next()) |interface| {
+    for (0..self.next_entity_id) |entity_id| {
+        self.destroyEntity(Entity{ .id = entity_id });
+    }
+
+    var storage_iter = self.component_storages.valueIterator();
+    while (storage_iter.next()) |interface| {
         interface.vtable.deinit(interface.ptr);
         interface.vtable.destroy(interface.ptr, self.allocator);
     }

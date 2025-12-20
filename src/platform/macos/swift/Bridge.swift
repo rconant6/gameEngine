@@ -5,6 +5,8 @@ import Foundation
 private var appDelegate: AppDelegate?
 @MainActor
 var activeWindows: [OpaquePointer: GameWindow] = [:]
+@MainActor
+private var globalEventHandler: EventHandler!
 
 @MainActor
 @_cdecl("init")
@@ -12,6 +14,7 @@ public func _init() {
   NSApplication.shared.setActivationPolicy(.regular)
   appDelegate = AppDelegate()
   NSApp.delegate = appDelegate
+  globalEventHandler = EventHandler()
 }
 
 @MainActor
@@ -76,6 +79,23 @@ public func poll_events() {
   while let event = NSApp.nextEvent(
     matching: .any, until: nil, inMode: .default, dequeue: true
   ) {
+    if event.type == .keyDown || event.type == .keyUp {
+      globalEventHandler.handleKeyEvent(event)
+    }
     NSApp.sendEvent(event)
   }
+}
+
+@MainActor
+@_cdecl("poll_key_event")
+public func poll_key_event(
+  keycode: UnsafeMutablePointer<UInt16>,
+  isDown: UnsafeMutablePointer<UInt8>
+) -> Bool {
+  guard let event = globalEventHandler.pollNext() else { return false }
+
+  keycode.pointee = event.keycode
+  isDown.pointee = event.isDown
+
+  return true
 }

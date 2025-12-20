@@ -187,7 +187,7 @@ pub const KeyCode = enum(u8) {
 
 // Comptime validation: ensure enum is contiguous
 comptime {
-    const fields = @typeInfo(KeyCode).Enum.fields;
+    const fields = @typeInfo(KeyCode).@"enum".fields;
     for (fields, 0..) |field, i| {
         if (field.value != i) {
             @compileError(std.fmt.comptimePrint(

@@ -28,6 +28,14 @@ pub const Shape = union(ShapeType) {
     Rectangle: Rectangle,
     Triangle: Triangle,
     Polygon: Polygon,
+
+    pub fn deinit(self: *Shape) void {
+        switch (self.*) {
+            .Triangle => |*t| t.deinit(),
+            .Polygon => |*p| p.deinit(),
+            else => {},
+        }
+    }
 };
 
 pub const Line = struct {
@@ -67,8 +75,8 @@ pub const Triangle = struct {
             .fill_color = fc,
         };
     }
-    pub fn deinit(tri: *Triangle) void {
-        try .allocator.free(tri.vertices);
+    pub fn deinit(self: *Triangle) void {
+        self.allocator.free(self.vertices);
     }
 };
 

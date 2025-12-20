@@ -1,6 +1,9 @@
 const std = @import("std");
-const platform = @import("platform");
 const build_options = @import("build_options");
+
+const platform = @import("platform");
+pub const KeyCode = platform.KeyCode;
+pub const MouseButton = platform.MouseButton;
 
 const core = @import("core");
 pub const Point = core.V2;
@@ -42,14 +45,13 @@ pub const Lifetime = ecs.Lifetime;
 pub const ScreenWrap = ecs.ScreenWrap;
 pub const ScreenClamp = ecs.ScreenClamp;
 
-const control = @import("input");
-const Input = control.Input;
+const Input = @import("Input.zig");
 
 const Systems = @import("Systems.zig");
 
 pub const Engine = struct {
     allocator: std.mem.Allocator,
-    input: control.Input,
+    input: Input,
     renderer: renderer.Renderer,
     assets: assets.AssetManager,
     window: platform.Window,
@@ -97,9 +99,11 @@ pub const Engine = struct {
 
         const asset_manager = try AssetManager.init(allocator);
         const world = try World.init(allocator);
+        const input: Input = .init();
 
         return .{
             .allocator = allocator,
+            .input = input,
             .assets = asset_manager,
             .renderer = rend,
             .window = window.*,
@@ -132,6 +136,7 @@ pub const Engine = struct {
     }
 
     pub fn beginFrame(self: *Engine) !void {
+        platform.clearInputFrameStates();
         _ = platform.pollEvent();
         try self.renderer.beginFrame();
     }
@@ -280,10 +285,3 @@ pub const Engine = struct {
         };
     }
 };
-
-// Input (from platform)
-pub const Key = platform.Key;
-pub const MouseButton = platform.MouseButton;
-pub const isKeyDown = platform.isKeyDown;
-pub const isMouseButtonDown = platform.isMouseButtonDown;
-pub const getMousePosition = platform.getMousePosition;

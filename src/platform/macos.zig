@@ -13,8 +13,11 @@ const KeyModifiers = plat.KeyModifiers;
 const MouseButton = plat.MouseButton;
 const PlatformImpl = plat.PlatformImpl;
 const WindowConfig = plat.WindowConfig;
+const Keyboard = plat.Keyboard;
+const Mouse = plat.Mouse;
 
-// TODO: MacOS keymapping map?
+var keyboard_state: Keyboard = .{};
+var mouse_state: Mouse = .{};
 
 pub const Window = struct {
     handle: c.WindowHandle,
@@ -67,76 +70,36 @@ pub fn setPixelBuffer(window: *Window, pixels: []const u8, width: u32, height: u
 }
 
 pub fn pollEvent() ?Event {
-    _ = c.poll_events();
+    _ = c.poll_events(); // process macos events
+
+    var keycode: u16 = undefined;
+    var is_down: u8 = undefined;
+
+    while (poll_key_event(&keycode, &is_down)) {
+        const key = plat.mapToGameKeyCode(keycode);
+        if (key == .Unused) {
+            std.log.warn("[INPUT] Unknown macOS keycode 0x{X:0>2}", .{keycode});
+            continue;
+        }
+        keyboard_state.updateState(key, is_down != 0);
+    }
+
     return null;
 }
 pub fn waitEvent() Event {
     return .NullEvent;
 }
 
-pub fn isKeyDown(window: *Window, key: Key) bool {
-    _ = window;
-    _ = key;
-    return false;
-}
-
-pub fn getMousePosition(window: *Window) struct { x: i32, y: i32 } {
-    _ = window;
-    return .{ .x = 0, .y = 0 };
-}
-
-pub fn isMouseButtonDown(window: *Window, button: MouseButton) bool {
-    _ = window;
-    _ = button;
-    return false;
-}
-
-pub fn setMouseCursorVisible(window: *Window, visible: bool) void {
-    _ = window;
-    _ = visible;
-}
-
-pub fn setMouseCursorLocked(window: *Window, locked: bool) void {
-    _ = window;
-    _ = locked;
-}
-
-pub fn getTime() f64 {
-    return 0;
-}
-
-pub fn sleep(seconds: f64) void {
-    _ = seconds;
-}
-
 pub fn getNativeWindowHandle(window: *Window) *anyopaque {
     return window.handle;
 }
-
-// pub fn getNativeHandles(window: *Window) NativeHandles {
-//     return PlatformImpl.getNativeHandles(window);
-// }
 
 pub fn getMetalLayer(window: *Window) ?*anyopaque {
     return c.get_metal_layer(window.handle);
 }
 
-pub fn getDisplays(allocator: std.mem.Allocator) ![]DisplayInfo {
-    _ = allocator;
-    return std.Error.NotImplemented;
-}
-
 pub fn getWindowScaleFactor(window: *Window) f32 {
     return c.get_window_scale_factor(window.handle);
-}
-
-pub fn getClipboardText(allocator: std.mem.Allocator) ![]const u8 {
-    _ = allocator;
-    return "TODO: This is not implemented\n";
-}
-
-pub fn setClipboardText(text: []const u8) !void {
-    _ = text;
 }
 
 pub fn getCapabilities() Capabilities {
@@ -149,26 +112,16 @@ pub fn getCapabilities() Capabilities {
     };
 }
 
-pub fn openFileDialog(
-    allocator: std.mem.Allocator,
-    title: []const u8,
-    filters: []const []const u8,
-) ?[]const u8 {
-    _ = allocator;
-    _ = filters;
-    _ = title;
-    return null;
+pub fn getKeyboard() *Keyboard {
+    return &keyboard_state;
+}
+pub fn getMouse() *Mouse {
+    return &mouse_state;
 }
 
-pub fn saveFileDialog(
-    allocator: std.mem.Allocator,
-    title: []const u8,
-    default_name: []const u8,
-) ?[]const u8 {
-    _ = allocator;
-    _ = default_name;
-    _ = title;
-    return null;
+pub fn clearInputFrameStates() void {
+    keyboard_state.clearFrameStates();
+    mouse_state.clearFrameStates();
 }
 
 extern fn set_pixel_buffer(
@@ -180,3 +133,4 @@ extern fn set_pixel_buffer(
 ) void;
 
 extern fn swap_buffers(window: c.WindowHandle, offset: usize) void;
+extern fn poll_key_event(keycode: *u16, is_down: *u8) bool;

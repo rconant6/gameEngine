@@ -25,6 +25,10 @@ pub const Sprite = struct {
     color: Color,
     outline: ?Color = null,
     visible: bool,
+
+    pub fn deinit(self: *Sprite) void {
+        self.shape.deinit();
+    }
 };
 pub const Text = struct {
     text: []const u8,

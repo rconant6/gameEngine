@@ -5,6 +5,11 @@
 #include <stdint.h>
 
 typedef void *WindowHandle;
+struct RawKeyEvent {
+  uint16_t keycode;
+  uint8_t isDown;
+  uint8_t _padding;
+};
 
 void init();
 void deinit();
@@ -18,4 +23,5 @@ void swap_buffers(WindowHandle window, uint32_t offest);
 void set_pixel_buffer(WindowHandle window, void *pixels, uint32_t width,
                       uint32_t height);
 
+bool poll_key_event(uint16_t *keycode, uint8_t *isDown);
 #endif

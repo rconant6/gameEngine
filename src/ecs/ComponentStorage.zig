@@ -79,6 +79,12 @@ pub fn ComponentStorage(comptime T: type) type {
             const last_index = self.dense.items.len - 1;
             std.debug.assert(last_index == self.entities.items.len - 1);
             const dense_index = self.sparse.items[entity_id].?;
+
+            if (@hasDecl(T, "deinit")) {
+                self.dense.items[dense_index].deinit();
+            }
+
+            std.debug.assert(last_index == self.entities.items.len - 1);
             if (last_index != dense_index) {
                 self.dense.items[dense_index] = self.dense.items[last_index];
                 self.entities.items[dense_index] = self.entities.items[last_index];
