@@ -72,18 +72,35 @@ public func get_window_get_scale_factor(window: OpaquePointer?) -> Float {
 
   return Float(gameWindow.backingScaleFactor)
 }
-
+// TODO: This is not the right place to do this work?
 @MainActor
 @_cdecl("poll_events")
 public func poll_events() {
   while let event = NSApp.nextEvent(
     matching: .any, until: nil, inMode: .default, dequeue: true
   ) {
-    if event.type == .keyDown || event.type == .keyUp {
-      globalEventHandler.handleKeyEvent(event)
-    }
+    globalEventHandler.handleEvent(event)
     NSApp.sendEvent(event)
   }
+}
+
+@MainActor
+@_cdecl("poll_mouse_event")
+public func poll_mouse_event(
+  button: UnsafeMutablePointer<UInt8>,
+  isDown: UnsafeMutablePointer<UInt8>,
+  x: UnsafeMutablePointer<Float>,
+  y: UnsafeMutablePointer<Float>
+) -> Bool {
+  guard let event = globalEventHandler.pollNextMouse() else { return false }
+
+  x.pointee = event.x
+  y.pointee = event.y
+  button.pointee = event.button
+  isDown.pointee = event.isDown
+
+  print("[SWIFT BRIDGE] Wrote: button=\(event.button) isDown=\(event.isDown) to pointers")
+  return true
 }
 
 @MainActor
@@ -92,7 +109,7 @@ public func poll_key_event(
   keycode: UnsafeMutablePointer<UInt16>,
   isDown: UnsafeMutablePointer<UInt8>
 ) -> Bool {
-  guard let event = globalEventHandler.pollNext() else { return false }
+  guard let event = globalEventHandler.pollNextKey() else { return false }
 
   keycode.pointee = event.keycode
   isDown.pointee = event.isDown

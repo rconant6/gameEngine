@@ -36,10 +36,14 @@ pub fn InputDevice(comptime Device: type) type {
             const idx = @intFromEnum(dev);
             const was_down = self.pressed[idx];
 
+            std.log.debug("[INPUT_DEVICE] {s} idx={d} was_down={} down={}", .{ @typeName(Device), idx, was_down, down });
+
             if (down and !was_down) {
                 self.just_pressed[idx] = true;
+                std.log.debug("[INPUT_DEVICE] Setting just_presed[{d}] = true", .{idx});
             } else if (!down and was_down) {
                 self.just_released[idx] = true;
+                std.log.debug("[INPUT_DEVICE] Setting just_released[{d}] = true", .{idx});
             }
 
             self.pressed[idx] = down;
@@ -51,7 +55,6 @@ pub fn InputDevice(comptime Device: type) type {
         }
     };
 }
-
 pub const KeyModifiers = packed struct {
     shift: bool = false,
     control: bool = false,
@@ -60,14 +63,26 @@ pub const KeyModifiers = packed struct {
 };
 
 pub const MouseButton = enum(u8) {
-    Left,
-    Right,
-    Middle,
-    Extra1,
-    Extra2,
+    Left = 0,
+    Right = 1,
+    Middle = 2,
+    Extra1 = 3,
+    Extra2 = 4,
+
+    Unused = 5,
 };
 
-// MARK: Keyboard Bridging
+pub fn mapToGameMouseButton(button_num: u8) MouseButton {
+    return switch (button_num) {
+        0 => .Left,
+        1 => .Right,
+        2 => .Middle,
+        3 => .Extra1,
+        4 => .Extra2,
+        else => .Unused,
+    };
+}
+
 pub const KeyCode = enum(u8) {
     // Letters A-Z (0-25)
     A = 0,

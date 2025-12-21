@@ -77,6 +77,8 @@ pub fn pollEvent() ?Event {
 
     while (poll_key_event(&keycode, &is_down)) {
         const key = plat.mapToGameKeyCode(keycode);
+        std.log.info("[INPUT] macOS keycode 0x{X:0>2}", .{keycode});
+
         if (key == .Unused) {
             std.log.warn("[INPUT] Unknown macOS keycode 0x{X:0>2}", .{keycode});
             continue;
@@ -84,8 +86,25 @@ pub fn pollEvent() ?Event {
         keyboard_state.updateState(key, is_down != 0);
     }
 
+    var x: f16 = undefined;
+    var y: f16 = undefined;
+    var button: u8 = undefined;
+    is_down = undefined;
+
+    while (poll_mouse_event(&button, &is_down, &x, &y)) {
+        const b = plat.mapToGameMouseButton(button);
+        std.log.info("[INPUT] macOS mousecode 0x{X:0>2}", .{button});
+
+        if (b == .Unused) {
+            std.log.warn("[INPUT] Unknown macOS MouseButton 0x{X:0>2}", .{button});
+            continue;
+        }
+        mouse_state.updateState(b, is_down != 0);
+    }
+
     return null;
 }
+
 pub fn waitEvent() Event {
     return .NullEvent;
 }
@@ -112,10 +131,10 @@ pub fn getCapabilities() Capabilities {
     };
 }
 
-pub fn getKeyboard() *Keyboard {
+pub fn getKeyboard() *const Keyboard {
     return &keyboard_state;
 }
-pub fn getMouse() *Mouse {
+pub fn getMouse() *const Mouse {
     return &mouse_state;
 }
 
@@ -134,3 +153,4 @@ extern fn set_pixel_buffer(
 
 extern fn swap_buffers(window: c.WindowHandle, offset: usize) void;
 extern fn poll_key_event(keycode: *u16, is_down: *u8) bool;
+extern fn poll_mouse_event(button: *u8, isDown: *u8, x: *f16, y: *f16) bool;

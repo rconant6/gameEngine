@@ -118,6 +118,27 @@ pub fn main() !void {
         try game.beginFrame();
         game.clear(engine.Colors.DARK_GRAY);
 
+        // TEST: Click to spawn
+        if (game.input.wasJustPressed(engine.MouseButton.Left)) {
+            std.log.debug("[MAIN] left mouse was clicked", .{});
+            const test_circle = try game.createEntity();
+            try game.addComponent(test_circle, engine.TransformComp, .{
+                .position = .{ .x = 0.0, .y = 0.0 }, // TODO: Use mouse position
+                .rotation = 0.0,
+                .scale = 1.0,
+            });
+            try game.addComponent(test_circle, engine.Sprite, .{
+                .shape = .{ .Circle = game.create(engine.Circle, .{
+                    engine.V2{ .x = 0.0, .y = 0.0 },
+                    1.0,
+                    engine.Colors.NEON_PINK,
+                    engine.Colors.WHITE,
+                }) },
+                .color = engine.Colors.NEON_PINK,
+                .visible = true,
+            });
+            try game.addComponent(test_circle, engine.Lifetime, .{ .remaining = 0.5 });
+        }
         // TEST: finally quit!
         if (game.input.isPressed(KeyCode.Esc)) {
             game.running = false;

@@ -3,6 +3,7 @@ const build_options = @import("build_options");
 
 const platform = @import("platform");
 pub const KeyCode = platform.KeyCode;
+pub const KeyModifiers = platform.KeyModifiers;
 pub const MouseButton = platform.MouseButton;
 
 const core = @import("core");
@@ -112,7 +113,7 @@ pub const Engine = struct {
         };
     }
     pub fn deinit(self: *Engine) void {
-        std.log.info("Engine is shutdown...Renderer/Window/Assets deinit()", .{});
+        std.log.info("[ENGINE] is shutting down...deinit()", .{});
         self.renderer.deinit();
         self.assets.deinit();
         self.world.deinit();
@@ -136,8 +137,10 @@ pub const Engine = struct {
     }
 
     pub fn beginFrame(self: *Engine) !void {
-        platform.clearInputFrameStates();
+        platform.clearInputStates();
         _ = platform.pollEvent();
+        self.input.keyboard = platform.getKeyboard();
+        self.input.mouse = platform.getMouse();
         try self.renderer.beginFrame();
     }
     pub fn endFrame(self: *Engine) !void {

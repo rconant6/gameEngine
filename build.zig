@@ -53,6 +53,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/platform/platform.zig"),
     });
     platform_module.addIncludePath(b.path("src/platform/macos/swift/include"));
+    platform_module.addImport("build_options", build_options_module);
 
     // TODO: This is probably the end for the engine 'library'
     const engine_module = b.addModule("engine", .{

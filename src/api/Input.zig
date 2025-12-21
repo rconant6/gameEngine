@@ -1,14 +1,14 @@
 const std = @import("std");
 const plat = @import("platform");
-const Keyboard = plat.Keyboard;
-const Mouse = plat.Mouse;
-const KeyCode = plat.KeyCode;
-const MouseButton = plat.MouseButton;
+pub const Keyboard = plat.Keyboard;
+pub const Mouse = plat.Mouse;
+pub const KeyCode = plat.KeyCode;
+pub const MouseButton = plat.MouseButton;
 
 const Self = @This();
 
-keyboard: *Keyboard,
-mouse: *Mouse,
+keyboard: *const Keyboard,
+mouse: *const Mouse,
 
 const SupportedInputTypes = .{ KeyCode, MouseButton };
 

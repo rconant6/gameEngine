@@ -7,6 +7,7 @@ pub const KeyModifiers = id.KeyModifiers;
 pub const Mouse = id.Mouse;
 pub const MouseButton = id.MouseButton;
 pub const mapToGameKeyCode = id.mapToGameKeyCode;
+pub const mapToGameMouseButton = id.mapToGameMouseButton;
 pub const Window = PlatformImpl.Window;
 
 const PlatformImpl = switch (builtin.os.tag) {
@@ -41,15 +42,14 @@ pub const WindowConfig = struct {
     fullscreen: bool = false,
 };
 
-pub fn getKeyboard() *Keyboard {
+pub fn getKeyboard() *const Keyboard {
     return PlatformImpl.getKeyboard();
 }
-pub fn getMouse() *Mouse {
+pub fn getMouse() *const Mouse {
     return PlatformImpl.getMouse();
 }
-pub fn clearInputFrameStates() void {
-    PlatformImpl.getKeyboard().clearFrameStates();
-    PlatformImpl.getMouse().clearFrameStates();
+pub fn clearInputStates() void {
+    PlatformImpl.clearInputFrameStates();
 }
 
 // TODO: This needs to be evicted
