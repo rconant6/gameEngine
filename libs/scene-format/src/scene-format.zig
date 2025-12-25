@@ -1,8 +1,9 @@
 const std = @import("std");
 const lex = @import("lexer.zig");
-const Lexer = lex.Lexer;
-const Token = lex.Token;
-const TokenTag = Token.Tag;
+pub const Lexer = lex.Lexer;
+const tok = @import("token.zig");
+pub const Token = tok.Token;
+pub const TokenTag = Token.Tag;
 
 pub fn main() !void {
     const test_scene =

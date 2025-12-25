@@ -1,88 +1,11 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-
 const LexerErrors = @import("scene_errors.zig").LexerErrors;
-
-const DataLocation = struct {
-    start: u32,
-    end: u32,
-
-    pub fn format(self: DataLocation, w: *std.Io.Writer) !void {
-        try w.print(" start: {d:4} end: {d:4}", .{ self.start, self.end });
-    }
-};
-const SourceLocation = struct {
-    line: u32,
-    col: u32,
-
-    pub fn format(self: SourceLocation, w: *std.Io.Writer) !void {
-        try w.print("line: {d:4} col: {d:4}", .{ self.line, self.col });
-    }
-};
-
-pub const Token = struct {
-    tag: Tag,
-    loc: DataLocation,
-    src_loc: SourceLocation,
-
-    current_indent_level: u32 = 0,
-    pending_dedents: u32 = 0,
-
-    pub fn format(self: Token, w: *std.Io.Writer) !void {
-        try w.print(
-            "[TOKEN]\n  Tag: {}\n  SourceLoc {f}\n  DataLoc {f}",
-            .{ self.tag, self.src_loc, self.loc },
-        );
-    }
-
-    pub const Tag = enum {
-        // Structure
-        l_bracket,
-        r_bracket,
-        l_brace,
-        r_brace,
-        minus, // negative numbers
-        dot, // floats
-        comma,
-        colon,
-        newline,
-        whitespace,
-        comment,
-        indent,
-        dedent,
-        eof,
-
-        // Keywords sections
-        scene,
-        entity,
-        asset,
-        shape,
-
-        // Keywords types
-        vec2,
-        vec3,
-        f32,
-        i32,
-        u32,
-        bool,
-        string,
-        color,
-        asset_ref,
-
-        // Literals
-        number,
-        string_lit,
-        color_lit,
-        true,
-        false,
-
-        // Identifiers
-        identifier,
-
-        invalid,
-    };
-};
+const tok = @import("token.zig");
+pub const Token = tok.Token;
+pub const SourceLocation = tok.SourceLocation;
+pub const DataLocation = tok.DataLocation;
 
 pub const Lexer = struct {
     const single_char_tokens = std.StaticStringMap(Token.Tag).initComptime(.{
@@ -353,13 +276,13 @@ pub const Lexer = struct {
         self.src_loc.col = 1;
     }
     fn consumeToken(self: *Lexer, tag: Token.Tag) Token {
-        const tok: Token = .{
+        const token: Token = .{
             .tag = tag,
             .loc = .{ .start = self.token_start, .end = self.index },
             .src_loc = self.src_loc,
         };
         self.token_start = self.index;
 
-        return tok;
+        return token;
     }
 };
