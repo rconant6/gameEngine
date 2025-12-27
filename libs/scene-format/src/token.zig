@@ -11,9 +11,13 @@ pub const DataLocation = struct {
 pub const SourceLocation = struct {
     line: u32,
     col: u32,
+    len: u32,
 
     pub fn format(self: SourceLocation, w: *std.Io.Writer) !void {
-        try w.print("line: {d:4} col: {d:4}", .{ self.line, self.col });
+        try w.print(
+            "line: {d:3} col: {d:3}, len: {d:3}",
+            .{ self.line, self.col, self.len },
+        );
     }
 };
 
@@ -42,7 +46,6 @@ pub const Token = struct {
         dot, // floats
         comma,
         colon,
-        newline,
         whitespace,
         comment,
         indent,
@@ -65,6 +68,9 @@ pub const Token = struct {
         string,
         color,
         asset_ref,
+
+        // Keywords asset-types
+        font,
 
         // Literals
         number,

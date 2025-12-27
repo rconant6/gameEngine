@@ -1,9 +1,10 @@
 const std = @import("std");
 const testing = std.testing;
-const lex = @import("lexer");
-const Lexer = lex.Lexer;
-const Token = lex.Token;
-const TokenTag = Token.Tag;
+
+const scene = @import("lib");
+const Lexer = scene.Lexer;
+const Token = scene.Token;
+const TokenTag = scene.TokenTag;
 
 fn expectToken(lexer: *Lexer, expected_tag: TokenTag) !void {
     const token = try lexer.next();
@@ -11,7 +12,12 @@ fn expectToken(lexer: *Lexer, expected_tag: TokenTag) !void {
     try testing.expectEqual(expected_tag, token.?.tag);
 }
 
-fn expectTokenWithLexeme(lexer: *Lexer, expected_tag: TokenTag, src: [:0]const u8, expected_lexeme: []const u8) !void {
+fn expectTokenWithLexeme(
+    lexer: *Lexer,
+    expected_tag: TokenTag,
+    src: [:0]const u8,
+    expected_lexeme: []const u8,
+) !void {
     const token = try lexer.next();
     try testing.expect(token != null);
     try testing.expectEqual(expected_tag, token.?.tag);
@@ -30,8 +36,7 @@ test "lexer - single character tokens" {
     try expectToken(&lexer, .r_brace);
     try expectToken(&lexer, .comma);
     try expectToken(&lexer, .colon);
-    // Note: .dot is not a standalone token, only used in numbers
-    // So ".-" becomes invalid number (dot without preceding digit)
+    // NOTE: .dot is not a standalone token, only used in numbers
     const result = lexer.next();
     try testing.expectError(error.InvalidCharacter, result);
 }
@@ -112,10 +117,10 @@ test "lexer - strings" {
     const src = "\"hello\" \"world\" \"with spaces\" \"\"";
     var lexer = Lexer.init(src);
 
-    try expectTokenWithLexeme(&lexer, .string_lit, src, "\"hello\"");
-    try expectTokenWithLexeme(&lexer, .string_lit, src, "\"world\"");
-    try expectTokenWithLexeme(&lexer, .string_lit, src, "\"with spaces\"");
-    try expectTokenWithLexeme(&lexer, .string_lit, src, "\"\"");
+    try expectTokenWithLexeme(&lexer, .string_lit, src, "hello");
+    try expectTokenWithLexeme(&lexer, .string_lit, src, "world");
+    try expectTokenWithLexeme(&lexer, .string_lit, src, "with spaces");
+    try expectTokenWithLexeme(&lexer, .string_lit, src, "");
     try expectToken(&lexer, .eof);
 }
 
@@ -133,12 +138,12 @@ test "lexer - colors 6 digits" {
     const src = "#FF0000 #00FF00 #0000FF #FFFFFF #000000 #abcdef";
     var lexer = Lexer.init(src);
 
-    try expectTokenWithLexeme(&lexer, .color_lit, src, "#FF0000");
-    try expectTokenWithLexeme(&lexer, .color_lit, src, "#00FF00");
-    try expectTokenWithLexeme(&lexer, .color_lit, src, "#0000FF");
-    try expectTokenWithLexeme(&lexer, .color_lit, src, "#FFFFFF");
-    try expectTokenWithLexeme(&lexer, .color_lit, src, "#000000");
-    try expectTokenWithLexeme(&lexer, .color_lit, src, "#abcdef");
+    try expectTokenWithLexeme(&lexer, .color_lit, src, "FF0000");
+    try expectTokenWithLexeme(&lexer, .color_lit, src, "00FF00");
+    try expectTokenWithLexeme(&lexer, .color_lit, src, "0000FF");
+    try expectTokenWithLexeme(&lexer, .color_lit, src, "FFFFFF");
+    try expectTokenWithLexeme(&lexer, .color_lit, src, "000000");
+    try expectTokenWithLexeme(&lexer, .color_lit, src, "abcdef");
     try expectToken(&lexer, .eof);
 }
 
@@ -147,9 +152,9 @@ test "lexer - colors 8 digits" {
     const src = "#FF0000FF #00FF0080 #0000FFAA";
     var lexer = Lexer.init(src);
 
-    try expectTokenWithLexeme(&lexer, .color_lit, src, "#FF0000FF");
-    try expectTokenWithLexeme(&lexer, .color_lit, src, "#00FF0080");
-    try expectTokenWithLexeme(&lexer, .color_lit, src, "#0000FFAA");
+    try expectTokenWithLexeme(&lexer, .color_lit, src, "FF0000FF");
+    try expectTokenWithLexeme(&lexer, .color_lit, src, "00FF0080");
+    try expectTokenWithLexeme(&lexer, .color_lit, src, "0000FFAA");
     try expectToken(&lexer, .eof);
 }
 

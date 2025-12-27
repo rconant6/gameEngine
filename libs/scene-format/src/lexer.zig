@@ -1,7 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-const LexerErrors = @import("scene_errors.zig").LexerErrors;
+const LexerErrors = @import("scene_errors.zig").LexerError;
 const tok = @import("token.zig");
 pub const Token = tok.Token;
 pub const SourceLocation = tok.SourceLocation;
@@ -23,13 +23,13 @@ pub const Lexer = struct {
         .{ "vec3", .vec3 },           .{ "f32", .f32 },
         .{ "i32", .i32 },             .{ "u32", .u32 },
         .{ "bool", .bool },           .{ "color", .color },
-        .{ "asset_ref", .asset_ref },
+        .{ "asset_ref", .asset_ref }, .{ "font", .font },
     });
 
     src: [:0]const u8,
     index: u32 = 0,
     token_start: u32 = 0,
-    src_loc: SourceLocation = .{ .line = 1, .col = 1 },
+    src_loc: SourceLocation = .{ .line = 1, .col = 1, .len = 0 },
 
     hex_color_count: u32 = 0,
     indent_level: u32 = 0,
@@ -189,8 +189,8 @@ pub const Lexer = struct {
                     continue :_id self.src[self.index];
                 },
                 else => {
-                    const lexeme = self.src[self.token_start..self.index];
-                    const tag = keywords.get(lexeme) orelse .identifier;
+                    const str = self.src[self.token_start..self.index];
+                    const tag = keywords.get(str) orelse .identifier;
 
                     return self.consumeToken(tag);
                 },
@@ -228,7 +228,13 @@ pub const Lexer = struct {
                 },
                 '"' => {
                     self.advance();
-                    return self.consumeToken(.string_lit);
+                    // Adjust token_start to skip opening quote, end already excludes closing quote
+                    const token = self.consumeToken(.string_lit);
+                    return Token{
+                        .tag = token.tag,
+                        .loc = .{ .start = token.loc.start + 1, .end = token.loc.end - 1 },
+                        .src_loc = token.src_loc,
+                    };
                 },
                 '\n' => {
                     self.newline();
@@ -249,7 +255,13 @@ pub const Lexer = struct {
                 else => {
                     if (self.hex_color_count != 6 and self.hex_color_count != 8)
                         return LexerErrors.InvalidColor;
-                    return self.consumeToken(.color_lit);
+                    // Adjust token_start to skip '#'
+                    const token = self.consumeToken(.color_lit);
+                    return Token{
+                        .tag = token.tag,
+                        .loc = .{ .start = token.loc.start + 1, .end = token.loc.end },
+                        .src_loc = token.src_loc,
+                    };
                 },
             },
             .dedent_end => {
@@ -276,6 +288,8 @@ pub const Lexer = struct {
         self.src_loc.col = 1;
     }
     fn consumeToken(self: *Lexer, tag: Token.Tag) Token {
+        const len = self.index - self.token_start;
+        self.src_loc.len = len;
         const token: Token = .{
             .tag = tag,
             .loc = .{ .start = self.token_start, .end = self.index },
@@ -286,3 +300,7 @@ pub const Lexer = struct {
         return token;
     }
 };
+
+pub fn lexeme(src: [:0]const u8, token: Token) []const u8 {
+    return src[token.loc.start..token.loc.end];
+}
