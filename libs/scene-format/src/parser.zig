@@ -65,6 +65,8 @@ pub const Parser = struct {
 
     fn consume(self: *Parser, token_type: TokenTag) !Token {
         if (self.current_tok.tag != token_type) {
+            // std.log.err("Go unexpected token of type: {}", .{token_type});
+            // std.log.err("Parser.currentTok: {f}", .{self.current_tok});
             return ParseError.UnexpectedToken;
         }
 

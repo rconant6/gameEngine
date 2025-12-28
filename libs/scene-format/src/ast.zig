@@ -6,6 +6,13 @@ pub const SourceLocation = tok.SourceLocation;
 pub const SceneFile = struct {
     decls: []Declaration,
     source_file_name: []const u8,
+
+    pub fn deinit(self: *SceneFile, allocator: std.mem.Allocator) void {
+        for (self.decls) |*decl| {
+            decl.deinit(allocator);
+        }
+        allocator.free(self.decls);
+    }
 };
 
 pub const Declaration = union(enum) {
@@ -14,6 +21,16 @@ pub const Declaration = union(enum) {
     asset: AssetDeclaration,
     component: ComponentDeclaration,
     shape: ShapeDeclaration,
+
+    pub fn deinit(self: *Declaration, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            .scene => |*s| s.deinit(allocator),
+            .entity => |*e| e.deinit(allocator),
+            .asset => |*a| a.deinit(allocator),
+            .component => |*c| c.deinit(allocator),
+            .shape => |*sh| sh.deinit(allocator),
+        }
+    }
 };
 
 pub const SceneDeclaration = struct {
@@ -21,27 +38,67 @@ pub const SceneDeclaration = struct {
     decls: []Declaration,
     is_container: bool,
     location: SourceLocation,
+
+    pub fn deinit(self: *SceneDeclaration, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+        for (self.decls) |*decl| {
+            decl.deinit(allocator);
+        }
+        allocator.free(self.decls);
+    }
 };
 pub const EntityDeclaration = struct {
     name: []const u8,
     components: []ComponentDeclaration,
     location: SourceLocation,
+
+    pub fn deinit(self: *EntityDeclaration, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+        for (self.components) |*comp| {
+            comp.deinit(allocator);
+        }
+        allocator.free(self.components);
+    }
 };
 pub const AssetDeclaration = struct {
     name: []const u8,
     asset_type: AssetType,
     properties: []Property,
     location: SourceLocation,
+
+    pub fn deinit(self: *AssetDeclaration, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+        for (self.properties) |*prop| {
+            prop.deinit(allocator);
+        }
+        allocator.free(self.properties);
+    }
 };
 pub const ComponentDeclaration = struct {
     name: []const u8,
     properties: []Property,
     location: SourceLocation,
+
+    pub fn deinit(self: *ComponentDeclaration, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+        for (self.properties) |*prop| {
+            prop.deinit(allocator);
+        }
+        allocator.free(self.properties);
+    }
 };
 pub const ShapeDeclaration = struct {
     name: []const u8,
     properties: []Property,
     location: SourceLocation,
+
+    pub fn deinit(self: *ShapeDeclaration, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+        for (self.properties) |*prop| {
+            prop.deinit(allocator);
+        }
+        allocator.free(self.properties);
+    }
 };
 
 pub const ShapeBlock = struct {
@@ -55,6 +112,11 @@ pub const Property = struct {
     type_annotation: TypeAnnotation,
     value: Value,
     location: SourceLocation,
+
+    pub fn deinit(self: *Property, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+        self.value.deinit(allocator);
+    }
 };
 
 pub const TypeAnnotation = struct {
@@ -108,4 +170,19 @@ pub const Value = union(enum) {
     vector: []f64,
     assetRef: []const u8,
     array: []Value,
+
+    pub fn deinit(self: *Value, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            .string => |s| allocator.free(s),
+            .vector => |v| allocator.free(v),
+            .assetRef => |a| allocator.free(a),
+            .array => |arr| {
+                for (arr) |*val| {
+                    val.deinit(allocator);
+                }
+                allocator.free(arr);
+            },
+            .number, .color, .boolean => {},
+        }
+    }
 };
