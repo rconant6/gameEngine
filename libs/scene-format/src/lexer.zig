@@ -3,9 +3,15 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const LexerErrors = @import("scene_errors.zig").LexerError;
 const tok = @import("token.zig");
-pub const Token = tok.Token;
-pub const SourceLocation = tok.SourceLocation;
-pub const DataLocation = tok.DataLocation;
+const Token = tok.Token;
+const SourceLocation = tok.SourceLocation;
+const DataLocation = tok.DataLocation;
+
+pub fn lexeme(src: [:0]const u8, token: Token) []const u8 {
+    const start = token.loc.start;
+    const end = token.loc.end;
+    return src[start..end];
+}
 
 pub const Lexer = struct {
     const single_char_tokens = std.StaticStringMap(Token.Tag).initComptime(.{
@@ -300,7 +306,3 @@ pub const Lexer = struct {
         return token;
     }
 };
-
-pub fn lexeme(src: [:0]const u8, token: Token) []const u8 {
-    return src[token.loc.start..token.loc.end];
-}

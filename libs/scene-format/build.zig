@@ -51,6 +51,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    exe_module.addImport("scene-format", lib_module);
+
     const exe = b.addExecutable(.{
         .name = "scene-format-demo",
         .root_module = exe_module,

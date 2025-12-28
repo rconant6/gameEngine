@@ -1,22 +1,23 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-
 const lex = @import("lexer.zig");
 const Lexer = lex.Lexer;
-const Token = lex.Token;
-const TokenTag = Token.Tag;
-
+const lexeme = lex.lexeme;
 const ast = @import("ast.zig");
-pub const SceneFile = ast.SceneFile;
-pub const Declaration = ast.Declaration;
-pub const Property = ast.Property;
-pub const Value = ast.Value;
-pub const AssetType = ast.AssetType;
+const SceneFile = ast.SceneFile;
+const Declaration = ast.Declaration;
+const Property = ast.Property;
+const Value = ast.Value;
+const AssetType = ast.AssetType;
 
 const errs = @import("scene_errors.zig");
 const LexerError = errs.LexerError;
 const ParseError = errs.ParseError;
+
+const toks = @import("token.zig");
+const Token = toks.Token;
+const TokenTag = toks.Token.Tag;
 
 pub const Parser = struct {
     allocator: Allocator,
@@ -50,7 +51,7 @@ pub const Parser = struct {
         return self.parseSceneFile();
     }
 
-    pub fn advance(self: *Parser) !Token {
+    fn advance(self: *Parser) !Token {
         self.previous_tok = self.current_tok;
         self.current_tok = try self.lexer.next() orelse
             return ParseError.NoTokenReturned;
@@ -58,11 +59,11 @@ pub const Parser = struct {
         return self.previous_tok orelse unreachable;
     }
 
-    pub fn check(self: *Parser, token_type: TokenTag) bool {
+    fn check(self: *Parser, token_type: TokenTag) bool {
         return self.current_tok.tag == token_type;
     }
 
-    pub fn consume(self: *Parser, token_type: TokenTag) !Token {
+    fn consume(self: *Parser, token_type: TokenTag) !Token {
         if (self.current_tok.tag != token_type) {
             return ParseError.UnexpectedToken;
         }
@@ -74,7 +75,7 @@ pub const Parser = struct {
 
     // ===== Top Level =====
 
-    pub fn parseSceneFile(self: *Parser) !SceneFile {
+    fn parseSceneFile(self: *Parser) !SceneFile {
         var declarations: ArrayList(Declaration) = .empty;
         while (self.current_tok.tag != .eof) {
             const decl = try self.parseDeclaration();
@@ -88,7 +89,7 @@ pub const Parser = struct {
 
     // ===== Declarations =====
 
-    pub fn parseDeclaration(self: *Parser) ParseError!Declaration {
+    fn parseDeclaration(self: *Parser) ParseError!Declaration {
         // NOTE: consume [name:, dispatch on keyword
         _ = try self.consume(.l_bracket);
         const name_token = try self.consume(.identifier);
@@ -102,7 +103,7 @@ pub const Parser = struct {
         }
     }
 
-    pub fn parseSceneDeclaration(self: *Parser, name_token: Token) !ast.SceneDeclaration {
+    fn parseSceneDeclaration(self: *Parser, name_token: Token) !ast.SceneDeclaration {
         // NOTE: [name:scene], check for INDENT, parse children or label
         const name_str = lex.lexeme(self.lexer.src, name_token);
         const name = try self.allocator.dupe(u8, name_str);
@@ -129,7 +130,7 @@ pub const Parser = struct {
         };
     }
 
-    pub fn parseEntityDeclaration(self: *Parser, name_token: Token) !ast.EntityDeclaration {
+    fn parseEntityDeclaration(self: *Parser, name_token: Token) !ast.EntityDeclaration {
         // NOTE: [name:entity], expect INDENT, loop components
         const name_str = lex.lexeme(self.lexer.src, name_token);
         const name = try self.allocator.dupe(u8, name_str);
@@ -155,7 +156,7 @@ pub const Parser = struct {
         };
     }
 
-    pub fn parseAssetDeclaration(self: *Parser, name_token: Token) !ast.AssetDeclaration {
+    fn parseAssetDeclaration(self: *Parser, name_token: Token) !ast.AssetDeclaration {
         // NOTE: [name:asset type], parse properties
         const name_str = lex.lexeme(self.lexer.src, name_token);
         const name = try self.allocator.dupe(u8, name_str);
@@ -186,11 +187,11 @@ pub const Parser = struct {
         };
     }
 
-    pub fn parseComponentDeclaration(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
+    fn parseComponentDeclaration(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
         return try self.parseComponentBlock(name_token);
     }
 
-    pub fn parseShapeDeclaration(self: *Parser, name_token: Token) !ast.ShapeDeclaration {
+    fn parseShapeDeclaration(self: *Parser, name_token: Token) !ast.ShapeDeclaration {
         const block = try self.parseShapeBlock(name_token);
         return ast.ShapeDeclaration{
             .name = block.name,
@@ -199,7 +200,7 @@ pub const Parser = struct {
         };
     }
 
-    pub fn parseComponentBlock(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
+    fn parseComponentBlock(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
         const name_str = lex.lexeme(self.lexer.src, name_token);
         const name = try self.allocator.dupe(u8, name_str);
         _ = try self.consume(.r_bracket);
@@ -221,7 +222,7 @@ pub const Parser = struct {
         };
     }
 
-    pub fn parseShapeBlock(self: *Parser, name_token: Token) !ast.ShapeBlock {
+    fn parseShapeBlock(self: *Parser, name_token: Token) !ast.ShapeBlock {
         const name_str = lex.lexeme(self.lexer.src, name_token);
         const name = try self.allocator.dupe(u8, name_str);
 
@@ -245,7 +246,7 @@ pub const Parser = struct {
         };
     }
 
-    pub fn parseProperty(self: *Parser) !Property {
+    fn parseProperty(self: *Parser) !Property {
         const name_token = try self.consume(.identifier);
         const name_str = lex.lexeme(self.lexer.src, name_token);
         const name = try self.allocator.dupe(u8, name_str);
@@ -264,7 +265,7 @@ pub const Parser = struct {
         };
     }
 
-    pub fn parseTypeAnnotation(self: *Parser) !ast.TypeAnnotation {
+    fn parseTypeAnnotation(self: *Parser) !ast.TypeAnnotation {
         const base_type: ast.BaseType = switch (self.current_tok.tag) {
             .vec2 => .vec2,
             .vec3 => .vec3,
@@ -291,7 +292,7 @@ pub const Parser = struct {
         };
     }
 
-    pub fn parseValue(self: *Parser, type_annotation: ast.TypeAnnotation) !Value {
+    fn parseValue(self: *Parser, type_annotation: ast.TypeAnnotation) !Value {
         if (type_annotation.is_array == true) {
             return try self.parseArrayValue(type_annotation.base_type);
         } else {
@@ -299,7 +300,7 @@ pub const Parser = struct {
         }
     }
 
-    pub fn parseArrayValue(self: *Parser, element_type: ast.BaseType) !Value {
+    fn parseArrayValue(self: *Parser, element_type: ast.BaseType) !Value {
         _ = try self.consume(.l_brace);
 
         var vals: ArrayList(Value) = .empty;
@@ -320,7 +321,7 @@ pub const Parser = struct {
         return Value{ .array = try vals.toOwnedSlice(self.allocator) };
     }
 
-    pub fn parseSingleValue(self: *Parser, base_type: ast.BaseType) !Value {
+    fn parseSingleValue(self: *Parser, base_type: ast.BaseType) !Value {
         return switch (base_type) {
             .vec2 => try self.parseVectorValue(2),
             .vec3 => try self.parseVectorValue(3),
@@ -356,7 +357,7 @@ pub const Parser = struct {
         };
     }
 
-    pub fn parseVectorValue(self: *Parser, arity: u8) !Value {
+    fn parseVectorValue(self: *Parser, arity: u8) !Value {
         _ = try self.consume(.l_brace);
 
         if (arity != 2 and arity != 3) {
@@ -378,7 +379,7 @@ pub const Parser = struct {
         return Value{ .vector = arr };
     }
 
-    pub fn parseNumber(self: *Parser) !f64 {
+    fn parseNumber(self: *Parser) !f64 {
         const isNegative = self.check(.minus);
         if (isNegative) {
             _ = try self.consume(.minus);

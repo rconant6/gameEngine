@@ -18,3 +18,5 @@ pub const ParseError = error{
     UnknownAssetType,
     UnsupportedVectorLength,
 } || LexerError || @TypeOf(error.OutOfMemory) || @TypeOf(error.Overflow);
+
+const SceneError = ParseError || LexerError || @TypeOf(error.OutOfMemory) || @TypeOf(error.Overflow);
