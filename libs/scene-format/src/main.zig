@@ -6,6 +6,7 @@ pub const Token = tok.Token;
 pub const TokenTag = Token.Tag;
 const ast = @import("ast.zig");
 const parse = @import("parser.zig");
+const lib = @import("lib.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -15,7 +16,74 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(gpa_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
-    _ = allocator;
+    // _ = allocator;
+    const src: [:0]const u8 =
+        \\[MainFont:asset font]
+        \\  path:string "assets/fonts/Roboto-Regular.ttf"
+        \\  size:f32 16.0
+        \\
+        \\[UIFont:asset font]
+        \\  path:string "assets/fonts/Roboto-Bold.ttf"
+        \\  size:f32 14.0
+        \\
+        \\[MainScene:scene]
+        \\  [Player:entity]
+        \\    [Transform]
+        \\      position:vec3 {0.0, 0.0, 0.0}
+        \\      rotation:vec3 {0.0, 0.0, 0.0}
+        \\      scale:vec3 {1.0, 1.0, 1.0}
+        \\    [Sprite]
+        \\      fill_color:color #FFFFFF
+        \\      visible:bool true
+        \\    [Physics]
+        \\      velocity:vec2 {0.0, 0.0}
+        \\      mass:f32 1.0
+        \\      friction:f32 0.5
+        \\
+        \\  [Ground:entity]
+        \\    [Transform]
+        \\      position:vec3 {0.0, -5.0, 0.0}
+        \\      scale:vec3 {20.0, 1.0, 1.0}
+        \\    [Box]
+        \\      size:vec2 {20.0, 1.0}
+        \\      fill_color:color #808080
+        \\      filled:bool true
+        \\
+        \\  [Camera:entity]
+        \\    [Transform]
+        \\      position:vec3 {0.0, 0.0, 10.0}
+        \\    [Camera]
+        \\      fov:f32 60.0
+        \\      near:f32 0.1
+        \\      far:f32 100.0
+        \\
+        \\  [UI:scene]
+        \\    [ScoreText:entity]
+        \\      [Transform]
+        \\        position:vec2 {10.0, 10.0}
+        \\      [Text]
+        \\        content:string "Score: 0"
+        \\        font_asset:asset_ref "MainFont"
+        \\        fill_color:color #FFFFFF
+        \\        size:f32 24.0
+        \\
+        \\    [HealthBar:entity]
+        \\      [Transform]
+        \\        position:vec2 {10.0, 50.0}
+        \\      [Rectangle]
+        \\        size:vec2 {200.0, 20.0}
+        \\        fill_color:color #FF0000
+        \\        filled:bool true
+    ;
+
+    // var lexer = Lexer.init(src);
+    // var token = try lexer.next();
+    // while (token.?.tag != .eof) : (token = try lexer.next()) {
+    //     std.log.info("{}  {s}", .{ token.?.tag, lib.lexeme(src, token.?) });
+    // }
+    var parser = try parse.Parser.init(allocator, src, "demo.scene");
+    const scene = try parser.parse();
+    _ = scene;
 
     //     // ===== Test parseNumber =====
     //     std.debug.print("\n=== PARSER DEMO - parseNumber ===\n\n", .{});

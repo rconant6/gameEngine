@@ -25,6 +25,11 @@ pub const SceneError = errs.SceneError;
 pub const ParserError = errs.ParseError;
 pub const LexerError = errs.LexerError;
 
+pub fn lexeme(src: [:0]const u8, token: Token) []const u8 {
+    const start = token.loc.start;
+    const end = token.loc.end;
+    return src[start..end];
+}
 pub fn parseString(
     allocator: std.mem.Allocator,
     src: [:0]const u8,

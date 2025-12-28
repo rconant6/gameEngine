@@ -13,7 +13,7 @@
       rotation:vec3 {0.0, 0.0, 0.0}
       scale:vec3 {1.0, 1.0, 1.0}
     [Sprite]
-      color:color FFFFFF
+      tint:color #FFFFFF
       visible:bool true
     [Physics]
       velocity:vec2 {0.0, 0.0}
@@ -26,7 +26,7 @@
       scale:vec3 {20.0, 1.0, 1.0}
     [Box]
       size:vec2 {20.0, 1.0}
-      color:color 808080
+      fill_color:color #808080
       filled:bool true
 
   [Camera:entity]
@@ -43,8 +43,8 @@
         position:vec2 {10.0, 10.0}
       [Text]
         content:string "Score: 0"
-        font:asset_ref "MainFont"
-        color:color FFFFFF
+        font_asset:asset_ref "MainFont"
+        text_color:color #FFFFFF
         size:f32 24.0
 
     [HealthBar:entity]
@@ -52,5 +52,5 @@
         position:vec2 {10.0, 50.0}
       [Rectangle]
         size:vec2 {200.0, 20.0}
-        color:color FF0000
+        fill_color:color #FF0000
         filled:bool true

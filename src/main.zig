@@ -2,6 +2,8 @@ const std = @import("std");
 const engine = @import("engine");
 const KeyCode = engine.KeyCode;
 
+const loader = @import("scene/loader.zig");
+
 const logical_width = 800 * 2;
 const logical_height = 600 * 2;
 
@@ -17,6 +19,26 @@ pub fn main() !void {
         logical_height,
     );
     defer game.deinit();
+    const scene = try loader.loadSceneFile(allocator, "demo.scene");
+    // const scene = try loader.loadSceneFile(allocator, "test.scene");
+    defer {
+        // TODO: Add proper scene cleanup function
+        // For now, just acknowledge we need to free it
+    }
+
+    // Debug: Print scene info
+    std.debug.print("\n=== Scene Loaded: {s} ===\n", .{scene.source_file_name});
+    std.debug.print("Total declarations: {d}\n", .{scene.decls.len});
+    for (scene.decls) |decl| {
+        switch (decl) {
+            .scene => |s| std.debug.print("  - Scene: {s}\n", .{s.name}),
+            .entity => |e| std.debug.print("  - Entity: {s} ({d} components)\n", .{ e.name, e.components.len }),
+            .asset => |a| std.debug.print("  - Asset: {s} (type: {s})\n", .{ a.name, @tagName(a.asset_type) }),
+            .shape => |sh| std.debug.print("  - Shape: {s}\n", .{sh.name}),
+            .component => |c| std.debug.print("  - Component: {s}\n", .{c.name}),
+        }
+    }
+    std.debug.print("===========================\n\n", .{});
 
     // Setup font
     try game.assets.setFontPath("assets/fonts");

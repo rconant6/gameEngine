@@ -50,6 +50,8 @@ const Input = @import("Input.zig");
 
 const Systems = @import("Systems.zig");
 
+// const scene_format = @import("scene_format");
+
 pub const Engine = struct {
     allocator: std.mem.Allocator,
     input: Input,
