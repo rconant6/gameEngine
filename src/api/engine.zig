@@ -51,7 +51,9 @@ const Input = @import("Input.zig");
 
 const Systems = @import("Systems.zig");
 
-// const scene_format = @import("scene_format");
+const scene_format = @import("scene_format");
+
+pub const ComponentRegistry = @import("component_registry.zig").ComponentRegistry;
 
 pub const Engine = struct {
     allocator: std.mem.Allocator,

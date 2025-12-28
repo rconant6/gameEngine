@@ -1,5 +1,6 @@
 const std = @import("std");
 const engine = @import("engine");
+const ComponentRegistry = engine.ComponentRegistry;
 const KeyCode = engine.KeyCode;
 
 const loader = @import("scene/loader.zig");
@@ -22,6 +23,25 @@ pub fn main() !void {
     );
     defer game.deinit();
 
+    // Test ComponentRegistry
+    std.log.debug("=== Component Registry Test ===\n", .{});
+    inline for (ComponentRegistry.component_names, 0..) |name, i| {
+        std.log.debug("[{d}] {s} -> {s}\n", .{ i, name, @typeName(ComponentRegistry.component_types[i]) });
+    }
+
+    // Test component lookup
+    if (ComponentRegistry.getComponentIndex("Transform")) |idx| {
+        std.log.debug("Found 'Transform' at index {d}\n", .{idx});
+    }
+    if (ComponentRegistry.getComponentIndex("Sprite")) |idx| {
+        std.log.debug("Found 'Sprite' at index {d}\n", .{idx});
+    }
+    if (ComponentRegistry.getComponentIndex("InvalidComponent")) |idx| {
+        std.log.debug("Found 'InvalidComponent' at index {d}\n", .{idx});
+    } else {
+        std.log.debug("'InvalidComponent' not found (expected)\n", .{});
+    }
+    std.log.debug("\n", .{});
     // Test SceneManager
     var scene_manager = SceneManager.init(allocator);
     defer scene_manager.deinit();
