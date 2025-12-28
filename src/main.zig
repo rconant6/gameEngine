@@ -3,6 +3,8 @@ const engine = @import("engine");
 const KeyCode = engine.KeyCode;
 
 const loader = @import("scene/loader.zig");
+const manager = @import("scene/manager.zig");
+const SceneManager = manager.SceneManager;
 
 const logical_width = 800 * 2;
 const logical_height = 600 * 2;
@@ -19,26 +21,45 @@ pub fn main() !void {
         logical_height,
     );
     defer game.deinit();
-    const scene = try loader.loadSceneFile(allocator, "demo.scene");
-    // const scene = try loader.loadSceneFile(allocator, "test.scene");
-    defer {
-        // TODO: Add proper scene cleanup function
-        // For now, just acknowledge we need to free it
+
+    // Test SceneManager
+    var scene_manager = SceneManager.init(allocator);
+    defer scene_manager.deinit();
+
+    // Load game.scene into the manager
+    try scene_manager.loadScene("main", "game");
+    std.debug.print("\n=== SceneManager Test ===\n", .{});
+    std.debug.print("Loaded scene 'main' from game.scene\n", .{});
+
+    // Set it as the active scene
+    try scene_manager.setActiveScene("main");
+    std.debug.print("Set 'main' as active scene\n", .{});
+
+    // Get the active scene and print info
+    if (scene_manager.getActiveScene()) |scene| {
+        std.debug.print("\n=== Active Scene: {s} ===\n", .{scene.source_file_name});
+        std.debug.print("Total declarations: {d}\n", .{scene.decls.len});
+        for (scene.decls) |decl| {
+            switch (decl) {
+                .scene => |s| std.debug.print("  - Scene: {s}\n", .{s.name}),
+                .entity => |e| std.debug.print("  - Entity: {s} ({d} components)\n", .{ e.name, e.components.len }),
+                .asset => |a| std.debug.print("  - Asset: {s} (type: {s})\n", .{ a.name, @tagName(a.asset_type) }),
+                .shape => |sh| std.debug.print("  - Shape: {s}\n", .{sh.name}),
+                .component => |c| std.debug.print("  - Component: {s}\n", .{c.name}),
+            }
+        }
+        std.debug.print("===========================\n\n", .{});
+    } else {
+        std.debug.print("ERROR: No active scene found!\n", .{});
     }
 
-    // Debug: Print scene info
-    std.debug.print("\n=== Scene Loaded: {s} ===\n", .{scene.source_file_name});
-    std.debug.print("Total declarations: {d}\n", .{scene.decls.len});
-    for (scene.decls) |decl| {
-        switch (decl) {
-            .scene => |s| std.debug.print("  - Scene: {s}\n", .{s.name}),
-            .entity => |e| std.debug.print("  - Entity: {s} ({d} components)\n", .{ e.name, e.components.len }),
-            .asset => |a| std.debug.print("  - Asset: {s} (type: {s})\n", .{ a.name, @tagName(a.asset_type) }),
-            .shape => |sh| std.debug.print("  - Shape: {s}\n", .{sh.name}),
-            .component => |c| std.debug.print("  - Component: {s}\n", .{c.name}),
-        }
+    // Test getting a specific scene
+    if (scene_manager.getScene("main")) |scene| {
+        std.debug.print("Successfully retrieved scene 'main' by name\n", .{});
+        std.debug.print("Scene has {d} declarations\n\n", .{scene.decls.len});
+    } else {
+        std.debug.print("ERROR: Could not retrieve scene 'main'!\n\n", .{});
     }
-    std.debug.print("===========================\n\n", .{});
 
     // Setup font
     try game.assets.setFontPath("assets/fonts");

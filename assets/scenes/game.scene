@@ -1,0 +1,116 @@
+[OrbitronFont:asset font]
+  path:string "assets/fonts/Orbitron.ttf"
+  size:f32 16.0
+
+[MainFont:asset font]
+  path:string "assets/fonts/Roboto-Regular.ttf"
+  size:f32 16.0
+
+[UIFont:asset font]
+  path:string "assets/fonts/Roboto-Bold.ttf"
+  size:f32 14.0
+
+[GameScene:scene]
+  [Bouncer:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 0.0}
+      rotation:f32 0.0
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {5.0, 3.0}
+      angular:f32 0.0
+    [Sprite]
+      shape_type:string "Circle"
+      radius:f32 2.0
+      tint:color #00FF00
+      stroke_color:color #FFFFFF
+      visible:bool true
+
+  [Wrapper:entity]
+    [Transform]
+      position:vec3 {-5.0, -5.0, 0.0}
+      rotation:f32 0.0
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {2.0, 1.5}
+      angular:f32 1.0
+    [Sprite]
+      shape_type:string "Rectangle"
+      width:f32 3.0
+      height:f32 2.0
+      tint:color #AA00FF
+      stroke_color:color #FFFFFF
+      visible:bool true
+
+  [StaticTriangle:entity]
+    [Transform]
+      position:vec3 {0.0, 5.0, 0.0}
+      rotation:f32 0.0
+      scale:f32 1.0
+    [Sprite]
+      shape_type:string "Triangle"
+      vertices:string "{0.0, 1.0}, {-1.0, -1.0}, {1.0, -1.0}"
+      tint:color #0000FF
+      stroke_color:color #FFFFFF
+      visible:bool true
+    [Lifetime]
+      remaining:f32 2.0
+
+  [TitleText:entity]
+    [Transform]
+      position:vec2 {-15.0, 11.0}
+      rotation:f32 0.0
+      scale:f32 1.0
+    [Text]
+      content:string "ECS DEMO - Bouncing & Wrapping"
+      font_asset:asset_ref "OrbitronFont"
+      text_color:color #FF8800
+      size:f32 0.5
+
+  [Player:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 0.0}
+      rotation:vec3 {0.0, 0.0, 0.0}
+      scale:vec3 {1.0, 1.0, 1.0}
+    [Sprite]
+      tint:color #FFFFFF
+      visible:bool true
+    [Physics]
+      velocity:vec2 {0.0, 0.0}
+      mass:f32 1.0
+      friction:f32 0.5
+
+  [Ground:entity]
+    [Transform]
+      position:vec3 {0.0, -5.0, 0.0}
+      scale:vec3 {20.0, 1.0, 1.0}
+    [Box]
+      size:vec2 {20.0, 1.0}
+      fill_color:color #808080
+      filled:bool true
+
+  [Camera:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 10.0}
+    [Camera]
+      fov:f32 60.0
+      near:f32 0.1
+      far:f32 100.0
+
+  [UI:scene]
+    [ScoreText:entity]
+      [Transform]
+        position:vec2 {10.0, 10.0}
+      [Text]
+        content:string "Score: 0"
+        font_asset:asset_ref "MainFont"
+        text_color:color #FFFFFF
+        size:f32 24.0
+
+    [HealthBar:entity]
+      [Transform]
+        position:vec2 {10.0, 50.0}
+      [Rectangle]
+        size:vec2 {200.0, 20.0}
+        fill_color:color #FF0000
+        filled:bool true
