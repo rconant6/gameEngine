@@ -24,6 +24,10 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/core/types.zig"),
     });
 
+    const scene_format_module = b.addModule("scene-format", .{
+        .root_source_file = b.path("libs/scene-format/src/lib.zig"),
+    });
+
     const asset_module = b.addModule("asset", .{
         .root_source_file = b.path("src/assets/assets.zig"),
     });
@@ -65,6 +69,7 @@ pub fn build(b: *std.Build) void {
     engine_module.addImport("build_options", build_options_module);
     engine_module.addImport("asset", asset_module);
     engine_module.addImport("entity", entity_module);
+    engine_module.addImport("scene-format", scene_format_module);
 
     // Main is floating around for dev/testing
     const main_module = b.addModule("main", .{
@@ -78,6 +83,7 @@ pub fn build(b: *std.Build) void {
     main_module.addImport("engine", engine_module);
     main_module.addImport("asset", asset_module);
     main_module.addImport("entity", entity_module);
+    main_module.addImport("scene-format", scene_format_module);
 
     const exe = b.addExecutable(.{
         .name = "game-engine",
@@ -90,6 +96,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("asset", asset_module);
     exe.root_module.addImport("entity", entity_module);
     exe.root_module.addImport("engine", engine_module);
+    exe.root_module.addImport("scene-format", scene_format_module);
     configurePlatform(b, exe, main_module, target, optimize, selected_renderer);
 
     b.installArtifact(exe);
