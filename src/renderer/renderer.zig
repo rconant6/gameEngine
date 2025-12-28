@@ -101,8 +101,21 @@ pub const Renderer = struct {
         self.backend.setClearColor(color);
     }
 
-    pub fn drawShape(self: *Renderer, shape_data: Shape, transform: ?Transform) void {
-        self.backend.drawShape(shape_data, transform);
+    pub fn drawGeometry(
+        self: *Renderer,
+        shape_data: Shape,
+        transform: ?Transform,
+        fill_color: ?Color,
+        stroke_color: ?Color,
+        stroke_width: f32,
+    ) void {
+        self.backend.drawShape(
+            shape_data,
+            transform,
+            fill_color,
+            stroke_color,
+            stroke_width,
+        );
     }
     pub fn drawText(
         self: *Renderer,

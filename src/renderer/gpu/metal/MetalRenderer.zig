@@ -164,9 +164,19 @@ pub fn drawShape(
     self: *Self,
     shape: ShapeData,
     transform: ?Transform,
+    fill_color: ?Color,
+    stroke_color: ?Color,
+    stroke_width: f32,
 ) void {
     const ctx = self.getRenderContext();
-    self.batch.addShape(shape, transform, ctx) catch |err| {
+    self.batch.addShape(
+        shape,
+        transform,
+        fill_color,
+        stroke_color,
+        stroke_width,
+        ctx,
+    ) catch |err| {
         std.log.err("Failed to add shape to batch: {any}\n", .{err});
     };
 }

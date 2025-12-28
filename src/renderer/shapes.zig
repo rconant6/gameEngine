@@ -2,8 +2,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const core = @import("core");
 const Point = core.GamePoint;
-const col = @import("color.zig");
-const Color = col.Color;
 const tris = @import("triangulation.zig");
 
 pub const Transform = struct {
@@ -13,26 +11,26 @@ pub const Transform = struct {
 };
 
 pub const ShapeType = enum {
-    Circle,
-    Ellipse,
-    Line,
-    Rectangle,
-    Triangle,
-    Polygon,
+    circle,
+    ellipse,
+    line,
+    rectangle,
+    triangle,
+    polygon,
 };
 
 pub const Shape = union(ShapeType) {
-    Circle: Circle,
-    Ellipse: Ellipse,
-    Line: Line,
-    Rectangle: Rectangle,
-    Triangle: Triangle,
-    Polygon: Polygon,
+    circle: Circle,
+    ellipse: Ellipse,
+    line: Line,
+    rectangle: Rectangle,
+    triangle: Triangle,
+    polygon: Polygon,
 
     pub fn deinit(self: *Shape) void {
         switch (self.*) {
-            .Triangle => |*t| t.deinit(),
-            .Polygon => |*p| p.deinit(),
+            .triangle => |*t| t.deinit(),
+            .polygon => |*p| p.deinit(),
             else => {},
         }
     }
@@ -41,19 +39,16 @@ pub const Shape = union(ShapeType) {
 pub const Line = struct {
     start: Point,
     end: Point,
-    color: ?Color = null,
 
     pub fn init(
         alloc: Allocator,
         start: Point,
         end: Point,
-        c: ?Color,
     ) !Line {
         _ = alloc;
         return .{
             .start = start,
             .end = end,
-            .color = c,
         };
     }
 };
@@ -61,18 +56,17 @@ pub const Line = struct {
 pub const Triangle = struct {
     allocator: Allocator,
     vertices: []Point,
-    outline_color: ?Color = null,
-    fill_color: ?Color = null,
 
-    pub fn init(alloc: Allocator, points: []const Point, fc: ?Color, oc: ?Color) !Triangle {
+    pub fn init(
+        alloc: Allocator,
+        points: []const Point,
+    ) !Triangle {
         const owned_points: []Point = try alloc.dupe(Point, points);
         std.debug.assert(owned_points.len == 3);
         std.mem.sort(Point, owned_points, {}, sortPointByYThenX);
         return .{
             .allocator = alloc,
             .vertices = owned_points,
-            .outline_color = oc,
-            .fill_color = fc,
         };
     }
     pub fn deinit(self: *Triangle) void {
@@ -82,10 +76,8 @@ pub const Triangle = struct {
 
 pub const Rectangle = struct {
     center: Point,
-    fill_color: ?Color = null,
     half_height: f32,
     half_width: f32,
-    outline_color: ?Color = null,
 
     pub fn init(
         alloc: Allocator,
@@ -93,16 +85,12 @@ pub const Rectangle = struct {
         y: f32,
         w: f32,
         h: f32,
-        fc: ?Color,
-        oc: ?Color,
     ) !Rectangle {
         _ = alloc;
         return .{
             .center = .{ .x = x - w / 2, .y = y - h / 2 },
             .half_width = w / 2,
             .half_height = h / 2,
-            .outline_color = oc,
-            .fill_color = fc,
         };
     }
 
@@ -166,9 +154,7 @@ pub const Polygon = struct {
     allocator: Allocator,
     center: Point,
     fill_call_count: usize = 0,
-    fill_color: ?Color = null,
     outline_call_count: usize = 0,
-    outline_color: ?Color = null,
     points: []const Point,
     triangle_cache: ?[][3]Point = null,
     vertex_count: usize = 0,
@@ -176,8 +162,6 @@ pub const Polygon = struct {
     pub fn init(
         alloc: Allocator,
         points: []const Point,
-        fc: ?Color,
-        oc: ?Color,
     ) !Polygon {
         const owned_points = try alloc.dupe(Point, points);
         errdefer alloc.free(owned_points);
@@ -187,8 +171,6 @@ pub const Polygon = struct {
             .allocator = alloc,
             .points = owned_points,
             .center = center,
-            .outline_color = oc,
-            .fill_color = fc,
             .triangle_cache = null,
         };
 
@@ -220,23 +202,17 @@ pub const Polygon = struct {
 };
 
 pub const Circle = struct {
-    fill_color: ?Color = null,
     origin: Point,
-    outline_color: ?Color = null,
     radius: f32,
 
     pub fn init(
         alloc: Allocator,
         origin: Point,
         r: f32,
-        fc: ?Color,
-        oc: ?Color,
     ) !Circle {
         _ = alloc;
         return .{
-            .fill_color = fc,
             .origin = origin,
-            .outline_color = oc,
             .radius = r,
         };
     }
@@ -247,8 +223,6 @@ pub const Ellipse = struct {
     origin: Point,
     semi_minor: f32,
     semi_major: f32,
-    outline_color: ?Color = null,
-    fill_color: ?Color = null,
 };
 
 fn sortPointByX(context: void, a: Point, b: Point) bool {

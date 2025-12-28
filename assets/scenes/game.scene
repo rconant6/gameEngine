@@ -20,10 +20,11 @@
       linear:vec2 {5.0, 3.0}
       angular:f32 0.0
     [Sprite]
-      shape_type:string "Circle"
-      radius:f32 2.0
-      tint:color #00FF00
+      circle_origin:vec2 {0.0, 0.0}
+      circle_radius:f32 2.0
+      fill_color:color #00FF00
       stroke_color:color #FFFFFF
+      stroke_width:f32 1.0
       visible:bool true
 
   [Wrapper:entity]
@@ -35,11 +36,12 @@
       linear:vec2 {2.0, 1.5}
       angular:f32 1.0
     [Sprite]
-      shape_type:string "Rectangle"
-      width:f32 3.0
-      height:f32 2.0
-      tint:color #AA00FF
+      rectangle_center:vec2 {0.0, 0.0}
+      rectangle_half_width:f32 1.5
+      rectangle_half_height:f32 1.0
+      fill_color:color #AA00FF
       stroke_color:color #FFFFFF
+      stroke_width:f32 1.0
       visible:bool true
 
   [StaticTriangle:entity]
@@ -48,10 +50,12 @@
       rotation:f32 0.0
       scale:f32 1.0
     [Sprite]
-      shape_type:string "Triangle"
-      vertices:string "{0.0, 1.0}, {-1.0, -1.0}, {1.0, -1.0}"
-      tint:color #0000FF
+      triangle_v0:vec2 {0.0, 1.0}
+      triangle_v1:vec2 {-1.0, -1.0}
+      triangle_v2:vec2 {1.0, -1.0}
+      fill_color:color #0000FF
       stroke_color:color #FFFFFF
+      stroke_width:f32 1.0
       visible:bool true
     [Lifetime]
       remaining:f32 2.0
@@ -73,7 +77,11 @@
       rotation:vec3 {0.0, 0.0, 0.0}
       scale:vec3 {1.0, 1.0, 1.0}
     [Sprite]
-      tint:color #FFFFFF
+      circle_origin:vec2 {0.0, 0.0}
+      circle_radius:f32 1.0
+      fill_color:color #FFFFFF
+      stroke_color:color #FFFFFF
+      stroke_width:f32 1.0
       visible:bool true
     [Physics]
       velocity:vec2 {0.0, 0.0}

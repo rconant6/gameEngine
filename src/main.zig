@@ -78,13 +78,10 @@ pub fn main() !void {
         .angular = 0.0,
     });
     try game.addComponent(bouncer, engine.Sprite, .{
-        .shape = .{ .Circle = game.create(engine.Circle, .{
-            engine.V2{ .x = 0.0, .y = 0.0 },
-            2.0,
-            engine.Colors.NEON_GREEN,
-            engine.Colors.WHITE,
-        }) },
-        .color = engine.Colors.NEON_GREEN,
+        .geometry = .{ .circle = .{ .origin = .{ .x = 0.0, .y = 0.0 }, .radius = 2.0 } },
+        .fill_color = engine.Colors.NEON_GREEN,
+        .stroke_color = engine.Colors.WHITE,
+        .stroke_width = 1.0,
         .visible = true,
     });
     try game.addComponent(bouncer, engine.ScreenClamp, .{});
@@ -101,15 +98,10 @@ pub fn main() !void {
         .angular = 1.0, // Rotate while moving
     });
     try game.addComponent(wrapper, engine.Sprite, .{
-        .shape = .{ .Rectangle = game.create(engine.Rectangle, .{
-            0.0,
-            0.0,
-            3.0,
-            2.0,
-            engine.Colors.NEON_PURPLE,
-            engine.Colors.WHITE,
-        }) },
-        .color = engine.Colors.NEON_PURPLE,
+        .geometry = .{ .rectangle = .{ .center = .{ .x = 0.0, .y = 0.0 }, .half_width = 1.5, .half_height = 1.0 } },
+        .fill_color = engine.Colors.NEON_PURPLE,
+        .stroke_color = engine.Colors.WHITE,
+        .stroke_width = 1.0,
         .visible = true,
     });
     try game.addComponent(wrapper, engine.ScreenWrap, .{});
@@ -121,17 +113,16 @@ pub fn main() !void {
         .rotation = 0.0,
         .scale = 1.0,
     });
+    const tri_verts = [3]engine.V2{
+        .{ .x = 0.0, .y = 1.0 },
+        .{ .x = -1.0, .y = -1.0 },
+        .{ .x = 1.0, .y = -1.0 },
+    };
     try game.addComponent(static_tri, engine.Sprite, .{
-        .shape = .{ .Triangle = game.create(engine.Triangle, .{
-            &[3]engine.V2{
-                .{ .x = 0.0, .y = 1.0 },
-                .{ .x = -1.0, .y = -1.0 },
-                .{ .x = 1.0, .y = -1.0 },
-            },
-            engine.Colors.BLUE,
-            engine.Colors.WHITE,
-        }) },
-        .color = engine.Colors.BLUE,
+        .geometry = .{ .triangle = try engine.Triangle.init(allocator, &tri_verts) },
+        .fill_color = engine.Colors.BLUE,
+        .stroke_color = engine.Colors.WHITE,
+        .stroke_width = 1.0,
         .visible = true,
     });
     try game.addComponent(static_tri, engine.Lifetime, .{ .remaining = 2 });
@@ -171,13 +162,10 @@ pub fn main() !void {
                 .scale = 1.0,
             });
             try game.addComponent(test_circle, engine.Sprite, .{
-                .shape = .{ .Circle = game.create(engine.Circle, .{
-                    engine.V2{ .x = 0.0, .y = 0.0 },
-                    1.0,
-                    engine.Colors.NEON_PINK,
-                    engine.Colors.WHITE,
-                }) },
-                .color = engine.Colors.NEON_PINK,
+                .geometry = .{ .circle = .{ .origin = .{ .x = 0.0, .y = 0.0 }, .radius = 1.0 } },
+                .fill_color = engine.Colors.NEON_PINK,
+                .stroke_color = engine.Colors.WHITE,
+                .stroke_width = 1.0,
                 .visible = true,
             });
             try game.addComponent(test_circle, engine.Lifetime, .{ .remaining = 0.5 });
@@ -195,17 +183,16 @@ pub fn main() !void {
                 .rotation = 0.0,
                 .scale = 1.0,
             });
+            const test_tri_verts = [3]engine.V2{
+                .{ .x = 3.0, .y = 1.0 },
+                .{ .x = 1.0, .y = 1.0 },
+                .{ .x = -1.0, .y = -1.0 },
+            };
             try game.addComponent(test_tri, engine.Sprite, .{
-                .shape = .{ .Triangle = game.create(engine.Triangle, .{
-                    &[3]engine.V2{
-                        .{ .x = 3.0, .y = 1.0 },
-                        .{ .x = 1.0, .y = 1.0 },
-                        .{ .x = -1.0, .y = -1.0 },
-                    },
-                    engine.Colors.BLUE,
-                    engine.Colors.WHITE,
-                }) },
-                .color = engine.Colors.BLUE,
+                .geometry = .{ .triangle = try engine.Triangle.init(allocator, &test_tri_verts) },
+                .fill_color = engine.Colors.BLUE,
+                .stroke_color = engine.Colors.WHITE,
+                .stroke_width = 1.0,
                 .visible = true,
             });
             try game.addComponent(test_tri, engine.Lifetime, .{ .remaining = 2 });

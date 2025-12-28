@@ -86,49 +86,81 @@ pub fn drawShape(
     self: *CpuRenderer,
     shape: Shape,
     transform: ?Transform,
+    fill_color: ?Color,
+    stroke_color: ?Color,
+    stroke_width: f32,
 ) void {
     if (transform) |xform| {
         switch (shape) {
-            .Circle => |circle| {
-                self.drawCircleWithTransform(circle, xform);
+            .circle => |circle| {
+                self.drawCircleWithTransform(
+                    circle,
+                    xform,
+                    fill_color,
+                    stroke_color,
+                    stroke_width,
+                );
             },
-            .Ellipse => |ellipse| {
+            .ellipse => |ellipse| {
                 _ = ellipse;
                 std.debug.panic("Ellipse has not been implemented yet!!\n", .{});
             },
-            .Line => |line| {
-                self.drawLineWithTransform(line, xform);
+            .line => |line| {
+                self.drawLineWithTransform(
+                    line,
+                    xform,
+                    stroke_color,
+                    stroke_width,
+                );
             },
-            .Rectangle => |rect| {
-                self.drawRectangleWithTransform(rect, xform);
+            .rectangle => |rect| {
+                self.drawRectangleWithTransform(
+                    rect,
+                    xform,
+                    fill_color,
+                    stroke_color,
+                    stroke_width,
+                );
             },
-            .Triangle => |tri| {
-                self.drawTriangleWithTransform(tri, xform);
+            .triangle => |tri| {
+                self.drawTriangleWithTransform(
+                    tri,
+                    xform,
+                    fill_color,
+                    stroke_color,
+                    stroke_width,
+                );
             },
-            .Polygon => |poly| {
-                self.drawPolygonWithTransform(poly, xform);
+            .polygon => |poly| {
+                self.drawPolygonWithTransform(
+                    poly,
+                    xform,
+                    fill_color,
+                    stroke_color,
+                    stroke_width,
+                );
             },
         }
     } else {
         switch (shape) {
-            .Circle => |circle| {
-                self.drawCircle(circle);
+            .circle => |circle| {
+                self.drawCircle(circle, fill_color, stroke_color, stroke_width);
             },
-            .Ellipse => |ellipse| {
+            .ellipse => |ellipse| {
                 _ = ellipse;
                 std.debug.panic("TODO: Ellipse has not been implemented yet!!\n", .{});
             },
-            .Line => |line| {
-                self.drawLine(line.start, line.end, line.color);
+            .line => |line| {
+                self.drawLine(line.start, line.end, stroke_color, stroke_width);
             },
-            .Rectangle => |rect| {
-                self.drawRectangle(rect, null);
+            .rectangle => |rect| {
+                self.drawRectangle(rect, null, fill_color, stroke_color, stroke_width);
             },
-            .Triangle => |tri| {
-                self.drawTriangle(tri, null);
+            .triangle => |tri| {
+                self.drawTriangle(tri, null, fill_color, stroke_color, stroke_width);
             },
-            .Polygon => |poly| {
-                self.drawPolygon(poly, null);
+            .polygon => |poly| {
+                self.drawPolygon(poly, null, fill_color, stroke_color, stroke_width);
             },
         }
     }
@@ -139,39 +171,57 @@ fn drawOutlineWithTransform(
     pts: []const GamePoint,
     transform: ?Transform,
     color: Color,
+    stroke_width: f32,
 ) void {
     if (transform) |xform| {
         const len = pts.len;
         switch (len) {
             0 => return,
             1 => drawPoint(renderer, utils.transformPoint(pts[0], xform), color),
-            2 => drawLineWithTransform(renderer, Line{ .start = pts[0], .end = pts[1], .color = color }, xform),
+            2 => drawLineWithTransform(
+                renderer,
+                Line{ .start = pts[0], .end = pts[1] },
+                xform,
+                color,
+                stroke_width,
+            ),
             else => {
                 // draw them all
                 for (0..len) |i| {
                     const start = pts[i];
                     const end = pts[(i + 1) % len];
-                    drawLineWithTransform(renderer, Line{ .start = start, .end = end, .color = color }, xform);
+                    drawLineWithTransform(
+                        renderer,
+                        Line{ .start = start, .end = end },
+                        xform,
+                        color,
+                        stroke_width,
+                    );
                 }
             },
         }
     } else {
-        drawOutline(renderer, pts, color);
+        drawOutline(renderer, pts, color, stroke_width);
     }
 }
 
-fn drawOutline(renderer: *CpuRenderer, pts: []const GamePoint, color: Color) void {
+fn drawOutline(
+    renderer: *CpuRenderer,
+    pts: []const GamePoint,
+    color: Color,
+    stroke_width: f32,
+) void {
     const len = pts.len;
     switch (len) {
         0 => return,
         1 => drawPoint(renderer, pts[0], color),
-        2 => drawLine(renderer, pts[0], pts[1], color),
+        2 => drawLine(renderer, pts[0], pts[1], color, stroke_width),
         else => {
             // draw them all
             for (0..len) |i| {
                 const start = pts[i];
                 const end = pts[(i + 1) % len];
-                drawLine(renderer, start, end, color);
+                drawLine(renderer, start, end, color, stroke_width);
             }
         },
     }
@@ -191,13 +241,26 @@ fn drawPoint(renderer: *CpuRenderer, point: GamePoint, color: ?Color) void {
 }
 
 // MARK: Lines
-fn drawLineWithTransform(renderer: *CpuRenderer, line: Line, xform: Transform) void {
+fn drawLineWithTransform(
+    renderer: *CpuRenderer,
+    line: Line,
+    xform: Transform,
+    stroke_color: ?Color,
+    stroke_width: f32,
+) void {
     const start = utils.transformPoint(line.start, xform);
     const end = utils.transformPoint(line.end, xform);
-    renderer.drawLine(start, end, line.color);
+    renderer.drawLine(start, end, stroke_color, stroke_width);
 }
 
-fn drawLine(renderer: *CpuRenderer, start: GamePoint, end: GamePoint, color: ?Color) void {
+fn drawLine(
+    renderer: *CpuRenderer,
+    start: GamePoint,
+    end: GamePoint,
+    color: ?Color,
+    stroke_width: f32,
+) void {
+    _ = stroke_width;
     const c = if (color != null) color.? else return;
 
     const screenStart = renderer.gameToScreen(start);
@@ -276,24 +339,35 @@ fn drawLine(renderer: *CpuRenderer, start: GamePoint, end: GamePoint, color: ?Co
 }
 
 // MARK: Circle drawing
-fn drawCircleWithTransform(renderer: *CpuRenderer, circle: Circle, xform: Transform) void {
+fn drawCircleWithTransform(
+    renderer: *CpuRenderer,
+    circle: Circle,
+    xform: Transform,
+    fill_color: ?Color,
+    stroke_color: ?Color,
+    stroke_width: f32,
+) void {
     const newOrigin = utils.transformPoint(circle.origin, xform);
     const newRadius = if (xform.scale) |scale| circle.radius * scale else circle.radius;
     const newCircle = Circle{
         .origin = newOrigin,
         .radius = newRadius,
-        .fill_color = circle.fill_color,
-        .outline_color = circle.outline_color,
     };
-    drawCircle(renderer, newCircle);
+    drawCircle(renderer, newCircle, fill_color, stroke_color, stroke_width);
 }
 
-fn drawCircle(renderer: *CpuRenderer, circle: Circle) void {
-    if (circle.fill_color) |fc| {
-        drawCircleFilled(renderer, circle, fc);
+fn drawCircle(
+    renderer: *CpuRenderer,
+    circle: Circle,
+    fill_color: ?Color,
+    stroke_color: ?Color,
+    stroke_width: f32,
+) void {
+    if (fill_color) |fc| {
+        drawCircleFilled(renderer, circle, fc, stroke_width);
     }
-    if (circle.outline_color) |oc| {
-        drawCircleOutline(renderer, circle, oc);
+    if (stroke_color) |oc| {
+        drawCircleOutline(renderer, circle, oc, stroke_width);
     }
 }
 
@@ -316,7 +390,13 @@ fn drawHorizontalScanLineInt(renderer: *CpuRenderer, y: i32, startx: i32, endx: 
     }
 }
 
-fn drawCircleFilled(renderer: *CpuRenderer, circle: Circle, color: Color) void {
+fn drawCircleFilled(
+    renderer: *CpuRenderer,
+    circle: Circle,
+    color: Color,
+    stroke_width: f32,
+) void {
+    _ = stroke_width;
     const center = renderer.gameToScreen(circle.origin);
     const edge: GamePoint = .{ .x = circle.origin.x + circle.radius, .y = circle.origin.y };
     const edgeScreen = renderer.gameToScreen(edge);
@@ -360,7 +440,13 @@ fn plotCirclePoints(renderer: *CpuRenderer, center: ScreenPoint, x: i32, y: i32,
     plotCirclePoint(renderer, center.x - y, center.y - x, color);
 }
 
-fn drawCircleOutline(renderer: *CpuRenderer, circle: Circle, color: Color) void {
+fn drawCircleOutline(
+    renderer: *CpuRenderer,
+    circle: Circle,
+    color: Color,
+    stroke_width: f32,
+) void {
+    _ = stroke_width;
     const center = renderer.gameToScreen(circle.origin);
     const edge: GamePoint = .{ .x = circle.origin.x + circle.radius, .y = circle.origin.y };
     const edgeScreen = renderer.gameToScreen(edge);
@@ -384,7 +470,14 @@ fn drawCircleOutline(renderer: *CpuRenderer, circle: Circle, color: Color) void 
 }
 
 // MARK: Rectangles
-fn drawRectangleWithTransform(renderer: *CpuRenderer, rect: Rectangle, transform: Transform) void {
+fn drawRectangleWithTransform(
+    renderer: *CpuRenderer,
+    rect: Rectangle,
+    transform: Transform,
+    fill_color: ?Color,
+    stroke_color: ?Color,
+    stroke_width: f32,
+) void {
     // const newCenter = transformPoint(rect.center, transform);
     const new_half_width = if (transform.scale) |scale| rect.half_width * scale else rect.half_width;
     const new_half_height = if (transform.scale) |scale| rect.half_height * scale else rect.half_height;
@@ -393,22 +486,32 @@ fn drawRectangleWithTransform(renderer: *CpuRenderer, rect: Rectangle, transform
         .center = rect.center,
         .half_width = new_half_width,
         .half_height = new_half_height,
-        .fill_color = rect.fill_color,
-        .outline_color = rect.outline_color,
     };
-    renderer.drawRectangle(newRect, transform);
+    renderer.drawRectangle(newRect, transform, fill_color, stroke_color, stroke_width);
 }
 
-fn drawRectangle(renderer: *CpuRenderer, rect: Rectangle, transform: ?Transform) void {
-    if (rect.fill_color) |_| {
-        drawRectFilled(renderer, rect, transform);
+fn drawRectangle(
+    renderer: *CpuRenderer,
+    rect: Rectangle,
+    transform: ?Transform,
+    fill_color: ?Color,
+    stroke_color: ?Color,
+    stroke_width: f32,
+) void {
+    if (fill_color) |fc| {
+        drawRectFilled(renderer, rect, transform, fc);
     }
-    if (rect.outline_color) |_| {
-        drawRectOutline(renderer, rect, transform);
+    if (stroke_color) |sc| {
+        drawRectOutline(renderer, rect, transform, sc, stroke_width);
     }
 }
 
-fn drawRectFilled(renderer: *CpuRenderer, rect: Rectangle, transform: ?Transform) void {
+fn drawRectFilled(
+    renderer: *CpuRenderer,
+    rect: Rectangle,
+    transform: ?Transform,
+    fill_color: Color,
+) void {
     const corners = rect.getCorners();
 
     var c0 = corners[0];
@@ -430,18 +533,14 @@ fn drawRectFilled(renderer: *CpuRenderer, rect: Rectangle, transform: ?Transform
             const tri1 = Triangle{
                 .allocator = renderer.allocator,
                 .vertices = &verts1,
-                .fill_color = rect.fill_color.?,
-                .outline_color = null,
             };
             const tri2 = Triangle{
                 .allocator = renderer.allocator,
                 .vertices = &verts2,
-                .fill_color = rect.fill_color.?,
-                .outline_color = null,
             };
 
-            drawTriangle(renderer, tri1, null);
-            drawTriangle(renderer, tri2, null);
+            drawTriangle(renderer, tri1, null, fill_color, null, 0);
+            drawTriangle(renderer, tri2, null, fill_color, null, 0);
             return;
         }
     }
@@ -463,12 +562,18 @@ fn drawRectFilled(renderer: *CpuRenderer, rect: Rectangle, transform: ?Transform
     while (y <= endY) : (y += 1) {
         var x = startX;
         while (x <= endX) : (x += 1) {
-            renderer.frame_buffer.setPixel(x, y, rect.fill_color.?);
+            renderer.frame_buffer.setPixel(x, y, fill_color);
         }
     }
 }
 
-fn drawRectOutline(renderer: *CpuRenderer, rect: Rectangle, transform: ?Transform) void {
+fn drawRectOutline(
+    renderer: *CpuRenderer,
+    rect: Rectangle,
+    transform: ?Transform,
+    stroke_color: Color,
+    stroke_width: f32,
+) void {
     const corners = rect.getCorners();
 
     const c0 = if (transform) |xform| utils.transformPoint(corners[0], xform) else corners[0];
@@ -480,21 +585,35 @@ fn drawRectOutline(renderer: *CpuRenderer, rect: Rectangle, transform: ?Transfor
     for (0..4) |i| {
         const start = xformexCorners[i];
         const end = xformexCorners[(i + 1) % 4];
-        drawLine(renderer, start, end, rect.outline_color);
+        drawLine(renderer, start, end, stroke_color, stroke_width);
     }
 }
 
 // MARK: Triangle
-fn drawTriangleWithTransform(renderer: *CpuRenderer, tri: Triangle, xform: Transform) void {
-    drawTriangle(renderer, tri, xform);
+fn drawTriangleWithTransform(
+    renderer: *CpuRenderer,
+    tri: Triangle,
+    xform: Transform,
+    fill_color: ?Color,
+    stroke_color: ?Color,
+    stroke_width: f32,
+) void {
+    drawTriangle(renderer, tri, xform, fill_color, stroke_color, stroke_width);
 }
 
-fn drawTriangle(renderer: *CpuRenderer, tri: Triangle, transform: ?Transform) void {
-    if (tri.fill_color) |fc| {
+fn drawTriangle(
+    renderer: *CpuRenderer,
+    tri: Triangle,
+    transform: ?Transform,
+    fill_color: ?Color,
+    stroke_color: ?Color,
+    stroke_width: f32,
+) void {
+    if (fill_color) |fc| {
         drawTriangleFilled(renderer, tri.vertices, transform, fc);
     }
-    if (tri.outline_color) |oc| {
-        drawOutlineWithTransform(renderer, tri.vertices, transform, oc);
+    if (stroke_color) |sc| {
+        drawOutlineWithTransform(renderer, tri.vertices, transform, sc, stroke_width);
     }
 }
 
@@ -607,27 +726,52 @@ fn drawFlatBottomTriangle(
 }
 
 // MARK: Polygon
-fn drawPolygonWithTransform(renderer: *CpuRenderer, poly: Polygon, xform: Transform) void {
-    drawPolygon(renderer, poly, xform);
+fn drawPolygonWithTransform(
+    renderer: *CpuRenderer,
+    poly: Polygon,
+    xform: Transform,
+    fill_color: ?Color,
+    stroke_color: ?Color,
+    stroke_width: f32,
+) void {
+    drawPolygon(renderer, poly, xform, fill_color, stroke_color, stroke_width);
 }
 
-fn drawPolygon(renderer: *CpuRenderer, poly: Polygon, transform: ?Transform) void {
-    if (poly.fill_color) |_| {
-        drawPolygonFilled(renderer, poly, transform);
+fn drawPolygon(
+    renderer: *CpuRenderer,
+    poly: Polygon,
+    transform: ?Transform,
+    fill_color: ?Color,
+    stroke_color: ?Color,
+    stroke_width: f32,
+) void {
+    if (fill_color) |fc| {
+        drawPolygonFilled(renderer, poly, transform, fc);
     }
-    if (poly.outline_color) |oc| {
-        drawOutlineWithTransform(renderer, poly.points, transform, oc);
+    if (stroke_color) |sc| {
+        drawOutlineWithTransform(renderer, poly.points, transform, sc, stroke_width);
     }
 }
 
-fn drawPolygonOutline(renderer: *CpuRenderer, poly: Polygon, transform: ?Transform) void {
+fn drawPolygonOutline(
+    renderer: *CpuRenderer,
+    poly: Polygon,
+    transform: ?Transform,
+    color: Color,
+    stroke_width: f32,
+) void {
     if (transform) |xform| {
-        return drawPolygonOutline(renderer, poly, xform, poly.outline_color);
+        return drawPolygonOutline(renderer, poly, xform, color, stroke_width);
     }
-    return drawOutline(renderer, poly.verts, poly.outline_color);
+    return drawOutline(renderer, poly.verts, color, stroke_width);
 }
 
-fn drawPolygonFilled(renderer: *CpuRenderer, poly: Polygon, transform: ?Transform) void {
+fn drawPolygonFilled(
+    renderer: *CpuRenderer,
+    poly: Polygon,
+    transform: ?Transform,
+    color: Color,
+) void {
     var sortedVerts: [3]GamePoint = undefined;
     var v1: GamePoint = undefined;
     var v2: GamePoint = undefined;
@@ -639,7 +783,7 @@ fn drawPolygonFilled(renderer: *CpuRenderer, poly: Polygon, transform: ?Transfor
         v2 = if (transform) |xform| utils.transformPoint(poly.points[idx], xform) else poly.points[idx];
         sortedVerts = .{ center, v1, v2 };
         std.mem.sort(GamePoint, &sortedVerts, {}, sortPointByY);
-        drawTriangleFilled(renderer, &sortedVerts, null, poly.fill_color.?);
+        drawTriangleFilled(renderer, &sortedVerts, null, color);
     }
 }
 

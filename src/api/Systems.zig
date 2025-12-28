@@ -38,11 +38,17 @@ pub fn renderSystem(engine: *Engine) void {
         const sprite = entry.get(1);
 
         if (sprite.visible) {
-            renderer.drawShape(sprite.shape, .{
-                .offset = transform.position,
-                .rotation = transform.rotation,
-                .scale = transform.scale,
-            });
+            renderer.drawGeometry(
+                sprite.geometry,
+                .{
+                    .offset = transform.position,
+                    .rotation = transform.rotation,
+                    .scale = transform.scale,
+                },
+                sprite.fill_color,
+                sprite.stroke_color,
+                sprite.stroke_width,
+            );
         }
     }
 

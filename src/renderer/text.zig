@@ -62,11 +62,13 @@ fn drawGlyph(
                 .y = next_point.y * scale + pos.y,
             };
 
-            renderer.drawShape(.{ .Line = .{
-                .start = p1,
-                .end = p2,
-                .color = color,
-            } }, null);
+            renderer.drawGeometry(
+                .{ .line = .{ .start = p1, .end = p2 } },
+                null,
+                null,
+                color,
+                1,
+            );
         }
 
         start_idx = end_idx + 1;
