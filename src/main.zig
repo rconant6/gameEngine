@@ -3,6 +3,7 @@ const engine = @import("engine");
 const ComponentRegistry = engine.ComponentRegistry;
 const KeyCode = engine.KeyCode;
 
+const Instantiator = @import("scene/instantiator.zig").Instantiator;
 const loader = @import("scene/loader.zig");
 const manager = @import("scene/manager.zig");
 const SceneManager = manager.SceneManager;
@@ -24,25 +25,25 @@ pub fn main() !void {
     defer game.deinit();
 
     // Test ComponentRegistry
-    std.log.debug("=== Component Registry Test ===\n", .{});
-    inline for (ComponentRegistry.component_names, 0..) |name, i| {
-        std.log.debug("[{d}] {s} -> {s}\n", .{ i, name, @typeName(ComponentRegistry.component_types[i]) });
-    }
+    // std.log.debug("=== Component Registry Test ===\n", .{});
+    // inline for (ComponentRegistry.component_names, 0..) |name, i| {
+    //     std.log.debug("[{d}] {s} -> {s}\n", .{ i, name, @typeName(ComponentRegistry.component_types[i]) });
+    // }
 
-    // Test component lookup
-    if (ComponentRegistry.getComponentIndex("Transform")) |idx| {
-        std.log.debug("Found 'Transform' at index {d}\n", .{idx});
-    }
-    if (ComponentRegistry.getComponentIndex("Sprite")) |idx| {
-        std.log.debug("Found 'Sprite' at index {d}\n", .{idx});
-    }
-    if (ComponentRegistry.getComponentIndex("InvalidComponent")) |idx| {
-        std.log.debug("Found 'InvalidComponent' at index {d}\n", .{idx});
-    } else {
-        std.log.debug("'InvalidComponent' not found (expected)\n", .{});
-    }
-    std.log.debug("\n", .{});
-    // Test SceneManager
+    // // Test component lookup
+    // if (ComponentRegistry.getComponentIndex("Transform")) |idx| {
+    //     std.log.debug("Found 'Transform' at index {d}\n", .{idx});
+    // }
+    // if (ComponentRegistry.getComponentIndex("Sprite")) |idx| {
+    //     std.log.debug("Found 'Sprite' at index {d}\n", .{idx});
+    // }
+    // if (ComponentRegistry.getComponentIndex("InvalidComponent")) |idx| {
+    //     std.log.debug("Found 'InvalidComponent' at index {d}\n", .{idx});
+    // } else {
+    //     std.log.debug("'InvalidComponent' not found (expected)\n", .{});
+    // }
+    // std.log.debug("\n", .{});
+    // // Test SceneManager
     var scene_manager = SceneManager.init(allocator);
     defer scene_manager.deinit();
 
@@ -81,87 +82,94 @@ pub fn main() !void {
         std.debug.print("ERROR: Could not retrieve scene 'main'!\n\n", .{});
     }
 
-    // Setup font
-    try game.assets.setFontPath("assets/fonts");
-    const font_handle = try game.assets.loadFont("Orbitron.ttf");
-    const font = game.assets.fonts.getFont(font_handle);
+    // Instantiate entities from the loaded scene
+    var instantiator = Instantiator.init(allocator, &game);
+    const scene_file = scene_manager.getActiveScene() orelse return error.SceneNotFound;
+    try instantiator.instantiate(scene_file);
 
-    // Create bouncing circle (clamps to screen edges)
-    const bouncer = try game.createEntity();
-    try game.addComponent(bouncer, engine.TransformComp, .{
-        .position = .{ .x = 0.0, .y = 0.0 },
-        .rotation = 0.0,
-        .scale = 1.0,
-    });
-    try game.addComponent(bouncer, engine.Velocity, .{
-        .linear = .{ .x = 5.0, .y = 3.0 },
-        .angular = 0.0,
-    });
-    try game.addComponent(bouncer, engine.Sprite, .{
-        .geometry = .{ .circle = .{ .origin = .{ .x = 0.0, .y = 0.0 }, .radius = 2.0 } },
-        .fill_color = engine.Colors.NEON_GREEN,
-        .stroke_color = engine.Colors.WHITE,
-        .stroke_width = 1.0,
-        .visible = true,
-    });
-    try game.addComponent(bouncer, engine.ScreenClamp, .{});
+    // Find the GameScene declaration and instantiate it
 
-    // Create wrapping rectangle (wraps around screen)
-    const wrapper = try game.createEntity();
-    try game.addComponent(wrapper, engine.TransformComp, .{
-        .position = .{ .x = -5.0, .y = -5.0 },
-        .rotation = 0.0,
-        .scale = 1.0,
-    });
-    try game.addComponent(wrapper, engine.Velocity, .{
-        .linear = .{ .x = 2.0, .y = 1.5 },
-        .angular = 1.0, // Rotate while moving
-    });
-    try game.addComponent(wrapper, engine.Sprite, .{
-        .geometry = .{ .rectangle = .{ .center = .{ .x = 0.0, .y = 0.0 }, .half_width = 1.5, .half_height = 1.0 } },
-        .fill_color = engine.Colors.NEON_PURPLE,
-        .stroke_color = engine.Colors.WHITE,
-        .stroke_width = 1.0,
-        .visible = true,
-    });
-    try game.addComponent(wrapper, engine.ScreenWrap, .{});
+    // // Setup font
+    // try game.assets.setFontPath("assets/fonts");
+    // const font_handle = try game.assets.loadFont("Orbitron.ttf");
+    // const font = game.assets.fonts.getFont(font_handle);
 
-    // Create static triangle
-    const static_tri = try game.createEntity();
-    try game.addComponent(static_tri, engine.TransformComp, .{
-        .position = .{ .x = 0.0, .y = 5.0 },
-        .rotation = 0.0,
-        .scale = 1.0,
-    });
-    const tri_verts = [3]engine.V2{
-        .{ .x = 0.0, .y = 1.0 },
-        .{ .x = -1.0, .y = -1.0 },
-        .{ .x = 1.0, .y = -1.0 },
-    };
-    try game.addComponent(static_tri, engine.Sprite, .{
-        .geometry = .{ .triangle = try engine.Triangle.init(allocator, &tri_verts) },
-        .fill_color = engine.Colors.BLUE,
-        .stroke_color = engine.Colors.WHITE,
-        .stroke_width = 1.0,
-        .visible = true,
-    });
-    try game.addComponent(static_tri, engine.Lifetime, .{ .remaining = 2 });
+    // // Create bouncing circle (clamps to screen edges)
+    // const bouncer = try game.createEntity();
+    // try game.addComponent(bouncer, engine.TransformComp, .{
+    //     .position = .{ .x = 0.0, .y = 0.0 },
+    //     .rotation = 0.0,
+    //     .scale = 1.0,
+    // });
+    // try game.addComponent(bouncer, engine.Velocity, .{
+    //     .linear = .{ .x = 5.0, .y = 3.0 },
+    //     .angular = 0.0,
+    // });
+    // try game.addComponent(bouncer, engine.Sprite, .{
+    //     .geometry = .{ .circle = .{ .origin = .{ .x = 0.0, .y = 0.0 }, .radius = 2.0 } },
+    //     .fill_color = engine.Colors.NEON_GREEN,
+    //     .stroke_color = engine.Colors.WHITE,
+    //     .stroke_width = 1.0,
+    //     .visible = true,
+    // });
+    // try game.addComponent(bouncer, engine.ScreenClamp, .{});
 
-    // Create text entity
-    if (font) |_| {
-        const text_entity = try game.createEntity();
-        try game.addComponent(text_entity, engine.TransformComp, .{
-            .position = .{ .x = game.getLeftEdge() + 0.5, .y = game.getTopEdge() - 1.0 },
-            .rotation = 0.0,
-            .scale = 1.0,
-        });
-        try game.addComponent(text_entity, engine.Text, .{
-            .text = "ECS DEMO - Bouncing & Wrapping",
-            .font = font_handle,
-            .scale = 0.5,
-            .color = engine.Colors.NEON_ORANGE,
-        });
-    }
+    // // Create wrapping rectangle (wraps around screen)
+    // const wrapper = try game.createEntity();
+    // try game.addComponent(wrapper, engine.TransformComp, .{
+    //     .position = .{ .x = -5.0, .y = -5.0 },
+    //     .rotation = 0.0,
+    //     .scale = 1.0,
+    // });
+    // try game.addComponent(wrapper, engine.Velocity, .{
+    //     .linear = .{ .x = 2.0, .y = 1.5 },
+    //     .angular = 1.0, // Rotate while moving
+    // });
+    // try game.addComponent(wrapper, engine.Sprite, .{
+    //     .geometry = .{ .rectangle = .{ .center = .{ .x = 0.0, .y = 0.0 }, .half_width = 1.5, .half_height = 1.0 } },
+    //     .fill_color = engine.Colors.NEON_PURPLE,
+    //     .stroke_color = engine.Colors.WHITE,
+    //     .stroke_width = 1.0,
+    //     .visible = true,
+    // });
+    // try game.addComponent(wrapper, engine.ScreenWrap, .{});
+
+    // // Create static triangle
+    // const static_tri = try game.createEntity();
+    // try game.addComponent(static_tri, engine.TransformComp, .{
+    //     .position = .{ .x = 0.0, .y = 5.0 },
+    //     .rotation = 0.0,
+    //     .scale = 1.0,
+    // });
+    // const tri_verts = [3]engine.V2{
+    //     .{ .x = 0.0, .y = 1.0 },
+    //     .{ .x = -1.0, .y = -1.0 },
+    //     .{ .x = 1.0, .y = -1.0 },
+    // };
+    // try game.addComponent(static_tri, engine.Sprite, .{
+    //     .geometry = .{ .triangle = try engine.Triangle.init(allocator, &tri_verts) },
+    //     .fill_color = engine.Colors.BLUE,
+    //     .stroke_color = engine.Colors.WHITE,
+    //     .stroke_width = 1.0,
+    //     .visible = true,
+    // });
+    // try game.addComponent(static_tri, engine.Lifetime, .{ .remaining = 2 });
+
+    // // Create text entity
+    // if (font) |_| {
+    //     const text_entity = try game.createEntity();
+    //     try game.addComponent(text_entity, engine.TransformComp, .{
+    //         .position = .{ .x = game.getLeftEdge() + 0.5, .y = game.getTopEdge() - 1.0 },
+    //         .rotation = 0.0,
+    //         .scale = 1.0,
+    //     });
+    //     try game.addComponent(text_entity, engine.Text, .{
+    //         .text = "ECS DEMO - Bouncing & Wrapping",
+    //         .font = font_handle,
+    //         .scale = 0.5,
+    //         .color = engine.Colors.NEON_ORANGE,
+    //     });
+    // }
 
     var last_time = std.time.milliTimestamp();
     while (!game.shouldClose()) {

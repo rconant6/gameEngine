@@ -58,17 +58,15 @@ pub fn renderSystem(engine: *Engine) void {
         const transform = entry.get(0);
         const text = entry.get(1);
 
-        const font = assets.fonts.getFont(text.font);
+        const font = assets.getFont(text.font_asset) orelse continue;
 
-        if (font) |f| {
-            renderer.drawText(
-                f,
-                text.text,
-                transform.position,
-                text.scale,
-                text.color,
-            );
-        }
+        renderer.drawText(
+            font,
+            text.text,
+            transform.position,
+            text.size,
+            text.text_color,
+        );
     }
 }
 

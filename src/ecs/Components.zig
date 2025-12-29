@@ -33,15 +33,30 @@ pub const Sprite = struct {
 };
 pub const Text = struct {
     text: []const u8,
-    font: FontHandle,
-    scale: f32,
-    color: Color,
+    font_asset: FontHandle,
+    size: f32,
+    text_color: Color,
+};
+pub const Box = struct {
+    size: V2,
+    fill_color: ?Color = null,
+    filled: bool,
+};
+pub const Camera = struct {
+    fov: f32,
+    near: f32,
+    far: f32,
 };
 pub const RenderLayer = struct {
     z_order: i32 = 0,
 };
 
 // MARK: Physics Components
+pub const Physics = struct {
+    velocity: V2,
+    mass: f32,
+    friction: f32,
+};
 pub const CircleCollider = struct {
     radius: f32,
 };

@@ -35,6 +35,26 @@ pub const Color = struct {
             .a = if (len == 9) parseHexPair(str[7], str[8]) else 255,
         };
     }
+
+    pub fn initFromU32Hex(hex: u32) Color {
+        if (hex > 0xFFFFFF) {
+            // 8-digit: 0xRRGGBBAA
+            return .{
+                .r = @truncate(hex >> 24),
+                .g = @truncate(hex >> 16),
+                .b = @truncate(hex >> 8),
+                .a = @truncate(hex),
+            };
+        } else {
+            // 6-digit: 0xRRGGBB
+            return .{
+                .r = @truncate(hex >> 16),
+                .g = @truncate(hex >> 8),
+                .b = @truncate(hex),
+                .a = 255, // Default Opaque
+            };
+        }
+    }
 };
 
 pub const Colors = struct {
