@@ -1,5 +1,5 @@
 const std = @import("std");
-const Font = @import("font.zig").Font;
+pub const Font = @import("font.zig").Font;
 
 pub const FontHandle = struct {
     id: usize,
@@ -39,11 +39,20 @@ pub const FontManager = struct {
         if (self.font_path.len > 0) self.allocator.free(self.font_path);
         self.font_path = try self.allocator.dupe(u8, path);
     }
-
     pub fn loadFont(self: *FontManager, name: []const u8) !FontHandle {
         const normalized_path = try normalizePath(self.allocator, self.font_path, name);
         errdefer self.allocator.free(normalized_path);
 
+        return self.load(normalized_path);
+    }
+    pub fn loadFontFromPath(self: *FontManager, path: []const u8) !FontHandle {
+        const normalized_path = try std.fs.cwd().realpathAlloc(self.allocator, path);
+        errdefer self.allocator.free(normalized_path);
+
+        return self.load(normalized_path);
+    }
+
+    fn load(self: *FontManager, normalized_path: []const u8) !FontHandle {
         if (self.path_to_handle.get(normalized_path)) |handle| {
             self.allocator.free(normalized_path);
             return handle;
@@ -74,11 +83,11 @@ pub const FontManager = struct {
     ) ![]const u8 {
         const joined = try std.fs.path.join(alloc, &[_][]const u8{ base_path, name });
         defer alloc.free(joined);
-        std.log.debug("Joined path: {s}", .{joined});
+        // std.log.debug("Joined path: {s}", .{joined});
 
         // Caller owns this memory
         const absolute = try std.fs.cwd().realpathAlloc(alloc, joined);
-        std.log.debug("Absolute path: {s}", .{absolute});
+        // std.log.debug("Absolute path: {s}", .{absolute});
 
         return absolute;
     }
