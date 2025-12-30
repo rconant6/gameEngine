@@ -100,7 +100,6 @@ pub const Parser = struct {
             .scene => return .{ .scene = try self.parseSceneDeclaration(name_token) },
             .entity => return .{ .entity = try self.parseEntityDeclaration(name_token) },
             .asset => return .{ .asset = try self.parseAssetDeclaration(name_token) },
-            .shape => return .{ .shape = try self.parseShapeDeclaration(name_token) },
             else => return ParseError.UnknownDeclarationType,
         }
     }
@@ -193,18 +192,12 @@ pub const Parser = struct {
         return try self.parseComponentBlock(name_token);
     }
 
-    fn parseShapeDeclaration(self: *Parser, name_token: Token) !ast.ShapeDeclaration {
-        const block = try self.parseShapeBlock(name_token);
-        return ast.ShapeDeclaration{
-            .name = block.name,
-            .properties = block.properties,
-            .location = block.location,
-        };
-    }
-
     fn parseComponentBlock(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
-        const name_str = lex.lexeme(self.lexer.src, name_token);
-        const name = try self.allocator.dupe(u8, name_str);
+        const component_name = lex.lexeme(self.lexer.src, name_token);
+
+        if (std.mem.eql(u8, "Sprite", component_name)) {
+            return try self.parseSpriteBlock(name_token);
+        }
         _ = try self.consume(.r_bracket);
 
         var properties: ArrayList(Property) = .empty;
@@ -217,18 +210,20 @@ pub const Parser = struct {
             _ = try self.consume(.dedent);
         }
 
-        return ast.ComponentDeclaration{
-            .name = name,
+        return ast.ComponentDeclaration{ .generic = .{
+            .name = try self.allocator.dupe(u8, component_name),
             .properties = try properties.toOwnedSlice(self.allocator),
             .location = name_token.src_loc,
-        };
+        } };
     }
 
-    fn parseShapeBlock(self: *Parser, name_token: Token) !ast.ShapeBlock {
+    fn parseSpriteBlock(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
         const name_str = lex.lexeme(self.lexer.src, name_token);
         const name = try self.allocator.dupe(u8, name_str);
+        _ = try self.consume(.colon);
 
-        _ = try self.consume(.shape);
+        const shape_type_token = try self.consume(.identifier);
+        const type_name = lex.lexeme(self.lexer.src, shape_type_token);
         _ = try self.consume(.r_bracket);
 
         var properties: ArrayList(Property) = .empty;
@@ -241,11 +236,12 @@ pub const Parser = struct {
             _ = try self.consume(.dedent);
         }
 
-        return ast.ShapeBlock{
+        return ast.ComponentDeclaration{ .sprite = .{
             .name = name,
+            .shape_type = try self.allocator.dupe(u8, type_name),
             .properties = try properties.toOwnedSlice(self.allocator),
             .location = name_token.src_loc,
-        };
+        } };
     }
 
     fn parseProperty(self: *Parser) !Property {
