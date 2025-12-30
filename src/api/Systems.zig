@@ -36,10 +36,11 @@ pub fn renderSystem(engine: *Engine) void {
     while (query.next()) |entry| {
         const transform = entry.get(0);
         const sprite = entry.get(1);
+        const geo = sprite.geometry orelse return;
 
         if (sprite.visible) {
             renderer.drawGeometry(
-                sprite.geometry,
+                geo,
                 .{
                     .offset = transform.position,
                     .rotation = transform.rotation,

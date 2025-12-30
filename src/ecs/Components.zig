@@ -21,14 +21,14 @@ pub const Velocity = struct {
 
 // MARK: Rendering Components
 pub const Sprite = struct {
-    geometry: Shape,
+    geometry: ?Shape,
     fill_color: ?Color = null,
     stroke_color: ?Color = null,
     stroke_width: f32 = 1,
     visible: bool = true,
 
     pub fn deinit(self: *Sprite) void {
-        self.geometry.deinit();
+        if (self.geometry) |*g| g.deinit();
     }
 };
 pub const Text = struct {
