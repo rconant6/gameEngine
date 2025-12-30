@@ -46,6 +46,9 @@ pub const Lifetime = ecs.Lifetime;
 pub const ScreenWrap = ecs.ScreenWrap;
 pub const ScreenClamp = ecs.ScreenClamp;
 pub const Destroy = ecs.Destroy;
+pub const Physics = ecs.Physics;
+pub const Box = ecs.Box;
+pub const Camera = ecs.Camera;
 
 const Input = @import("Input.zig");
 

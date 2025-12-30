@@ -11,6 +11,9 @@ pub const RenderLayer = comps.RenderLayer;
 pub const CircleCollider = comps.CircleCollider;
 pub const RectCollider = comps.RectCollider;
 pub const Lifetime = comps.Lifetime;
+pub const Box = comps.Box;
+pub const Physics = comps.Physics;
+pub const Camera = comps.Camera;
 // Mark: Tags
 pub const ScreenWrap = comps.ScreenWrap;
 pub const ScreenClamp = comps.ScreenClamp;
