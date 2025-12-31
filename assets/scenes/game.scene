@@ -112,7 +112,7 @@
       linear:vec2 {-3.0, 2.5}
       angular:f32 2.0
     [Sprite:polygon]
-      points:vec2[] {{-1.0, -1.0}, {1.0, -1.0}, {1.0, 1.0}, {-1.0, 1.0}}
+      points:vec2[] {{0.0, 1.0}, {0.951, 0.309}, {0.588, -0.809}, {-0.588, -0.809}, {-0.951, 0.309}}
       fill_color:color #00FFFF
       visible:bool true
     [ScreenWrap]
