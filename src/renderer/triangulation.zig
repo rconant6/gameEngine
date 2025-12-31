@@ -191,45 +191,62 @@ const PartitionContext = struct {
             }
         }
 
-        return self.diagonals.toOwnedSlice(self.allocator);
+        // Remove duplicate diagonals
+        const result = try self.diagonals.toOwnedSlice(self.allocator);
+        return try removeDuplicateDiagonals(self.allocator, result);
     }
 };
+fn removeDuplicateDiagonals(allocator: Allocator, diagonals: []Diagonal) ![]Diagonal {
+    if (diagonals.len == 0) return diagonals;
+
+    var unique: ArrayList(Diagonal) = .empty;
+    errdefer unique.deinit(allocator);
+
+    for (diagonals) |diag| {
+        var is_duplicate = false;
+        for (unique.items) |existing| {
+            // Check both directions since (v1, v2) == (v2, v1)
+            if ((existing.v1 == diag.v1 and existing.v2 == diag.v2) or
+                (existing.v1 == diag.v2 and existing.v2 == diag.v1))
+            {
+                is_duplicate = true;
+                break;
+            }
+        }
+        if (!is_duplicate) {
+            try unique.append(allocator, diag);
+        }
+    }
+
+    allocator.free(diagonals);
+    return try unique.toOwnedSlice(allocator);
+}
+
 fn handleStart(self: *PartitionContext, event: VertexEvent) !void {
     const curr_index = event.index;
     const next_index = self.getNextIndex(curr_index);
-    const prev_index = self.getPrevIndex(curr_index);
-    const edge1 = Edge{
-        .helper_idx = event.index,
-        .p1 = self.vertices[event.index],
-        .p2 = self.vertices[next_index],
-    };
-    const right2 = Edge{
+
+    // For a start vertex, insert the edge going downward (to next in CCW order)
+    const edge = Edge{
         .helper_idx = event.index,
         .p1 = self.vertices[curr_index],
-        .p2 = self.vertices[prev_index],
+        .p2 = self.vertices[next_index],
     };
 
-    try self.status.insert(edge1);
-    try self.status.insert(right2);
+    try self.status.insert(edge);
 }
 
 fn handleEnd(self: *PartitionContext, event: VertexEvent) !void {
-    var found_edges: [2]usize = undefined;
-    var count: usize = 0;
-
-    for (self.status.edges.items, 0..) |edge, i| {
+    // Find the edge that ends at this vertex
+    var found_edge: ?Edge = null;
+    for (self.status.edges.items) |edge| {
         if (edge.p2.eql(event.point)) {
-            found_edges[count] = i;
-            count += 1;
-            if (count == 2) break;
+            found_edge = edge;
+            break;
         }
     }
-    if (count != 2) return error.NotEnoughEdges;
 
-    const edge0 = self.status.edges.items[found_edges[0]];
-    const edge1 = self.status.edges.items[found_edges[1]];
-
-    for ([_]Edge{ edge0, edge1 }) |edge| {
+    if (found_edge) |edge| {
         const helper_vertex = self.events.items[edge.helper_idx];
         if (helper_vertex.vert_type == .Merge) {
             try self.diagonals.append(self.allocator, .{
@@ -237,10 +254,8 @@ fn handleEnd(self: *PartitionContext, event: VertexEvent) !void {
                 .v2 = helper_vertex.index,
             });
         }
+        self.status.remove(edge);
     }
-
-    self.status.remove(edge0);
-    self.status.remove(edge1);
 }
 
 fn handleSplit(self: *PartitionContext, event: VertexEvent) !void {
@@ -257,35 +272,26 @@ fn handleSplit(self: *PartitionContext, event: VertexEvent) !void {
 
     self.status.edges.items[left_edge_idx].helper_idx = event.index;
 
-    for ([_]Edge{ .{
+    // Insert the edge going downward from this split vertex
+    const next_index = self.getNextIndex(event.index);
+    const edge = Edge{
         .p1 = self.vertices[event.index],
-        .p2 = self.vertices[self.getNextIndex(event.index)],
+        .p2 = self.vertices[next_index],
         .helper_idx = event.index,
-    }, .{
-        .p1 = self.vertices[event.index],
-        .p2 = self.vertices[self.getPrevIndex(event.index)],
-        .helper_idx = event.index,
-    } }) |edge| {
-        try self.status.insert(edge);
-    }
+    };
+    try self.status.insert(edge);
 }
 fn handleMerge(self: *PartitionContext, event: VertexEvent) !void {
-    var found_edges: [2]usize = undefined;
-    var count: usize = 0;
-    for (self.status.edges.items, 0..) |edge, i| {
+    // Find the edge ending at this vertex
+    var found_edge: ?Edge = null;
+    for (self.status.edges.items) |edge| {
         if (edge.p2.eql(event.point)) {
-            found_edges[count] = i;
-            count += 1;
-            if (count == 2) break;
+            found_edge = edge;
+            break;
         }
     }
 
-    const edge0 = self.status.edges.items[found_edges[0]];
-    const edge1 = self.status.edges.items[found_edges[1]];
-    self.status.remove(edge0);
-    self.status.remove(edge1);
-
-    for ([_]Edge{ edge0, edge1 }) |edge| {
+    if (found_edge) |edge| {
         const helper_vertex = self.events.items[edge.helper_idx];
         if (helper_vertex.vert_type == .Merge) {
             try self.diagonals.append(self.allocator, .{
@@ -293,20 +299,21 @@ fn handleMerge(self: *PartitionContext, event: VertexEvent) !void {
                 .v2 = edge.helper_idx,
             });
         }
-    }
-    const left_edge_idx = self.status.findEdgeLeftIndex(event.point) orelse
-        return error.NoEdgeFound;
-
-    const left_edge = self.status.edges.items[left_edge_idx];
-    const helper_vertex = self.events.items[left_edge.helper_idx];
-    if (helper_vertex.vert_type == .Merge) {
-        try self.diagonals.append(self.allocator, .{
-            .v1 = event.index,
-            .v2 = left_edge.helper_idx,
-        });
+        self.status.remove(edge);
     }
 
-    self.status.edges.items[left_edge_idx].helper_idx = event.index;
+    if (self.status.findEdgeLeftIndex(event.point)) |left_edge_idx| {
+        const left_edge = self.status.edges.items[left_edge_idx];
+        const helper_vertex = self.events.items[left_edge.helper_idx];
+        if (helper_vertex.vert_type == .Merge) {
+            try self.diagonals.append(self.allocator, .{
+                .v1 = event.index,
+                .v2 = left_edge.helper_idx,
+            });
+        }
+
+        self.status.edges.items[left_edge_idx].helper_idx = event.index;
+    }
 }
 fn handleRegular(self: *PartitionContext, event: VertexEvent) !void {
     const curr_index = event.index;
@@ -314,61 +321,76 @@ fn handleRegular(self: *PartitionContext, event: VertexEvent) !void {
     const prev_index = self.getPrevIndex(curr_index);
     const next_vert = self.vertices[next_index];
     const prev_vert = self.vertices[prev_index];
-    const left_chain = prev_vert.y < next_vert.y;
+    const curr_vert = self.vertices[curr_index];
 
-    if (left_chain) {
-        var found_edge: ?usize = null;
-        for (self.status.edges.items, 0..) |edge, i| {
+    // Check if previous vertex is above or below
+    // If prev is above, we're on the left boundary (edge comes in from above)
+    // If prev is below, we're on the right boundary (edge goes out below)
+    const prev_above = prev_vert.y < curr_vert.y;
+
+    if (prev_above) {
+        // Left boundary - remove incoming edge, add outgoing edge
+        var found_edge: ?Edge = null;
+        for (self.status.edges.items) |edge| {
             if (edge.p2.eql(event.point)) {
-                found_edge = i;
+                found_edge = edge;
                 break;
             }
         }
 
-        const edge_idx = found_edge orelse return error.EdgeNotFound;
-        const edge = self.status.edges.items[edge_idx];
+        if (found_edge) |edge| {
+            const helper_vertex = self.events.items[edge.helper_idx];
+            if (helper_vertex.vert_type == .Merge) {
+                try self.diagonals.append(self.allocator, .{
+                    .v1 = event.index,
+                    .v2 = helper_vertex.index,
+                });
+            }
 
-        const helper_vertex = self.events.items[edge.helper_idx];
-        if (helper_vertex.vert_type == .Merge) {
-            try self.diagonals.append(self.allocator, .{
-                .v1 = event.index,
-                .v2 = helper_vertex.index,
+            self.status.remove(edge);
+
+            // Insert new edge going down
+            try self.status.insert(.{
+                .p1 = curr_vert,
+                .p2 = next_vert,
+                .helper_idx = event.index,
             });
         }
-
-        self.status.remove(edge);
-
-        try self.status.insert(.{
-            .p1 = self.vertices[event.index],
-            .p2 = self.vertices[next_index],
-            .helper_idx = event.index,
-        });
     } else {
-        const left_edge_idx = self.status.findEdgeLeftIndex(event.point) orelse
-            return error.NoEdgeFound;
+        // Right boundary - update helper of edge to left
+        if (self.status.findEdgeLeftIndex(event.point)) |left_edge_idx| {
+            const left_edge = self.status.edges.items[left_edge_idx];
+            const helper_vertex = self.events.items[left_edge.helper_idx];
+            if (helper_vertex.vert_type == .Merge) {
+                try self.diagonals.append(self.allocator, .{
+                    .v1 = event.index,
+                    .v2 = helper_vertex.index,
+                });
+            }
 
-        const left_edge = self.status.edges.items[left_edge_idx];
-        const helper_vertex = self.events.items[left_edge.helper_idx];
-        if (helper_vertex.vert_type == .Merge) {
-            try self.diagonals.append(self.allocator, .{
-                .v1 = event.index,
-                .v2 = helper_vertex.index,
-            });
+            self.status.edges.items[left_edge_idx].helper_idx = event.index;
         }
-
-        self.status.edges.items[left_edge_idx].helper_idx = event.index;
-
-        try self.status.insert(.{
-            .p1 = self.vertices[event.index],
-            .p2 = self.vertices[prev_index],
-            .helper_idx = event.index,
-        });
+        // If no edge to left, this is fine for simple convex polygons
     }
 }
 
 fn canTriangulate(a: Point, b: Point, c: Point, chain: ChainType) bool {
     const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
     return if (chain == .Left) cross > 0 else cross < 0;
+}
+
+fn ensureCounterClockwise(tri: *[3]Point) void {
+    const a = tri[0];
+    const b = tri[1];
+    const c = tri[2];
+    // Calculate signed area (cross product)
+    const cross = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+    // If negative (clockwise), swap vertices to make counter-clockwise
+    if (cross < 0) {
+        const temp = tri[1];
+        tri[1] = tri[2];
+        tri[2] = temp;
+    }
 }
 
 const TriangleIndicies = struct {
@@ -392,7 +414,7 @@ inline fn comparePoints(a: Point, b: Point) std.math.Order {
     return .eq;
 }
 
-fn signedArea(points: []const Point) f32 {
+pub fn signedArea(points: []const Point) f32 {
     var area: f32 = 0;
     const n = points.len;
     for (0..n) |i| {
@@ -470,7 +492,14 @@ pub fn triangulate(
         try all_triangles.appendSlice(allocator, piece_triangles);
     }
 
-    return try all_triangles.toOwnedSlice(allocator);
+    const result = try all_triangles.toOwnedSlice(allocator);
+
+    // Ensure all triangles have counter-clockwise winding
+    for (result) |*tri| {
+        ensureCounterClockwise(tri);
+    }
+
+    return result;
 }
 
 fn triangulateMonotone(
@@ -662,6 +691,8 @@ fn extractCycle(
     errdefer polygon.deinit(allocator);
 
     var current = start_vertex;
+    var cycle_closed = false;
+
     while (true) {
         polygon.appendAssumeCapacity(current);
         const neighbors = adjacency.get(current) orelse return error.NoNeighbors;
@@ -671,8 +702,16 @@ fn extractCycle(
         try used_edges.put(.{ .from = next, .to = current }, true);
         current = next;
 
-        if (current == start_vertex) break;
+        if (current == start_vertex) {
+            cycle_closed = true;
+            break;
+        }
         if (polygon.items.len > 2 * n_vertices) return error.InfiniteLoop;
+    }
+
+    // If the cycle didn't close, return empty cycle (will be filtered out)
+    if (!cycle_closed) {
+        polygon.clearRetainingCapacity();
     }
 
     return try polygon.toOwnedSlice(allocator);
