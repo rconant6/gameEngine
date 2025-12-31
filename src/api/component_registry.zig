@@ -1,12 +1,6 @@
 const std = @import("std");
-const core = @import("core");
-const V2 = core.V2;
-const V2I = core.V2I;
-const V2U = core.V2U;
 const ecs = @import("entity");
 const Components = ecs.comps;
-const scene_format = @import("scene-format");
-const BaseTypes = scene_format.BaseType;
 
 pub const ComponentRegistry = struct {
     pub const component_types = blk: {

@@ -6,6 +6,8 @@ const EntityDeclaration = scene_format.EntityDeclaration;
 const ComponentDeclaration = scene_format.ComponentDeclaration;
 const AssetDeclaration = scene_format.AssetDeclaration;
 const ShapeDeclaration = scene_format.ShapeDeclaration;
+const SpriteBlock = scene_format.SpriteBlock;
+const GenericBlock = scene_format.GenericBlock;
 
 const Property = scene_format.Property;
 const Value = scene_format.Value;
@@ -16,6 +18,7 @@ const V2 = core.V2;
 
 const engine = @import("engine");
 const ComponentRegistry = engine.ComponentRegistry;
+const ShapeRegistry = engine.ShapeRegistry;
 const Engine = engine.Engine;
 
 const ecs = @import("entity");
@@ -29,6 +32,7 @@ const FontHandle = asset.FontHandle;
 
 const rend = @import("renderer");
 const Color = rend.Color;
+const Colors = rend.Colors;
 const Shape = rend.Shape;
 const shapes = rend.shapes;
 
@@ -42,6 +46,7 @@ pub const InstantiatorError = error{
     UnableToLoadFont,
     Unimplemented,
     MissingAssetPath,
+    NotOptionalValue,
 };
 
 pub const Instantiator = struct {
@@ -74,15 +79,17 @@ pub const Instantiator = struct {
                 },
                 .entity => |*entity_decl| {
                     std.debug.print("== Entity: {s} ==\n", .{entity_decl.name});
-                    self.instantiateEntity(entity_decl) catch {
-                        std.log.info(
-                            "Tried to instantiate an entity that failed",
-                            .{},
+                    self.instantiateEntity(entity_decl) catch |err| {
+                        std.log.err(
+                            "Entity Instantiation Failed {s}: with {d} components -> {any}",
+                            .{ entity_decl.name, entity_decl.components.len, err },
                         );
                         continue;
                     };
                 },
-                else => {},
+                else => {
+                    // NOTE: .component cannot be at top level
+                },
             }
         }
     }
@@ -101,7 +108,13 @@ pub const Instantiator = struct {
                     std.debug.print("== Nested Scene: {s} ==\n", .{nested_scene.name});
                     try self.instantiateScene(nested_scene);
                 },
-                else => {},
+                .asset => |*nested_asset| {
+                    std.debug.print("== Nested asset {s} ==\n", .{nested_asset.name});
+                    try self.instantiateAsset(nested_asset);
+                },
+                else => {
+                    // NOTE: .component cannot be at top level
+                },
             }
         }
     }
@@ -136,12 +149,16 @@ pub const Instantiator = struct {
     fn instantiateFont(self: *Instantiator, asset_decl: *const AssetDeclaration) !void {
         const props = asset_decl.properties;
         const handle = if (getProperty(props, "abs_path")) |prop| blk: {
-            const abs_path_value = try self.extractValueForType([]const u8, prop.value);
+            const abs_path_value = try self.extractValueForType([]const u8, prop.value) orelse
+                return InstantiatorError.NotOptionalValue;
             break :blk try self.engine.assets.loadFontFromPath(abs_path_value);
         } else if (getProperty(props, "filename")) |f| blk: {
-            const file = try self.extractValueForType([]const u8, f.value);
+            const file = try self.extractValueForType([]const u8, f.value) orelse
+                return InstantiatorError.NotOptionalValue;
             if (getProperty(props, "path")) |p| {
-                const path = try self.extractValueForType([]const u8, p.value);
+                const path = try self.extractValueForType([]const u8, p.value) orelse
+                    return InstantiatorError.NotOptionalValue;
+
                 const full = try std.fs.path.join(self.allocator, &.{ path, file });
                 defer self.allocator.free(full);
                 break :blk try self.engine.assets.loadFontFromPath(full);
@@ -158,54 +175,57 @@ pub const Instantiator = struct {
         try self.engine.assets.registerFontAsset(asset_decl.name, handle);
     }
 
+    // MARK: Components
     fn addComponent(
         self: *Instantiator,
         entity: Entity,
         comp_decl: *const ComponentDeclaration,
     ) !void {
-        const comp_name = comp_decl.name;
-
-        const comp_index = ComponentRegistry.getComponentIndex(comp_name) orelse {
-            std.log.warn("Unknown component: {s}", .{comp_name});
-            return InstantiatorError.UnknownComponent;
+        const comp_name = switch (comp_decl.*) {
+            .generic => |g| g.name,
+            .sprite => |s| s.name,
         };
 
-        inline for (ComponentRegistry.component_names, 0..) |_, i| {
-            if (comp_index == i) {
-                const ComponentType = ComponentRegistry.component_types[i];
-                const component = try self.buildComponent(ComponentType, comp_decl);
-                try self.engine.world.addComponent(entity, ComponentType, component);
-                return;
-            }
+        switch (comp_decl.*) {
+            .sprite => |s| {
+                const shape_index = ShapeRegistry.getShapeIndex(s.shape_type) orelse {
+                    std.log.warn("Unknown component: {s}", .{comp_name});
+                    return InstantiatorError.UnknownComponent;
+                };
+                inline for (ShapeRegistry.shape_names, 0..) |_, i| {
+                    if (shape_index == i) {
+                        const ShapeType = ShapeRegistry.shape_types[i];
+                        const sprite = try self.buildSpriteComponent(ShapeType, s);
+                        try self.engine.world.addComponent(entity, Components.Sprite, sprite);
+                        return;
+                    }
+                }
+            },
+            .generic => |g| {
+                const comp_index = ComponentRegistry.getComponentIndex(comp_name) orelse {
+                    std.log.warn("Unknown component: {s}", .{comp_name});
+                    return InstantiatorError.UnknownComponent;
+                };
+                inline for (ComponentRegistry.component_names, 0..) |_, i| {
+                    if (comp_index == i) {
+                        const ComponentType = ComponentRegistry.component_types[i];
+                        const component = try self.buildGenericComponent(ComponentType, g);
+                        try self.engine.world.addComponent(entity, ComponentType, component);
+                        return;
+                    }
+                }
+            },
         }
     }
-
-    fn buildComponent(
-        self: *Instantiator,
-        comptime ComponentType: type,
-        comp_decl: *const ComponentDeclaration,
-    ) !ComponentType {
-        if (ComponentType == Components.Sprite) {
-            return self.buildSpriteComponent(comp_decl);
-        } else {
-            return self.buildGenericComponent(ComponentType, comp_decl);
-        }
-    }
-
     fn buildGenericComponent(
         self: *Instantiator,
         comptime ComponentType: type,
-        comp_decl: *const ComponentDeclaration,
+        comp: GenericBlock,
     ) !ComponentType {
         var component: ComponentType = std.mem.zeroInit(ComponentType, .{});
 
-        const comp_name = comp_decl.name;
-
-        // For each property in the scene
-        for (comp_decl.properties) |prop| {
+        for (comp.properties) |prop| {
             var field_found = false;
-
-            // Check against all fields in the component type
             inline for (std.meta.fields(ComponentType)) |field| {
                 if (std.mem.eql(u8, field.name, prop.name)) {
                     field_found = true;
@@ -213,13 +233,16 @@ pub const Instantiator = struct {
                         std.log.debug("{s} {s}", .{ field.name, @typeName(field.type) });
                         return err;
                     };
-                    @field(component, field.name) = field_value;
+                    if (field_value) |val|
+                        @field(component, field.name) = val;
                     break;
                 }
             }
-
             if (!field_found) {
-                std.log.err("[{s}] Unknown property: {s}\n", .{ comp_name, prop.name });
+                std.log.err(
+                    "[{s}] Unknown property: {s}\n",
+                    .{ comp.name, prop.name },
+                );
                 return InstantiatorError.UnknownProperty;
             }
         }
@@ -229,22 +252,63 @@ pub const Instantiator = struct {
 
     fn buildSpriteComponent(
         self: *Instantiator,
-        comp_decl: *const ComponentDeclaration,
+        comptime ShapeType: type,
+        sprite: SpriteBlock,
     ) !Components.Sprite {
-        _ = self;
-        _ = comp_decl;
-        // TODO: Implement sprite component building
-        // For now, return a default circle sprite
-        return Components.Sprite{
-            .geometry = .{ .circle = .{ .origin = .{ .x = 0, .y = 0 }, .radius = 1.0 } },
-            .fill_color = null,
-            .stroke_color = null,
-            .stroke_width = 1.0,
-            .visible = true,
-        };
+        const cs = rend.cs;
+
+        var component = std.mem.zeroInit(Components.Sprite, .{});
+
+        // Only zero-init shapes without pointers
+        var shape: ShapeType = if (ShapeType == cs.Polygon or ShapeType == cs.Ellipse)
+            undefined  // Don't zero-init shapes with pointers
+        else
+            std.mem.zeroInit(ShapeType, .{});
+
+        for (sprite.properties) |prop| {
+            var field_found = false;
+
+            inline for (std.meta.fields(Components.Sprite)) |field| {
+                if (std.mem.eql(u8, field.name, prop.name)) {
+                    field_found = true;
+                    const field_value = try self.extractValueForType(field.type, prop.value);
+                    if (field_value) |val| {
+                        @field(component, field.name) = val;
+                    }
+                    break;
+                }
+            }
+
+            if (!field_found) {
+                inline for (std.meta.fields(ShapeType)) |shape_field| {
+                    if (std.mem.eql(u8, shape_field.name, prop.name)) {
+                        field_found = true;
+                        const field_value = try self.extractValueForType(shape_field.type, prop.value);
+                        if (field_value) |val| {
+                            @field(shape, shape_field.name) = val;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            if (!field_found) {
+                std.log.err("[{s}] Unknown property: {s}\n", .{ sprite.name, prop.name });
+                return InstantiatorError.UnknownProperty;
+            }
+        }
+
+        // Error if trying to use unimplemented shapes
+        if (ShapeType == cs.Polygon or ShapeType == cs.Ellipse) {
+            std.log.err("Shape type {s} not yet supported in scene files\n", .{@typeName(ShapeType)});
+            return InstantiatorError.Unimplemented;
+        }
+
+        component.geometry = ShapeRegistry.createShapeUnion(ShapeType, shape);
+        return component;
     }
 
-    fn extractValueForType(self: *Instantiator, comptime T: type, value: Value) !T {
+    fn extractValueForType(self: *Instantiator, comptime T: type, value: Value) !?T {
         switch (@typeInfo(T)) {
             .float => {
                 // T is f32 or f64
@@ -306,8 +370,18 @@ pub const Instantiator = struct {
                 }
                 return InstantiatorError.TypeMismatch;
             },
-            .optional => {
-                return Color{ .a = 1, .r = 123, .b = 120, .g = 20 };
+            .optional => |o| {
+                const Child = o.child;
+                if (Child == Color) {
+                    return switch (value) {
+                        .color => |c| Color.initFromU32Hex(c),
+                        else => return null,
+                    };
+                } else if (Child == Shape) {
+                    // TODO buildShape
+                    return InstantiatorError.Unimplemented;
+                }
+                return InstantiatorError.TypeMismatch;
             },
             else => return InstantiatorError.TypeMismatch,
         }

@@ -18,8 +18,8 @@
       linear:vec2 {5.0, 3.0}
       angular:f32 0.0
     [Sprite:circle]
-      circle_origin:vec2 {0.0, 0.0}
-      circle_radius:f32 2.0
+      origin:vec2 {0.0, 0.0}
+      radius:f32 2.0
       fill_color:color #00FF00
       stroke_color:color #FFFFFF
       stroke_width:f32 1.0
@@ -35,9 +35,9 @@
       linear:vec2 {2.0, 1.5}
       angular:f32 1.0
     [Sprite:rectangle]
-      rectangle_center:vec2 {0.0, 0.0}
-      rectangle_half_width:f32 1.5
-      rectangle_half_height:f32 1.0
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.5
+      half_height:f32 1.0
       fill_color:color #AA00FF
       stroke_color:color #FFFFFF
       stroke_width:f32 1.0
@@ -50,9 +50,9 @@
       rotation:f32 0.0
       scale:f32 1.0
     [Sprite:triangle]
-      triangle_v0:vec2 {0.0, 1.0}
-      triangle_v1:vec2 {-1.0, -1.0}
-      triangle_v2:vec2 {1.0, -1.0}
+      v0:vec2 {0.0, 1.0}
+      v1:vec2 {-1.0, -1.0}
+      v2:vec2 {1.0, -1.0}
       fill_color:color #0000FF
       stroke_color:color #FFFFFF
       stroke_width:f32 1.0
@@ -76,8 +76,8 @@
       position:vec3 {0.0, 0.0, 0.0}
       scale:f32 1.0
     [Sprite:circle]
-      circle_origin:vec2 {0.0, 0.0}
-      circle_radius:f32 1.0
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
       fill_color:color #FFFFFF
       stroke_color:color #FFFFFF
       stroke_width:f32 1.0

@@ -610,10 +610,12 @@ fn drawTriangle(
     stroke_width: f32,
 ) void {
     if (fill_color) |fc| {
-        drawTriangleFilled(renderer, tri.vertices, transform, fc);
+        const verts = [3]GamePoint{ tri.v0, tri.v1, tri.v2 };
+        drawTriangleFilled(renderer, &verts, transform, fc);
     }
     if (stroke_color) |sc| {
-        drawOutlineWithTransform(renderer, tri.vertices, transform, sc, stroke_width);
+        const verts = [3]GamePoint{ tri.v0, tri.v1, tri.v2 };
+        drawOutlineWithTransform(renderer, &verts, transform, sc, stroke_width);
     }
 }
 

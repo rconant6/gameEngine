@@ -176,9 +176,9 @@ pub const GeometryBatch = struct {
         const batch_offset: u32 = @intCast(self.vertices.items.len);
         if (has_fill) {
             const vertices = [_]Vertex{
-                makeVertex(tri.vertices[0], transform, ctx, fc),
-                makeVertex(tri.vertices[1], transform, ctx, fc),
-                makeVertex(tri.vertices[2], transform, ctx, fc),
+                makeVertex(tri.v0, transform, ctx, fc),
+                makeVertex(tri.v1, transform, ctx, fc),
+                makeVertex(tri.v2, transform, ctx, fc),
             };
             try self.vertices.appendSlice(self.allocator, &vertices);
             try self.draw_calls.append(self.allocator, .{
@@ -190,12 +190,12 @@ pub const GeometryBatch = struct {
 
         if (has_outline) {
             self.vertices.appendSliceAssumeCapacity(&.{
-                makeVertex(tri.vertices[0], transform, ctx, sc),
-                makeVertex(tri.vertices[1], transform, ctx, sc),
-                makeVertex(tri.vertices[1], transform, ctx, sc),
-                makeVertex(tri.vertices[2], transform, ctx, sc),
-                makeVertex(tri.vertices[2], transform, ctx, sc),
-                makeVertex(tri.vertices[0], transform, ctx, sc),
+                makeVertex(tri.v0, transform, ctx, sc),
+                makeVertex(tri.v1, transform, ctx, sc),
+                makeVertex(tri.v1, transform, ctx, sc),
+                makeVertex(tri.v2, transform, ctx, sc),
+                makeVertex(tri.v2, transform, ctx, sc),
+                makeVertex(tri.v0, transform, ctx, sc),
             });
             self.draw_calls.appendSliceAssumeCapacity(&.{
                 .{ .primitive_type = .line, .vertex_start = batch_offset + 3, .vertex_count = 2 },

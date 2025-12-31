@@ -51,12 +51,11 @@ pub const Box = ecs.Box;
 pub const Camera = ecs.Camera;
 
 const Input = @import("Input.zig");
-
 const Systems = @import("Systems.zig");
 
 const scene_format = @import("scene_format");
-
 pub const ComponentRegistry = @import("component_registry.zig").ComponentRegistry;
+pub const ShapeRegistry = @import("shape_registry.zig").ShapeRegistry;
 
 pub const Engine = struct {
     allocator: std.mem.Allocator,
@@ -68,6 +67,23 @@ pub const Engine = struct {
     running: bool,
 
     pub fn init(allocator: std.mem.Allocator, title: []const u8, width: u32, height: u32) !Engine {
+        std.debug.print("=== Shape Registry ===\n", .{});
+        inline for (ShapeRegistry.shape_names) |name| {
+            std.debug.print(
+                "[{d}] name: {s}  type: {any}\n",
+                .{ ShapeRegistry.getShapeIndex(name).?, name, ShapeRegistry.getShapeType(name).? },
+            );
+        }
+        std.debug.print("==========================\n", .{});
+        std.debug.print("\n=== Component Registry ===\n", .{});
+        inline for (ComponentRegistry.component_names) |name| {
+            std.debug.print(
+                "[{d}] name: {s}  type: {any}\n",
+                .{ ComponentRegistry.getComponentIndex(name).?, name, ComponentRegistry.getComponentType(name).? },
+            );
+        }
+        std.debug.print("==========================\n", .{});
+
         try platform.init();
 
         const window = try platform.createWindow(.{
