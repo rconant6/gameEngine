@@ -176,7 +176,7 @@ const PartitionContext = struct {
         return (idx + 1 + self.vertices.len) % self.vertices.len;
     }
     inline fn getPrevIndex(self: *const PartitionContext, idx: usize) usize {
-        return (idx - 1) % self.vertices.len;
+        return if (idx == 0) self.vertices.len - 1 else idx - 1;
     }
 
     pub fn partition(self: *PartitionContext) ![]Diagonal {

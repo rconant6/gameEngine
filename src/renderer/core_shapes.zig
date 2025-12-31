@@ -120,10 +120,10 @@ pub const Rectangle = struct {
 
 pub const Polygon = struct {
     allocator: Allocator,
-    center: Point,
+    points: []const Point,
+    center: Point = .{ .x = 0, .y = 0 },
     fill_call_count: usize = 0,
     outline_call_count: usize = 0,
-    points: []const Point,
     triangle_cache: ?[][3]Point = null,
     vertex_count: usize = 0,
 

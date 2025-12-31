@@ -34,7 +34,7 @@ const rend = @import("renderer");
 const Color = rend.Color;
 const Colors = rend.Colors;
 const Shape = rend.Shape;
-const shapes = rend.shapes;
+const core_shapes = rend.cs;
 
 pub const InstantiatorError = error{
     UnknownComponent,
@@ -171,7 +171,6 @@ pub const Instantiator = struct {
             return InstantiatorError.MissingAssetPath;
         };
 
-        // Register scene name → handle
         try self.engine.assets.registerFontAsset(asset_decl.name, handle);
     }
 
@@ -255,35 +254,45 @@ pub const Instantiator = struct {
         comptime ShapeType: type,
         sprite: SpriteBlock,
     ) !Components.Sprite {
-        const cs = rend.cs;
+        if (ShapeType == core_shapes.Polygon) {
+            return try self.buildPolygonSprite(sprite);
+        }
+        if (ShapeType == core_shapes.Ellipse) {
+            std.log.err("Shape type {s} not yet supported in scene files\n", .{
+                @typeName(ShapeType),
+            });
+            return InstantiatorError.Unimplemented;
+        }
 
         var component = std.mem.zeroInit(Components.Sprite, .{});
-
-        // Only zero-init shapes without pointers
-        var shape: ShapeType = if (ShapeType == cs.Polygon or ShapeType == cs.Ellipse)
-            undefined  // Don't zero-init shapes with pointers
-        else
-            std.mem.zeroInit(ShapeType, .{});
+        var shape = std.mem.zeroInit(ShapeType, .{});
 
         for (sprite.properties) |prop| {
             var field_found = false;
 
+            // NOTE: this handles non-shape related fields (colors etc.)
             inline for (std.meta.fields(Components.Sprite)) |field| {
                 if (std.mem.eql(u8, field.name, prop.name)) {
                     field_found = true;
-                    const field_value = try self.extractValueForType(field.type, prop.value);
+                    const field_value = try self.extractValueForType(
+                        field.type,
+                        prop.value,
+                    );
                     if (field_value) |val| {
                         @field(component, field.name) = val;
                     }
                     break;
                 }
             }
-
+            // NOTE: shape's fields are mixed in with sprite's in .scene files
             if (!field_found) {
                 inline for (std.meta.fields(ShapeType)) |shape_field| {
                     if (std.mem.eql(u8, shape_field.name, prop.name)) {
                         field_found = true;
-                        const field_value = try self.extractValueForType(shape_field.type, prop.value);
+                        const field_value = try self.extractValueForType(
+                            shape_field.type,
+                            prop.value,
+                        );
                         if (field_value) |val| {
                             @field(shape, shape_field.name) = val;
                         }
@@ -293,18 +302,59 @@ pub const Instantiator = struct {
             }
 
             if (!field_found) {
-                std.log.err("[{s}] Unknown property: {s}\n", .{ sprite.name, prop.name });
+                std.log.err(
+                    "[{s}] Unknown property: {s}\n",
+                    .{ sprite.name, prop.name },
+                );
                 return InstantiatorError.UnknownProperty;
             }
         }
-
-        // Error if trying to use unimplemented shapes
-        if (ShapeType == cs.Polygon or ShapeType == cs.Ellipse) {
-            std.log.err("Shape type {s} not yet supported in scene files\n", .{@typeName(ShapeType)});
-            return InstantiatorError.Unimplemented;
-        }
-
         component.geometry = ShapeRegistry.createShapeUnion(ShapeType, shape);
+
+        return component;
+    }
+    fn buildPolygonSprite(self: *Instantiator, sprite: SpriteBlock) !Components.Sprite {
+        var component = std.mem.zeroInit(Components.Sprite, .{});
+        var owned_points: []const V2 = undefined;
+        errdefer self.allocator.free(owned_points);
+
+        for (sprite.properties) |prop| {
+            if (std.mem.eql(u8, "points", prop.name)) {
+                owned_points = self.extractValueForType([]const V2, prop.value) catch |err|
+                    {
+                        std.log.err("Unable to create polygon points -> {any}", .{err});
+                        return InstantiatorError.InvalidValue;
+                    } orelse return InstantiatorError.InvalidValue;
+                std.log.info("points: {any}", .{owned_points});
+                continue;
+            }
+            var field_found = false;
+            inline for (std.meta.fields(Components.Sprite)) |field| {
+                if (std.mem.eql(u8, field.name, prop.name)) {
+                    field_found = true;
+                    const field_value = try self.extractValueForType(
+                        field.type,
+                        prop.value,
+                    );
+                    if (field_value) |val| {
+                        @field(component, field.name) = val;
+                    }
+                    break;
+                }
+            }
+            if (!field_found) {
+                std.log.err(
+                    "[{s}] Unknown property: {s}\n",
+                    .{ sprite.name, prop.name },
+                );
+                return InstantiatorError.UnknownProperty;
+            }
+        }
+        const polygon = core_shapes.Polygon.init(self.allocator, owned_points) catch |err| {
+            std.log.err("Unable to create polygon -> {any}", .{err});
+            return InstantiatorError.InvalidValue;
+        };
+        component.geometry = .{ .polygon = polygon };
         return component;
     }
 
@@ -338,13 +388,40 @@ pub const Instantiator = struct {
                         else => InstantiatorError.TypeMismatch,
                     };
                 }
+                // For []const V2 (point arrays for polygons)
+                if (ptr_info.size == .slice and ptr_info.child == V2) {
+                    return switch (value) {
+                        .array => |arr| blk: {
+                            const points = try self.allocator.alloc(V2, arr.len);
+                            for (arr, 0..) |val, i| {
+                                switch (val) {
+                                    .vector => |v| {
+                                        points[i] = V2{
+                                            .x = @floatCast(v[0]),
+                                            .y = @floatCast(v[1]),
+                                        };
+                                    },
+                                    else => {
+                                        self.allocator.free(points);
+                                        return InstantiatorError.TypeMismatch;
+                                    },
+                                }
+                            }
+                            break :blk points;
+                        },
+                        else => InstantiatorError.TypeMismatch,
+                    };
+                }
                 return InstantiatorError.TypeMismatch;
             },
             .@"struct" => {
                 // For V2, Color, FontHandle...
                 if (T == V2) {
                     return switch (value) {
-                        .vector => |v| V2{ .x = @floatCast(v[0]), .y = @floatCast(v[1]) },
+                        .vector => |v| V2{
+                            .x = @floatCast(v[0]),
+                            .y = @floatCast(v[1]),
+                        },
                         else => InstantiatorError.TypeMismatch,
                     };
                 }

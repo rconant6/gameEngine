@@ -104,6 +104,19 @@
       near:f32 0.1
       far:f32 100.0
 
+  [Pentagon:entity]
+    [Transform]
+      position:vec3 {9.0, -9.0, 0.0}
+      scale:f32 0.6
+    [Velocity]
+      linear:vec2 {-3.0, 2.5}
+      angular:f32 2.0
+    [Sprite:polygon]
+      points:vec2[] {{-1.0, -1.0}, {1.0, -1.0}, {1.0, 1.0}, {-1.0, 1.0}}
+      fill_color:color #00FFFF
+      visible:bool true
+    [ScreenWrap]
+
   [UI:scene]
     [ScoreText:entity]
       [Transform]
