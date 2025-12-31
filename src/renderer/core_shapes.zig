@@ -133,6 +133,12 @@ pub const Polygon = struct {
     ) !Polygon {
         const owned_points = try alloc.dupe(Point, points);
         errdefer alloc.free(owned_points);
+
+        const area = tris.signedArea(owned_points);
+        if (area < 0) {
+            std.mem.reverse(Point, owned_points);
+        }
+
         const center = hf.calculateCentroid(owned_points);
 
         var poly: Polygon = .{
