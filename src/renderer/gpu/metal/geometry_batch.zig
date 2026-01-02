@@ -254,8 +254,8 @@ pub const GeometryBatch = struct {
                 .{ .primitive_type = .triangle, .vertex_start = batch_offset, .vertex_count = 3 },
                 .{ .primitive_type = .triangle, .vertex_start = batch_offset + 3, .vertex_count = 3 },
             });
+            batch_offset += 6;
         }
-        batch_offset += 6;
         if (has_outline) {
             self.vertices.appendSliceAssumeCapacity(&.{
                 makeVertex(corners[0], transform, ctx, sc),
