@@ -7,9 +7,6 @@ pub const KeyModifiers = platform.KeyModifiers;
 pub const MouseButton = platform.MouseButton;
 
 const core = @import("core");
-pub const Point = core.V2;
-pub const GamePoint = core.GamePoint;
-pub const ScreenPoint = core.ScreenPoint;
 pub const V2 = core.V2;
 pub const V2I = core.V2I;
 
@@ -26,15 +23,13 @@ pub const Shape = renderer.Shape;
 pub const Transform = renderer.Transform;
 
 const assets = @import("asset");
-pub const AssetManager = assets.AssetManager;
+const AssetManager = assets.AssetManager;
 pub const FontHandle = assets.FontHandle;
 pub const Font = assets.Font;
 
 const ecs = @import("entity");
-pub const World = ecs.World;
+const World = ecs.World;
 pub const Entity = ecs.Entity;
-pub const Query = ecs.Query;
-pub const ComponentStorage = ecs.ComponentStorage;
 pub const TransformComp = ecs.Transform;
 pub const Velocity = ecs.Velocity;
 pub const Sprite = ecs.Sprite;
@@ -50,12 +45,14 @@ pub const Physics = ecs.Physics;
 pub const Box = ecs.Box;
 pub const Camera = ecs.Camera;
 
-const Input = @import("Input.zig");
-const Systems = @import("Systems.zig");
+const Input = @import("internal/Input.zig");
+const Systems = @import("internal/Systems.zig");
 
-const scene_format = @import("scene_format");
-pub const ComponentRegistry = @import("component_registry.zig").ComponentRegistry;
-pub const ShapeRegistry = @import("shape_registry.zig").ShapeRegistry;
+// Scene management is internal to the engine
+const scene_instantiator = @import("scene_instantiator");
+const scene_manager = @import("scene_manager");
+const Instantiator = scene_instantiator.Instantiator;
+const SceneManager = scene_manager.SceneManager;
 
 pub const Engine = struct {
     allocator: std.mem.Allocator,
@@ -65,6 +62,10 @@ pub const Engine = struct {
     window: platform.Window,
     world: ecs.World,
     running: bool,
+
+    // Internal scene management
+    scene_manager: SceneManager,
+    instantiator: Instantiator,
 
     pub fn init(allocator: std.mem.Allocator, title: []const u8, width: u32, height: u32) !Engine {
         try platform.init();
@@ -117,10 +118,13 @@ pub const Engine = struct {
             .window = window.*,
             .world = world,
             .running = true,
+            .scene_manager = SceneManager.init(allocator),
+            .instantiator = undefined, // Will be initialized in a separate step
         };
     }
     pub fn deinit(self: *Engine) void {
         std.log.info("[ENGINE] is shutting down...deinit()", .{});
+        self.scene_manager.deinit();
         self.renderer.deinit();
         self.assets.deinit();
         self.world.deinit();
@@ -293,5 +297,32 @@ pub const Engine = struct {
             .x = (point.x / hw + 1.0) / 2.0, // [-hw, hw] -> [0,1]
             .y = (point.y / 10.0 + 1.0) / 2.0, // [-10, 10] -> [0,1]
         };
+    }
+
+    // Scene Management API
+    pub fn loadScene(self: *Engine, scene_name: []const u8, filename: []const u8) !void {
+        try self.scene_manager.loadScene(scene_name, filename);
+    }
+
+    pub fn setActiveScene(self: *Engine, scene_name: []const u8) !void {
+        try self.scene_manager.setActiveScene(scene_name);
+    }
+
+    pub fn instantiateActiveScene(self: *Engine) !void {
+        // Initialize instantiator on first use (lazy init to avoid pointer issues)
+        self.instantiator = Instantiator.init(self.allocator, self);
+
+        const scene_file = self.scene_manager.getActiveScene() orelse return error.NoActiveScene;
+        try self.instantiator.instantiate(scene_file);
+    }
+
+    pub fn reloadActiveScene(self: *Engine) !void {
+        _ = self;
+        // TODO: Implement hot-reload logic
+        // 1. Get current active scene name
+        // 2. Clear all entities from world
+        // 3. Reload scene file from disk
+        // 4. Re-instantiate all entities
+        std.log.info("Scene reload not yet implemented", .{});
     }
 };

@@ -6,9 +6,10 @@ pub const KeyCode = id.KeyCode;
 pub const KeyModifiers = id.KeyModifiers;
 pub const Mouse = id.Mouse;
 pub const MouseButton = id.MouseButton;
+pub const Window = PlatformImpl.Window;
+// Internal use only - used by platform implementations
 pub const mapToGameKeyCode = id.mapToGameKeyCode;
 pub const mapToGameMouseButton = id.mapToGameMouseButton;
-pub const Window = PlatformImpl.Window;
 
 const PlatformImpl = switch (builtin.os.tag) {
     .macos => @import("macos.zig"),

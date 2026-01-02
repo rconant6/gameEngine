@@ -1,0 +1,9 @@
+.{
+    .name = .test_game,
+    .version = "0.0.1",
+    .fingerprint = 0x26521b43d896204e,
+    .dependencies = .{
+        .@"game-engine" = .{ .path = "../.." },
+    },
+    .paths = .{""},
+}

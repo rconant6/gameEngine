@@ -64,6 +64,11 @@ pub const SceneManager = struct {
         self.allocator.destroy(scene_entry.value);
         self.allocator.free(scene_entry.key);
     }
+    pub fn reloadActiveScene(self: *SceneManager) void {
+        std.log.info("Trying to re-load the scene", .{});
+        _ = self;
+        std.log.info("Did re-load the scene", .{});
+    }
 
     pub fn setActiveScene(self: *SceneManager, name: []const u8) !void {
         if (!self.scenes.contains(name)) return SceneManagerError.SceneNotFound;

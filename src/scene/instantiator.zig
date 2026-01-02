@@ -16,9 +16,11 @@ const BaseType = scene_format.BaseType;
 const core = @import("core");
 const V2 = core.V2;
 
+const ComponentRegistry = @import("component_registry").ComponentRegistry;
+const ShapeRegistry = @import("shape_registry").ShapeRegistry;
+
+// Import Engine type - no circular dependency because engine doesn't import scene modules
 const engine = @import("engine");
-const ComponentRegistry = engine.ComponentRegistry;
-const ShapeRegistry = engine.ShapeRegistry;
 const Engine = engine.Engine;
 
 const ecs = @import("entity");
@@ -51,7 +53,7 @@ pub const InstantiatorError = error{
 
 pub const Instantiator = struct {
     allocator: Allocator,
-    engine: *engine.Engine,
+    engine: *Engine,
 
     pub fn init(allocator: Allocator, game_engine: *Engine) Instantiator {
         return .{

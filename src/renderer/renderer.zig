@@ -29,7 +29,6 @@ pub const toClip = utils.toClip;
 pub const RenderContext = @import("RenderContext.zig");
 const text_module = @import("text.zig");
 const Font = text_module.Font;
-pub const EarClipper = core.EarClipper;
 
 const CpuRenderer = if (build_options.backend == .cpu)
     @import("./cpu/CpuRenderer.zig");

@@ -60,47 +60,10 @@ pub fn build(b: *std.Build) void {
     platform_module.addIncludePath(b.path("src/platform/macos/swift/include"));
     platform_module.addImport("build_options", build_options_module);
 
-    // Scene internal modules
-    const component_registry_module = b.addModule("component_registry", .{
-        .root_source_file = b.path("src/scene/component_registry.zig"),
-    });
-    component_registry_module.addImport("scene-format", scene_format_module);
-    component_registry_module.addImport("entity", entity_module);
-
-    const shape_registry_module = b.addModule("shape_registry", .{
-        .root_source_file = b.path("src/scene/shape_registry.zig"),
-    });
-    shape_registry_module.addImport("scene-format", scene_format_module);
-    shape_registry_module.addImport("renderer", renderer_module);
-
-    // Scene modules
-    const scene_manager_module = b.addModule("scene_manager", .{
-        .root_source_file = b.path("src/scene/manager.zig"),
-    });
-    scene_manager_module.addImport("scene-format", scene_format_module);
-
-    const scene_instantiator_module = b.addModule("scene_instantiator", .{
-        .root_source_file = b.path("src/scene/instantiator.zig"),
-    });
-    scene_instantiator_module.addImport("scene-format", scene_format_module);
-    scene_instantiator_module.addImport("core", core_module);
-    scene_instantiator_module.addImport("entity", entity_module);
-    scene_instantiator_module.addImport("asset", asset_module);
-    scene_instantiator_module.addImport("renderer", renderer_module);
-    scene_instantiator_module.addImport("build_options", build_options_module);
-    scene_instantiator_module.addImport("component_registry", component_registry_module);
-    scene_instantiator_module.addImport("shape_registry", shape_registry_module);
-    scene_instantiator_module.addImport("platform", platform_module);
-
-    // Engine public API
+    // TODO: This is probably the end for the engine 'library'
     const engine_module = b.addModule("engine", .{
-        .root_source_file = b.path("src/engine.zig"),
+        .root_source_file = b.path("src/api/engine.zig"),
     });
-
-    // Scene instantiator needs the Engine type
-    scene_instantiator_module.addImport("engine", engine_module);
-
-    // Engine module dependencies
     engine_module.addImport("core", core_module);
     engine_module.addImport("platform", platform_module);
     engine_module.addImport("renderer", renderer_module);
@@ -108,12 +71,6 @@ pub fn build(b: *std.Build) void {
     engine_module.addImport("asset", asset_module);
     engine_module.addImport("entity", entity_module);
     engine_module.addImport("scene-format", scene_format_module);
-
-    // Engine owns scene management internally - games don't need to import these
-    engine_module.addImport("scene_instantiator", scene_instantiator_module);
-    engine_module.addImport("scene_manager", scene_manager_module);
-    engine_module.addImport("component_registry", component_registry_module);
-    engine_module.addImport("shape_registry", shape_registry_module);
 
     // Clean step for Swift build artifacts
     const clean_step = b.step("clean", "Remove all build artifacts");
@@ -252,7 +209,7 @@ pub fn configureMacOS(
         .cpu => {},
     }
 
-    exe.root_module.addIncludePath(b.path("src/platform/macos/include"));
+    exe.root_module.addIncludePath(b.path("../../src/platform/macos/include"));
 
     module.linkFramework("AppKit", .{});
     module.linkFramework("Metal", .{});
@@ -350,32 +307,32 @@ pub fn buildMacOSSwift(
 
     const config = if (optimize == .Debug) "debug" else "release";
 
-    const swift_scratch = b.fmt("zig-out/swift-build/{s}", .{config});
+    const swift_scratch = b.fmt("../../zig-out/swift-build/{s}", .{config});
 
     const swift_build = b.addSystemCommand(&.{
         "swift",          "build",
-        "--package-path", "src/platform/macos",
+        "--package-path", "../../src/platform/macos",
         "--scratch-path", swift_scratch,
         "-c",             config,
         "--arch",         arch,
     });
 
     const metal_compile = b.addSystemCommand(&.{
-        "xcrun", "-sdk",                                    "macosx", "metal",
-        "-c",    "src/platform//macos/swift/shaders.metal", "-o",     "zig-out/shaders.air",
+        "xcrun", "-sdk",                                            "macosx", "metal",
+        "-c",    "../../src/platform/macos/swift/shaders.metal", "-o",     "../../zig-out/shaders.air",
     });
     metal_compile.step.dependOn(&swift_build.step);
 
     const metal_lib = b.addSystemCommand(&.{
-        "xcrun",               "-sdk", "macosx",                       "metallib",
-        "zig-out/shaders.air", "-o",   "zig-out/lib/default.metallib",
+        "xcrun",                   "-sdk", "macosx",                           "metallib",
+        "../../zig-out/shaders.air", "-o",   "../../zig-out/lib/default.metallib",
     });
     metal_lib.step.dependOn(&metal_compile.step);
 
-    const install_metallib = b.addInstallFile(.{ .cwd_relative = "zig-out/lib/default.metallib" }, "bin/default.metallib");
+    const install_metallib = b.addInstallFile(.{ .cwd_relative = "../../zig-out/lib/default.metallib" }, "bin/default.metallib");
     install_metallib.step.dependOn(&metal_lib.step);
 
-    const swift_clean = b.addSystemCommand(&.{ "rm", "-rf", "./src/platform/macos/.build/" });
+    const swift_clean = b.addSystemCommand(&.{ "rm", "-rf", "../../src/platform/macos/.build/" });
     exe.step.dependOn(&swift_build.step);
     exe.step.dependOn(&swift_clean.step);
 
@@ -387,5 +344,5 @@ pub fn buildMacOSSwift(
     exe.step.dependOn(&install_lib.step);
     exe.step.dependOn(&install_metallib.step);
 
-    module.addObjectFile(b.path(b.fmt("zig-out/{s}", .{lib_dest})));
+    module.addObjectFile(b.path(b.fmt("../../zig-out/{s}", .{lib_dest})));
 }

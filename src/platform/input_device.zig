@@ -36,14 +36,10 @@ pub fn InputDevice(comptime Device: type) type {
             const idx = @intFromEnum(dev);
             const was_down = self.pressed[idx];
 
-            std.log.debug("[INPUT_DEVICE] {s} idx={d} was_down={} down={}", .{ @typeName(Device), idx, was_down, down });
-
             if (down and !was_down) {
                 self.just_pressed[idx] = true;
-                std.log.debug("[INPUT_DEVICE] Setting just_presed[{d}] = true", .{idx});
             } else if (!down and was_down) {
                 self.just_released[idx] = true;
-                std.log.debug("[INPUT_DEVICE] Setting just_released[{d}] = true", .{idx});
             }
 
             self.pressed[idx] = down;

@@ -77,10 +77,8 @@ pub fn pollEvent() ?Event {
 
     while (poll_key_event(&keycode, &is_down)) {
         const key = plat.mapToGameKeyCode(keycode);
-        std.log.info("[INPUT] macOS keycode 0x{X:0>2}", .{keycode});
 
         if (key == .Unused) {
-            std.log.warn("[INPUT] Unknown macOS keycode 0x{X:0>2}", .{keycode});
             continue;
         }
         keyboard_state.updateState(key, is_down != 0);
@@ -93,10 +91,8 @@ pub fn pollEvent() ?Event {
 
     while (poll_mouse_event(&button, &is_down, &x, &y)) {
         const b = plat.mapToGameMouseButton(button);
-        std.log.info("[INPUT] macOS mousecode 0x{X:0>2}", .{button});
 
         if (b == .Unused) {
-            std.log.warn("[INPUT] Unknown macOS MouseButton 0x{X:0>2}", .{button});
             continue;
         }
         mouse_state.updateState(b, is_down != 0);

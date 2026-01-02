@@ -13,7 +13,7 @@ const Text = ecs.Text;
 const LifeTime = ecs.Lifetime;
 const Destroy = ecs.Destroy;
 const Box = ecs.Box;
-const Engine = @import("engine.zig").Engine;
+const Engine = @import("../engine.zig").Engine;
 
 const Renderer = rend.Renderer;
 pub fn movementSystem(engine: *Engine, dt: f32) void {
