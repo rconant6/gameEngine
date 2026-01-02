@@ -47,6 +47,11 @@ pub const Camera = ecs.Camera;
 
 const Input = @import("internal/Input.zig");
 const Systems = @import("internal/Systems.zig");
+const err_log = @import("error_logger");
+const ErrorLogger = err_log.ErrorLogger;
+pub const Severity = err_log.Severity;
+pub const Subsystem = err_log.SubSystem;
+pub const ErrorEntry = err_log.ErrorEntry;
 
 // Scene management is internal to the engine
 const scene_instantiator = @import("scene_instantiator");
@@ -67,7 +72,15 @@ pub const Engine = struct {
     scene_manager: SceneManager,
     instantiator: Instantiator,
 
-    pub fn init(allocator: std.mem.Allocator, title: []const u8, width: u32, height: u32) !Engine {
+    // Internal error logging
+    error_logger: ErrorLogger,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        title: []const u8,
+        width: u32,
+        height: u32,
+    ) !Engine {
         try platform.init();
 
         const window = try platform.createWindow(.{
@@ -84,15 +97,17 @@ pub const Engine = struct {
         const scaled_width: u32 = @intFromFloat(f_width * scale_factor);
         const scaled_height: u32 = @intFromFloat(f_height * scale_factor);
 
-        std.log.info("Scaled width: {d} Scaled height: {d}", .{ scaled_width, scaled_height });
-        const rend = try renderer.Renderer.init(
+        const rend = renderer.Renderer.init(
             allocator,
             .{
                 .width = scaled_width,
                 .height = scaled_height,
                 .native_handle = window.handle,
             },
-        );
+        ) catch |err| {
+            std.log.err("[renderer] Unable to create rendering backend: {any}", .{err});
+            return err;
+        };
 
         if (build_options.backend == .cpu) {
             if (rend.getPixelBufferPtr()) |pixels| {
@@ -119,16 +134,19 @@ pub const Engine = struct {
             .world = world,
             .running = true,
             .scene_manager = SceneManager.init(allocator),
-            .instantiator = undefined, // Will be initialized in a separate step
+            .instantiator = Instantiator.init(allocator),
+            .error_logger = ErrorLogger.init(allocator),
         };
     }
     pub fn deinit(self: *Engine) void {
-        std.log.info("[ENGINE] is shutting down...deinit()", .{});
+        self.logInfo(.engine, "Engine shutting down", .{});
         self.scene_manager.deinit();
         self.renderer.deinit();
         self.assets.deinit();
         self.world.deinit();
         self.window.deinit();
+        self.instantiator.deinit();
+        self.error_logger.deinit();
     }
 
     pub fn shouldClose(self: *const Engine) bool {
@@ -300,8 +318,25 @@ pub const Engine = struct {
     }
 
     // Scene Management API
-    pub fn loadScene(self: *Engine, scene_name: []const u8, filename: []const u8) !void {
-        try self.scene_manager.loadScene(scene_name, filename);
+    pub fn loadScene(
+        self: *Engine,
+        scene_name: []const u8,
+        filename: []const u8,
+    ) !void {
+        self.scene_manager.loadScene(scene_name, filename) catch |err| {
+            self.logError(
+                .scene,
+                "Failed to load scene '{s}' from '{s}': {any}",
+                .{ scene_name, filename, err },
+            );
+            return;
+        };
+
+        self.logInfo(
+            .scene,
+            "Loaded scene '{s}' from '{s}'",
+            .{ scene_name, filename },
+        );
     }
 
     pub fn setActiveScene(self: *Engine, scene_name: []const u8) !void {
@@ -309,20 +344,80 @@ pub const Engine = struct {
     }
 
     pub fn instantiateActiveScene(self: *Engine) !void {
-        // Initialize instantiator on first use (lazy init to avoid pointer issues)
-        self.instantiator = Instantiator.init(self.allocator, self);
-
         const scene_file = self.scene_manager.getActiveScene() orelse return error.NoActiveScene;
-        try self.instantiator.instantiate(scene_file);
+        self.instantiator.instantiate(scene_file, &self.world, &self.assets) catch |err| {
+            self.logError(.scene, "Failed to instantiate scene: {any}", .{err});
+            return err;
+        };
     }
 
     pub fn reloadActiveScene(self: *Engine) !void {
-        _ = self;
-        // TODO: Implement hot-reload logic
-        // 1. Get current active scene name
-        // 2. Clear all entities from world
-        // 3. Reload scene file from disk
-        // 4. Re-instantiate all entities
-        std.log.info("Scene reload not yet implemented", .{});
+        self.logInfo(.scene, "Reloading active scene...", .{});
+
+        self.instantiator.clearLastInstantiated(&self.world);
+
+        self.scene_manager.reloadActiveScene() catch |err| {
+            self.logError(.scene, "Failed to reload scene: {any}", .{err});
+            self.logWarning(.scene, "Keeping previous scene state", .{});
+
+            try self.instantiateActiveScene();
+            return;
+        };
+
+        try self.instantiateActiveScene();
+
+        self.logInfo(.scene, "Scene reloaded successfully", .{});
+    }
+
+    // MARK: Error logging
+    pub fn logDebug(
+        self: *Engine,
+        subsystem: Subsystem,
+        comptime fmt: []const u8,
+        args: anytype,
+    ) void {
+        self.error_logger.logDebug(subsystem, fmt, args, @src());
+    }
+    pub fn logInfo(
+        self: *Engine,
+        subsystem: Subsystem,
+        comptime fmt: []const u8,
+        args: anytype,
+    ) void {
+        self.error_logger.logInfo(subsystem, fmt, args, @src());
+    }
+    pub fn logWarning(
+        self: *Engine,
+        subsystem: Subsystem,
+        comptime fmt: []const u8,
+        args: anytype,
+    ) void {
+        self.error_logger.logWarning(subsystem, fmt, args, @src());
+    }
+    pub fn logError(
+        self: *Engine,
+        subsystem: Subsystem,
+        comptime fmt: []const u8,
+        args: anytype,
+    ) void {
+        self.error_logger.logError(subsystem, fmt, args, @src());
+    }
+    pub fn logFatal(
+        self: *Engine,
+        subsystem: Subsystem,
+        comptime fmt: []const u8,
+        args: anytype,
+    ) void {
+        self.error_logger.logFatal(subsystem, fmt, args, @src());
+    }
+
+    pub fn getErrors(self: *const Engine) []const ErrorEntry {
+        return self.error_logger.getErrors();
+    }
+    pub fn hasErrors(self: *const Engine) bool {
+        return self.error_logger.hasErrors();
+    }
+    pub fn clearErrors(self: *Engine) void {
+        self.error_logger.clearErrors();
     }
 };

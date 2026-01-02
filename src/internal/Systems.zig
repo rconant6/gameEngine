@@ -107,8 +107,9 @@ pub fn lifetimeSystem(engine: *Engine, dt: f32) void {
 
         if (lifetime.remaining <= 0) {
             world.addComponent(entry.entity, Destroy, .{}) catch |err| {
-                std.log.err(
-                    "Failed to add 'Destroy' to entity {d} at lifetime expiration {}",
+                engine.logError(
+                    .ecs,
+                    "Failed to add 'Destroy' to entity {d} at lifetime expiration: {any}",
                     .{ entry.entity.id, err },
                 );
             };

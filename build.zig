@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const RendererBackend = enum { metal, vulkan, opengl, cpu };
+const MinLogLevel = enum { debug, info, warn, err, fatal };
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -60,6 +61,11 @@ pub fn build(b: *std.Build) void {
     platform_module.addIncludePath(b.path("src/platform/macos/swift/include"));
     platform_module.addImport("build_options", build_options_module);
 
+    // Internal error logger module
+    const error_logger_module = b.addModule("error_logger", .{
+        .root_source_file = b.path("src/internal/error_logger.zig"),
+    });
+
     // Scene internal modules
     const component_registry_module = b.addModule("component_registry", .{
         .root_source_file = b.path("src/scene/component_registry.zig"),
@@ -108,6 +114,7 @@ pub fn build(b: *std.Build) void {
     engine_module.addImport("asset", asset_module);
     engine_module.addImport("entity", entity_module);
     engine_module.addImport("scene-format", scene_format_module);
+    engine_module.addImport("error_logger", error_logger_module);
 
     // Engine owns scene management internally - games don't need to import these
     engine_module.addImport("scene_instantiator", scene_instantiator_module);
