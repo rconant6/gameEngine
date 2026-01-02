@@ -18,9 +18,9 @@ pub fn main() !void {
     );
     defer game.deinit();
 
-    // Load and instantiate the main scene
-    try game.loadScene("main", "game");
-    try game.setActiveScene("main");
+    // Load and instantiate the master test scene
+    try game.loadScene("master", "master");
+    try game.setActiveScene("master");
     try game.instantiateActiveScene();
 
     std.debug.print("\n=== GameDimensions ===\n", .{});

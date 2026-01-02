@@ -1,0 +1,360 @@
+[OrbitronFont:asset font]
+  path:string "assets/fonts/"
+  filename: string "Orbitron.ttf"
+
+[MainFont:asset font]
+  abs_path:string "assets/fonts/arcadeFont.ttf"
+
+[UIFont:asset font]
+  filename:string "pressStart1.ttf"
+
+[GameScene:scene]
+  // GROUND - Full screen grass background
+  [Ground:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, -1.0}
+      scale:f32 1.0
+    [Box]
+      size:vec2 {26.66, 20.0}
+      fill_color:color #3CB371
+      filled:bool true
+
+  // CIRCLES - Row 1 (top-left area)
+  [CircleFilled:entity]
+    [Transform]
+      position:vec3 {-10.0, 7.0, 0.0}
+      scale:f32 0.8
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #FF0000
+      visible:bool true
+
+  [CircleOutline:entity]
+    [Transform]
+      position:vec3 {-7.0, 7.0, 0.0}
+      scale:f32 0.8
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      stroke_color:color #00FF00
+      stroke_width:f32 2.0
+      visible:bool true
+
+  [CircleBoth:entity]
+    [Transform]
+      position:vec3 {-4.0, 7.0, 0.0}
+      scale:f32 0.8
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #0000FF
+      stroke_color:color #FFFF00
+      stroke_width:f32 2.0
+      visible:bool true
+
+  [CircleSpinning:entity]
+    [Transform]
+      position:vec3 {-1.0, 7.0, 0.0}
+      scale:f32 0.8
+    [Velocity]
+      linear:vec2 {0.0, 0.0}
+      angular:f32 1.5
+    [Sprite:circle]
+      origin:vec2 {0.5, 0.0}
+      radius:f32 1.0
+      fill_color:color #FF00FF
+      stroke_color:color #FFFFFF
+      stroke_width:f32 1.5
+      visible:bool true
+
+  // RECTANGLES - Row 2
+  [RectFilled:entity]
+    [Transform]
+      position:vec3 {-10.0, 4.0, 0.0}
+      scale:f32 0.8
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.2
+      half_height:f32 0.8
+      fill_color:color #FF8800
+      visible:bool true
+
+  [RectOutline:entity]
+    [Transform]
+      position:vec3 {-7.0, 4.0, 0.0}
+      scale:f32 0.8
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.2
+      half_height:f32 0.8
+      stroke_color:color #00FFFF
+      stroke_width:f32 2.0
+      visible:bool true
+
+  [RectBoth:entity]
+    [Transform]
+      position:vec3 {-4.0, 4.0, 0.0}
+      scale:f32 0.8
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.2
+      half_height:f32 0.8
+      fill_color:color #8800FF
+      stroke_color:color #FFFFFF
+      stroke_width:f32 1.5
+      visible:bool true
+
+  [RectBouncing:entity]
+    [Transform]
+      position:vec3 {2.0, 4.0, 0.0}
+      scale:f32 0.6
+    [Velocity]
+      linear:vec2 {4.0, 2.5}
+      angular:f32 0.5
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.5
+      half_height:f32 1.0
+      fill_color:color #00FF88
+      stroke_color:color #FF0000
+      stroke_width:f32 1.0
+      visible:bool true
+    [ScreenClamp]
+
+  // TRIANGLES - Row 3
+  [TriFilled:entity]
+    [Transform]
+      position:vec3 {-10.0, 1.0, 0.0}
+      scale:f32 0.8
+    [Sprite:triangle]
+      v0:vec2 {0.0, 1.0}
+      v1:vec2 {-0.866, -0.5}
+      v2:vec2 {0.866, -0.5}
+      fill_color:color #FFFF00
+      visible:bool true
+
+  [TriOutline:entity]
+    [Transform]
+      position:vec3 {-7.0, 1.0, 0.0}
+      scale:f32 0.8
+    [Sprite:triangle]
+      v0:vec2 {0.0, 1.0}
+      v1:vec2 {-0.866, -0.5}
+      v2:vec2 {0.866, -0.5}
+      stroke_color:color #FF0088
+      stroke_width:f32 2.0
+      visible:bool true
+
+  [TriBoth:entity]
+    [Transform]
+      position:vec3 {-4.0, 1.0, 0.0}
+      scale:f32 0.8
+    [Sprite:triangle]
+      v0:vec2 {0.0, 1.0}
+      v1:vec2 {-0.866, -0.5}
+      v2:vec2 {0.866, -0.5}
+      fill_color:color #00FFAA
+      stroke_color:color #0000FF
+      stroke_width:f32 1.5
+      visible:bool true
+
+  [TriRotated:entity]
+    [Transform]
+      position:vec3 {-1.0, 1.0, 0.0}
+      rotation:f32 0.785
+      scale:f32 0.8
+    [Sprite:triangle]
+      v0:vec2 {0.0, 1.0}
+      v1:vec2 {-0.866, -0.5}
+      v2:vec2 {0.866, -0.5}
+      fill_color:color #FF00FF
+      stroke_color:color #FFFF00
+      stroke_width:f32 1.0
+      visible:bool true
+
+  // LINES - Row 4
+  [LineHorizontal:entity]
+    [Transform]
+      position:vec3 {-10.0, -2.0, 0.0}
+      scale:f32 1.0
+    [Sprite:line]
+      start:vec2 {-1.5, 0.0}
+      end:vec2 {1.5, 0.0}
+      stroke_color:color #FFFFFF
+      stroke_width:f32 3.0
+      visible:bool true
+
+  [LineVertical:entity]
+    [Transform]
+      position:vec3 {-7.0, -2.0, 0.0}
+      scale:f32 1.0
+    [Sprite:line]
+      start:vec2 {0.0, -1.5}
+      end:vec2 {0.0, 1.5}
+      stroke_color:color #00FFFF
+      stroke_width:f32 2.0
+      visible:bool true
+
+  [LineDiagonal:entity]
+    [Transform]
+      position:vec3 {-4.0, -2.0, 0.0}
+      scale:f32 1.0
+    [Sprite:line]
+      start:vec2 {-1.0, -1.0}
+      end:vec2 {1.0, 1.0}
+      stroke_color:color #FF00FF
+      stroke_width:f32 2.5
+      visible:bool true
+
+  [LineSpinning:entity]
+    [Transform]
+      position:vec3 {-1.0, -2.0, 0.0}
+      scale:f32 0.8
+    [Velocity]
+      linear:vec2 {0.0, 0.0}
+      angular:f32 2.0
+    [Sprite:line]
+      start:vec2 {0.0, 0.0}
+      end:vec2 {1.5, 0.5}
+      stroke_color:color #FFFF00
+      stroke_width:f32 3.0
+      visible:bool true
+
+  // POLYGONS - Row 5 (bottom)
+  [PolyPentagonFilled:entity]
+    [Transform]
+      position:vec3 {-10.0, -5.0, 0.0}
+      scale:f32 0.7
+    [Sprite:polygon]
+      points:vec2[] {{0.0, 1.0}, {0.951, 0.309}, {0.588, -0.809}, {-0.588, -0.809}, {-0.951, 0.309}}
+      fill_color:color #FF5500
+      visible:bool true
+
+  [PolyHexagonOutline:entity]
+    [Transform]
+      position:vec3 {-7.0, -5.0, 0.0}
+      scale:f32 0.7
+    [Sprite:polygon]
+      points:vec2[] {{1.0, 0.0}, {0.5, 0.866}, {-0.5, 0.866}, {-1.0, 0.0}, {-0.5, -0.866}, {0.5, -0.866}}
+      stroke_color:color #00FF00
+      stroke_width:f32 2.0
+      visible:bool true
+
+  [PolySquareBoth:entity]
+    [Transform]
+      position:vec3 {-4.0, -5.0, 0.0}
+      scale:f32 0.7
+    [Sprite:polygon]
+      points:vec2[] {{-1.0, -1.0}, {1.0, -1.0}, {1.0, 1.0}, {-1.0, 1.0}}
+      fill_color:color #FFFF00
+      stroke_color:color #FF0000
+      stroke_width:f32 1.5
+      visible:bool true
+
+  [PolyWrapping:entity]
+    [Transform]
+      position:vec3 {8.0, -5.0, 0.0}
+      scale:f32 0.7
+    [Velocity]
+      linear:vec2 {-3.0, 2.0}
+      angular:f32 1.5
+    [Sprite:polygon]
+      points:vec2[] {{0.0, 1.0}, {0.951, 0.309}, {0.588, -0.809}, {-0.588, -0.809}, {-0.951, 0.309}}
+      fill_color:color #00FFAA
+      stroke_color:color #FF00FF
+      stroke_width:f32 1.0
+      visible:bool true
+    [ScreenWrap]
+
+  // COMPLEX MOTION - Right side
+  [ComplexCircle1:entity]
+    [Transform]
+      position:vec3 {5.0, 6.0, 0.0}
+      scale:f32 0.6
+    [Velocity]
+      linear:vec2 {3.5, -2.0}
+      angular:f32 -2.5
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #FF0080
+      stroke_color:color #FFFFFF
+      stroke_width:f32 1.0
+      visible:bool true
+    [ScreenClamp]
+
+  [ComplexRect1:entity]
+    [Transform]
+      position:vec3 {8.0, 3.0, 0.0}
+      scale:f32 0.7
+    [Velocity]
+      linear:vec2 {-2.5, 3.0}
+      angular:f32 1.8
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.0
+      half_height:f32 1.5
+      fill_color:color #00FF80
+      stroke_color:color #0000FF
+      stroke_width:f32 1.5
+      visible:bool true
+    [ScreenWrap]
+
+  [ComplexTri1:entity]
+    [Transform]
+      position:vec3 {10.0, 0.0, 0.0}
+      scale:f32 0.8
+    [Velocity]
+      linear:vec2 {-4.0, -1.5}
+      angular:f32 -1.2
+    [Sprite:triangle]
+      v0:vec2 {0.0, 1.2}
+      v1:vec2 {-1.0, -0.6}
+      v2:vec2 {1.0, -0.6}
+      fill_color:color #8000FF
+      stroke_color:color #FFFF00
+      stroke_width:f32 1.0
+      visible:bool true
+    [ScreenClamp]
+
+  // SCALED SHAPES - Bottom right
+  [TinyCircle:entity]
+    [Transform]
+      position:vec3 {5.0, -7.0, 0.0}
+      scale:f32 0.3
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #FFFFFF
+      visible:bool true
+
+  [BigRect:entity]
+    [Transform]
+      position:vec3 {8.0, -7.0, 0.0}
+      scale:f32 1.2
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.0
+      half_height:f32 0.6
+      fill_color:color #FF0000
+      stroke_color:color #00FF00
+      stroke_width:f32 2.0
+      visible:bool true
+
+  [SmallText:entity]
+    [Transform]
+      position:vec2 {-13.0, 8.0}
+    [Text]
+      text:string "abcdefghijklmnopqrstuvwxyz0123456789:;!*+-=/@#%^&()"
+      font_asset:asset_ref "OrbitronFont"
+      text_color:color #FF8800
+      size:f32 0.80
+
+  [Camera:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 10.0}
+    [Camera]
+      fov:f32 60.0
+      near:f32 0.1
+      far:f32 100.0
