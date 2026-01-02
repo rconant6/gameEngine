@@ -1,6 +1,7 @@
 const std = @import("std");
 const asset = @import("asset");
 pub const Font = asset.Font;
+pub const glyph_builder = asset.glyph_builder;
 const FilteredGlyph = asset.FilteredGlyph;
 const rend = @import("renderer.zig");
 const Renderer = rend.Renderer;
@@ -16,7 +17,7 @@ const V2 = rend.V2;
 
 pub fn drawText(
     renderer: *Renderer,
-    font: *const Font,
+    font: *Font,
     text: []const u8,
     position: GamePoint,
     scale: f32,
@@ -27,7 +28,18 @@ pub fn drawText(
         const ascii_val: u32 = @intCast(char);
         const glyph_index = font.char_to_glyph.get(ascii_val) orelse continue;
         if (font.glyph_shapes.get(glyph_index)) |glyph| {
-            drawGlyph(renderer, &glyph, scale, .{ .x = x_pos, .y = position.y }, color);
+            drawGlyph(
+                renderer,
+                font,
+                glyph_index,
+                &glyph,
+                scale,
+                .{ .x = x_pos, .y = position.y },
+                color,
+            ) catch |err| {
+                std.log.err("Failed to draw glyph {} ('{c}') with -> {any}", .{ ascii_val, @as(u8, @intCast(ascii_val)), err });
+                continue;
+            };
         }
 
         const advance_f: f32 = @floatFromInt(font.glyph_advance_width.items[glyph_index].advance_width);
@@ -38,39 +50,36 @@ pub fn drawText(
 
 fn drawGlyph(
     renderer: *Renderer,
+    font: *Font,
+    glyph_index: u16,
     glyph: *const FilteredGlyph,
     scale: f32,
     pos: V2,
     color: Color,
-) void {
-    var start_idx: usize = 0;
-    for (glyph.contour_ends) |end_idx| {
-        const contour_points = glyph.points[start_idx .. end_idx + 1];
+) !void {
+    const triangles = if (font.glyph_triangles.get(glyph_index)) |cached|
+        cached
+    else blk: {
+        const tris = try glyph_builder.buildTriangles(renderer.backend.allocator, glyph);
+        try font.glyph_triangles.put(glyph_index, tris);
+        break :blk tris;
+    };
 
-        for (contour_points, 0..) |point, i| {
-            const next_point = if (i == contour_points.len - 1)
-                contour_points[0]
-            else
-                contour_points[i + 1];
+    for (triangles) |tri| {
+        const p0 = glyph.points[tri[0]];
+        const p1 = glyph.points[tri[1]];
+        const p2 = glyph.points[tri[2]];
 
-            const p1 = V2{
-                .x = point.x * scale + pos.x,
-                .y = point.y * scale + pos.y,
-            };
-            const p2 = V2{
-                .x = next_point.x * scale + pos.x,
-                .y = next_point.y * scale + pos.y,
-            };
+        const t0 = V2{ .x = p0.x * scale + pos.x, .y = p0.y * scale + pos.y };
+        const t1 = V2{ .x = p1.x * scale + pos.x, .y = p1.y * scale + pos.y };
+        const t2 = V2{ .x = p2.x * scale + pos.x, .y = p2.y * scale + pos.y };
 
-            renderer.drawGeometry(
-                .{ .line = .{ .start = p1, .end = p2 } },
-                null,
-                null,
-                color,
-                1,
-            );
-        }
-
-        start_idx = end_idx + 1;
+        renderer.drawGeometry(
+            .{ .triangle = .{ .v0 = t0, .v1 = t1, .v2 = t2 } },
+            .{},
+            color,
+            null,
+            1.0,
+        );
     }
 }

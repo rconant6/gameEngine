@@ -38,4 +38,12 @@ pub fn distance(self: V2, other: V2) f32 {
     return (self.sub(other)).magnitude();
 }
 
+pub fn dot(self: V2, other: V2) f32 {
+    return self.x * other.x + self.y * other.y;
+}
+
+pub fn cross(self: V2, other: V2) f32 {
+    return self.x * other.y - self.y * other.x;
+}
+
 pub const ZERO = V2{ .x = 0, .y = 0 };

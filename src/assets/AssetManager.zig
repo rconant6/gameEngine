@@ -47,7 +47,7 @@ pub fn getFontHandle(self: *Self, name: []const u8) !FontHandle {
     return handle;
 }
 
-pub fn getFont(self: *Self, handle: FontHandle) ?*const Font {
+pub fn getFont(self: *Self, handle: FontHandle) ?*Font {
     return self.fonts.getFont(handle);
 }
 

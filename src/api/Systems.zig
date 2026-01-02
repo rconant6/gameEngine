@@ -12,6 +12,7 @@ const World = ecs.World;
 const Text = ecs.Text;
 const LifeTime = ecs.Lifetime;
 const Destroy = ecs.Destroy;
+const Box = ecs.Box;
 const Engine = @import("engine.zig").Engine;
 
 const Renderer = rend.Renderer;
@@ -31,25 +32,29 @@ pub fn movementSystem(engine: *Engine, dt: f32) void {
 pub fn renderSystem(engine: *Engine) void {
     var world = &engine.world;
     var renderer = &engine.renderer;
-    var query = world.query(.{ Transform, Sprite });
 
-    while (query.next()) |entry| {
+    var box_query = world.query(.{ Transform, Box });
+    while (box_query.next()) |entry| {
         const transform = entry.get(0);
-        const sprite = entry.get(1);
-        const geo = sprite.geometry orelse return;
+        const box = entry.get(1);
+        const geo = rend.Rectangle.initFromCenter(
+            .{ .x = 0, .y = 0 },
+            box.size.x,
+            box.size.y,
+        );
 
-        if (sprite.visible) {
-            renderer.drawGeometry(
-                geo,
-                .{
-                    .offset = transform.position,
-                    .rotation = transform.rotation,
-                    .scale = transform.scale,
-                },
-                sprite.fill_color,
-                sprite.stroke_color,
-                sprite.stroke_width,
-            );
+        if (box.filled) {
+            renderer.drawGeometry(rend.Shape{ .rectangle = geo }, .{
+                .offset = transform.position,
+                .rotation = transform.rotation,
+                .scale = transform.scale,
+            }, box.fill_color, null, 1.0);
+        } else {
+            renderer.drawGeometry(rend.Shape{ .rectangle = geo }, .{
+                .offset = transform.position,
+                .rotation = transform.rotation,
+                .scale = transform.scale,
+            }, null, box.fill_color, 1.0);
         }
     }
 
@@ -68,6 +73,26 @@ pub fn renderSystem(engine: *Engine) void {
             text.size,
             text.text_color,
         );
+    }
+    var query = world.query(.{ Transform, Sprite });
+    while (query.next()) |entry| {
+        const transform = entry.get(0);
+        const sprite = entry.get(1);
+        const geo = sprite.geometry orelse return;
+
+        if (sprite.visible) {
+            renderer.drawGeometry(
+                geo,
+                .{
+                    .offset = transform.position,
+                    .rotation = transform.rotation,
+                    .scale = transform.scale,
+                },
+                sprite.fill_color,
+                sprite.stroke_color,
+                sprite.stroke_width,
+            );
+        }
     }
 }
 
@@ -90,6 +115,8 @@ pub fn lifetimeSystem(engine: *Engine, dt: f32) void {
         }
     }
 }
+
+// TODO: This needs work to 'split'?
 pub fn screenWrapSystem(engine: *Engine) void {
     var world = &engine.world;
     var query = world.query(.{ Transform, ScreenWrap });
@@ -115,6 +142,9 @@ pub fn screenWrapSystem(engine: *Engine) void {
         }
     }
 }
+
+// TODO: This needs to work based on shapes and the sizes
+// do a better job of bouncing when edge hits (bounding boxes)
 pub fn screenClampSystem(engine: *Engine) void {
     var world = &engine.world;
     var query = world.query(.{ Transform, Velocity, ScreenClamp });

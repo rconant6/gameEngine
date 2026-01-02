@@ -28,15 +28,16 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("libs/scene-format/src/lib.zig"),
     });
 
-    const asset_module = b.addModule("asset", .{
-        .root_source_file = b.path("src/assets/assets.zig"),
-    });
-    asset_module.addImport("core", core_module);
-
     const renderer_module = b.addModule("renderer", .{
         .root_source_file = b.path("src/renderer/renderer.zig"),
     });
     renderer_module.addImport("core", core_module);
+
+    const asset_module = b.addModule("asset", .{
+        .root_source_file = b.path("src/assets/assets.zig"),
+    });
+    asset_module.addImport("core", core_module);
+    asset_module.addImport("renderer", renderer_module);
 
     const entity_module = b.addModule("entity", .{
         .root_source_file = b.path("src/ecs/ecs.zig"),

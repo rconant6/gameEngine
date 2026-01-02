@@ -318,8 +318,8 @@ fn parseGlyph(
 
             for (contour_end_pts) |endPt| {
                 if (i == endPt) {
-                    _ = filtered_contour_end_pts.pop();
                     filtered_contour_end_pts.appendAssumeCapacity(filtered_point_count - 1);
+                    break; // Only match once per point
                 }
             }
         }
@@ -346,6 +346,7 @@ pub const Font = struct {
     char_to_glyph: std.AutoHashMap(u32, u16) = undefined, // from cmap
     glyph_advance_width: std.ArrayList(Hmetric) = undefined, // horizontal spacing data
     glyph_shapes: std.AutoHashMap(u16, FilteredGlyph) = undefined, // data for shapes of glyphs
+    glyph_triangles: std.AutoHashMap(u16, [][3]usize),
 
     pub fn init(alloc: std.mem.Allocator, path: []const u8) !Font {
         var arena = std.heap.ArenaAllocator.init(alloc);
@@ -419,6 +420,7 @@ pub const Font = struct {
             .char_to_glyph = map_indicies,
             .glyph_advance_width = hMetrics,
             .glyph_shapes = glyphs,
+            .glyph_triangles = std.AutoHashMap(u16, [][3]usize).init(alloc),
         };
     }
 
@@ -432,6 +434,11 @@ pub const Font = struct {
             self.alloc.free(glyph.contour_ends);
         }
         self.glyph_shapes.deinit();
+        var tri_iter = self.glyph_triangles.iterator();
+        while (tri_iter.next()) |entry| {
+            self.alloc.free(entry.value_ptr.*);
+        }
+        self.glyph_triangles.deinit();
     }
 };
 

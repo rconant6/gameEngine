@@ -316,7 +316,7 @@ pub const Instantiator = struct {
     fn buildPolygonSprite(self: *Instantiator, sprite: SpriteBlock) !Components.Sprite {
         var component = std.mem.zeroInit(Components.Sprite, .{});
         var owned_points: []const V2 = undefined;
-        errdefer self.allocator.free(owned_points);
+        defer self.allocator.free(owned_points);
 
         for (sprite.properties) |prop| {
             if (std.mem.eql(u8, "points", prop.name)) {
@@ -325,7 +325,6 @@ pub const Instantiator = struct {
                         std.log.err("Unable to create polygon points -> {any}", .{err});
                         return InstantiatorError.InvalidValue;
                     } orelse return InstantiatorError.InvalidValue;
-                std.log.info("points: {any}", .{owned_points});
                 continue;
             }
             var field_found = false;

@@ -10,7 +10,6 @@ pub const Colors = col.Colors;
 const shape = @import("shapes.zig");
 pub const Shape = shape.Shape;
 pub const cs = @import("core_shapes.zig");
-// pub const Contour = cs.Contour;
 pub const Circle = cs.Circle;
 pub const Ellipse = cs.Ellipse;
 pub const Line = cs.Line;
@@ -30,6 +29,7 @@ pub const toClip = utils.toClip;
 pub const RenderContext = @import("RenderContext.zig");
 const text_module = @import("text.zig");
 const Font = text_module.Font;
+pub const EarClipper = core.EarClipper;
 
 const CpuRenderer = if (build_options.backend == .cpu)
     @import("./cpu/CpuRenderer.zig");
@@ -120,7 +120,7 @@ pub const Renderer = struct {
     }
     pub fn drawText(
         self: *Renderer,
-        font: *const Font,
+        font: *Font,
         text: []const u8,
         position: GamePoint,
         scale: f32,

@@ -71,7 +71,7 @@ pub const FontManager = struct {
         return new_handle;
     }
 
-    pub fn getFont(self: *FontManager, handle: FontHandle) ?*const Font {
+    pub fn getFont(self: *FontManager, handle: FontHandle) ?*Font {
         if (handle.id >= self.fonts.items.len) return null;
         return &self.fonts.items[handle.id].font;
     }
