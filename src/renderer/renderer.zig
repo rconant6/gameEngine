@@ -67,10 +67,7 @@ pub const Renderer = struct {
     };
 
     pub fn init(allocator: std.mem.Allocator, config: RendererConfig) !Renderer {
-        const backend = BackendImpl.init(allocator, config) catch |err| {
-            std.log.err("Unable to create a rendering backend {any}\n", .{err});
-            return err;
-        };
+        const backend = try BackendImpl.init(allocator, config);
         return .{
             .backend = backend,
             .width = config.width,

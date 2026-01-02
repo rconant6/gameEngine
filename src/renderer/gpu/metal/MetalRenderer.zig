@@ -86,14 +86,12 @@ pub fn init(allocator: std.mem.Allocator, config: RenderConfig) (MTLError || std
     };
 }
 fn getShaderPath(allocator: std.mem.Allocator) ![]const u8 {
-    const exe_dir = std.fs.selfExeDirPathAlloc(allocator) catch |err| {
-        std.log.err("Failed to get exe dir: {}", .{err});
+    const exe_dir = std.fs.selfExeDirPathAlloc(allocator) catch {
         return MTLError.ShaderPathError;
     };
     defer allocator.free(exe_dir);
 
-    return std.fs.path.join(allocator, &.{ exe_dir, "default.metallib" }) catch |err| {
-        std.log.err("Failed to join path: {}", .{err});
+    return std.fs.path.join(allocator, &.{ exe_dir, "default.metallib" }) catch {
         return MTLError.ShaderPathError;
     };
 }
@@ -176,8 +174,8 @@ pub fn drawShape(
         stroke_color,
         stroke_width,
         ctx,
-    ) catch |err| {
-        std.log.err("Failed to add shape to batch: {any}\n", .{err});
+    ) catch {
+        // Silently skip shapes that fail to batch
     };
 }
 fn flushBatch(self: *Self) !void {

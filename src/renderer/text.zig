@@ -36,8 +36,8 @@ pub fn drawText(
                 scale,
                 .{ .x = x_pos, .y = position.y },
                 color,
-            ) catch |err| {
-                std.log.err("Failed to draw glyph {} ('{c}') with -> {any}", .{ ascii_val, @as(u8, @intCast(ascii_val)), err });
+            ) catch {
+                // Skip glyphs that fail to render
                 continue;
             };
         }
