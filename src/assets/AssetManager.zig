@@ -23,6 +23,11 @@ pub fn init(alloc: std.mem.Allocator) !Self {
 }
 
 pub fn deinit(self: *Self) void {
+    var iter = self.name_to_font.keyIterator();
+    while (iter.next()) |key| {
+        self.allocator.free(key.*);
+    }
+
     self.fonts.deinit();
     self.name_to_font.deinit();
 }
