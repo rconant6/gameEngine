@@ -173,7 +173,7 @@ pub const GeometryBatch = struct {
         const fc = if (has_fill) utils.colorToFloat(fill_color.?) else undefined;
         const sc = if (has_outline) utils.colorToFloat(stroke_color.?) else undefined;
 
-        const batch_offset: u32 = @intCast(self.vertices.items.len);
+        var batch_offset: u32 = @intCast(self.vertices.items.len);
         if (has_fill) {
             const vertices = [_]Vertex{
                 makeVertex(tri.v0, transform, ctx, fc),
@@ -186,6 +186,7 @@ pub const GeometryBatch = struct {
                 .vertex_start = batch_offset,
                 .vertex_count = 3,
             });
+            batch_offset += 3;
         }
 
         if (has_outline) {
@@ -198,9 +199,9 @@ pub const GeometryBatch = struct {
                 makeVertex(tri.v0, transform, ctx, sc),
             });
             self.draw_calls.appendSliceAssumeCapacity(&.{
-                .{ .primitive_type = .line, .vertex_start = batch_offset + 3, .vertex_count = 2 },
-                .{ .primitive_type = .line, .vertex_start = batch_offset + 5, .vertex_count = 2 },
-                .{ .primitive_type = .line, .vertex_start = batch_offset + 7, .vertex_count = 2 },
+                .{ .primitive_type = .line, .vertex_start = batch_offset, .vertex_count = 2 },
+                .{ .primitive_type = .line, .vertex_start = batch_offset + 2, .vertex_count = 2 },
+                .{ .primitive_type = .line, .vertex_start = batch_offset + 4, .vertex_count = 2 },
             });
         }
     }
