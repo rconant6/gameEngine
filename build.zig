@@ -79,6 +79,11 @@ pub fn build(b: *std.Build) void {
     shape_registry_module.addImport("scene-format", scene_format_module);
     shape_registry_module.addImport("renderer", renderer_module);
 
+    const collider_shape_registry_module = b.addModule("collider_shape_registry", .{
+        .root_source_file = b.path("src/scene/collider_shape_registry.zig"),
+    });
+    collider_shape_registry_module.addImport("entity", entity_module);
+
     // Scene modules
     const scene_manager_module = b.addModule("scene_manager", .{
         .root_source_file = b.path("src/scene/manager.zig"),
@@ -96,6 +101,7 @@ pub fn build(b: *std.Build) void {
     scene_instantiator_module.addImport("build_options", build_options_module);
     scene_instantiator_module.addImport("component_registry", component_registry_module);
     scene_instantiator_module.addImport("shape_registry", shape_registry_module);
+    scene_instantiator_module.addImport("collider_shape_registry", collider_shape_registry_module);
     scene_instantiator_module.addImport("platform", platform_module);
 
     // Engine public API
@@ -122,8 +128,41 @@ pub fn build(b: *std.Build) void {
     engine_module.addImport("component_registry", component_registry_module);
     engine_module.addImport("shape_registry", shape_registry_module);
 
+    // ========================================
+    // Test Game Executable
+    // ========================================
+    const test_game_module = b.addModule("test_game", .{
+        .root_source_file = b.path("examples/test_game/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    test_game_module.addImport("engine", engine_module);
+
+    const test_game_exe = b.addExecutable(.{
+        .name = "test-game",
+        .root_module = test_game_module,
+    });
+
+    configurePlatform(b, test_game_exe, test_game_module, target, optimize, selected_renderer);
+
+    const install_test_game_assets = b.addInstallDirectory(.{
+        .source_dir = b.path("examples/test_game/assets"),
+        .install_dir = .bin,
+        .install_subdir = "assets",
+    });
+    test_game_exe.step.dependOn(&install_test_game_assets.step);
+
+    b.installArtifact(test_game_exe);
+
+    const run_test_game = b.addRunArtifact(test_game_exe);
+    run_test_game.step.dependOn(b.getInstallStep());
+    run_test_game.setCwd(b.path("zig-out/bin"));
+
+    const run_test_game_step = b.step("run-test-game", "Run the test game");
+    run_test_game_step.dependOn(&run_test_game.step);
+
     // Clean step for Swift build artifacts
-    const clean_step = b.step("clean", "Remove all build artifacts");
+    const clean_step = b.step("clean", "Remove all swift build artifacts");
     const remove_swift = b.addRemoveDirTree(.{ .cwd_relative = "zig-out/swift-build" });
     clean_step.dependOn(&remove_swift.step);
 

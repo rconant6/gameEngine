@@ -1,0 +1,294 @@
+[OrbitronFont:asset font]
+  path:string "assets/fonts/"
+  filename: string "Orbitron.ttf"
+
+[CollisionTestScene:scene]
+  // Simple background
+  [Ground:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, -1.0}
+      scale:f32 1.0
+    [Box]
+      size:vec2 {26.66, 20.0}
+      fill_color:color #1a1a2e
+      filled:bool true
+
+  // STATIONARY TARGETS - arranged in a grid
+  // Top row
+  [StaticTarget1:entity]
+    [Transform]
+      position:vec3 {-8.0, 6.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #0f3460
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.5
+
+  [StaticTarget2:entity]
+    [Transform]
+      position:vec3 {0.0, 6.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #0f3460
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.5
+
+  [StaticTarget3:entity]
+    [Transform]
+      position:vec3 {8.0, 6.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #0f3460
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+
+  // Middle row
+  [StaticTarget4:entity]
+    [Transform]
+      position:vec3 {-8.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #0f3460
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+
+  [StaticTarget5:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #0f3460
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+
+  [StaticTarget6:entity]
+    [Transform]
+      position:vec3 {8.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #0f3460
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+
+  // Bottom row
+  [StaticTarget7:entity]
+    [Transform]
+      position:vec3 {-8.0, -6.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #0f3460
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+
+  [StaticTarget8:entity]
+    [Transform]
+      position:vec3 {0.0, -6.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #0f3460
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+
+  [StaticTarget9:entity]
+    [Transform]
+      position:vec3 {8.0, -6.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #0f3460
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+
+  // MOVING BALLS - bouncing around with screen clamp
+  [MovingBall1:entity]
+    [Transform]
+      position:vec3 {-5.0, 3.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {4.0, 2.5}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #e94560
+      stroke_color:color #ff6b6b
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.0
+    [ScreenClamp]
+
+  [MovingBall2:entity]
+    [Transform]
+      position:vec3 {5.0, -3.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {-3.5, 3.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #e94560
+      stroke_color:color #ff6b6b
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.0
+    [ScreenClamp]
+
+  [MovingBall3:entity]
+    [Transform]
+      position:vec3 {-10.0, -8.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {5.0, 4.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #e94560
+      stroke_color:color #ff6b6b
+      stroke_width:f32 2.0
+      visible:bool true
+    [ScreenClamp]
+
+  // SLOWER MOVING BALLS - easier to see collisions
+  [SlowBall1:entity]
+    [Transform]
+      position:vec3 {-2.0, 8.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {1.5, -1.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.2
+      fill_color:color #f9a825
+      stroke_color:color #ffd54f
+      stroke_width:f32 2.0
+      visible:bool true
+    [ScreenClamp]
+
+  [SlowBall2:entity]
+    [Transform]
+      position:vec3 {2.0, -8.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {-1.0, 1.5}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.2
+      fill_color:color #f9a825
+      stroke_color:color #ffd54f
+      stroke_width:f32 2.0
+      visible:bool true
+    [ScreenClamp]
+
+  // SCALED CIRCLES - test that collision respects scale
+  [TinyBall:entity]
+    [Transform]
+      position:vec3 {10.0, 8.0, 0.0}
+      scale:f32 0.5
+    [Velocity]
+      linear:vec2 {-2.0, -2.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #00d9ff
+      stroke_color:color #00ffff
+      stroke_width:f32 2.0
+      visible:bool true
+    [ScreenClamp]
+
+  [BigBall:entity]
+    [Transform]
+      position:vec3 {-10.0, 8.0, 0.0}
+      scale:f32 1.5
+    [Velocity]
+      linear:vec2 {2.0, -1.5}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #9d4edd
+      stroke_color:color #c77dff
+      stroke_width:f32 2.0
+      visible:bool true
+    [ScreenClamp]
+
+  // WRAPPING BALL - test collision detection with screen wrap
+  [WrappingBall:entity]
+    [Transform]
+      position:vec3 {12.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {-3.0, 2.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #06ffa5
+      stroke_color:color #00ff88
+      stroke_width:f32 2.0
+      visible:bool true
+    [ScreenWrap]
+
+  // Title text
+  [TitleText:entity]
+    [Transform]
+      position:vec2 {-13.0, 9.0}
+    [Text]
+      text:string "collision test - circle vs circle"
+      font_asset:asset_ref "OrbitronFont"
+      text_color:color #ffffff
+      size:f32 0.6
+
+  // Legend
+  [LegendStatic:entity]
+    [Transform]
+      position:vec2 {-13.0, -9.5}
+    [Text]
+      text:string "blue=static  red=fast  yellow=slow  purple=scaled"
+      font_asset:asset_ref "OrbitronFont"
+      text_color:color #888888
+      size:f32 0.4
+
+  [Camera:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 10.0}
+    [Camera]
+      fov:f32 60.0
+      near:f32 0.1
+      far:f32 100.0

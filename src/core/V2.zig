@@ -22,7 +22,7 @@ pub fn div(self: V2, scalar: f32) V2 {
 }
 
 pub fn eql(self: V2, other: V2) bool {
-    const epsilon = 0.0001;
+    const epsilon = 0.00001;
     return @abs(self.x - other.x) < epsilon and @abs(self.y - other.y) < epsilon;
 }
 

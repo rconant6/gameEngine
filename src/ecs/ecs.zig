@@ -14,7 +14,12 @@ pub const Lifetime = comps.Lifetime;
 pub const Box = comps.Box;
 pub const Physics = comps.Physics;
 pub const Camera = comps.Camera;
-// Mark: Tags
+const collide = @import("collider.zig");
+pub const Collider = collide.Collider;
+pub const ColliderShape = collide.ColliderShape;
+// MARK: Tags
 pub const ScreenWrap = comps.ScreenWrap;
 pub const ScreenClamp = comps.ScreenClamp;
 pub const Destroy = comps.Destroy;
+// MARK: Colllisions
+pub const Collision = @import("Collision.zig");

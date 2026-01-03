@@ -17,10 +17,10 @@ pub fn main() !void {
         logical_height,
     );
     defer game.deinit();
-
-    // Load and instantiate the master test scene
     try game.loadScene("master", "master");
-    try game.setActiveScene("master");
+    // Load and instantiate the collision test scene
+    try game.loadScene("collision", "collision_test");
+    try game.setActiveScene("collision");
     try game.instantiateActiveScene();
 
     std.debug.print("\n=== GameDimensions ===\n", .{});
@@ -35,6 +35,10 @@ pub fn main() !void {
         last_time = current_time;
 
         try game.beginFrame();
+        const collisions = game.getCollisionEvents();
+        if (collisions.len > 0) {
+            game.logDebug(.engine, "Game had {d} collisions", .{collisions.len});
+        }
         game.clear(engine.Colors.DARK_GRAY);
 
         // TEST: Click to spawn
@@ -92,6 +96,12 @@ pub fn main() !void {
         game.render();
 
         try game.endFrame();
-        _ = game.getErrors();
+        if (game.hasErrors()) {
+            const errs = game.getErrors();
+            for (errs) |err| {
+                std.debug.print("{s}\n", .{err.message});
+            }
+        }
+        game.clearErrors();
     }
 }

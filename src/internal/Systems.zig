@@ -14,6 +14,7 @@ const LifeTime = ecs.Lifetime;
 const Destroy = ecs.Destroy;
 const Box = ecs.Box;
 const Engine = @import("../engine.zig").Engine;
+const CollisionDetection = @import("../internal/CollisionDetection.zig");
 
 const Renderer = rend.Renderer;
 pub fn movementSystem(engine: *Engine, dt: f32) void {
@@ -169,6 +170,16 @@ pub fn screenClampSystem(engine: *Engine) void {
             transform.position.y = std.math.clamp(transform.position.y, bottom, top);
         }
     }
+}
+
+pub fn collisionDetectionSystem(engine: *Engine) void {
+    CollisionDetection.detectCollisions(&engine.world, &engine.collision_events) catch |err| {
+        engine.logError(
+            .engine,
+            "Failed to run detection system: {any}",
+            .{err},
+        );
+    };
 }
 
 pub fn cleanupSystem(engine: *Engine) void {

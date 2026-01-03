@@ -171,10 +171,8 @@ pub const ErrorLogger = struct {
         return self.count > 0;
     }
     pub fn clearErrors(self: *ErrorLogger) void {
-        self.entries = std.mem.zeroes(ErrorEntry);
         self.write_index = 0;
         self.count = 0;
-        self.message_buffer = std.mem.zeroes(u8);
         self.message_write_offset = 0;
     }
 

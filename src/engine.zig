@@ -1,4 +1,6 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
 const build_options = @import("build_options");
 
 const platform = @import("platform");
@@ -44,6 +46,7 @@ pub const Destroy = ecs.Destroy;
 pub const Physics = ecs.Physics;
 pub const Box = ecs.Box;
 pub const Camera = ecs.Camera;
+pub const Collision = ecs.Collision;
 
 const Input = @import("internal/Input.zig");
 const Systems = @import("internal/Systems.zig");
@@ -60,12 +63,13 @@ const Instantiator = scene_instantiator.Instantiator;
 const SceneManager = scene_manager.SceneManager;
 
 pub const Engine = struct {
-    allocator: std.mem.Allocator,
+    allocator: Allocator,
     input: Input,
     renderer: renderer.Renderer,
     assets: assets.AssetManager,
     window: platform.Window,
     world: ecs.World,
+    collision_events: ArrayList(Collision),
     running: bool,
 
     // Internal scene management
@@ -76,7 +80,7 @@ pub const Engine = struct {
     error_logger: ErrorLogger,
 
     pub fn init(
-        allocator: std.mem.Allocator,
+        allocator: Allocator,
         title: []const u8,
         width: u32,
         height: u32,
@@ -136,10 +140,12 @@ pub const Engine = struct {
             .scene_manager = SceneManager.init(allocator),
             .instantiator = Instantiator.init(allocator),
             .error_logger = ErrorLogger.init(allocator),
+            .collision_events = .empty,
         };
     }
     pub fn deinit(self: *Engine) void {
         self.logInfo(.engine, "Engine shutting down", .{});
+        self.collision_events.deinit(self.allocator);
         self.scene_manager.deinit();
         self.renderer.deinit();
         self.assets.deinit();
@@ -317,7 +323,16 @@ pub const Engine = struct {
         };
     }
 
-    // Scene Management API
+    // MARK: Collisions
+    pub fn clearCollisionEvents(self: *Engine) void {
+        self.collision_events.clearRetainingCapacity();
+    }
+    pub fn getCollisionEvents(self: *Engine) []const Collision {
+        Systems.collisionDetectionSystem(self);
+        return self.collision_events.items;
+    }
+
+    // MARK: Scene Management
     pub fn loadScene(
         self: *Engine,
         scene_name: []const u8,
