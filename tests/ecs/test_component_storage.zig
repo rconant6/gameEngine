@@ -182,7 +182,7 @@ test "ComponentStorage - iterator basic" {
         count += 1;
 
         // Verify we can access both entity and component
-        try testing.expect(entry.entity == 5 or entry.entity == 10 or entry.entity == 15);
+        try testing.expect(entry.entity.id == 5 or entry.entity.id == 10 or entry.entity.id == 15);
         try testing.expect(entry.component.dx > 0);
         try testing.expect(entry.component.dy > 0);
     }
@@ -202,15 +202,15 @@ test "ComponentStorage - iterator order matches insertion" {
     var iter = storage.iterator();
 
     const first = iter.next().?;
-    try testing.expectEqual(@as(usize, 100), first.entity);
+    try testing.expectEqual(@as(usize, 100), first.entity.id);
     try testing.expectEqual(@as(f32, 1.0), first.component.x);
 
     const second = iter.next().?;
-    try testing.expectEqual(@as(usize, 200), second.entity);
+    try testing.expectEqual(@as(usize, 200), second.entity.id);
     try testing.expectEqual(@as(f32, 2.0), second.component.x);
 
     const third = iter.next().?;
-    try testing.expectEqual(@as(usize, 300), third.entity);
+    try testing.expectEqual(@as(usize, 300), third.entity.id);
     try testing.expectEqual(@as(f32, 3.0), third.component.x);
 
     try testing.expect(iter.next() == null);

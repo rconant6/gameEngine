@@ -169,9 +169,29 @@ pub fn build(b: *std.Build) void {
     // ========================================
     // Test Frameworks
     // ========================================
-    // TODO: go back and start testing each component
     const test_step = b.step("test", "Run all tests");
 
+    // ========================================
+    // Layer 1: Core V2 Tests
+    // ========================================
+    const v2_test_module = b.addModule("v2_tests", .{
+        .root_source_file = b.path("tests/core/test_v2.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    v2_test_module.addAnonymousImport("V2", .{
+        .root_source_file = b.path("src/core/V2.zig"),
+    });
+
+    const v2_tests = b.addTest(.{
+        .name = "v2-tests",
+        .root_module = v2_test_module,
+    });
+    const run_v2_tests = b.addRunArtifact(v2_tests);
+
+    // ========================================
+    // Layer 2: ECS Component Tests
+    // ========================================
     // ECS Component Storage Tests
     const ecs_test_module = b.addModule("ecs_tests", .{
         .root_source_file = b.path("tests/ecs/test_component_storage.zig"),
@@ -187,22 +207,16 @@ pub fn build(b: *std.Build) void {
         .name = "ecs-tests",
         .root_module = ecs_test_module,
     });
-
     const run_ecs_tests = b.addRunArtifact(ecs_tests);
 
-    // Query Tests
+    // Query Tests - use entity module which properly exports Query and ComponentStorage
     const query_test_module = b.addModule("query_tests", .{
         .root_source_file = b.path("tests/ecs/test_query.zig"),
         .target = target,
         .optimize = optimize,
     });
     query_test_module.addImport("core", core_module);
-    query_test_module.addAnonymousImport("ComponentStorage", .{
-        .root_source_file = b.path("src/ecs/ComponentStorage.zig"),
-    });
-    query_test_module.addAnonymousImport("Query", .{
-        .root_source_file = b.path("src/ecs/Query.zig"),
-    });
+    query_test_module.addImport("entity", entity_module);
 
     const query_tests = b.addTest(.{
         .name = "query-tests",
@@ -235,10 +249,130 @@ pub fn build(b: *std.Build) void {
     });
     const run_world_tests = b.addRunArtifact(world_tests);
 
-    // test steps
+    // Collider Component Tests
+    const collider_test_module = b.addModule("collider_tests", .{
+        .root_source_file = b.path("tests/ecs/test_collider.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    collider_test_module.addAnonymousImport("collider", .{
+        .root_source_file = b.path("src/ecs/collider.zig"),
+    });
+
+    const collider_tests = b.addTest(.{
+        .name = "collider-tests",
+        .root_module = collider_test_module,
+    });
+    const run_collider_tests = b.addRunArtifact(collider_tests);
+
+    // ========================================
+    // Layer 3: Collision Detection Tests
+    // ========================================
+    const collision_detection_module = b.addModule("CollisionDetection", .{
+        .root_source_file = b.path("src/internal/CollisionDetection.zig"),
+    });
+    collision_detection_module.addImport("core", core_module);
+    collision_detection_module.addImport("entity", entity_module);
+
+    const collision_test_module = b.addModule("collision_tests", .{
+        .root_source_file = b.path("tests/collision/test_collision_detection.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    collision_test_module.addImport("core", core_module);
+    collision_test_module.addImport("entity", entity_module);
+    collision_test_module.addImport("CollisionDetection", collision_detection_module);
+
+    const collision_tests = b.addTest(.{
+        .name = "collision-tests",
+        .root_module = collision_test_module,
+    });
+    const run_collision_tests = b.addRunArtifact(collision_tests);
+
+    // ========================================
+    // Layer 4: Scene Format Integration Tests
+    // ========================================
+    const scene_test_module = b.addModule("scene_tests", .{
+        .root_source_file = b.path("tests/scene/test_scene_integration.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    scene_test_module.addImport("scene-format", scene_format_module);
+
+    const scene_tests = b.addTest(.{
+        .name = "scene-tests",
+        .root_module = scene_test_module,
+    });
+    const run_scene_tests = b.addRunArtifact(scene_tests);
+
+    // ========================================
+    // Layer 4B: Renderer Tests
+    // ========================================
+    const color_test_module = b.addModule("color_tests", .{
+        .root_source_file = b.path("tests/renderer/test_color.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    color_test_module.addAnonymousImport("color", .{
+        .root_source_file = b.path("src/renderer/color.zig"),
+    });
+
+    const color_tests = b.addTest(.{
+        .name = "color-tests",
+        .root_module = color_test_module,
+    });
+    const run_color_tests = b.addRunArtifact(color_tests);
+
+    const core_shapes_module = b.addModule("core_shapes", .{
+        .root_source_file = b.path("src/renderer/core_shapes.zig"),
+    });
+    core_shapes_module.addImport("core", core_module);
+
+    const shapes_test_module = b.addModule("shapes_tests", .{
+        .root_source_file = b.path("tests/renderer/test_shapes.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    shapes_test_module.addImport("core", core_module);
+    shapes_test_module.addImport("core_shapes", core_shapes_module);
+
+    const shapes_tests = b.addTest(.{
+        .name = "shapes-tests",
+        .root_module = shapes_test_module,
+    });
+    const run_shapes_tests = b.addRunArtifact(shapes_tests);
+
+    // ========================================
+    // Layer 5: End-to-End Integration Tests
+    // ========================================
+    const integration_test_module = b.addModule("integration_tests", .{
+        .root_source_file = b.path("tests/integration/test_end_to_end.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    integration_test_module.addImport("core", core_module);
+    integration_test_module.addImport("entity", entity_module);
+    integration_test_module.addImport("CollisionDetection", collision_detection_module);
+
+    const integration_tests = b.addTest(.{
+        .name = "integration-tests",
+        .root_module = integration_test_module,
+    });
+    const run_integration_tests = b.addRunArtifact(integration_tests);
+
+    // ========================================
+    // Register all test suites
+    // ========================================
+    test_step.dependOn(&run_v2_tests.step);
     test_step.dependOn(&run_ecs_tests.step);
     test_step.dependOn(&run_query_tests.step);
     test_step.dependOn(&run_world_tests.step);
+    test_step.dependOn(&run_collider_tests.step);
+    test_step.dependOn(&run_collision_tests.step);
+    test_step.dependOn(&run_scene_tests.step);
+    test_step.dependOn(&run_color_tests.step);
+    test_step.dependOn(&run_shapes_tests.step);
+    test_step.dependOn(&run_integration_tests.step);
 }
 
 pub fn defaultRendererForTarget(os_tag: std.Target.Os.Tag) RendererBackend {

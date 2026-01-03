@@ -1,8 +1,9 @@
 const std = @import("std");
 const testing = std.testing;
 
-const ComponentStorage = @import("ComponentStorage").ComponentStorage;
-const Query = @import("Query").Query;
+const entity = @import("entity");
+const ComponentStorage = entity.ComponentStorage;
+const Query = entity.Query;
 
 // Test components
 const Position = struct {
@@ -53,7 +54,7 @@ test "Query - basic two component query" {
         count += 1;
 
         // Should only find entities 0 and 2
-        try testing.expect(entry.entity == 0 or entry.entity == 2);
+        try testing.expect(entry.entity.id == 0 or entry.entity.id == 2);
 
         // Verify we can access both components
         const pos = entry.get(0); // *const Position
@@ -62,8 +63,8 @@ test "Query - basic two component query" {
         try testing.expect(pos.x > 0);
         try testing.expect(vel.dx > 0);
 
-        if (entry.entity == 0) found_0 = true;
-        if (entry.entity == 2) found_2 = true;
+        if (entry.entity.id == 0) found_0 = true;
+        if (entry.entity.id == 2) found_2 = true;
     }
 
     try testing.expectEqual(@as(usize, 2), count);
@@ -130,7 +131,7 @@ test "Query - three component query" {
         count += 1;
 
         // Should only find entities 0 and 3
-        try testing.expect(entry.entity == 0 or entry.entity == 3);
+        try testing.expect(entry.entity.id == 0 or entry.entity.id == 3);
 
         const pos = entry.get(0);
         const vel = entry.get(1);
@@ -223,7 +224,7 @@ test "Query - component values are correct" {
     var query = Query(@TypeOf(storages)).init(storages);
 
     if (query.next()) |entry| {
-        try testing.expectEqual(@as(usize, 42), entry.entity);
+        try testing.expectEqual(@as(usize, 42), entry.entity.id);
         try testing.expectEqual(@as(f32, 123.0), entry.get(0).x);
         try testing.expectEqual(@as(f32, 456.0), entry.get(0).y);
         try testing.expectEqual(@as(f32, 7.0), entry.get(1).dx);
