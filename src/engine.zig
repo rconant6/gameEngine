@@ -253,18 +253,6 @@ pub const Engine = struct {
         _ = self;
         return .{ .x = 0.0, .y = 0.0 };
     }
-
-    // ECS
-    pub fn createEntity(self: *Engine) !Entity {
-        return self.world.createEntity();
-    }
-    pub fn destroyEntity(self: *Engine, entity: Entity) void {
-        self.world.destroyEntity(entity);
-    }
-    pub fn addComponent(self: *Engine, entity: Entity, comptime T: type, value: T) !void {
-        try self.world.addComponent(entity, T, value);
-    }
-
     // Edges
     pub fn getLeftEdge(self: *const Engine) f32 {
         return -self.getGameWidth() / 2.0;
@@ -279,6 +267,17 @@ pub const Engine = struct {
     pub fn getBottomEdge(self: *const Engine) f32 {
         _ = self;
         return -10.0;
+    }
+
+    // ECS
+    pub fn createEntity(self: *Engine) !Entity {
+        return self.world.createEntity();
+    }
+    pub fn destroyEntity(self: *Engine, entity: Entity) void {
+        self.world.destroyEntity(entity);
+    }
+    pub fn addComponent(self: *Engine, entity: Entity, comptime T: type, value: T) !void {
+        try self.world.addComponent(entity, T, value);
     }
 
     // Bounds checking
@@ -320,6 +319,14 @@ pub const Engine = struct {
         return .{
             .x = (point.x / hw + 1.0) / 2.0, // [-hw, hw] -> [0,1]
             .y = (point.y / 10.0 + 1.0) / 2.0, // [-10, 10] -> [0,1]
+        };
+    }
+
+    // MARK: Assets
+    pub fn getFont(self: *Engine, name: []const u8) !*const Font {
+        return self.assets.getFontByName(name) catch |err| {
+            self.logError(.assets, "Unable to get Font[{s}] {any}", .{ name, err });
+            return err;
         };
     }
 

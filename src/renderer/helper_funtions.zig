@@ -15,7 +15,7 @@ pub fn sortPointByYThenX(context: void, a: Point, b: Point) bool {
     if (a.y == b.y) {
         return a.x < b.x;
     }
-    return a.y > b.y;
+    return a.y < b.y;
 }
 
 pub fn calculateCentroid(points: []const Point) Point {
