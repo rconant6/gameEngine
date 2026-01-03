@@ -2,6 +2,8 @@ const std = @import("std");
 const engine = @import("engine");
 const KeyCode = engine.KeyCode;
 
+const Colors = engine.Colors;
+
 const logical_width = 800 * 2;
 const logical_height = 600 * 2;
 
@@ -17,7 +19,7 @@ pub fn main() !void {
         logical_height,
     );
     defer game.deinit();
-    try game.loadScene("master", "master");
+    // try game.loadScene("master", "master");
     // Load and instantiate the collision test scene
     try game.loadScene("collision", "collision_test");
     try game.setActiveScene("collision");
@@ -35,9 +37,17 @@ pub fn main() !void {
         last_time = current_time;
 
         try game.beginFrame();
+        game.clearCollisionEvents();
         const collisions = game.getCollisionEvents();
         if (collisions.len > 0) {
-            game.logDebug(.engine, "Game had {d} collisions", .{collisions.len});
+            game.logInfo(.engine, "Game had {d} collisions", .{collisions.len});
+            for (collisions) |collision| {
+                game.logDebug(
+                    .engine,
+                    "Entity1: {d}, Entity2: {d}",
+                    .{ collision.entity_a.id, collision.entity_b.id },
+                );
+            }
         }
         game.clear(engine.Colors.DARK_GRAY);
 
