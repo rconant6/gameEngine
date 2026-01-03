@@ -25,9 +25,6 @@ pub const Parser = struct {
     current_tok: Token,
     previous_tok: ?Token,
     file_name: []const u8,
-    // errors: std.ArrayList(ParseError),
-    // had_error: bool,
-    // panic_mode: bool,
 
     pub fn init(allocator: Allocator, src: [:0]const u8, file_name: []const u8) !Parser {
         var lexer = Lexer.init(src);
@@ -65,8 +62,6 @@ pub const Parser = struct {
 
     fn consume(self: *Parser, token_type: TokenTag) !Token {
         if (self.current_tok.tag != token_type) {
-            // std.log.err("Go unexpected token of type: {}", .{token_type});
-            // std.log.err("Parser.currentTok: {f}", .{self.current_tok});
             return ParseError.UnexpectedToken;
         }
 
@@ -74,8 +69,6 @@ pub const Parser = struct {
         _ = try self.advance();
         return token;
     }
-
-    // ===== Top Level =====
 
     fn parseSceneFile(self: *Parser) !SceneFile {
         var declarations: ArrayList(Declaration) = .empty;
@@ -89,8 +82,7 @@ pub const Parser = struct {
         };
     }
 
-    // ===== Declarations =====
-
+    // MARK: Declarations
     fn parseDeclaration(self: *Parser) ParseError!Declaration {
         // NOTE: consume [name:, dispatch on keyword
         _ = try self.consume(.l_bracket);
@@ -198,6 +190,9 @@ pub const Parser = struct {
         if (std.mem.eql(u8, "Sprite", component_name)) {
             return try self.parseSpriteBlock(name_token);
         }
+        if (std.mem.eql(u8, "Collider", component_name)) {
+            return try self.parseColliderBlock(name_token);
+        }
         _ = try self.consume(.r_bracket);
 
         var properties: ArrayList(Property) = .empty;
@@ -237,6 +232,32 @@ pub const Parser = struct {
         }
 
         return ast.ComponentDeclaration{ .sprite = .{
+            .name = name,
+            .shape_type = try self.allocator.dupe(u8, type_name),
+            .properties = try properties.toOwnedSlice(self.allocator),
+            .location = name_token.src_loc,
+        } };
+    }
+    fn parseColliderBlock(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
+        const name_str = lex.lexeme(self.lexer.src, name_token);
+        const name = try self.allocator.dupe(u8, name_str);
+        _ = try self.consume(.colon);
+
+        const shape_type_token = try self.consume(.identifier);
+        const type_name = lex.lexeme(self.lexer.src, shape_type_token);
+        _ = try self.consume(.r_bracket);
+
+        var properties: ArrayList(Property) = .empty;
+        if (self.check(.indent)) {
+            _ = try self.consume(.indent);
+            while (!self.check(.dedent)) {
+                const prop = try self.parseProperty();
+                try properties.append(self.allocator, prop);
+            }
+            _ = try self.consume(.dedent);
+        }
+
+        return ast.ComponentDeclaration{ .collider = .{
             .name = name,
             .shape_type = try self.allocator.dupe(u8, type_name),
             .properties = try properties.toOwnedSlice(self.allocator),

@@ -18,6 +18,7 @@ const V2 = core.V2;
 
 const ComponentRegistry = @import("component_registry").ComponentRegistry;
 const ShapeRegistry = @import("shape_registry").ShapeRegistry;
+const ColliderShapeRegistry = @import("collider_shape_registry").ColliderShapeRegistry;
 
 const ecs = @import("entity");
 const World = ecs.World;
@@ -211,16 +212,37 @@ pub const Instantiator = struct {
         const comp_name = switch (comp_decl.*) {
             .generic => |g| g.name,
             .sprite => |s| s.name,
+            .collider => |c| c.name,
         };
 
         switch (comp_decl.*) {
+            .collider => |c| {
+                const shape_index = ColliderShapeRegistry.getShapeIndex(c.shape_type) orelse
+                    return InstantiatorError.UnknownComponent;
+                inline for (ColliderShapeRegistry.shape_names, 0..) |_, i| {
+                    if (shape_index == i) {
+                        const ShapeType = ColliderShapeRegistry.shape_types[i];
+                        const collider = try self.buildColliderComponent(
+                            ShapeType,
+                            c,
+                            asset_manager,
+                        );
+                        try world.addComponent(entity, Components.Collider, collider);
+                        return;
+                    }
+                }
+            },
             .sprite => |s| {
                 const shape_index = ShapeRegistry.getShapeIndex(s.shape_type) orelse
                     return InstantiatorError.UnknownComponent;
                 inline for (ShapeRegistry.shape_names, 0..) |_, i| {
                     if (shape_index == i) {
                         const ShapeType = ShapeRegistry.shape_types[i];
-                        const sprite = try self.buildSpriteComponent(ShapeType, s, asset_manager);
+                        const sprite = try self.buildSpriteComponent(
+                            ShapeType,
+                            s,
+                            asset_manager,
+                        );
                         try world.addComponent(entity, Components.Sprite, sprite);
                         return;
                     }
@@ -232,7 +254,11 @@ pub const Instantiator = struct {
                 inline for (ComponentRegistry.component_names, 0..) |_, i| {
                     if (comp_index == i) {
                         const ComponentType = ComponentRegistry.component_types[i];
-                        const component = try self.buildGenericComponent(ComponentType, g, asset_manager);
+                        const component = try self.buildGenericComponent(
+                            ComponentType,
+                            g,
+                            asset_manager,
+                        );
                         try world.addComponent(entity, ComponentType, component);
                         return;
                     }
@@ -371,6 +397,45 @@ pub const Instantiator = struct {
         const polygon = try core_shapes.Polygon.init(self.allocator, owned_points);
         component.geometry = .{ .polygon = polygon };
         return component;
+    }
+
+    fn buildColliderComponent(
+        self: *Instantiator,
+        comptime ColliderShapeType: type,
+        collider_block: SpriteBlock,
+        asset_manager: *AssetManager,
+    ) !Components.Collider {
+        var shape_data: ColliderShapeType = undefined;
+
+        // Extract properties for the collider shape
+        for (collider_block.properties) |prop| {
+            inline for (std.meta.fields(ColliderShapeType)) |field| {
+                if (std.mem.eql(u8, field.name, prop.name)) {
+                    const field_value = try self.extractValueForType(
+                        field.type,
+                        prop.value,
+                        asset_manager,
+                    );
+                    if (field_value) |val| {
+                        @field(shape_data, field.name) = val;
+                    }
+                }
+            }
+        }
+
+        // Create the ColliderShape union based on the shape type
+        const collider_shape = blk: {
+            inline for (ColliderShapeRegistry.shape_names, 0..) |name, i| {
+                if (ColliderShapeType == ColliderShapeRegistry.shape_types[i]) {
+                    break :blk @unionInit(ecs.ColliderShape, name, shape_data);
+                }
+            }
+            @compileError("Unknown collider shape type");
+        };
+
+        return Components.Collider{
+            .shape = collider_shape,
+        };
     }
 
     fn extractValueForType(

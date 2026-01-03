@@ -76,6 +76,7 @@ pub const AssetDeclaration = struct {
 pub const ComponentDeclaration = union(enum) {
     generic: GenericBlock,
     sprite: SpriteBlock,
+    collider: SpriteBlock,
 
     pub fn deinit(self: *ComponentDeclaration, allocator: Allocator) void {
         switch (self.*) {
