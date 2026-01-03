@@ -18,7 +18,7 @@ pub fn ComponentStorage(comptime T: type) type {
                 if (self.index >= self.storage.dense.items.len) return null;
 
                 const res: Entry = .{
-                    .entity = self.storage.entities.items[self.index],
+                    .entity = .{ .id = self.storage.entities.items[self.index] },
                     .component = &self.storage.dense.items[self.index],
                 };
 
