@@ -99,7 +99,6 @@ public func poll_mouse_event(
   button.pointee = event.button
   isDown.pointee = event.isDown
 
-  print("[SWIFT BRIDGE] Wrote: button=\(event.button) isDown=\(event.isDown) to pointers")
   return true
 }
 

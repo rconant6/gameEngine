@@ -70,7 +70,6 @@ class EventHandler {
     let rawEvent = RawMouseEvent(
       x: Float(x), y: Float(y), button: UInt8(mouseButton), isDown: isDown, _padding: 0)
 
- print("[SWIFT] Mouse event: type=\(event.type.rawValue) button=\(mouseButton) isDown=\(isDown)")
     self.mouseEventQueue.append(rawEvent)
   }
 
