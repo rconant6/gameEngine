@@ -30,6 +30,11 @@ pub fn movementSystem(engine: *Engine, dt: f32) void {
         transform.rotation += velocity.angular * dt;
     }
 }
+pub fn physicsSystem(engine: *Engine, dt: f32) void {
+    // TODO: Implement
+    _ = engine;
+    _ = dt;
+}
 pub fn renderSystem(engine: *Engine) void {
     var world = &engine.world;
     var renderer = &engine.renderer;
@@ -147,6 +152,7 @@ pub fn screenWrapSystem(engine: *Engine) void {
 
 // TODO: This needs to work based on shapes and the sizes
 // do a better job of bouncing when edge hits (bounding boxes)
+// once collisionTriggers work
 pub fn screenClampSystem(engine: *Engine) void {
     var world = &engine.world;
     var query = world.query(.{ Transform, Velocity, ScreenClamp });
@@ -173,6 +179,7 @@ pub fn screenClampSystem(engine: *Engine) void {
 }
 
 pub fn collisionDetectionSystem(engine: *Engine) void {
+    engine.clearCollisionEvents();
     CollisionDetection.detectCollisions(&engine.world, &engine.collision_events) catch |err| {
         engine.logError(
             .engine,
@@ -183,18 +190,10 @@ pub fn collisionDetectionSystem(engine: *Engine) void {
 }
 
 pub fn cleanupSystem(engine: *Engine) void {
-    var world = engine.world;
-    const allocator = world.allocator;
-
-    var to_destroy: std.ArrayList(Entity) = .empty;
-    defer to_destroy.deinit(world.allocator);
+    var world = &engine.world;
 
     var query = world.query(.{Destroy});
     while (query.next()) |entry| {
-        to_destroy.append(allocator, entry.entity) catch continue;
-    }
-
-    for (to_destroy.items) |entity| {
-        world.destroyEntity(entity);
+        world.destroyEntity(entry.entity);
     }
 }
