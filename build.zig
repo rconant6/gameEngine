@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const scene_format_module = b.addModule("scene-format", .{
-        .root_source_file = b.path("libs/scene-format/src/lib.zig"),
+        .root_source_file = b.path("src/scene-format/lib.zig"),
     });
 
     const renderer_module = b.addModule("renderer", .{
@@ -39,13 +39,6 @@ pub fn build(b: *std.Build) void {
     });
     asset_module.addImport("core", core_module);
     asset_module.addImport("renderer", renderer_module);
-
-    const entity_module = b.addModule("entity", .{
-        .root_source_file = b.path("src/ecs/ecs.zig"),
-    });
-    entity_module.addImport("core", core_module);
-    entity_module.addImport("renderer", renderer_module);
-    entity_module.addImport("asset", asset_module);
 
     const renderer_options = b.addOptions();
     renderer_options.addOption(RendererBackend, "backend", selected_renderer);
@@ -60,6 +53,31 @@ pub fn build(b: *std.Build) void {
     });
     platform_module.addIncludePath(b.path("src/platform/macos/swift/include"));
     platform_module.addImport("build_options", build_options_module);
+
+    const entity_module = b.addModule("entity", .{
+        .root_source_file = b.path("src/ecs/ecs.zig"),
+    });
+    entity_module.addImport("core", core_module);
+    entity_module.addImport("renderer", renderer_module);
+    entity_module.addImport("asset", asset_module);
+
+    const internal_module = b.addModule("internal", .{
+        .root_source_file = b.path("src/internal/internal.zig"),
+    });
+    internal_module.addImport("platform", platform_module);
+    internal_module.addImport("core", core_module);
+    internal_module.addImport("entity", entity_module);
+
+    const action_module = b.addModule("action", .{
+        .root_source_file = b.path("src/action/Action.zig"),
+    });
+    action_module.addImport("core", core_module);
+    action_module.addImport("entity", entity_module);
+    action_module.addImport("platform", platform_module);
+    action_module.addImport("internal", internal_module);
+
+    entity_module.addImport("internal", internal_module);
+    entity_module.addImport("action", action_module);
 
     // Internal error logger module
     const error_logger_module = b.addModule("error_logger", .{
@@ -119,8 +137,10 @@ pub fn build(b: *std.Build) void {
     engine_module.addImport("build_options", build_options_module);
     engine_module.addImport("asset", asset_module);
     engine_module.addImport("entity", entity_module);
+    engine_module.addImport("internal", internal_module);
     engine_module.addImport("scene-format", scene_format_module);
     engine_module.addImport("error_logger", error_logger_module);
+    engine_module.addImport("action", action_module);
 
     // Engine owns scene management internally - games don't need to import these
     engine_module.addImport("scene_instantiator", scene_instantiator_module);
@@ -133,6 +153,7 @@ pub fn build(b: *std.Build) void {
     // ========================================
     const test_game_module = b.addModule("test_game", .{
         .root_source_file = b.path("examples/test_game/main.zig"),
+        // .root_source_file = b.path("examples/test_game/action_test_scenario.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -265,6 +286,114 @@ pub fn build(b: *std.Build) void {
     });
     const run_collider_tests = b.addRunArtifact(collider_tests);
 
+    // Tag Component Tests
+    const tag_test_module = b.addModule("tag_tests", .{
+        .root_source_file = b.path("tests/ecs/test_tag.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    tag_test_module.addAnonymousImport("Tag", .{
+        .root_source_file = b.path("src/ecs/Tag.zig"),
+    });
+
+    const tag_tests = b.addTest(.{
+        .name = "tag-tests",
+        .root_module = tag_test_module,
+    });
+    const run_tag_tests = b.addRunArtifact(tag_tests);
+
+    // Action Tests
+
+    const action_test_module = b.addModule("action_tests", .{
+        .root_source_file = b.path("tests/ecs/test_action.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    action_test_module.addImport("core", core_module);
+    action_test_module.addImport("Action", action_module);
+
+    const action_tests = b.addTest(.{
+        .name = "action-tests",
+        .root_module = action_test_module,
+    });
+    const run_action_tests = b.addRunArtifact(action_tests);
+
+    // ActionBindings Tests
+    const triggers_module = b.addModule("triggers", .{
+        .root_source_file = b.path("src/action/Triggers.zig"),
+    });
+    triggers_module.addImport("core", core_module);
+    triggers_module.addImport("action", action_module);
+    triggers_module.addImport("platform", platform_module);
+    triggers_module.addImport("entity", entity_module);
+
+    const action_bindings_module = b.addModule("ActionBindings", .{
+        .root_source_file = b.path("src/action/ActionBindings.zig"),
+    });
+    action_bindings_module.addImport("core", core_module);
+    action_bindings_module.addImport("triggers", triggers_module);
+
+    const action_bindings_test_module = b.addModule("action_bindings_tests", .{
+        .root_source_file = b.path("tests/ecs/test_action_bindings.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    action_bindings_test_module.addImport("core", core_module);
+    action_bindings_test_module.addImport("Action", action_module);
+
+    const action_bindings_tests = b.addTest(.{
+        .name = "action-bindings-tests",
+        .root_module = action_bindings_test_module,
+    });
+    const run_action_bindings_tests = b.addRunArtifact(action_bindings_tests);
+
+    // CollisionTrigger Tests
+    const collision_trigger_test_module = b.addModule("collision_trigger_tests", .{
+        .root_source_file = b.path("tests/ecs/test_collision_trigger.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    collision_trigger_test_module.addImport("core", core_module);
+    collision_trigger_test_module.addImport("Action", action_module);
+
+    const collision_trigger_tests = b.addTest(.{
+        .name = "collision-trigger-tests",
+        .root_module = collision_trigger_test_module,
+    });
+    const run_collision_trigger_tests = b.addRunArtifact(collision_trigger_tests);
+
+    // InputTrigger Tests
+    const input_trigger_test_module = b.addModule("input_trigger_tests", .{
+        .root_source_file = b.path("tests/ecs/test_input_trigger.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    input_trigger_test_module.addImport("core", core_module);
+    input_trigger_test_module.addImport("Action", action_module);
+    input_trigger_test_module.addImport("platform", platform_module);
+
+    const input_trigger_tests = b.addTest(.{
+        .name = "input-trigger-tests",
+        .root_module = input_trigger_test_module,
+    });
+    const run_input_trigger_tests = b.addRunArtifact(input_trigger_tests);
+
+    // TimeTrigger Tests (Custom Trigger System)
+    const time_trigger_test_module = b.addModule("time_trigger_tests", .{
+        .root_source_file = b.path("tests/ecs/test_time_trigger.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    time_trigger_test_module.addImport("core", core_module);
+    time_trigger_test_module.addImport("Action", action_module);
+    time_trigger_test_module.addImport("entity", entity_module);
+
+    const time_trigger_tests = b.addTest(.{
+        .name = "time-trigger-tests",
+        .root_module = time_trigger_test_module,
+    });
+    const run_time_trigger_tests = b.addRunArtifact(time_trigger_tests);
+
     // ========================================
     // Layer 3: Collision Detection Tests
     // ========================================
@@ -290,8 +419,51 @@ pub fn build(b: *std.Build) void {
     const run_collision_tests = b.addRunArtifact(collision_tests);
 
     // ========================================
-    // Layer 4: Scene Format Integration Tests
+    // Layer 4: Scene Format Tests
     // ========================================
+    // Scene Format Lexer Tests
+    const scene_lexer_test_module = b.addModule("scene_lexer_tests", .{
+        .root_source_file = b.path("tests/scene-format/lexer_test.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    scene_lexer_test_module.addImport("scene-format", scene_format_module);
+
+    const scene_lexer_tests = b.addTest(.{
+        .name = "scene-lexer-tests",
+        .root_module = scene_lexer_test_module,
+    });
+    const run_scene_lexer_tests = b.addRunArtifact(scene_lexer_tests);
+
+    // Scene Format Parser Tests
+    const scene_parser_test_module = b.addModule("scene_parser_tests", .{
+        .root_source_file = b.path("tests/scene-format/parser_test.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    scene_parser_test_module.addImport("scene-format", scene_format_module);
+
+    const scene_parser_tests = b.addTest(.{
+        .name = "scene-parser-tests",
+        .root_module = scene_parser_test_module,
+    });
+    const run_scene_parser_tests = b.addRunArtifact(scene_parser_tests);
+
+    // Template Parser Tests (will fail until template support is added)
+    const template_parser_test_module = b.addModule("template_parser_tests", .{
+        .root_source_file = b.path("tests/scene-format/template_parser_test.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    template_parser_test_module.addImport("scene-format", scene_format_module);
+
+    const template_parser_tests = b.addTest(.{
+        .name = "template-parser-tests",
+        .root_module = template_parser_test_module,
+    });
+    const run_template_parser_tests = b.addRunArtifact(template_parser_tests);
+
+    // Scene Integration Tests
     const scene_test_module = b.addModule("scene_tests", .{
         .root_source_file = b.path("tests/scene/test_scene_integration.zig"),
         .target = target,
@@ -304,6 +476,21 @@ pub fn build(b: *std.Build) void {
         .root_module = scene_test_module,
     });
     const run_scene_tests = b.addRunArtifact(scene_tests);
+
+    // Template Instantiation Tests (will fail until template system is implemented)
+    const template_instantiation_test_module = b.addModule("template_instantiation_tests", .{
+        .root_source_file = b.path("tests/scene/test_template_instantiation.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    template_instantiation_test_module.addImport("scene-format", scene_format_module);
+    template_instantiation_test_module.addImport("entity", entity_module);
+
+    const template_instantiation_tests = b.addTest(.{
+        .name = "template-instantiation-tests",
+        .root_module = template_instantiation_test_module,
+    });
+    const run_template_instantiation_tests = b.addRunArtifact(template_instantiation_tests);
 
     // ========================================
     // Layer 4B: Renderer Tests
@@ -368,8 +555,18 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_query_tests.step);
     test_step.dependOn(&run_world_tests.step);
     test_step.dependOn(&run_collider_tests.step);
+    test_step.dependOn(&run_tag_tests.step);
+    test_step.dependOn(&run_action_tests.step);
+    test_step.dependOn(&run_action_bindings_tests.step);
+    test_step.dependOn(&run_collision_trigger_tests.step);
+    test_step.dependOn(&run_input_trigger_tests.step);
+    test_step.dependOn(&run_time_trigger_tests.step);
     test_step.dependOn(&run_collision_tests.step);
+    test_step.dependOn(&run_scene_lexer_tests.step);
+    test_step.dependOn(&run_scene_parser_tests.step);
+    test_step.dependOn(&run_template_parser_tests.step);
     test_step.dependOn(&run_scene_tests.step);
+    test_step.dependOn(&run_template_instantiation_tests.step);
     test_step.dependOn(&run_color_tests.step);
     test_step.dependOn(&run_shapes_tests.step);
     test_step.dependOn(&run_integration_tests.step);
