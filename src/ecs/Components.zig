@@ -64,6 +64,7 @@ pub const Collider = collider.Collider;
 pub const Lifetime = struct {
     remaining: f32, // seconds
 };
+pub const Tag = @import("Tag.zig");
 
 // MARK: Tagging Comonents
 pub const ScreenWrap = struct { _dummy: u8 = 0 };

@@ -14,7 +14,7 @@ component_storages: Storages,
 pub fn init(alloc: Allocator) !Self {
     return .{
         .allocator = alloc,
-        .next_entity_id = 0,
+        .next_entity_id = 1, // 0 is dummy/invalid entity
         .component_storages = Storages.init(alloc),
     };
 }

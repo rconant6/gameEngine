@@ -8,8 +8,6 @@ pub const Velocity = comps.Velocity;
 pub const Sprite = comps.Sprite;
 pub const Text = comps.Text;
 pub const RenderLayer = comps.RenderLayer;
-pub const CircleCollider = comps.CircleCollider;
-pub const RectCollider = comps.RectCollider;
 pub const Lifetime = comps.Lifetime;
 pub const Box = comps.Box;
 pub const Physics = comps.Physics;
@@ -17,9 +15,20 @@ pub const Camera = comps.Camera;
 const collide = @import("collider.zig");
 pub const Collider = collide.Collider;
 pub const ColliderShape = collide.ColliderShape;
-// MARK: Tags
+// MARK: Component Tags
 pub const ScreenWrap = comps.ScreenWrap;
 pub const ScreenClamp = comps.ScreenClamp;
 pub const Destroy = comps.Destroy;
 // MARK: Colllisions
 pub const Collision = @import("Collision.zig");
+pub const Tag = @import("Tag.zig");
+// MARK: Internal
+const internal = @import("internal");
+pub const Input = internal.Input;
+// MARK: Action System
+const action = @import("action");
+pub const Action = action.Action;
+pub const ActionType = action.ActionType;
+pub const ActionTarget = action.ActionTarget;
+pub const OnCollision = action.OnCollision;
+pub const OnInput = action.OnInput;
