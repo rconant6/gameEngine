@@ -29,10 +29,10 @@ test "World - create entity" {
     defer world.deinit();
 
     const entity = try world.createEntity();
-    try testing.expect(entity.id == 0);
+    try testing.expect(entity.id == 1);
 
     const entity2 = try world.createEntity();
-    try testing.expect(entity2.id == 1);
+    try testing.expect(entity2.id == 2);
 }
 
 test "World - add component" {
