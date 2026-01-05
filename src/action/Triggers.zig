@@ -16,6 +16,10 @@ const OnCollision = ecs.OnCollision;
 const OnInput = ecs.OnInput;
 const Collision = ecs.Collision;
 
+pub const Trigger = struct {
+    other_tag_pattern: []const u8,
+};
+
 pub const TriggerSystem = struct {
     sys: *anyopaque,
     processFn: *const fn (

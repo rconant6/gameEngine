@@ -1,11 +1,19 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-const LexerErrors = @import("scene_errors.zig").LexerError;
 const tok = @import("token.zig");
 const Token = tok.Token;
 const SourceLocation = tok.SourceLocation;
 const DataLocation = tok.DataLocation;
+
+pub const LexerError = error{
+    InvalidCharacter,
+    InvalidColor,
+    InvalidIndentation,
+    InvalidNumber,
+    TabIndentationFound,
+    UnclosedString,
+};
 
 pub fn lexeme(src: [:0]const u8, token: Token) []const u8 {
     const start = token.loc.start;
@@ -30,6 +38,7 @@ pub const Lexer = struct {
         .{ "i32", .i32 },             .{ "u32", .u32 },
         .{ "bool", .bool },           .{ "color", .color },
         .{ "asset_ref", .asset_ref }, .{ "font", .font },
+        .{ "template", .template },
     });
 
     src: [:0]const u8,
@@ -94,7 +103,7 @@ pub const Lexer = struct {
                 '\t' => {
                     self.space_count = 0;
 
-                    return LexerErrors.TabIndentationFound;
+                    return LexerError.TabIndentationFound;
                 },
                 0 => continue :state .dedent_end,
                 else => {
@@ -104,7 +113,7 @@ pub const Lexer = struct {
                         continue :state .start;
                     } else if (self.space_count > self.indent_level) {
                         if (self.space_count != self.indent_level + 2) {
-                            return LexerErrors.InvalidIndentation;
+                            return LexerError.InvalidIndentation;
                         }
 
                         self.indent_level = self.space_count;
@@ -114,7 +123,7 @@ pub const Lexer = struct {
                     } else {
                         const delta = self.indent_level - self.space_count;
                         if (delta % 2 != 0) {
-                            return LexerErrors.InvalidIndentation;
+                            return LexerError.InvalidIndentation;
                         }
                         self.indent_level = self.space_count;
                         self.dedents_left = (delta / 2) - 1;
@@ -124,7 +133,7 @@ pub const Lexer = struct {
                 },
             },
             .start => _start: switch (self.src[self.index]) {
-                else => return LexerErrors.InvalidCharacter,
+                else => return LexerError.InvalidCharacter,
                 0 => continue :state .dedent_end,
                 ' ', '\t', '\r' => {
                     if (self.src_loc.col == 1) {
@@ -158,7 +167,7 @@ pub const Lexer = struct {
                 '[', ']', ',', '-', '{', '}', ':' => |c| {
                     // self.token_start = self.index;
                     const tag = single_char_tokens.get(&.{c}) orelse
-                        return LexerErrors.InvalidCharacter;
+                        return LexerError.InvalidCharacter;
                     self.advance();
                     return self.consumeToken(tag);
                 },
@@ -173,7 +182,7 @@ pub const Lexer = struct {
             },
             .comment_start => {
                 if (self.src[self.index] == '/') continue :state .comment;
-                return LexerErrors.InvalidCharacter;
+                return LexerError.InvalidCharacter;
             },
             .comment => _comment: switch (self.src[self.index]) {
                 0 => continue :state .dedent_end,
@@ -215,7 +224,7 @@ pub const Lexer = struct {
             .number_after_dot => {
                 const c = self.src[self.index];
 
-                if (c < '0' or c > '9') return LexerErrors.InvalidNumber;
+                if (c < '0' or c > '9') return LexerError.InvalidNumber;
 
                 frac: switch (c) {
                     '0'...'9' => {
@@ -230,7 +239,7 @@ pub const Lexer = struct {
             .string => _string: switch (self.src[self.index]) {
                 0 => {
                     // TODO: Need error system
-                    return LexerErrors.UnclosedString;
+                    return LexerError.UnclosedString;
                 },
                 '"' => {
                     self.advance();
@@ -260,7 +269,7 @@ pub const Lexer = struct {
                 },
                 else => {
                     if (self.hex_color_count != 6 and self.hex_color_count != 8)
-                        return LexerErrors.InvalidColor;
+                        return LexerError.InvalidColor;
                     // Adjust token_start to skip '#'
                     const token = self.consumeToken(.color_lit);
                     return Token{

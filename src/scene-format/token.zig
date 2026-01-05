@@ -68,6 +68,7 @@ pub const Token = struct {
         string,
         color,
         asset_ref,
+        template,
 
         // Keywords asset-types
         font,

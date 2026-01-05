@@ -1,13 +1,17 @@
 const core = @import("core");
 const V2 = core.V2;
-
 const rend = @import("renderer");
 const Color = rend.Color;
 const Shape = rend.Shape;
-
 const asset = @import("asset");
 const FontHandle = asset.FontHandle;
 const collider = @import("collider.zig");
+const action = @import("action");
+
+// MARK: Action Components
+pub const Action = action.Action;
+pub const Trigger = action.TriggerComp;
+pub const OnCollision = struct { _dummy: u8 = 0 };
 
 // MARK: Spatial Components
 pub const Transform = struct {

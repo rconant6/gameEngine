@@ -9,6 +9,7 @@ pub const ActionContext = actque.ActionContext;
 pub const QueuedAction = actque.QueuedAction;
 pub const ActionQueue = actque.ActionQueue;
 pub const triggers = @import("Triggers.zig");
+pub const TriggerComp = triggers.Trigger;
 pub const TriggerSystem = triggers.TriggerSystem;
 pub const TriggerContext = triggers.TriggerContext;
 pub const InputTrigger = triggers.InputTrigger;

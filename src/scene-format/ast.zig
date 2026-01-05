@@ -13,6 +13,7 @@ pub const SceneFile = struct {
             decl.deinit(allocator);
         }
         allocator.free(self.decls);
+        allocator.free(self.source_file_name);
     }
 };
 
@@ -21,6 +22,7 @@ pub const Declaration = union(enum) {
     entity: EntityDeclaration,
     asset: AssetDeclaration,
     component: ComponentDeclaration,
+    template: TemplateDeclaration,
 
     pub fn deinit(self: *Declaration, allocator: Allocator) void {
         switch (self.*) {
@@ -28,7 +30,22 @@ pub const Declaration = union(enum) {
             .entity => |*e| e.deinit(allocator),
             .asset => |*a| a.deinit(allocator),
             .component => |*c| c.deinit(allocator),
+            .template => |*t| t.deinit(allocator),
         }
+    }
+};
+
+pub const TemplateDeclaration = struct {
+    name: []const u8,
+    components: []ComponentDeclaration,
+    location: SourceLocation,
+
+    pub fn deinit(self: *TemplateDeclaration, allocator: Allocator) void {
+        allocator.free(self.name);
+        for (self.components) |*comp| {
+            comp.deinit(allocator);
+        }
+        allocator.free(self.components);
     }
 };
 
@@ -62,15 +79,17 @@ pub const EntityDeclaration = struct {
 pub const AssetDeclaration = struct {
     name: []const u8,
     asset_type: AssetType,
-    properties: []Property,
+    properties: ?[]Property,
     location: SourceLocation,
 
     pub fn deinit(self: *AssetDeclaration, allocator: Allocator) void {
         allocator.free(self.name);
-        for (self.properties) |*prop| {
-            prop.deinit(allocator);
+        if (self.properties) |props| {
+            for (props) |*prop| {
+                prop.deinit(allocator);
+            }
+            allocator.free(props);
         }
-        allocator.free(self.properties);
     }
 };
 pub const ComponentDeclaration = union(enum) {
@@ -79,30 +98,54 @@ pub const ComponentDeclaration = union(enum) {
     collider: SpriteBlock,
 
     pub fn deinit(self: *ComponentDeclaration, allocator: Allocator) void {
+        _ = allocator;
         switch (self.*) {
-            inline else => |block| {
-                allocator.free(block.name);
-                for (block.properties) |*prop| {
-                    prop.deinit(allocator);
-                }
-                allocator.free(block.properties);
-
-                if (@TypeOf(block) == SpriteBlock)
-                    allocator.free(block.shape_type);
+            inline else => |*block| {
+                block.deinit();
             },
         }
     }
 };
 pub const GenericBlock = struct {
     name: []const u8,
-    properties: []Property,
+    properties: ?[]Property,
     location: SourceLocation,
+    nested_blocks: ?[]GenericBlock,
+    allocator: Allocator,
+
+    pub fn deinit(self: *GenericBlock) void {
+        if (self.properties) |props| {
+            for (props) |*prop| {
+                prop.deinit(self.allocator);
+            }
+            self.allocator.free(props);
+        }
+        if (self.nested_blocks) |blocks| {
+            for (blocks) |*block| {
+                block.deinit();
+            }
+            self.allocator.free(blocks);
+        }
+        self.allocator.free(self.name);
+    }
 };
 pub const SpriteBlock = struct {
     name: []const u8,
     shape_type: []const u8,
-    properties: []Property,
+    properties: ?[]Property,
     location: SourceLocation,
+    allocator: Allocator,
+
+    pub fn deinit(self: *SpriteBlock) void {
+        if (self.properties) |props| {
+            for (props) |*prop| {
+                prop.deinit(self.allocator);
+            }
+            self.allocator.free(props);
+        }
+        self.allocator.free(self.name);
+        self.allocator.free(self.shape_type);
+    }
 };
 
 pub const Property = struct {
@@ -157,6 +200,10 @@ pub const BaseType = enum {
     string,
     color,
     asset,
+    action,
+    action_target,
+    key,
+    mouse,
     // custom, // TODO: this is coming later
 };
 
@@ -168,12 +215,20 @@ pub const Value = union(enum) {
     vector: []f64,
     assetRef: []const u8,
     array: []Value,
+    action_type: []const u8,
+    action_target: []const u8,
+    key_input: []const u8,
+    mouse_input: []const u8,
 
     pub fn deinit(self: *Value, allocator: Allocator) void {
         switch (self.*) {
             .string => |s| allocator.free(s),
             .vector => |v| allocator.free(v),
             .assetRef => |a| allocator.free(a),
+            .action_type => |a| allocator.free(a),
+            .action_target => |t| allocator.free(t),
+            .key_input => |k| allocator.free(k),
+            .mouse_input => |m| allocator.free(m),
             .array => |arr| {
                 for (arr) |*val| {
                     val.deinit(allocator);

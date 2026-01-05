@@ -2,16 +2,13 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const build_options = @import("build_options");
-
 const platform = @import("platform");
 pub const KeyCode = platform.KeyCode;
 pub const KeyModifiers = platform.KeyModifiers;
 pub const MouseButton = platform.MouseButton;
-
 const core = @import("core");
 pub const V2 = core.V2;
 pub const V2I = core.V2I;
-
 const renderer = @import("renderer");
 pub const Color = renderer.Color;
 pub const Colors = renderer.Colors;
@@ -22,23 +19,21 @@ pub const Polygon = renderer.Polygon;
 pub const Line = renderer.Line;
 pub const RenderContext = renderer.RenderContext;
 pub const Shape = renderer.Shape;
-pub const Transform = renderer.Transform;
-
+pub const RenderTransform = renderer.Transform;
 const assets = @import("asset");
 const AssetManager = assets.AssetManager;
 pub const FontHandle = assets.FontHandle;
 pub const Font = assets.Font;
-
 const ecs = @import("entity");
 const World = ecs.World;
 pub const Entity = ecs.Entity;
-pub const TransformComp = ecs.Transform;
+pub const Transform = ecs.Transform;
 pub const Velocity = ecs.Velocity;
 pub const Sprite = ecs.Sprite;
 pub const Text = ecs.Text;
 pub const RenderLayer = ecs.RenderLayer;
-pub const CircleCollider = ecs.CircleCollider;
-pub const RectCollider = ecs.RectCollider;
+pub const ColliderShape = ecs.ColliderShape;
+pub const Collider = ecs.Collider;
 pub const Lifetime = ecs.Lifetime;
 pub const ScreenWrap = ecs.ScreenWrap;
 pub const ScreenClamp = ecs.ScreenClamp;
@@ -47,16 +42,23 @@ pub const Physics = ecs.Physics;
 pub const Box = ecs.Box;
 pub const Camera = ecs.Camera;
 pub const Collision = ecs.Collision;
-
-const Input = @import("internal/Input.zig");
-const Systems = @import("internal/Systems.zig");
+pub const Tag = ecs.Tag;
+pub const OnInput = ecs.OnInput;
+pub const OnCollision = ecs.OnCollision;
+const action = @import("action");
+pub const Action = action.Action;
+pub const ActionSystem = action.ActionSystem;
+pub const InputTrigger = action.InputTrigger;
+pub const CollisionTrigger = action.CollisionTrigger;
+pub const TriggerContext = action.TriggerContext;
+const internal = @import("internal");
+const Input = internal.Input;
 const err_log = @import("error_logger");
 const ErrorLogger = err_log.ErrorLogger;
 pub const Severity = err_log.Severity;
 pub const Subsystem = err_log.SubSystem;
 pub const ErrorEntry = err_log.ErrorEntry;
-
-// Scene management is internal to the engine
+const Systems = @import("internal/Systems.zig");
 const scene_instantiator = @import("scene_instantiator");
 const scene_manager = @import("scene_manager");
 const Instantiator = scene_instantiator.Instantiator;
@@ -70,13 +72,12 @@ pub const Engine = struct {
     window: platform.Window,
     world: ecs.World,
     collision_events: ArrayList(Collision),
+    action_system: ActionSystem,
     running: bool,
 
-    // Internal scene management
     scene_manager: SceneManager,
     instantiator: Instantiator,
 
-    // Internal error logging
     error_logger: ErrorLogger,
 
     pub fn init(
@@ -84,14 +85,22 @@ pub const Engine = struct {
         title: []const u8,
         width: u32,
         height: u32,
-    ) !Engine {
-        try platform.init();
+    ) Engine {
+        var had_error = false;
+        platform.init() catch |err| {
+            std.log.err("[PLATFORM] Unable to platform layer: {any}", .{err});
+            had_error = true;
+        };
 
-        const window = try platform.createWindow(.{
+        const window = platform.createWindow(.{
             .title = title,
             .width = width,
             .height = height,
-        });
+        }) catch |err| blk: {
+            std.log.err("[PLATFORM] Unable to native window: {any}", .{err});
+            had_error = true;
+            break :blk undefined;
+        };
 
         const scale_factor = platform.getWindowScaleFactor(window);
 
@@ -108,9 +117,10 @@ pub const Engine = struct {
                 .height = scaled_height,
                 .native_handle = window.handle,
             },
-        ) catch |err| {
-            std.log.err("[renderer] Unable to create rendering backend: {any}", .{err});
-            return err;
+        ) catch |err| blk: {
+            std.log.err("[RENDERER] Unable to create rendering backend: {any}", .{err});
+            had_error = true;
+            break :blk undefined;
         };
 
         if (build_options.backend == .cpu) {
@@ -125,9 +135,27 @@ pub const Engine = struct {
             }
         }
 
-        const asset_manager = try AssetManager.init(allocator);
-        const world = try World.init(allocator);
+        const asset_manager = AssetManager.init(allocator) catch |err| blk: {
+            std.log.err("[ASSETS] Unable to create an asset manager: {any}", .{err});
+            had_error = true;
+            break :blk undefined;
+        };
+        const world = World.init(allocator) catch |err| blk: {
+            std.log.err("[ECS] Unable to create a world entity manager: {any}", .{err});
+            had_error = true;
+            break :blk undefined;
+        };
         const input: Input = .init();
+        const action_system = ActionSystem.init(allocator) catch |err| blk: {
+            std.log.err("[ACTIONS] Unable to create the action system manager: {any}", .{err});
+            had_error = true;
+            break :blk undefined;
+        };
+
+        if (had_error) {
+            std.debug.print("FATAL: [ENGINE]Failed to initialize engine!! (see console)\n", .{});
+            @panic("Engine Broke");
+        }
 
         return .{
             .allocator = allocator,
@@ -141,10 +169,13 @@ pub const Engine = struct {
             .instantiator = Instantiator.init(allocator),
             .error_logger = ErrorLogger.init(allocator),
             .collision_events = .empty,
+            .action_system = action_system,
         };
     }
+
     pub fn deinit(self: *Engine) void {
         self.logInfo(.engine, "Engine shutting down", .{});
+        self.action_system.deinit();
         self.collision_events.deinit(self.allocator);
         self.scene_manager.deinit();
         self.renderer.deinit();
@@ -164,26 +195,41 @@ pub const Engine = struct {
         Systems.screenWrapSystem(self);
         Systems.screenClampSystem(self);
         Systems.movementSystem(self, dt);
-
+        Systems.physicsSystem(self, dt);
+        Systems.collisionDetectionSystem(self);
+        const context: TriggerContext = .{
+            .collision_events = self.collision_events.items,
+            .input = &self.input,
+            .delta_time = dt,
+            .action_queue = &self.action_system.action_queue,
+        };
+        self.action_system.update(&self.world, context) catch |err| {
+            self.logError(.assets, "Action system failure: {any}", .{err});
+        };
         Systems.cleanupSystem(self);
-    }
-    pub fn render(self: *Engine) void {
         Systems.renderSystem(self);
     }
+    // pub fn render(self: *Engine) void {
+    //     Systems.renderSystem(self);
+    // }
 
-    pub fn beginFrame(self: *Engine) !void {
+    pub fn beginFrame(self: *Engine) void {
         platform.clearInputStates();
         _ = platform.pollEvent();
         self.input.keyboard = platform.getKeyboard();
         self.input.mouse = platform.getMouse();
-        try self.renderer.beginFrame();
+        self.renderer.beginFrame() catch |err| {
+            self.logError(.renderer, "Failure in beginFrame(): {any}", .{err});
+        };
     }
-    pub fn endFrame(self: *Engine) !void {
-        try self.renderer.endFrame();
+    pub fn endFrame(self: *Engine) void {
         if (build_options.backend == .cpu) {
             const offset = self.renderer.getDisplayBufferOffset() orelse 0;
             self.window.swapBuffers(offset);
         }
+        self.renderer.endFrame() catch |err| {
+            self.logError(.renderer, "Failure in endFrame(): {any}", .{err});
+        };
     }
     pub fn clear(self: *Engine, color: Color) void {
         self.renderer.setClearColor(color);
@@ -201,7 +247,7 @@ pub const Engine = struct {
     }
 
     // Drawing shapes
-    pub fn draw(self: *Engine, shape: anytype, xform: ?Transform) void {
+    pub fn draw(self: *Engine, shape: anytype, xform: ?RenderTransform) void {
         const T = @TypeOf(shape);
         const shape_union = switch (T) {
             Polygon => Shape{ .Polygon = shape },
@@ -270,14 +316,27 @@ pub const Engine = struct {
     }
 
     // ECS
-    pub fn createEntity(self: *Engine) !Entity {
-        return self.world.createEntity();
+    pub fn createEntity(self: *Engine) Entity {
+        return self.world.createEntity() catch |err| {
+            self.logError(.ecs, "Unable to add to create Entity: {any}", .{err});
+        };
     }
     pub fn destroyEntity(self: *Engine, entity: Entity) void {
         self.world.destroyEntity(entity);
     }
-    pub fn addComponent(self: *Engine, entity: Entity, comptime T: type, value: T) !void {
-        try self.world.addComponent(entity, T, value);
+    pub fn addComponent(
+        self: *Engine,
+        entity: Entity,
+        comptime T: type,
+        value: T,
+    ) void {
+        self.world.addComponent(entity, T, value) catch |err| {
+            self.logError(
+                .ecs,
+                "Unable to add component to Entity: {d} {any}",
+                .{ entity.id, err },
+            );
+        };
     }
 
     // Bounds checking
@@ -335,7 +394,6 @@ pub const Engine = struct {
         self.collision_events.clearRetainingCapacity();
     }
     pub fn getCollisionEvents(self: *Engine) []const Collision {
-        Systems.collisionDetectionSystem(self);
         return self.collision_events.items;
     }
 
