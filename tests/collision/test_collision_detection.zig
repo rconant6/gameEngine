@@ -1,13 +1,14 @@
 const std = @import("std");
 const testing = std.testing;
-const V2 = @import("core").V2;
+const core = @import("core");
+const V2 = core.V2;
 const ecs = @import("entity");
 const World = ecs.World;
 const Transform = ecs.Transform;
 const Collider = ecs.Collider;
 const ColliderShape = ecs.ColliderShape;
 const Collision = ecs.Collision;
-const CollisionDetection = @import("CollisionDetection");
+const CollisionDetection = core.CollisionDetection;
 const TransformedCollider = CollisionDetection.TransformedCollider;
 
 // MARK: Circle-Circle Collision Tests

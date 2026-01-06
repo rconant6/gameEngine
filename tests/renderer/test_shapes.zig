@@ -1,12 +1,12 @@
 const std = @import("std");
 const testing = std.testing;
 const V2 = @import("core").V2;
-const shapes = @import("core_shapes");
-const Line = shapes.Line;
-const Triangle = shapes.Triangle;
-const Rectangle = shapes.Rectangle;
-const Circle = shapes.Circle;
-const Ellipse = shapes.Ellipse;
+const renderer = @import("renderer");
+const Line = renderer.Line;
+const Triangle = renderer.Triangle;
+const Rectangle = renderer.Rectangle;
+const Circle = renderer.Circle;
+const Ellipse = renderer.Ellipse;
 
 test "Line: init with start and end points" {
     const allocator = testing.allocator;
