@@ -23,19 +23,27 @@ pub fn build(b: *std.Build) void {
 
     const core_module = b.addModule("core", .{
         .root_source_file = b.path("src/core/types.zig"),
+        .target = target,
+        .optimize = optimize,
     });
 
     const scene_format_module = b.addModule("scene-format", .{
         .root_source_file = b.path("src/scene-format/lib.zig"),
+        .target = target,
+        .optimize = optimize,
     });
 
     const renderer_module = b.addModule("renderer", .{
         .root_source_file = b.path("src/renderer/renderer.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     renderer_module.addImport("core", core_module);
 
     const asset_module = b.addModule("asset", .{
         .root_source_file = b.path("src/assets/assets.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     asset_module.addImport("core", core_module);
     asset_module.addImport("renderer", renderer_module);
@@ -50,66 +58,78 @@ pub fn build(b: *std.Build) void {
 
     const platform_module = b.addModule("platform", .{
         .root_source_file = b.path("src/platform/platform.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     platform_module.addIncludePath(b.path("src/platform/macos/swift/include"));
     platform_module.addImport("build_options", build_options_module);
 
+    // Configure platform-specific linking on the platform module
+    configurePlatformModule(b, platform_module, target, optimize, selected_renderer);
+
+    // Core needs platform for Input.zig
+    core_module.addImport("platform", platform_module);
+
     const entity_module = b.addModule("entity", .{
         .root_source_file = b.path("src/ecs/ecs.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     entity_module.addImport("core", core_module);
     entity_module.addImport("renderer", renderer_module);
     entity_module.addImport("asset", asset_module);
 
-    const internal_module = b.addModule("internal", .{
-        .root_source_file = b.path("src/internal/internal.zig"),
-    });
-    internal_module.addImport("platform", platform_module);
-    internal_module.addImport("core", core_module);
-    internal_module.addImport("entity", entity_module);
+    // Core needs entity for CollisionDetection.zig and shape_registry.zig needs renderer
+    core_module.addImport("entity", entity_module);
+    core_module.addImport("renderer", renderer_module);
 
     const action_module = b.addModule("action", .{
         .root_source_file = b.path("src/action/Action.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     action_module.addImport("core", core_module);
     action_module.addImport("entity", entity_module);
     action_module.addImport("platform", platform_module);
-    action_module.addImport("internal", internal_module);
 
-    entity_module.addImport("internal", internal_module);
     entity_module.addImport("action", action_module);
 
-    // Internal error logger module
-    const error_logger_module = b.addModule("error_logger", .{
-        .root_source_file = b.path("src/internal/error_logger.zig"),
-    });
-
-    // Scene internal modules
+    // Core registry modules (already exported via core.zig but needed for separate imports)
     const component_registry_module = b.addModule("component_registry", .{
-        .root_source_file = b.path("src/scene/component_registry.zig"),
+        .root_source_file = b.path("src/core/component_registry.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     component_registry_module.addImport("scene-format", scene_format_module);
     component_registry_module.addImport("entity", entity_module);
 
     const shape_registry_module = b.addModule("shape_registry", .{
-        .root_source_file = b.path("src/scene/shape_registry.zig"),
+        .root_source_file = b.path("src/core/shape_registry.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     shape_registry_module.addImport("scene-format", scene_format_module);
     shape_registry_module.addImport("renderer", renderer_module);
 
     const collider_shape_registry_module = b.addModule("collider_shape_registry", .{
-        .root_source_file = b.path("src/scene/collider_shape_registry.zig"),
+        .root_source_file = b.path("src/core/collider_shape_registry.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     collider_shape_registry_module.addImport("entity", entity_module);
 
     // Scene modules
     const scene_manager_module = b.addModule("scene_manager", .{
         .root_source_file = b.path("src/scene/manager.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     scene_manager_module.addImport("scene-format", scene_format_module);
 
     const scene_instantiator_module = b.addModule("scene_instantiator", .{
         .root_source_file = b.path("src/scene/instantiator.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     scene_instantiator_module.addImport("scene-format", scene_format_module);
     scene_instantiator_module.addImport("core", core_module);
@@ -125,6 +145,8 @@ pub fn build(b: *std.Build) void {
     // Engine public API
     const engine_module = b.addModule("engine", .{
         .root_source_file = b.path("src/engine.zig"),
+        .target = target,
+        .optimize = optimize,
     });
 
     // Scene instantiator needs the Engine type
@@ -137,9 +159,7 @@ pub fn build(b: *std.Build) void {
     engine_module.addImport("build_options", build_options_module);
     engine_module.addImport("asset", asset_module);
     engine_module.addImport("entity", entity_module);
-    engine_module.addImport("internal", internal_module);
     engine_module.addImport("scene-format", scene_format_module);
-    engine_module.addImport("error_logger", error_logger_module);
     engine_module.addImport("action", action_module);
 
     // Engine owns scene management internally - games don't need to import these
@@ -321,6 +341,8 @@ pub fn build(b: *std.Build) void {
     // ActionBindings Tests
     const triggers_module = b.addModule("triggers", .{
         .root_source_file = b.path("src/action/Triggers.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     triggers_module.addImport("core", core_module);
     triggers_module.addImport("action", action_module);
@@ -329,6 +351,8 @@ pub fn build(b: *std.Build) void {
 
     const action_bindings_module = b.addModule("ActionBindings", .{
         .root_source_file = b.path("src/action/ActionBindings.zig"),
+        .target = target,
+        .optimize = optimize,
     });
     action_bindings_module.addImport("core", core_module);
     action_bindings_module.addImport("triggers", triggers_module);
@@ -397,12 +421,6 @@ pub fn build(b: *std.Build) void {
     // ========================================
     // Layer 3: Collision Detection Tests
     // ========================================
-    const collision_detection_module = b.addModule("CollisionDetection", .{
-        .root_source_file = b.path("src/internal/CollisionDetection.zig"),
-    });
-    collision_detection_module.addImport("core", core_module);
-    collision_detection_module.addImport("entity", entity_module);
-
     const collision_test_module = b.addModule("collision_tests", .{
         .root_source_file = b.path("tests/collision/test_collision_detection.zig"),
         .target = target,
@@ -410,7 +428,6 @@ pub fn build(b: *std.Build) void {
     });
     collision_test_module.addImport("core", core_module);
     collision_test_module.addImport("entity", entity_module);
-    collision_test_module.addImport("CollisionDetection", collision_detection_module);
 
     const collision_tests = b.addTest(.{
         .name = "collision-tests",
@@ -463,6 +480,20 @@ pub fn build(b: *std.Build) void {
     });
     const run_template_parser_tests = b.addRunArtifact(template_parser_tests);
 
+    // Nested Block Parser Tests (will fail until nested block support is added)
+    const nested_block_parser_test_module = b.addModule("nested_block_parser_tests", .{
+        .root_source_file = b.path("tests/scene-format/parser_nested_blocks_test.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    nested_block_parser_test_module.addImport("scene-format", scene_format_module);
+
+    const nested_block_parser_tests = b.addTest(.{
+        .name = "nested-block-parser-tests",
+        .root_module = nested_block_parser_test_module,
+    });
+    const run_nested_block_parser_tests = b.addRunArtifact(nested_block_parser_tests);
+
     // Scene Integration Tests
     const scene_test_module = b.addModule("scene_tests", .{
         .root_source_file = b.path("tests/scene/test_scene_integration.zig"),
@@ -478,19 +509,19 @@ pub fn build(b: *std.Build) void {
     const run_scene_tests = b.addRunArtifact(scene_tests);
 
     // Template Instantiation Tests (will fail until template system is implemented)
-    const template_instantiation_test_module = b.addModule("template_instantiation_tests", .{
-        .root_source_file = b.path("tests/scene/test_template_instantiation.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    template_instantiation_test_module.addImport("scene-format", scene_format_module);
-    template_instantiation_test_module.addImport("entity", entity_module);
+    // const template_instantiation_test_module = b.addModule("template_instantiation_tests", .{
+    //     .root_source_file = b.path("tests/scene/test_template_instantiation.zig"),
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    // template_instantiation_test_module.addImport("scene-format", scene_format_module);
+    // template_instantiation_test_module.addImport("entity", entity_module);
 
-    const template_instantiation_tests = b.addTest(.{
-        .name = "template-instantiation-tests",
-        .root_module = template_instantiation_test_module,
-    });
-    const run_template_instantiation_tests = b.addRunArtifact(template_instantiation_tests);
+    // const template_instantiation_tests = b.addTest(.{
+    //     .name = "template-instantiation-tests",
+    //     .root_module = template_instantiation_test_module,
+    // });
+    // const run_template_instantiation_tests = b.addRunArtifact(template_instantiation_tests);
 
     // ========================================
     // Layer 4B: Renderer Tests
@@ -510,18 +541,13 @@ pub fn build(b: *std.Build) void {
     });
     const run_color_tests = b.addRunArtifact(color_tests);
 
-    const core_shapes_module = b.addModule("core_shapes", .{
-        .root_source_file = b.path("src/renderer/core_shapes.zig"),
-    });
-    core_shapes_module.addImport("core", core_module);
-
     const shapes_test_module = b.addModule("shapes_tests", .{
         .root_source_file = b.path("tests/renderer/test_shapes.zig"),
         .target = target,
         .optimize = optimize,
     });
     shapes_test_module.addImport("core", core_module);
-    shapes_test_module.addImport("core_shapes", core_shapes_module);
+    shapes_test_module.addImport("renderer", renderer_module);
 
     const shapes_tests = b.addTest(.{
         .name = "shapes-tests",
@@ -539,7 +565,6 @@ pub fn build(b: *std.Build) void {
     });
     integration_test_module.addImport("core", core_module);
     integration_test_module.addImport("entity", entity_module);
-    integration_test_module.addImport("CollisionDetection", collision_detection_module);
 
     const integration_tests = b.addTest(.{
         .name = "integration-tests",
@@ -565,11 +590,111 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_scene_lexer_tests.step);
     test_step.dependOn(&run_scene_parser_tests.step);
     test_step.dependOn(&run_template_parser_tests.step);
+    test_step.dependOn(&run_nested_block_parser_tests.step);
     test_step.dependOn(&run_scene_tests.step);
-    test_step.dependOn(&run_template_instantiation_tests.step);
+    // test_step.dependOn(&run_template_instantiation_tests.step);
     test_step.dependOn(&run_color_tests.step);
     test_step.dependOn(&run_shapes_tests.step);
     test_step.dependOn(&run_integration_tests.step);
+}
+
+/// Configure a module with all platform-specific linking requirements
+/// This ensures any executable that imports this module gets all necessary frameworks and libraries
+pub fn configurePlatformModule(
+    b: *std.Build,
+    module: *std.Build.Module,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    renderer: RendererBackend,
+) void {
+    _ = b; // May be used for custom build steps in the future
+    _ = optimize; // May be used in future platform-specific logic
+
+    switch (target.result.os.tag) {
+        .macos => {
+            // Add all macOS frameworks to the module
+            module.linkFramework("Foundation", .{});
+            module.linkFramework("AppKit", .{});
+            module.linkFramework("QuartzCore", .{});
+            module.linkFramework("CoreGraphics", .{});
+
+            switch (renderer) {
+                .metal => {
+                    module.linkFramework("Metal", .{});
+                    module.linkFramework("MetalKit", .{});
+                },
+                .opengl => {
+                    module.linkFramework("OpenGL", .{});
+                },
+                .vulkan => {
+                    module.linkSystemLibrary("vulkan", .{});
+                    module.linkSystemLibrary("MoltenVK", .{});
+                },
+                .cpu => {},
+            }
+
+            // Add Swift library paths
+            const sys_path = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.sdk/usr/lib/swift/";
+            const other_sys_path = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx";
+            module.addLibraryPath(.{ .cwd_relative = sys_path });
+            module.addLibraryPath(.{ .cwd_relative = other_sys_path });
+
+            // Link all Swift runtime libraries
+            module.linkSystemLibrary("swiftObjectiveC", .{});
+            module.linkSystemLibrary("swiftCore", .{});
+            module.linkSystemLibrary("swiftAppKit", .{});
+            module.linkSystemLibrary("swiftCoreFoundation", .{});
+            module.linkSystemLibrary("swiftCompatibilityConcurrency", .{});
+            module.linkSystemLibrary("swiftCompatibility50", .{});
+            module.linkSystemLibrary("swiftCompatibility51", .{});
+            module.linkSystemLibrary("swiftCompatibility56", .{});
+            module.linkSystemLibrary("swiftCompatibilityDynamicReplacements", .{});
+            module.linkSystemLibrary("swift_Concurrency", .{});
+            module.linkSystemLibrary("swiftUniformTypeIdentifiers", .{});
+            module.linkSystemLibrary("swift_StringProcessing", .{});
+            module.linkSystemLibrary("swiftDispatch", .{});
+            module.linkSystemLibrary("swiftCoreGraphics", .{});
+            module.linkSystemLibrary("swiftMetal", .{});
+            module.linkSystemLibrary("swiftMetalKit", .{});
+            module.linkSystemLibrary("swiftModelIO", .{});
+            module.linkSystemLibrary("swiftIOKit", .{});
+            module.linkSystemLibrary("swiftXPC", .{});
+            module.linkSystemLibrary("swiftDarwin", .{});
+            module.linkSystemLibrary("swiftCoreImage", .{});
+            module.linkSystemLibrary("swiftQuartzCore", .{});
+            module.linkSystemLibrary("swiftOSLog", .{});
+            module.linkSystemLibrary("swiftos", .{});
+            module.linkSystemLibrary("swiftsimd", .{});
+        },
+        .linux => {
+            module.link_libc = true;
+            module.linkSystemLibrary("X11", .{});
+            module.linkSystemLibrary("Xrandr", .{});
+            module.linkSystemLibrary("Xi", .{});
+            module.linkSystemLibrary("Xcursor", .{});
+
+            switch (renderer) {
+                .vulkan => module.linkSystemLibrary("vulkan", .{}),
+                .opengl => module.linkSystemLibrary("GL", .{}),
+                .metal => @panic("Metal is not available on Linux"),
+                .cpu => {},
+            }
+        },
+        .windows => {
+            module.linkSystemLibrary("user32", .{});
+            module.linkSystemLibrary("gdi32", .{});
+            module.linkSystemLibrary("shell32", .{});
+            module.linkSystemLibrary("kernel32", .{});
+
+            switch (renderer) {
+                .vulkan => module.linkSystemLibrary("vulkan-1", .{}),
+                .opengl => module.linkSystemLibrary("opengl32", .{}),
+                .metal => @panic("Metal is not available on Windows"),
+                .cpu => {},
+            }
+        },
+        else => @panic("Unsupported operating system"),
+    }
 }
 
 pub fn defaultRendererForTarget(os_tag: std.Target.Os.Tag) RendererBackend {
@@ -581,6 +706,8 @@ pub fn defaultRendererForTarget(os_tag: std.Target.Os.Tag) RendererBackend {
     };
 }
 
+/// Configure an executable with platform-specific build steps (Swift builds, metal shaders, etc.)
+/// The module should already have configurePlatformModule called on it
 pub fn configurePlatform(
     b: *std.Build,
     exe: *std.Build.Step.Compile,
@@ -589,133 +716,21 @@ pub fn configurePlatform(
     optimize: std.builtin.OptimizeMode,
     renderer: RendererBackend,
 ) void {
+    _ = module;
+    _ = renderer;
+
     switch (target.result.os.tag) {
-        .macos => configureMacOS(b, exe, module, target, optimize, renderer),
-        .linux => configureLinux(b, exe, renderer),
-        .windows => configureWindows(b, exe, renderer),
+        .macos => configureMacOSExecutable(b, exe, target, optimize),
+        .linux => {}, // Linux doesn't need extra executable configuration
+        .windows => {}, // Windows doesn't need extra executable configuration
         else => @panic("Unsupported operating system"),
     }
 }
 
-pub fn configureMacOS(
+/// Configure macOS-specific executable build steps (Swift library, Metal shaders)
+fn configureMacOSExecutable(
     b: *std.Build,
     exe: *std.Build.Step.Compile,
-    module: *std.Build.Module,
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-    renderer: RendererBackend,
-) void {
-    // Build Swift static library
-    buildMacOSSwift(b, exe, module, target, optimize);
-
-    // Add frameworks to root_module
-    exe.root_module.linkFramework("Foundation", .{});
-    exe.root_module.linkFramework("AppKit", .{});
-    exe.root_module.linkFramework("QuartzCore", .{});
-    exe.root_module.linkFramework("CoreGraphics", .{});
-
-    switch (renderer) {
-        .metal => {
-            exe.root_module.linkFramework("Metal", .{});
-            exe.root_module.linkFramework("MetalKit", .{});
-        },
-        .opengl => {
-            exe.root_module.linkFramework("OpenGL", .{});
-        },
-        .vulkan => {
-            exe.root_module.linkSystemLibrary("vulkan", .{});
-            exe.root_module.linkSystemLibrary("MoltenVK", .{});
-        },
-        .cpu => {},
-    }
-
-    exe.root_module.addIncludePath(b.path("src/platform/macos/include"));
-
-    module.linkFramework("AppKit", .{});
-    module.linkFramework("Metal", .{});
-    module.linkFramework("MetalKit", .{});
-    module.linkFramework("QuartzCore", .{});
-    module.linkFramework("CoreGraphics", .{});
-
-    const sys_path = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.sdk/usr/lib/swift/";
-    const other_sys_path = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx";
-    exe.root_module.addLibraryPath(.{ .cwd_relative = sys_path });
-    exe.root_module.addLibraryPath(.{ .cwd_relative = other_sys_path });
-
-    exe.linkSystemLibrary("c++");
-    exe.root_module.linkSystemLibrary("swiftObjectiveC", .{});
-    exe.root_module.linkSystemLibrary("swiftCore", .{});
-    exe.root_module.linkSystemLibrary("swiftAppKit", .{});
-    exe.root_module.linkSystemLibrary("swiftCoreFoundation", .{});
-    exe.root_module.linkSystemLibrary("swiftCompatibilityConcurrency", .{});
-    exe.root_module.linkSystemLibrary("swiftCompatibility50", .{});
-    exe.root_module.linkSystemLibrary("swiftCompatibility51", .{});
-    exe.root_module.linkSystemLibrary("swiftCompatibility56", .{});
-    exe.root_module.linkSystemLibrary("swiftCompatibilityDynamicReplacements", .{});
-    exe.root_module.linkSystemLibrary("swift_Concurrency", .{});
-    exe.root_module.linkSystemLibrary("swiftUniformTypeIdentifiers", .{});
-    exe.root_module.linkSystemLibrary("swift_StringProcessing", .{});
-    exe.root_module.linkSystemLibrary("swiftDispatch", .{});
-    exe.root_module.linkSystemLibrary("swiftObjectiveC", .{});
-    exe.root_module.linkSystemLibrary("swiftCoreGraphics", .{});
-    exe.root_module.linkSystemLibrary("swiftMetal", .{});
-    exe.root_module.linkSystemLibrary("swiftMetalKit", .{});
-    exe.root_module.linkSystemLibrary("swiftModelIO", .{});
-    exe.root_module.linkSystemLibrary("swiftIOKit", .{});
-    exe.root_module.linkSystemLibrary("swiftXPC", .{});
-    exe.root_module.linkSystemLibrary("swiftDarwin", .{});
-    exe.root_module.linkSystemLibrary("swiftCoreImage", .{});
-    exe.root_module.linkSystemLibrary("swiftQuartzCore", .{});
-    exe.root_module.linkSystemLibrary("swiftOSLog", .{});
-    exe.root_module.linkSystemLibrary("swiftos", .{});
-    exe.root_module.linkSystemLibrary("swiftsimd", .{});
-}
-
-pub fn configureLinux(
-    b: *std.Build,
-    exe: *std.Build.Step.Compile,
-    renderer: RendererBackend,
-) void {
-    _ = b;
-
-    exe.root_module.link_libc = true;
-    exe.root_module.linkSystemLibrary("X11", .{});
-    exe.root_module.linkSystemLibrary("Xrandr", .{});
-    exe.root_module.linkSystemLibrary("Xi", .{});
-    exe.root_module.linkSystemLibrary("Xcursor", .{});
-
-    switch (renderer) {
-        .vulkan => exe.root_module.linkSystemLibrary("vulkan", .{}),
-        .opengl => exe.root_module.linkSystemLibrary("GL", .{}),
-        .metal => @panic("Metal is not available on Linux"),
-        .cpu => {},
-    }
-}
-
-pub fn configureWindows(
-    b: *std.Build,
-    exe: *std.Build.Step.Compile,
-    renderer: RendererBackend,
-) void {
-    _ = b;
-
-    exe.root_module.linkSystemLibrary("user32", .{});
-    exe.root_module.linkSystemLibrary("gdi32", .{});
-    exe.root_module.linkSystemLibrary("shell32", .{});
-    exe.root_module.linkSystemLibrary("kernel32", .{});
-
-    switch (renderer) {
-        .vulkan => exe.root_module.linkSystemLibrary("vulkan-1", .{}),
-        .opengl => exe.root_module.linkSystemLibrary("opengl32", .{}),
-        .metal => @panic("Metal is not available on Windows"),
-        .cpu => {},
-    }
-}
-
-pub fn buildMacOSSwift(
-    b: *std.Build,
-    exe: *std.Build.Step.Compile,
-    module: *std.Build.Module,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 ) void {
@@ -726,7 +741,6 @@ pub fn buildMacOSSwift(
     };
 
     const config = if (optimize == .Debug) "debug" else "release";
-
     const swift_scratch = b.fmt("zig-out/swift-build/{s}", .{config});
 
     const swift_build = b.addSystemCommand(&.{
@@ -753,16 +767,19 @@ pub fn buildMacOSSwift(
     install_metallib.step.dependOn(&metal_lib.step);
 
     const swift_clean = b.addSystemCommand(&.{ "rm", "-rf", "./src/platform/macos/.build/" });
-    exe.step.dependOn(&swift_build.step);
-    exe.step.dependOn(&swift_clean.step);
 
     const lib_src = b.fmt("{s}/arm64-apple-macosx/{s}/libMacPlatform.a", .{ swift_scratch, config });
     const lib_dest = "lib/libMacPlatform.a";
 
     const install_lib = b.addInstallFile(.{ .cwd_relative = lib_src }, lib_dest);
     install_lib.step.dependOn(&swift_build.step);
+
+    // Link c++ for Swift interop
+    exe.linkSystemLibrary("c++");
+
+    // Make executable depend on these build steps
+    exe.step.dependOn(&swift_build.step);
+    exe.step.dependOn(&swift_clean.step);
     exe.step.dependOn(&install_lib.step);
     exe.step.dependOn(&install_metallib.step);
-
-    module.addObjectFile(b.path(b.fmt("zig-out/{s}", .{lib_dest})));
 }

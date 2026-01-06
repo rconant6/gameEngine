@@ -1,7 +1,7 @@
 .{
-    .name = .crossPlatformDemo,
+    .name = .game_engine,
     .version = "0.0.1",
-    .fingerprint = 0xd809ed075f431db6,
+    .fingerprint = 0x959db745132f8675,
     .minimum_zig_version = "0.15.1",
     .dependencies = .{},
     .paths = .{
