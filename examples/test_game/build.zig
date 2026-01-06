@@ -10,26 +10,19 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // Create a module for main.zig
-    const main_module = b.addModule("main", .{
+    // Get the engine module
+    const engine_module = engine_dep.module("engine");
+
+    // Create the executable
+    const exe = b.addExecutable(.{
+        .name = "test-game",
         .root_source_file = b.path("main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    // Import engine module - scene management is internal to the engine
-    const engine_module = engine_dep.module("engine");
-    main_module.addImport("engine", engine_module);
-
-    const exe = b.addExecutable(.{
-        .name = "test-game",
-        .root_module = main_module,
-    });
-
-    // Configure platform
-    const helpers = @import("engine_build_helpers.zig");
-    const selected_renderer = helpers.defaultRendererForTarget(target.result.os.tag);
-    helpers.configurePlatform(b, exe, main_module, target, optimize, selected_renderer);
+    // Add the engine module
+    exe.root_module.addImport("engine", engine_module);
 
     // Install assets directory
     const install_assets = b.addInstallDirectory(.{
