@@ -259,73 +259,73 @@ pub const Parser = struct {
         }
         _ = try self.consume(.r_bracket);
 
-        var parent_block = ast.GenericBlock{
-            .allocator = self.allocator,
-            .location = name_token.src_loc,
-            .name = try self.allocator.dupe(u8, component_name),
-            .nested_blocks = null,
-            .properties = null,
-        };
+        const block_name = try self.allocator.dupe(u8, component_name);
+        errdefer self.allocator.free(block_name);
+
+        var properties: ArrayList(Property) = .empty;
+        errdefer {
+            for (properties.items) |*prop| {
+                prop.deinit(self.allocator);
+            }
+            properties.deinit(self.allocator);
+        }
+
+        var nested_blocks: ?[]ast.GenericBlock = null;
+        errdefer {
+            if (nested_blocks) |blocks| {
+                for (blocks) |*block| {
+                    block.deinit();
+                }
+                self.allocator.free(blocks);
+            }
+        }
+
         if (self.check(.indent)) {
             _ = try self.consume(.indent);
 
-            var properties: ArrayList(Property) = .empty;
-            defer {
-                // Only deinit if we didn't transfer ownership
-                if (parent_block.properties == null and properties.items.len == 0) {
-                    properties.deinit(self.allocator);
-                }
-            }
-            errdefer {
-                // Clean up properties if we haven't transferred ownership
-                if (parent_block.properties == null) {
-                    for (properties.items) |*prop| {
-                        prop.deinit(self.allocator);
-                    }
-                    properties.deinit(self.allocator);
-                }
-            }
             // NOTE: all properties must precede the nested blocks
             while (!self.check(.dedent) and
                 !self.check(.indent) and
                 !self.check(.l_bracket))
             {
-                // parse the property
                 const prop = try self.parseProperty();
                 try properties.append(self.allocator, prop);
-            }
-            if (properties.items.len > 0) {
-                parent_block.properties = try properties.toOwnedSlice(self.allocator);
             }
 
             if (self.check(.dedent)) {
                 _ = try self.consume(.dedent);
-                return ast.ComponentDeclaration{ .generic = parent_block };
+                return ast.ComponentDeclaration{ .generic = .{
+                    .allocator = self.allocator,
+                    .location = name_token.src_loc,
+                    .name = block_name,
+                    .nested_blocks = null,
+                    .properties = if (properties.items.len > 0) try properties.toOwnedSlice(self.allocator) else null,
+                } };
             }
 
             if (self.check(.l_bracket)) {
-                const nested_blocks = try self.parseNestedBlocks();
-                errdefer {
-                    for (nested_blocks) |*block| {
-                        block.deinit();
-                    }
-                    self.allocator.free(nested_blocks);
-                }
-                if (nested_blocks.len > 0) {
-                    parent_block.nested_blocks = nested_blocks;
-                } else {
-                    self.allocator.free(nested_blocks);
-                }
+                nested_blocks = try self.parseNestedBlocks();
                 _ = try self.consume(.dedent);
             }
         }
 
-        return ast.ComponentDeclaration{ .generic = parent_block };
+        return ast.ComponentDeclaration{ .generic = .{
+            .allocator = self.allocator,
+            .location = name_token.src_loc,
+            .name = block_name,
+            .nested_blocks = nested_blocks,
+            .properties = if (properties.items.len > 0) try properties.toOwnedSlice(self.allocator) else null,
+        } };
     }
 
     fn parseNestedBlocks(self: *Parser) ![]ast.GenericBlock {
         var siblings: ArrayList(ast.GenericBlock) = .empty;
-        errdefer siblings.deinit(self.allocator);
+        errdefer {
+            for (siblings.items) |*block| {
+                block.deinit();
+            }
+            siblings.deinit(self.allocator);
+        }
 
         while (!self.check(.dedent)) {
             _ = try self.consume(.l_bracket);
@@ -333,52 +333,49 @@ pub const Parser = struct {
             const component_name = lex.lexeme(self.lexer.src, name_token);
             _ = try self.consume(.r_bracket);
 
-            var parent_block = ast.GenericBlock{
-                .allocator = self.allocator,
-                .location = name_token.src_loc,
-                .name = try self.allocator.dupe(u8, component_name),
-                .nested_blocks = null,
-                .properties = null,
-            };
+            const block_name = try self.allocator.dupe(u8, component_name);
+            errdefer self.allocator.free(block_name);
 
-            // Check if block has content (properties or nested blocks)
+            var properties: ArrayList(Property) = .empty;
+            errdefer {
+                for (properties.items) |*prop| {
+                    prop.deinit(self.allocator);
+                }
+                properties.deinit(self.allocator);
+            }
+
+            var nested_blocks: ?[]ast.GenericBlock = null;
+            errdefer {
+                if (nested_blocks) |blocks| {
+                    for (blocks) |*block| {
+                        block.deinit();
+                    }
+                    self.allocator.free(blocks);
+                }
+            }
+
             if (self.check(.indent)) {
                 _ = try self.consume(.indent);
 
-                var properties: ArrayList(Property) = .empty;
-                defer {
-                    // Only deinit if we didn't transfer ownership
-                    if (parent_block.properties == null and properties.items.len == 0) {
-                        properties.deinit(self.allocator);
-                    }
-                }
-                errdefer {
-                    // Clean up properties if we haven't transferred ownership
-                    if (parent_block.properties == null) {
-                        for (properties.items) |*prop| {
-                            prop.deinit(self.allocator);
-                        }
-                        properties.deinit(self.allocator);
-                    }
-                }
-
-                // parse the properties
                 while (!self.check(.dedent) and !self.check(.l_bracket)) {
                     const prop = try self.parseProperty();
                     try properties.append(self.allocator, prop);
                 }
-                if (properties.items.len > 0) {
-                    parent_block.properties = try properties.toOwnedSlice(self.allocator);
-                }
 
-                // Check for nested blocks
                 if (self.check(.l_bracket)) {
-                    const nested_blocks = try self.parseNestedBlocks();
-                    parent_block.nested_blocks = nested_blocks;
+                    nested_blocks = try self.parseNestedBlocks();
                 }
 
                 _ = try self.consume(.dedent);
             }
+
+            const parent_block = ast.GenericBlock{
+                .allocator = self.allocator,
+                .location = name_token.src_loc,
+                .name = block_name,
+                .nested_blocks = nested_blocks,
+                .properties = if (properties.items.len > 0) try properties.toOwnedSlice(self.allocator) else null,
+            };
 
             try siblings.append(self.allocator, parent_block);
         }
@@ -452,7 +449,8 @@ pub const Parser = struct {
         _ = try self.consume(.colon);
 
         const type_annotation = try self.parseTypeAnnotation();
-        const value = try self.parseValue(type_annotation);
+        var value = try self.parseValue(type_annotation);
+        errdefer value.deinit(self.allocator);
         const location = name_token.src_loc;
 
         return Property{
@@ -474,6 +472,10 @@ pub const Parser = struct {
             .string => .string,
             .color => .color,
             .asset_ref => .asset,
+            .action => .action,
+            .action_target => .action_target,
+            .key => .key,
+            .mouse => .mouse,
             else => return ParseError.UnknownType,
         };
         _ = try self.advance(); // Consume the type token
@@ -558,28 +560,28 @@ pub const Parser = struct {
                 break :blk Value{ .assetRef = asset_copy };
             },
             .action => blk: {
-                const action_token = try self.consume(.string_lit);
+                const action_token = try self.consume(.identifier);
                 const action_name = lex.lexeme(self.lexer.src, action_token);
                 break :blk Value{
                     .action_type = try self.allocator.dupe(u8, action_name),
                 };
             },
             .action_target => blk: {
-                const target_token = try self.consume(.string_lit);
+                const target_token = try self.consume(.identifier);
                 const target_name = lex.lexeme(self.lexer.src, target_token);
                 break :blk Value{
                     .action_target = try self.allocator.dupe(u8, target_name),
                 };
             },
             .key => blk: {
-                const key_token = try self.consume(.string_lit);
+                const key_token = try self.consume(.identifier);
                 const key_name = lex.lexeme(self.lexer.src, key_token);
                 break :blk Value{
                     .key_input = try self.allocator.dupe(u8, key_name),
                 };
             },
             .mouse => blk: {
-                const mouse_token = try self.consume(.string_lit);
+                const mouse_token = try self.consume(.identifier);
                 const mouse_name = lex.lexeme(self.lexer.src, mouse_token);
                 break :blk Value{
                     .mouse_input = try self.allocator.dupe(u8, mouse_name),

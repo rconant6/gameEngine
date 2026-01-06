@@ -38,7 +38,9 @@ pub const Lexer = struct {
         .{ "i32", .i32 },             .{ "u32", .u32 },
         .{ "bool", .bool },           .{ "color", .color },
         .{ "asset_ref", .asset_ref }, .{ "font", .font },
-        .{ "template", .template },
+        .{ "template", .template },   .{ "action", .action },
+        .{ "action_target", .action_target }, .{ "key", .key },
+        .{ "mouse", .mouse },
     });
 
     src: [:0]const u8,
