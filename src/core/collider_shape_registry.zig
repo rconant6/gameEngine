@@ -1,6 +1,44 @@
 const std = @import("std");
 const ecs = @import("entity");
 const ColliderShape = ecs.ColliderShape;
+const Type = std.builtin.Type;
+pub const ColliderData = blk: {
+    const registry = ColliderShapeRegistry;
+
+    var enum_fields: [registry.shape_types.len]Type.EnumField = undefined;
+    for (registry.shape_names, 0..) |name, i| {
+        enum_fields[i] = .{
+            .name = name,
+            .value = i,
+        };
+    }
+    const TagEnum = @Type(.{
+        .@"enum" = .{
+            .tag_type = u8,
+            .fields = &enum_fields,
+            .decls = &.{},
+            .is_exhaustive = true,
+        },
+    });
+
+    var union_fields: [registry.shape_types.len]Type.UnionField = undefined;
+    for (registry.shape_types, registry.shape_names, 0..) |shape_type, name, i| {
+        union_fields[i] = .{
+            .name = name,
+            .type = shape_type,
+            .alignment = @alignOf(shape_type),
+        };
+    }
+
+    break :blk @Type(.{
+        .@"union" = .{
+            .layout = .auto,
+            .tag_type = TagEnum,
+            .fields = &union_fields,
+            .decls = &.{},
+        },
+    });
+};
 
 pub const ColliderShapeRegistry = struct {
     pub const shape_types = blk: {

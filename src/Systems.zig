@@ -13,8 +13,9 @@ const Text = ecs.Text;
 const LifeTime = ecs.Lifetime;
 const Destroy = ecs.Destroy;
 const Box = ecs.Box;
-const Engine = @import("../engine.zig").Engine;
-const CollisionDetection = @import("../internal/CollisionDetection.zig");
+const Engine = @import("engine.zig").Engine;
+const core = @import("core");
+const CollisionDetection = core.CollisionDetection;
 
 const Renderer = rend.Renderer;
 pub fn movementSystem(engine: *Engine, dt: f32) void {

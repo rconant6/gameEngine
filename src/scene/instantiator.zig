@@ -9,16 +9,19 @@ const ShapeDeclaration = scene_format.ShapeDeclaration;
 const SpriteBlock = scene_format.SpriteBlock;
 const GenericBlock = scene_format.GenericBlock;
 
+const plat = @import("platform");
+const KeyCode = plat.KeyCode;
+const MouseButton = plat.MouseButton;
+
 const Property = scene_format.Property;
 const Value = scene_format.Value;
 const BaseType = scene_format.BaseType;
 
 const core = @import("core");
 const V2 = core.V2;
-
-const ComponentRegistry = @import("component_registry").ComponentRegistry;
-const ShapeRegistry = @import("shape_registry").ShapeRegistry;
-const ColliderShapeRegistry = @import("collider_shape_registry").ColliderShapeRegistry;
+const ComponentRegistry = core.ComponentRegistry;
+const ShapeRegistry = core.ShapeRegistry;
+const ColliderRegistry = core.ColliderRegistry;
 
 const ecs = @import("entity");
 const World = ecs.World;
@@ -36,17 +39,22 @@ const Colors = rend.Colors;
 const Shape = rend.Shape;
 const core_shapes = rend.cs;
 
+const acts = @import("action");
+const ActionTarget = acts.ActionTarget;
+const ActionType = acts.ActionType;
+const CollisionTrigger = acts.CollisionTrigger;
+
 pub const InstantiatorError = error{
-    UnknownComponent,
-    UnknownProperty,
-    TypeMismatch,
-    MissingRequiredField,
     InvalidValue,
+    MissingAssetPath,
+    MissingRequiredField,
+    NotOptionalValue,
+    TypeMismatch,
     UnableToFindFont,
     UnableToLoadFont,
     Unimplemented,
-    MissingAssetPath,
-    NotOptionalValue,
+    UnknownComponent,
+    UnknownProperty,
 };
 
 pub const Instantiator = struct {
@@ -157,7 +165,7 @@ pub const Instantiator = struct {
         asset_decl: *const AssetDeclaration,
         asset_manager: *AssetManager,
     ) !void {
-        const props = asset_decl.properties;
+        const props = asset_decl.properties orelse return;
         const handle = if (getProperty(props, "abs_path")) |prop| blk: {
             const abs_path_value = try self.extractValueForType(
                 []const u8,
@@ -217,11 +225,11 @@ pub const Instantiator = struct {
 
         switch (comp_decl.*) {
             .collider => |c| {
-                const shape_index = ColliderShapeRegistry.getShapeIndex(c.shape_type) orelse
+                const shape_index = ColliderRegistry.getShapeIndex(c.shape_type) orelse
                     return InstantiatorError.UnknownComponent;
-                inline for (ColliderShapeRegistry.shape_names, 0..) |_, i| {
+                inline for (ColliderRegistry.shape_names, 0..) |_, i| {
                     if (shape_index == i) {
-                        const ShapeType = ColliderShapeRegistry.shape_types[i];
+                        const ShapeType = ColliderRegistry.shape_types[i];
                         const collider = try self.buildColliderComponent(
                             ShapeType,
                             c,
@@ -273,24 +281,25 @@ pub const Instantiator = struct {
         asset_manager: *AssetManager,
     ) !ComponentType {
         var component: ComponentType = std.mem.zeroInit(ComponentType, .{});
-
-        for (comp.properties) |prop| {
-            var field_found = false;
-            inline for (std.meta.fields(ComponentType)) |field| {
-                if (std.mem.eql(u8, field.name, prop.name)) {
-                    field_found = true;
-                    const field_value = try self.extractValueForType(
-                        field.type,
-                        prop.value,
-                        asset_manager,
-                    );
-                    if (field_value) |val|
-                        @field(component, field.name) = val;
-                    break;
+        if (comp.properties) |props| {
+            for (props) |prop| {
+                var field_found = false;
+                inline for (std.meta.fields(ComponentType)) |field| {
+                    if (std.mem.eql(u8, field.name, prop.name)) {
+                        field_found = true;
+                        const field_value = try self.extractValueForType(
+                            field.type,
+                            prop.value,
+                            asset_manager,
+                        );
+                        if (field_value) |val|
+                            @field(component, field.name) = val;
+                        break;
+                    }
                 }
-            }
-            if (!field_found) {
-                return InstantiatorError.UnknownProperty;
+                if (!field_found) {
+                    return InstantiatorError.UnknownProperty;
+                }
             }
         }
 
@@ -312,45 +321,46 @@ pub const Instantiator = struct {
 
         var component = std.mem.zeroInit(Components.Sprite, .{});
         var shape = std.mem.zeroInit(ShapeType, .{});
+        if (sprite.properties) |props| {
+            for (props) |prop| {
+                var field_found = false;
 
-        for (sprite.properties) |prop| {
-            var field_found = false;
-
-            // NOTE: this handles non-shape related fields (colors etc.)
-            inline for (std.meta.fields(Components.Sprite)) |field| {
-                if (std.mem.eql(u8, field.name, prop.name)) {
-                    field_found = true;
-                    const field_value = try self.extractValueForType(
-                        field.type,
-                        prop.value,
-                        asset_manager,
-                    );
-                    if (field_value) |val| {
-                        @field(component, field.name) = val;
-                    }
-                    break;
-                }
-            }
-            // NOTE: shape's fields are mixed in with sprite's in .scene files
-            if (!field_found) {
-                inline for (std.meta.fields(ShapeType)) |shape_field| {
-                    if (std.mem.eql(u8, shape_field.name, prop.name)) {
+                // NOTE: this handles non-shape related fields (colors etc.)
+                inline for (std.meta.fields(Components.Sprite)) |field| {
+                    if (std.mem.eql(u8, field.name, prop.name)) {
                         field_found = true;
                         const field_value = try self.extractValueForType(
-                            shape_field.type,
+                            field.type,
                             prop.value,
                             asset_manager,
                         );
                         if (field_value) |val| {
-                            @field(shape, shape_field.name) = val;
+                            @field(component, field.name) = val;
                         }
                         break;
                     }
                 }
-            }
+                // NOTE: shape's fields are mixed in with sprite's in .scene files
+                if (!field_found) {
+                    inline for (std.meta.fields(ShapeType)) |shape_field| {
+                        if (std.mem.eql(u8, shape_field.name, prop.name)) {
+                            field_found = true;
+                            const field_value = try self.extractValueForType(
+                                shape_field.type,
+                                prop.value,
+                                asset_manager,
+                            );
+                            if (field_value) |val| {
+                                @field(shape, shape_field.name) = val;
+                            }
+                            break;
+                        }
+                    }
+                }
 
-            if (!field_found) {
-                return InstantiatorError.UnknownProperty;
+                if (!field_found) {
+                    return InstantiatorError.UnknownProperty;
+                }
             }
         }
         component.geometry = ShapeRegistry.createShapeUnion(ShapeType, shape);
@@ -365,33 +375,34 @@ pub const Instantiator = struct {
         var component = std.mem.zeroInit(Components.Sprite, .{});
         var owned_points: []const V2 = undefined;
         defer self.allocator.free(owned_points);
-
-        for (sprite.properties) |prop| {
-            if (std.mem.eql(u8, "points", prop.name)) {
-                owned_points = try self.extractValueForType(
-                    []const V2,
-                    prop.value,
-                    asset_manager,
-                ) orelse return InstantiatorError.InvalidValue;
-                continue;
-            }
-            var field_found = false;
-            inline for (std.meta.fields(Components.Sprite)) |field| {
-                if (std.mem.eql(u8, field.name, prop.name)) {
-                    field_found = true;
-                    const field_value = try self.extractValueForType(
-                        field.type,
+        if (sprite.properties) |props| {
+            for (props) |prop| {
+                if (std.mem.eql(u8, "points", prop.name)) {
+                    owned_points = try self.extractValueForType(
+                        []const V2,
                         prop.value,
                         asset_manager,
-                    );
-                    if (field_value) |val| {
-                        @field(component, field.name) = val;
-                    }
-                    break;
+                    ) orelse return InstantiatorError.InvalidValue;
+                    continue;
                 }
-            }
-            if (!field_found) {
-                return InstantiatorError.UnknownProperty;
+                var field_found = false;
+                inline for (std.meta.fields(Components.Sprite)) |field| {
+                    if (std.mem.eql(u8, field.name, prop.name)) {
+                        field_found = true;
+                        const field_value = try self.extractValueForType(
+                            field.type,
+                            prop.value,
+                            asset_manager,
+                        );
+                        if (field_value) |val| {
+                            @field(component, field.name) = val;
+                        }
+                        break;
+                    }
+                }
+                if (!field_found) {
+                    return InstantiatorError.UnknownProperty;
+                }
             }
         }
         const polygon = try core_shapes.Polygon.init(self.allocator, owned_points);
@@ -408,16 +419,18 @@ pub const Instantiator = struct {
         var shape_data: ColliderShapeType = undefined;
 
         // Extract properties for the collider shape
-        for (collider_block.properties) |prop| {
-            inline for (std.meta.fields(ColliderShapeType)) |field| {
-                if (std.mem.eql(u8, field.name, prop.name)) {
-                    const field_value = try self.extractValueForType(
-                        field.type,
-                        prop.value,
-                        asset_manager,
-                    );
-                    if (field_value) |val| {
-                        @field(shape_data, field.name) = val;
+        if (collider_block.properties) |props| {
+            for (props) |prop| {
+                inline for (std.meta.fields(ColliderShapeType)) |field| {
+                    if (std.mem.eql(u8, field.name, prop.name)) {
+                        const field_value = try self.extractValueForType(
+                            field.type,
+                            prop.value,
+                            asset_manager,
+                        );
+                        if (field_value) |val| {
+                            @field(shape_data, field.name) = val;
+                        }
                     }
                 }
             }
@@ -425,8 +438,8 @@ pub const Instantiator = struct {
 
         // Create the ColliderShape union based on the shape type
         const collider_shape = blk: {
-            inline for (ColliderShapeRegistry.shape_names, 0..) |name, i| {
-                if (ColliderShapeType == ColliderShapeRegistry.shape_types[i]) {
+            inline for (ColliderRegistry.shape_names, 0..) |name, i| {
+                if (ColliderShapeType == ColliderRegistry.shape_types[i]) {
                     break :blk @unionInit(ecs.ColliderShape, name, shape_data);
                 }
             }
@@ -436,6 +449,29 @@ pub const Instantiator = struct {
         return Components.Collider{
             .shape = collider_shape,
         };
+    }
+
+    fn parseActionFromBlock(
+        self: *Instantiator,
+        block: GenericBlock,
+        asset_manager: *AssetManager, // TODO: just give the instantiator an asset manger and world to stop passing this all over the place. Make API availble only from an instance that is made in Engine.init()
+    ) !CollisionTrigger {
+        // var action_type: ActionType = undefined;
+        // use get property function (below)
+        if (block.properties) |props| {
+            for (props) |prop| {
+                if (std.mem.eql(u8, "type", prop.name)) {
+                    const action_type_str = try self.extractValueForType(
+                        []const u8,
+                        prop.value,
+                        asset_manager,
+                    ) orelse return InstantiatorError.InvalidValue;
+                    _ = action_type_str;
+                    continue;
+                }
+            }
+        }
+        return InstantiatorError.Unimplemented;
     }
 
     fn extractValueForType(
@@ -548,4 +584,17 @@ fn getProperty(props: []const Property, property: []const u8) ?Property {
     }
 
     return null;
+}
+
+fn getKeyCode(key_str: []const u8) !KeyCode {
+    return std.meta.stringToEnum(KeyCode, key_str);
+}
+fn getMouseButton(button_str: []const u8) !MouseButton {
+    return std.meta.stringToEnum(MouseButton, button_str);
+}
+fn getActionTarget(target: []const u8) !ActionTarget {
+    return std.meta.stringToEnum(ActionTarget, target);
+}
+fn getActionType(action: []const u8) !ActionType {
+    return std.meta.stringToEnum(ActionType, action);
 }

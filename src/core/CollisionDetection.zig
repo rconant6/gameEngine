@@ -1,6 +1,6 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
-const V2 = @import("core").V2;
+const V2 = @import("V2.zig");
 const entity = @import("entity");
 const World = entity.World;
 const Entity = entity.Entity;

@@ -22,9 +22,9 @@ pub const Destroy = comps.Destroy;
 // MARK: Colllisions
 pub const Collision = @import("Collision.zig");
 pub const Tag = @import("Tag.zig");
-// MARK: Internal
-const internal = @import("internal");
-pub const Input = internal.Input;
+// MARK: Core
+const core = @import("core");
+pub const Input = core.Input;
 // MARK: Action System
 const action = @import("action");
 pub const Action = action.Action;
