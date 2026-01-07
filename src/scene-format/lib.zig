@@ -12,6 +12,7 @@ const ast = @import("ast.zig");
 pub const AssetDeclaration = ast.AssetDeclaration;
 pub const AssetType = ast.AssetType;
 pub const BaseType = ast.BaseType;
+pub const TemplateDeclaration = ast.TemplateDeclaration;
 pub const ComponentDeclaration = ast.ComponentDeclaration;
 pub const Declaration = ast.Declaration;
 pub const EntityDeclaration = ast.EntityDeclaration;

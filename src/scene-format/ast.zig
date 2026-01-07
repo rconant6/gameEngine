@@ -41,10 +41,10 @@ pub const TemplateDeclaration = struct {
     location: SourceLocation,
 
     pub fn deinit(self: *TemplateDeclaration, allocator: Allocator) void {
-        allocator.free(self.name);
         for (self.components) |*comp| {
             comp.deinit(allocator);
         }
+        allocator.free(self.name);
         allocator.free(self.components);
     }
 };

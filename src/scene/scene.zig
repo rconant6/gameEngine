@@ -4,13 +4,16 @@ const manager = @import("manager.zig");
 pub const SceneManager = manager.SceneManager;
 pub const SceneManagerError = manager.SceneManagerError;
 
-const instantiator_mod = @import("instantiator.zig");
-pub const Instantiator = instantiator_mod.Instantiator;
-pub const InstantiatorError = instantiator_mod.InstantiatorError;
+const instantiator = @import("instantiator.zig");
+pub const Instantiator = instantiator.Instantiator;
+pub const InstantiatorError = instantiator.InstantiatorError;
 
 pub const loader = @import("loader.zig");
 
-pub const ComponentRegistry = @import("component_registry.zig").ComponentRegistry;
-pub const ShapeRegistry = @import("shape_registry.zig").ShapeRegistry;
+const core = @import("core");
+pub const ComponentRegistry = core.ComponentRegistry;
+pub const ShapeRegistry = core.ShapeRegistry;
 
-
+const templates = @import("templates.zig");
+pub const Template = templates.Template;
+pub const TemplateManager = templates.TemplateManager;

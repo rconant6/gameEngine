@@ -503,6 +503,9 @@ pub const Parser = struct {
     fn parseArrayValue(self: *Parser, element_type: ast.BaseType) !Value {
         _ = try self.consume(.l_brace);
 
+        const has_indent = self.check(.indent);
+        if (has_indent) _ = try self.advance();
+
         var vals: ArrayList(Value) = .empty;
         errdefer {
             for (vals.items) |*item| {
@@ -514,13 +517,14 @@ pub const Parser = struct {
             var val = try self.parseSingleValue(element_type);
             try vals.append(self.allocator, val);
 
-            while (!self.check(.r_brace)) {
+            while (!self.check(.r_brace) and !self.check(.dedent)) {
                 _ = try self.consume(.comma);
                 val = try self.parseSingleValue(element_type);
                 try vals.append(self.allocator, val);
             }
         }
 
+        if (has_indent and self.check(.dedent)) _ = try self.advance();
         _ = try self.consume(.r_brace);
 
         return Value{ .array = try vals.toOwnedSlice(self.allocator) };
@@ -599,6 +603,7 @@ pub const Parser = struct {
         }
 
         var arr = try self.allocator.alloc(f64, arity);
+        errdefer self.allocator.free(arr);
 
         var num = try self.parseNumber();
         arr[0] = num;
@@ -607,6 +612,7 @@ pub const Parser = struct {
             num = try self.parseNumber();
             arr[i] = num;
         }
+
         _ = try self.consume(.r_brace);
 
         return Value{ .vector = arr };
