@@ -134,10 +134,9 @@ test "Collider: shape modification from circle to rectangle" {
 test "ColliderData: union size" {
     // Verify the union is reasonably sized
     const size = @sizeOf(ColliderData);
-    std.debug.print("size: {d}\n", .{size});
     // Should be tag + largest variant
     try testing.expect(size > 0);
-    try testing.expect(size <= 24); // Reasonable upper bound
+    try testing.expect(size <= 20); // Reasonable upper bound
 }
 
 test "Collider: array of colliders with different shapes" {
