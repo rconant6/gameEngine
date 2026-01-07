@@ -158,7 +158,7 @@ pub const Engine = struct {
             @panic("Engine Broke");
         }
 
-        return .{
+        var engine = Engine{
             .allocator = allocator,
             .input = input,
             .assets = asset_manager,
@@ -168,10 +168,15 @@ pub const Engine = struct {
             .running = true,
             .action_system = action_system,
             .scene_manager = SceneManager.init(allocator),
-            .instantiator = Instantiator.init(allocator, &world, &asset_manager),
+            .instantiator = undefined,
             .error_logger = ErrorLogger.init(allocator),
             .collision_events = .empty,
         };
+
+        // Initialize instantiator with pointers to the engine's fields
+        engine.instantiator = Instantiator.init(allocator, &engine.world, &engine.assets);
+
+        return engine;
     }
 
     pub fn deinit(self: *Engine) void {
