@@ -2,12 +2,12 @@ const std = @import("std");
 const testing = std.testing;
 const core = @import("core");
 const V2 = core.V2;
+const ColliderData = core.ColliderData;
 const ecs = @import("entity");
 const World = ecs.World;
 const Transform = ecs.Transform;
 const Velocity = ecs.Velocity;
 const Collider = ecs.Collider;
-const ColliderShape = ecs.ColliderShape;
 const Collision = ecs.Collision;
 const CollisionDetection = core.CollisionDetection;
 
@@ -26,7 +26,7 @@ test "E2E: create world, add entities, detect collisions" {
         .scale = 1.0,
     });
     try world.addComponent(entity_a, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 5.0 } },
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 5.0 } },
     });
 
     const entity_b = try world.createEntity();
@@ -36,7 +36,7 @@ test "E2E: create world, add entities, detect collisions" {
         .scale = 1.0,
     });
     try world.addComponent(entity_b, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 5.0 } },
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 5.0 } },
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;
@@ -65,7 +65,7 @@ test "E2E: physics simulation with collisions" {
         .angular = 0,
     });
     try world.addComponent(ball, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 2.0 } },
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 2.0 } },
     });
 
     // Create static wall
@@ -76,7 +76,7 @@ test "E2E: physics simulation with collisions" {
         .scale = 1.0,
     });
     try world.addComponent(wall, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 2.0 } },
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 2.0 } },
     });
 
     // Simulate movement
@@ -131,7 +131,7 @@ test "E2E: multiple entities with different collision shapes" {
         .scale = 1.0,
     });
     try world.addComponent(circle1, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 3.0 } },
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 3.0 } },
     });
 
     // Circle 2
@@ -142,7 +142,7 @@ test "E2E: multiple entities with different collision shapes" {
         .scale = 1.0,
     });
     try world.addComponent(circle2, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 3.0 } },
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 3.0 } },
     });
 
     // Rectangle
@@ -153,7 +153,7 @@ test "E2E: multiple entities with different collision shapes" {
         .scale = 1.0,
     });
     try world.addComponent(rect, Collider, Collider{
-        .shape = ColliderShape{ .rectangle = .{ .half_w = 2.0, .half_h = 2.0 } },
+        .collider = ColliderData{ .RectangleCollider = .{ .half_w = 2.0, .half_h = 2.0 } },
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;
@@ -178,7 +178,7 @@ test "E2E: scale affects collision detection" {
         .scale = 0.5, // Half scale
     });
     try world.addComponent(small, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 4.0 } }, // Effective radius: 2.0
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 4.0 } }, // Effective radius: 2.0
     });
 
     // Large scaled circle
@@ -189,7 +189,7 @@ test "E2E: scale affects collision detection" {
         .scale = 2.0, // Double scale
     });
     try world.addComponent(large, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 4.0 } }, // Effective radius: 8.0
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 4.0 } }, // Effective radius: 8.0
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;
@@ -261,7 +261,7 @@ test "E2E: component removal and collision detection" {
         .scale = 1.0,
     });
     try world.addComponent(e1, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 5.0 } },
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 5.0 } },
     });
 
     const e2 = try world.createEntity();
@@ -271,7 +271,7 @@ test "E2E: component removal and collision detection" {
         .scale = 1.0,
     });
     try world.addComponent(e2, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 5.0 } },
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 5.0 } },
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;
@@ -304,7 +304,7 @@ test "E2E: entity destruction and collision detection" {
         .scale = 1.0,
     });
     try world.addComponent(e1, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 5.0 } },
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 5.0 } },
     });
 
     const e2 = try world.createEntity();
@@ -314,7 +314,7 @@ test "E2E: entity destruction and collision detection" {
         .scale = 1.0,
     });
     try world.addComponent(e2, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 5.0 } },
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 5.0 } },
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;
@@ -391,7 +391,7 @@ test "E2E: collision normal calculation with V2" {
         .scale = 1.0,
     });
     try world.addComponent(e1, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 5.0 } },
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 5.0 } },
     });
 
     const e2 = try world.createEntity();
@@ -401,7 +401,7 @@ test "E2E: collision normal calculation with V2" {
         .scale = 1.0,
     });
     try world.addComponent(e2, Collider, Collider{
-        .shape = ColliderShape{ .circle = .{ .radius = 5.0 } },
+        .collider = ColliderData{ .CircleCollider = .{ .radius = 5.0 } },
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;
@@ -442,7 +442,7 @@ test "E2E: stress test with many entities" {
             .scale = 1.0,
         });
         try world.addComponent(e, Collider, Collider{
-            .shape = ColliderShape{ .circle = .{ .radius = 1.5 } },
+            .collider = ColliderData{ .CircleCollider = .{ .radius = 1.5 } },
         });
     }
 
