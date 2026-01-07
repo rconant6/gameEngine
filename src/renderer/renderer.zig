@@ -3,20 +3,12 @@ const core = @import("core");
 pub const V2 = core.V2;
 pub const GamePoint = core.GamePoint;
 pub const ScreenPoint = core.ScreenPoint;
+pub const ShapeData = core.ShapeData;
+pub const Shapes = core.Shapes;
 const build_options = @import("build_options");
 const col = @import("color.zig");
 pub const Color = col.Color;
 pub const Colors = col.Colors;
-const shape = @import("shapes.zig");
-pub const Shape = shape.Shape;
-pub const cs = @import("core_shapes.zig");
-pub const Circle = cs.Circle;
-pub const Ellipse = cs.Ellipse;
-pub const Line = cs.Line;
-pub const Polygon = cs.Polygon;
-pub const Rectangle = cs.Rectangle;
-pub const Triangle = cs.Triangle;
-pub const FrameBuffer = @import("cpu/frameBuffer.zig").FrameBuffer;
 const utils = @import("geometry_utils.zig");
 pub const Transform = utils.Transform;
 pub const scalePt = utils.scalePt;
@@ -100,7 +92,7 @@ pub const Renderer = struct {
 
     pub fn drawGeometry(
         self: *Renderer,
-        shape_data: Shape,
+        shape_data: ShapeData,
         transform: ?Transform,
         fill_color: ?Color,
         stroke_color: ?Color,

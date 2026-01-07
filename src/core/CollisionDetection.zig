@@ -2,120 +2,31 @@ const std = @import("std");
 const ArrayList = std.ArrayList;
 const V2 = @import("V2.zig");
 const entity = @import("entity");
-const World = entity.World;
+const Collider = entity.comps.Collider;
+const CircleCollider = entity.CircleCollider;
+const RectangleCollider = entity.RectangleCollider;
 const Entity = entity.Entity;
-const Collision = entity.Collision;
 const Transform = entity.Transform;
-const Collider = entity.Collider;
-const ColliderShape = entity.ColliderShape;
+const World = entity.World;
+const csr = @import("collider_shape_registry.zig");
+const ColliderData = csr.ColliderData;
+const ColliderRegistry = csr.ColliderRegistry;
 
-pub const CollisionData = struct {
+pub const Collision = struct {
+    entity_a: Entity,
+    entity_b: Entity,
+    point: V2,
+    normal: V2,
+    penetration: f32,
+    actions_fired: bool = false,
+};
+
+const CollisionData = struct {
     point: V2,
     normal: V2,
     penetration: f32,
 };
 
-pub const TransformedCollider = struct {
-    position: V2,
-    scale: f32,
-    rotation: f32,
-    shape: ColliderShape,
-};
-
-// MARK: Collision detection functions
-pub fn collideCircleCircle(
-    a: TransformedCollider,
-    b: TransformedCollider,
-) ?CollisionData {
-    const radius_a = a.shape.circle.radius * a.scale;
-    const radius_b = b.shape.circle.radius * b.scale;
-
-    const delta = b.position.sub(a.position);
-    const dist_sq = (delta.x * delta.x) + (delta.y * delta.y);
-    const radii_sum = radius_a + radius_b;
-
-    if (dist_sq > radii_sum * radii_sum) return null;
-
-    const dist = delta.magnitude();
-
-    if (dist < 0.00001) {
-        return .{
-            .point = a.position,
-            .normal = .{ .x = 1.0, .y = 0.0 },
-            .penetration = radii_sum,
-        };
-    }
-
-    const normal = delta.div(dist);
-
-    const hit_point = a.position.add(normal.mul(radius_a));
-
-    return .{ .point = hit_point, .normal = normal, .penetration = radii_sum - dist };
-}
-pub fn collideCircleRect(a: TransformedCollider, b: TransformedCollider) ?CollisionData {
-    const radius_a = a.shape.circle.radius * a.scale;
-
-    const left_x = b.position.x - b.shape.rectangle.half_w;
-    const right_x = b.position.x + b.shape.rectangle.half_w;
-    const top = b.position.y + b.shape.rectangle.half_h;
-    const bottom = b.position.y - b.shape.rectangle.half_h;
-
-    const closest_x = @max(left_x, @min(a.position.x, right_x));
-    const closest_y = @max(bottom, @min(a.position.y, top));
-
-    const dx = a.position.x - closest_x;
-    const dy = a.position.y - closest_y;
-
-    const dist_sq = (dx * dx) + (dy * dy);
-    const radii_sq = radius_a * radius_a;
-
-    if (dist_sq > radii_sq) return null;
-
-    const dist = @sqrt(dist_sq);
-
-    const normal = if (dist > 0.00001)
-        V2{ .x = dx / dist, .y = dy / dist }
-    else blk: {
-        const dl = @abs(a.position.x - left_x);
-        const dr = @abs(a.position.x - right_x);
-        const dt = @abs(a.position.y - top);
-        const db = @abs(a.position.y - bottom);
-        const min = @min(dl, @min(dr, @min(dt, db)));
-
-        if (min == dl) break :blk V2{ .x = -1, .y = 0 };
-        if (min == dr) break :blk V2{ .x = 1, .y = 0 };
-        if (min == dt) break :blk V2{ .x = 0, .y = 1 };
-        break :blk V2{ .x = 0, .y = -1 };
-    };
-
-    return .{
-        .point = .{ .x = closest_x, .y = closest_y },
-        .normal = normal,
-        .penetration = radius_a - dist,
-    };
-}
-pub fn collideRectRect(
-    a: TransformedCollider,
-    b: TransformedCollider,
-) ?CollisionData {
-    _ = a;
-    _ = b;
-    return null;
-}
-
-// MARK: dispatch table
-const CollisionFn = *const fn (TransformedCollider, TransformedCollider) ?CollisionData;
-const table_size = @typeInfo(ColliderShape).@"union".fields.len;
-const dispatch_table: [table_size][table_size]CollisionFn = .{
-    // Rows: Circle, Rect, etc..
-    [_]CollisionFn{ collideCircleCircle, collideCircleRect }, // Circle collisions
-    [_]CollisionFn{ undefined, collideRectRect }, // Rectangle collisions
-};
-comptime {
-    if (dispatch_table.len != table_size) {
-        @compileError("Dispatch table row count does not match ShapeType count");
-    }
-}
 // MARK: Main collisiton detector
 pub fn detectCollisions(
     world: *World,
@@ -137,56 +48,266 @@ pub fn detectCollisions(
             const collider_a = entity_a.get(1);
             const collider_b = entity_b.get(1);
 
-            const shape_a = collider_a.shape orelse continue;
-            const shape_b = collider_b.shape orelse continue;
-
-            const shape_a_idx = @intFromEnum(shape_a);
-            const shape_b_idx = @intFromEnum(shape_b);
-            const row = if (shape_a_idx <= shape_b_idx) shape_a_idx else shape_b_idx;
-            const col = if (shape_a_idx <= shape_b_idx) shape_b_idx else shape_a_idx;
-            const collision_fn = dispatch_table[row][col];
-            const collision_data =
-                if (shape_a_idx < shape_b_idx) blk: {
-                    break :blk collision_fn(
-                        .{
-                            .position = transform_a.position,
-                            .scale = transform_a.scale,
-                            .rotation = transform_a.rotation,
-                            .shape = shape_a,
+            switch (collider_a.collider) {
+                inline else => |shape_a| {
+                    switch (collider_b.collider) {
+                        inline else => |shape_b| {
+                            if (tryCallCollision(
+                                shape_a,
+                                transform_a.*,
+                                shape_b,
+                                transform_b.*,
+                            )) |hit| {
+                                try collision_events.append(world.allocator, .{
+                                    .entity_a = entity_a.entity,
+                                    .entity_b = entity_b.entity,
+                                    .point = hit.point,
+                                    .normal = hit.normal,
+                                    .penetration = hit.penetration,
+                                });
+                            }
                         },
-                        .{
-                            .position = transform_b.position,
-                            .scale = transform_b.scale,
-                            .rotation = transform_b.rotation,
-                            .shape = shape_b,
-                        },
-                    );
-                } else blk: {
-                    break :blk collision_fn(
-                        .{
-                            .position = transform_b.position,
-                            .scale = transform_b.scale,
-                            .rotation = transform_b.rotation,
-                            .shape = shape_b,
-                        },
-                        .{
-                            .position = transform_a.position,
-                            .scale = transform_a.scale,
-                            .rotation = transform_a.rotation,
-                            .shape = shape_a,
-                        },
-                    );
-                };
-
-            if (collision_data) |data| {
-                try collision_events.append(world.allocator, .{
-                    .entity_a = entity_a.entity,
-                    .entity_b = entity_b.entity,
-                    .point = data.point,
-                    .normal = data.normal,
-                    .penetration = data.penetration,
-                });
+                    }
+                },
             }
         }
+    }
+}
+
+fn stripModulePrefix(comptime full_name: []const u8) []const u8 {
+    comptime {
+        if (std.mem.lastIndexOf(u8, full_name, ".")) |idx| {
+            return full_name[idx + 1 ..];
+        }
+        return full_name;
+    }
+}
+
+fn tryCallCollision(a: anytype, ta: Transform, b: anytype, tb: Transform) ?CollisionData {
+    const T1 = @TypeOf(a);
+    const T2 = @TypeOf(b);
+    const name1 = comptime stripModulePrefix(@typeName(T1));
+    const name2 = comptime stripModulePrefix(@typeName(T2));
+    const name = "collide" ++ name1 ++ name2;
+
+    if (@hasDecl(@This(), name)) {
+        return @call(.auto, @field(@This(), name), .{ a, ta, b, tb });
+    }
+
+    // NOTE: reverse (RectangleVsCircle) but flip the normal back
+    const rev_name = "collide" ++ name2 ++ name1;
+    if (@hasDecl(@This(), rev_name)) {
+        if (@call(.auto, @field(@This(), rev_name), .{ b, tb, a, ta })) |hit| {
+            var flipped = hit;
+            flipped.normal = flipped.normal.negate();
+            return flipped;
+        }
+    }
+
+    return null;
+}
+
+// MARK: Collision detection functions
+pub fn collideCircleColliderCircleCollider(
+    a: CircleCollider,
+    ta: Transform,
+    b: CircleCollider,
+    tb: Transform,
+) ?CollisionData {
+    const radius_a = a.radius * ta.scale;
+    const radius_b = b.radius * tb.scale;
+    const pos_a = a.origin.add(ta.position);
+    const pos_b = b.origin.add(tb.position);
+
+    const delta = pos_b.sub(pos_a);
+    const dist_sq = (delta.x * delta.x) + (delta.y * delta.y);
+    const radii_sum = radius_a + radius_b;
+
+    if (dist_sq > radii_sum * radii_sum) return null;
+
+    const dist = delta.magnitude();
+
+    if (dist < 0.00001) {
+        return .{
+            .point = pos_a,
+            .normal = .{ .x = 1.0, .y = 0.0 },
+            .penetration = radii_sum,
+        };
+    }
+
+    const normal = delta.div(dist);
+
+    const hit_point = pos_a.add(normal.mul(radius_a));
+
+    return .{ .point = hit_point, .normal = normal, .penetration = radii_sum - dist };
+}
+pub fn collideCircleColliderRectangleCollider(
+    a: CircleCollider,
+    ta: Transform,
+    b: RectangleCollider,
+    tb: Transform,
+) ?CollisionData {
+    const radius_a = a.radius * ta.scale;
+    const pos_a = a.origin.add(ta.position);
+    const pos_b = b.center.add(tb.position);
+    const b_half_w = b.half_w * tb.scale;
+    const b_half_h = b.half_h * tb.scale;
+
+    const left_x = pos_b.x - b_half_w;
+    const right_x = pos_b.x + b_half_w;
+    const top = pos_b.y + b_half_h;
+    const bottom = pos_b.y - b_half_h;
+
+    const closest_x = @max(left_x, @min(pos_a.x, right_x));
+    const closest_y = @max(bottom, @min(pos_a.y, top));
+
+    const dx = pos_a.x - closest_x;
+    const dy = pos_a.y - closest_y;
+
+    const dist_sq = (dx * dx) + (dy * dy);
+    const radii_sq = radius_a * radius_a;
+
+    if (dist_sq > radii_sq) return null;
+
+    const dist = @sqrt(dist_sq);
+
+    const normal = if (dist > 0.00001)
+        V2{ .x = dx / dist, .y = dy / dist }
+    else blk: {
+        const dl = @abs(pos_a.x - left_x);
+        const dr = @abs(pos_a.x - right_x);
+        const dt = @abs(pos_a.y - top);
+        const db = @abs(pos_a.y - bottom);
+        const min = @min(dl, @min(dr, @min(dt, db)));
+
+        if (min == dl) break :blk V2{ .x = -1, .y = 0 };
+        if (min == dr) break :blk V2{ .x = 1, .y = 0 };
+        if (min == dt) break :blk V2{ .x = 0, .y = 1 };
+        break :blk V2{ .x = 0, .y = -1 };
+    };
+
+    return .{
+        .point = .{ .x = closest_x, .y = closest_y },
+        .normal = normal,
+        .penetration = radius_a - dist,
+    };
+}
+pub fn collideRectangleColliderCircleCollider(
+    b: RectangleCollider,
+    tb: Transform,
+    a: CircleCollider,
+    ta: Transform,
+) ?CollisionData {
+    const radius_a = a.radius * ta.scale;
+    const pos_a = a.origin.add(ta.position);
+    const pos_b = b.center.add(tb.position);
+    const b_half_w = b.half_w * tb.scale;
+    const b_half_h = b.half_h * tb.scale;
+
+    const left_x = pos_b.x - b_half_w;
+    const right_x = pos_b.x + b_half_w;
+    const top = pos_b.y + b_half_h;
+    const bottom = pos_b.y - b_half_h;
+
+    const closest_x = @max(left_x, @min(pos_a.x, right_x));
+    const closest_y = @max(bottom, @min(pos_a.y, top));
+
+    const dx = pos_a.x - closest_x;
+    const dy = pos_a.y - closest_y;
+
+    const dist_sq = (dx * dx) + (dy * dy);
+    const radii_sq = radius_a * radius_a;
+
+    if (dist_sq > radii_sq) return null;
+
+    const dist = @sqrt(dist_sq);
+
+    const normal = if (dist > 0.00001)
+        V2{ .x = dx / dist, .y = dy / dist }
+    else blk: {
+        const dl = @abs(pos_a.x - left_x);
+        const dr = @abs(pos_a.x - right_x);
+        const dt = @abs(pos_a.y - top);
+        const db = @abs(pos_a.y - bottom);
+        const min = @min(dl, @min(dr, @min(dt, db)));
+
+        if (min == dl) break :blk V2{ .x = -1, .y = 0 };
+        if (min == dr) break :blk V2{ .x = 1, .y = 0 };
+        if (min == dt) break :blk V2{ .x = 0, .y = 1 };
+        break :blk V2{ .x = 0, .y = -1 };
+    };
+
+    return .{
+        .point = .{ .x = closest_x, .y = closest_y },
+        .normal = normal,
+        .penetration = radius_a - dist,
+    };
+}
+pub fn collideRectangleColliderRectangleCollider(
+    a: RectangleCollider,
+    ta: Transform,
+    b: RectangleCollider,
+    tb: Transform,
+) ?CollisionData {
+    const pos_a = a.center.add(ta.position);
+    const a_half_w = a.half_w * ta.scale;
+    const a_half_h = a.half_h * ta.scale;
+    const a_left_x = pos_a.x - a_half_w;
+    const a_right_x = pos_a.x + a_half_w;
+    const a_top = pos_a.y + a_half_h;
+    const a_bottom = pos_a.y - a_half_h;
+
+    const pos_b = b.center.add(tb.position);
+    const b_half_w = b.half_w * tb.scale;
+    const b_half_h = b.half_h * tb.scale;
+    const b_left_x = pos_b.x - b_half_w;
+    const b_right_x = pos_b.x + b_half_w;
+    const b_top = pos_b.y + b_half_h;
+    const b_bottom = pos_b.y - b_half_h;
+
+    if (a_right_x < b_left_x or a_left_x > b_right_x or
+        a_top < b_bottom or a_bottom > b_top)
+    {
+        return null;
+    }
+
+    const overlap_x_left = a_right_x - b_left_x;
+    const overlap_x_right = b_right_x - a_left_x;
+    const overlap_y_top = a_top - b_bottom;
+    const overlap_y_bottom = b_top - a_bottom;
+
+    const overlap_x = @min(overlap_x_left, overlap_x_right);
+    const overlap_y = @min(overlap_y_top, overlap_y_bottom);
+
+    if (overlap_x < overlap_y) {
+        // Collision from left or right
+        const normal = if (overlap_x_left < overlap_x_right)
+            V2{ .x = 1.0, .y = 0.0 } // Push right
+        else
+            V2{ .x = -1.0, .y = 0.0 }; // Push left
+
+        const point_x = if (normal.x > 0) a_right_x else a_left_x;
+        const point_y = (a_top + a_bottom) / 2.0;
+
+        return .{
+            .point = .{ .x = point_x, .y = point_y },
+            .normal = normal,
+            .penetration = overlap_x,
+        };
+    } else {
+        // Collision from top or bottom
+        const normal = if (overlap_y_top < overlap_y_bottom)
+            V2{ .x = 0.0, .y = 1.0 } // Push up
+        else
+            V2{ .x = 0.0, .y = -1.0 }; // Push down
+
+        const point_x = (a_left_x + a_right_x) / 2.0;
+        const point_y = if (normal.y > 0) a_top else a_bottom;
+
+        return .{
+            .point = .{ .x = point_x, .y = point_y },
+            .normal = normal,
+            .penetration = overlap_y,
+        };
     }
 }

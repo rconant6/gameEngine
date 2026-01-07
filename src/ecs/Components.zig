@@ -1,11 +1,13 @@
 const core = @import("core");
 const V2 = core.V2;
+const ColliderData = core.ColliderData;
+const ShapeRegistry = core.ShapeRegistry;
+const ShapeData = core.ShapeData;
 const rend = @import("renderer");
 const Color = rend.Color;
 const Shape = rend.Shape;
 const asset = @import("asset");
 const FontHandle = asset.FontHandle;
-const collider = @import("collider.zig");
 const action = @import("action");
 
 // MARK: Action Components
@@ -22,14 +24,22 @@ pub const Transform = struct {
 
 // MARK: Rendering Components
 pub const Sprite = struct {
-    geometry: ?Shape,
+    geometry: ?ShapeData,
     fill_color: ?Color = null,
     stroke_color: ?Color = null,
     stroke_width: f32 = 1,
     visible: bool = true,
 
     pub fn deinit(self: *Sprite) void {
-        if (self.geometry) |*g| g.deinit();
+        if (self.geometry) |*geo| {
+            switch (geo.*) {
+                inline else => |*shape| {
+                    if (@hasDecl(@TypeOf(shape.*), "deinit")) {
+                        shape.deinit();
+                    }
+                },
+            }
+        }
     }
 };
 pub const Text = struct {
@@ -62,7 +72,9 @@ pub const Physics = struct {
     friction: f32,
 };
 // MARK: Collision Components
-pub const Collider = collider.Collider;
+pub const Collider = struct {
+    collider: ColliderData,
+};
 
 // MARK: Utility Components
 pub const Lifetime = struct {

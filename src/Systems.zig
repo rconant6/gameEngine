@@ -15,7 +15,9 @@ const Destroy = ecs.Destroy;
 const Box = ecs.Box;
 const Engine = @import("engine.zig").Engine;
 const core = @import("core");
+const shapes = core.Shapes;
 const CollisionDetection = core.CollisionDetection;
+const ShapeRegistry = core.ShapeRegistry;
 
 const Renderer = rend.Renderer;
 pub fn movementSystem(engine: *Engine, dt: f32) void {
@@ -44,20 +46,20 @@ pub fn renderSystem(engine: *Engine) void {
     while (box_query.next()) |entry| {
         const transform = entry.get(0);
         const box = entry.get(1);
-        const geo = rend.Rectangle.initFromCenter(
+        const geo = shapes.Rectangle.initFromCenter(
             .{ .x = 0, .y = 0 },
             box.size.x,
             box.size.y,
         );
 
         if (box.filled) {
-            renderer.drawGeometry(rend.Shape{ .rectangle = geo }, .{
+            renderer.drawGeometry(ShapeRegistry.createShapeUnion(shapes.Rectangle, geo), .{
                 .offset = transform.position,
                 .rotation = transform.rotation,
                 .scale = transform.scale,
             }, box.fill_color, null, 1.0);
         } else {
-            renderer.drawGeometry(rend.Shape{ .rectangle = geo }, .{
+            renderer.drawGeometry(ShapeRegistry.createShapeUnion(shapes.Rectangle, geo), .{
                 .offset = transform.position,
                 .rotation = transform.rotation,
                 .scale = transform.scale,

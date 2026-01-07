@@ -1,9 +1,10 @@
 const std = @import("std");
 const ecs = @import("entity");
-const ColliderShape = ecs.ColliderShape;
+const Colliders = ecs.colliders;
 const Type = std.builtin.Type;
+
 pub const ColliderData = blk: {
-    const registry = ColliderShapeRegistry;
+    const registry = ColliderRegistry;
 
     var enum_fields: [registry.shape_types.len]Type.EnumField = undefined;
     for (registry.shape_names, 0..) |name, i| {
@@ -12,6 +13,7 @@ pub const ColliderData = blk: {
             .value = i,
         };
     }
+
     const TagEnum = @Type(.{
         .@"enum" = .{
             .tag_type = u8,
@@ -40,26 +42,26 @@ pub const ColliderData = blk: {
     });
 };
 
-pub const ColliderShapeRegistry = struct {
+pub const ColliderRegistry = struct {
     pub const shape_types = blk: {
-        const union_fields = @typeInfo(ColliderShape).@"union".fields;
-        var types: [union_fields.len]type = undefined;
-        for (union_fields, 0..) |field, i| {
-            types[i] = field.type;
+        const decls = @typeInfo(Colliders).@"struct".decls;
+        var types: [decls.len]type = undefined;
+        for (decls, 0..) |decl, i| {
+            types[i] = @field(Colliders, decl.name);
         }
         break :blk types;
     };
 
     pub const shape_names = blk: {
-        const union_fields = @typeInfo(ColliderShape).@"union".fields;
-        var names: [union_fields.len][]const u8 = undefined;
-        for (union_fields, 0..) |field, i| {
-            names[i] = field.name;
+        const decls = @typeInfo(Colliders).@"struct".decls;
+        var names: [decls.len][:0]const u8 = undefined;
+        for (decls, 0..) |decl, i| {
+            names[i] = decl.name;
         }
         break :blk names;
     };
 
-    pub fn getShapeIndex(name: []const u8) ?usize {
+    pub fn getColliderIndex(name: []const u8) ?usize {
         inline for (shape_names, 0..) |shape_name, i| {
             if (std.ascii.eqlIgnoreCase(name, shape_name)) {
                 return i;
@@ -68,12 +70,21 @@ pub const ColliderShapeRegistry = struct {
         return null;
     }
 
-    pub fn getShapeType(comptime name: []const u8) ?type {
+    pub fn getColliderType(comptime name: []const u8) ?type {
         inline for (shape_names, 0..) |shape_name, i| {
             if (std.mem.eql(u8, shape_name, name)) {
                 return shape_types[i];
             }
         }
         return null;
+    }
+
+    pub fn createColliderUnion(comptime ColliderType: type, shape: ColliderType) ColliderData {
+        inline for (shape_names, 0..) |name, i| {
+            if (ColliderType == shape_types[i]) {
+                return @unionInit(ColliderData, name, shape);
+            }
+        }
+        @compileError("Unknown collider shape type: " ++ @typeName(ColliderType));
     }
 };

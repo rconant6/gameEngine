@@ -1,43 +1,26 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const Point = @import("core").V2;
+const Point = @import("V2.zig").V2;
 const hf = @import("helper_funtions.zig");
 const tris = @import("triangulation.zig");
+// NOTE: These need to be in the right order in the file
+// inorder to keep collision working
+// Circle => 0
+// Rectangle => 2
 
-pub const Line = struct {
-    start: Point,
-    end: Point,
-
-    pub fn init(
-        alloc: Allocator,
-        start: Point,
-        end: Point,
-    ) !Line {
-        _ = alloc;
-        return .{
-            .start = start,
-            .end = end,
-        };
-    }
-};
-
-pub const Triangle = struct {
-    v0: Point,
-    v1: Point,
-    v2: Point,
+pub const Circle = struct {
+    origin: Point,
+    radius: f32,
 
     pub fn init(
         alloc: Allocator,
-        points: []const Point,
-    ) !Triangle {
+        origin: Point,
+        r: f32,
+    ) !Circle {
         _ = alloc;
-        std.debug.assert(points.len == 3);
-        var verts = [3]Point{ points[0], points[1], points[2] };
-        std.mem.sort(Point, &verts, {}, hf.sortPointByYThenX);
         return .{
-            .v0 = verts[0],
-            .v1 = verts[1],
-            .v2 = verts[2],
+            .origin = origin,
+            .radius = r,
         };
     }
 };
@@ -118,6 +101,44 @@ pub const Rectangle = struct {
     }
 };
 
+pub const Triangle = struct {
+    v0: Point,
+    v1: Point,
+    v2: Point,
+
+    pub fn init(
+        alloc: Allocator,
+        points: []const Point,
+    ) !Triangle {
+        _ = alloc;
+        std.debug.assert(points.len == 3);
+        var verts = [3]Point{ points[0], points[1], points[2] };
+        std.mem.sort(Point, &verts, {}, hf.sortPointByYThenX);
+        return .{
+            .v0 = verts[0],
+            .v1 = verts[1],
+            .v2 = verts[2],
+        };
+    }
+};
+
+pub const Line = struct {
+    start: Point,
+    end: Point,
+
+    pub fn init(
+        alloc: Allocator,
+        start: Point,
+        end: Point,
+    ) !Line {
+        _ = alloc;
+        return .{
+            .start = start,
+            .end = end,
+        };
+    }
+};
+
 pub const Polygon = struct {
     allocator: Allocator,
     points: []const Point,
@@ -172,23 +193,6 @@ pub const Polygon = struct {
 
         self.triangle_cache = triangles;
         return triangles;
-    }
-};
-
-pub const Circle = struct {
-    origin: Point,
-    radius: f32,
-
-    pub fn init(
-        alloc: Allocator,
-        origin: Point,
-        r: f32,
-    ) !Circle {
-        _ = alloc;
-        return .{
-            .origin = origin,
-            .radius = r,
-        };
     }
 };
 

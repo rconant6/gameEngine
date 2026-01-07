@@ -22,13 +22,12 @@ const MTLLoadAction = metal.MTLLoadAction;
 const MTLStoreAction = metal.MTLStoreAction;
 
 const Color = @import("../../color.zig").Color;
-const shapes = @import("../../shapes.zig");
-const ShapeData = shapes.Shape;
 const RenderContext = @import("../../RenderContext.zig");
 const utils = @import("../../geometry_utils.zig");
 const Transform = utils.Transform;
 const rend = @import("../../renderer.zig");
 const RenderConfig = rend.RendererConfig;
+const ShapeData = rend.ShapeData;
 
 const Self = @This();
 

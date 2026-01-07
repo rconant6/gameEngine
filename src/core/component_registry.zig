@@ -9,7 +9,7 @@ pub const ComponentData = blk: {
     var enum_fields: [registry.component_types.len]Type.EnumField = undefined;
     for (registry.component_names, 0..) |name, i| {
         enum_fields[i] = .{
-            .name = name,
+            .name = name[0..name.len :0],
             .value = i,
         };
     }
@@ -25,7 +25,7 @@ pub const ComponentData = blk: {
     var union_fields: [registry.component_types.len]Type.UnionField = undefined;
     for (registry.component_types, registry.component_names, 0..) |comp_type, name, i| {
         union_fields[i] = .{
-            .name = name,
+            .name = name[0..name.len :0],
             .type = comp_type,
             .alignment = @alignOf(comp_type),
         };
@@ -43,16 +43,16 @@ pub const ComponentData = blk: {
 
 pub const ComponentRegistry = struct {
     pub const component_types = blk: {
-        const names = std.meta.declarations(Components);
-        var types: [names.len]type = undefined;
-        for (names, 0..) |name, i| {
-            types[i] = @field(Components, name.name);
+        const decls = @typeInfo(Components).@"struct".decls;
+        var types: [decls.len]type = undefined;
+        for (decls, 0..) |decl, i| {
+            types[i] = @field(Components, decl.name);
         }
         break :blk types;
     };
 
     pub const component_names = blk: {
-        const decls = std.meta.declarations(Components);
+        const decls = @typeInfo(Components).@"struct".decls;
         var names: [decls.len][]const u8 = undefined;
         for (decls, 0..) |decl, i| {
             names[i] = decl.name;
@@ -76,5 +76,14 @@ pub const ComponentRegistry = struct {
             }
         }
         return null;
+    }
+
+    pub fn createComponentUnion(comptime ComponentType: type, component: ComponentType) ComponentData {
+        inline for (component_names, 0..) |name, i| {
+            if (ComponentType == component_types[i]) {
+                return @unionInit(ComponentData, name, component);
+            }
+        }
+        @compileError("Unknown component type: " ++ @typeName(ComponentType));
     }
 };

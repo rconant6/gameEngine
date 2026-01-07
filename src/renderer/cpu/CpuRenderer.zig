@@ -1,5 +1,4 @@
 const std = @import("std");
-const shapes = @import("../../renderer/shapes.zig");
 const RenderConfig = @import("../../renderer/renderer.zig").RendererConfig;
 const Circle = shapes.Circle;
 const Color = @import("../color.zig").Color;
@@ -10,6 +9,7 @@ const Rectangle = shapes.Rectangle;
 const Shape = shapes.Shape;
 const Triangle = shapes.Triangle;
 const core = @import("core");
+const shapes = core.Shapes;
 const GamePoint = core.GamePoint;
 const ScreenPoint = core.ScreenPoint;
 const utils = @import("../../renderer/geometry_utils.zig");

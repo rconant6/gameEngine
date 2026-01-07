@@ -1,7 +1,5 @@
 const std = @import("std");
-const rend = @import("renderer");
-const Shapes = rend.cs;
-const Shape = rend.Shape;
+const Shapes = @import("shapes.zig");
 const Type = std.builtin.Type;
 
 pub const ShapeData = blk: {
@@ -10,7 +8,7 @@ pub const ShapeData = blk: {
     var enum_fields: [ShapeRegistry.shape_types.len]Type.EnumField = undefined;
     for (registry.shape_names, 0..) |name, i| {
         enum_fields[i] = .{
-            .name = name,
+            .name = name[0..name.len :0],
             .value = i,
         };
     }
@@ -27,7 +25,7 @@ pub const ShapeData = blk: {
     var union_fields: [registry.shape_types.len]Type.UnionField = undefined;
     for (registry.shape_types, registry.shape_names, 0..) |shape_type, name, i| {
         union_fields[i] = .{
-            .name = name,
+            .name = name[0..name.len :0],
             .type = shape_type,
             .alignment = @alignOf(shape_type),
         };
@@ -45,10 +43,10 @@ pub const ShapeData = blk: {
 
 pub const ShapeRegistry = struct {
     pub const shape_types = blk: {
-        const names = @typeInfo(Shapes).@"struct".decls;
-        var types: [names.len]type = undefined;
-        for (names, 0..) |name, i| {
-            types[i] = @field(Shapes, name.name);
+        const decls = @typeInfo(Shapes).@"struct".decls;
+        var types: [decls.len]type = undefined;
+        for (decls, 0..) |decl, i| {
+            types[i] = @field(Shapes, decl.name);
         }
         break :blk types;
     };
@@ -80,21 +78,12 @@ pub const ShapeRegistry = struct {
         return null;
     }
 
-    pub fn createShapeUnion(comptime ShapeType: type, shape: ShapeType) Shape {
-        if (ShapeType == Shapes.Circle) {
-            return .{ .circle = shape };
-        } else if (ShapeType == Shapes.Rectangle) {
-            return .{ .rectangle = shape };
-        } else if (ShapeType == Shapes.Triangle) {
-            return .{ .triangle = shape };
-        } else if (ShapeType == Shapes.Line) {
-            return .{ .line = shape };
-        } else if (ShapeType == Shapes.Polygon) {
-            return .{ .polygon = shape };
-        } else if (ShapeType == Shapes.Ellipse) {
-            return .{ .ellipse = shape };
-        } else {
-            @compileError("Unknown shape type: " ++ @typeName(ShapeType));
+    pub fn createShapeUnion(comptime ShapeType: type, shape: ShapeType) ShapeData {
+        inline for (shape_names, 0..) |name, i| {
+            if (ShapeType == shape_types[i]) {
+                return @unionInit(ShapeData, name, shape);
+            }
         }
+        @compileError("Unknown shape type: " ++ @typeName(ShapeType));
     }
 };

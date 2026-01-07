@@ -67,6 +67,9 @@ pub fn build(b: *std.Build) void {
     // Configure platform-specific linking on the platform module
     configurePlatformModule(b, platform_module, target, optimize, selected_renderer);
 
+    // Configure platform-specific linking on the renderer module (needs Metal frameworks)
+    configurePlatformModule(b, renderer_module, target, optimize, selected_renderer);
+
     // Core needs platform for Input.zig
     core_module.addImport("platform", platform_module);
 
@@ -142,17 +145,16 @@ pub fn build(b: *std.Build) void {
     scene_instantiator_module.addImport("collider_shape_registry", collider_shape_registry_module);
     scene_instantiator_module.addImport("platform", platform_module);
 
-    // Engine public API
+    // ========================================
+    // Engine Module and Library
+    // ========================================
     const engine_module = b.addModule("engine", .{
         .root_source_file = b.path("src/engine.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    // Scene instantiator needs the Engine type
-    scene_instantiator_module.addImport("engine", engine_module);
-
-    // Engine module dependencies
+    // Add all module dependencies
     engine_module.addImport("core", core_module);
     engine_module.addImport("platform", platform_module);
     engine_module.addImport("renderer", renderer_module);
@@ -161,12 +163,25 @@ pub fn build(b: *std.Build) void {
     engine_module.addImport("entity", entity_module);
     engine_module.addImport("scene-format", scene_format_module);
     engine_module.addImport("action", action_module);
-
-    // Engine owns scene management internally - games don't need to import these
     engine_module.addImport("scene_instantiator", scene_instantiator_module);
     engine_module.addImport("scene_manager", scene_manager_module);
     engine_module.addImport("component_registry", component_registry_module);
     engine_module.addImport("shape_registry", shape_registry_module);
+
+    // Scene instantiator needs the Engine type
+    scene_instantiator_module.addImport("engine", engine_module);
+
+    // Create a static library for the engine
+    const engine_lib = b.addLibrary(.{
+        .name = "game-engine",
+        .root_module = engine_module,
+    });
+
+    // Configure platform-specific linking and build steps for the engine library
+    configurePlatform(b, engine_lib, engine_module, target, optimize, selected_renderer);
+
+    // Install the engine library
+    b.installArtifact(engine_lib);
 
     // ========================================
     // Test Game Executable
@@ -263,6 +278,7 @@ pub fn build(b: *std.Build) void {
         .name = "query-tests",
         .root_module = query_test_module,
     });
+    query_tests.linkLibrary(engine_lib);
     const run_query_tests = b.addRunArtifact(query_tests);
 
     // World Tests
@@ -288,6 +304,7 @@ pub fn build(b: *std.Build) void {
         .name = "world-tests",
         .root_module = world_test_module,
     });
+    world_tests.linkLibrary(engine_lib);
     const run_world_tests = b.addRunArtifact(world_tests);
 
     // Collider Component Tests
@@ -296,14 +313,14 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    collider_test_module.addAnonymousImport("collider", .{
-        .root_source_file = b.path("src/ecs/collider.zig"),
-    });
+    collider_test_module.addImport("core", core_module);
+    collider_test_module.addImport("entity", entity_module);
 
     const collider_tests = b.addTest(.{
         .name = "collider-tests",
         .root_module = collider_test_module,
     });
+    collider_tests.linkLibrary(engine_lib);
     const run_collider_tests = b.addRunArtifact(collider_tests);
 
     // Tag Component Tests
@@ -336,6 +353,7 @@ pub fn build(b: *std.Build) void {
         .name = "action-tests",
         .root_module = action_test_module,
     });
+    action_tests.linkLibrary(engine_lib);
     const run_action_tests = b.addRunArtifact(action_tests);
 
     // ActionBindings Tests
@@ -369,6 +387,7 @@ pub fn build(b: *std.Build) void {
         .name = "action-bindings-tests",
         .root_module = action_bindings_test_module,
     });
+    action_bindings_tests.linkLibrary(engine_lib);
     const run_action_bindings_tests = b.addRunArtifact(action_bindings_tests);
 
     // CollisionTrigger Tests
@@ -384,6 +403,7 @@ pub fn build(b: *std.Build) void {
         .name = "collision-trigger-tests",
         .root_module = collision_trigger_test_module,
     });
+    collision_trigger_tests.linkLibrary(engine_lib);
     const run_collision_trigger_tests = b.addRunArtifact(collision_trigger_tests);
 
     // InputTrigger Tests
@@ -400,6 +420,7 @@ pub fn build(b: *std.Build) void {
         .name = "input-trigger-tests",
         .root_module = input_trigger_test_module,
     });
+    input_trigger_tests.linkLibrary(engine_lib);
     const run_input_trigger_tests = b.addRunArtifact(input_trigger_tests);
 
     // TimeTrigger Tests (Custom Trigger System)
@@ -416,6 +437,7 @@ pub fn build(b: *std.Build) void {
         .name = "time-trigger-tests",
         .root_module = time_trigger_test_module,
     });
+    time_trigger_tests.linkLibrary(engine_lib);
     const run_time_trigger_tests = b.addRunArtifact(time_trigger_tests);
 
     // ========================================
@@ -433,6 +455,7 @@ pub fn build(b: *std.Build) void {
         .name = "collision-tests",
         .root_module = collision_test_module,
     });
+    collision_tests.linkLibrary(engine_lib);
     const run_collision_tests = b.addRunArtifact(collision_tests);
 
     // ========================================
@@ -509,19 +532,20 @@ pub fn build(b: *std.Build) void {
     const run_scene_tests = b.addRunArtifact(scene_tests);
 
     // Template Instantiation Tests (will fail until template system is implemented)
-    // const template_instantiation_test_module = b.addModule("template_instantiation_tests", .{
-    //     .root_source_file = b.path("tests/scene/test_template_instantiation.zig"),
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    // template_instantiation_test_module.addImport("scene-format", scene_format_module);
-    // template_instantiation_test_module.addImport("entity", entity_module);
+    const template_instantiation_test_module = b.addModule("template_instantiation_tests", .{
+        .root_source_file = b.path("tests/scene/test_template_instantiation.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    template_instantiation_test_module.addImport("scene-format", scene_format_module);
+    template_instantiation_test_module.addImport("entity", entity_module);
 
-    // const template_instantiation_tests = b.addTest(.{
-    //     .name = "template-instantiation-tests",
-    //     .root_module = template_instantiation_test_module,
-    // });
-    // const run_template_instantiation_tests = b.addRunArtifact(template_instantiation_tests);
+    const template_instantiation_tests = b.addTest(.{
+        .name = "template-instantiation-tests",
+        .root_module = template_instantiation_test_module,
+    });
+    template_instantiation_tests.linkLibrary(engine_lib);
+    const run_template_instantiation_tests = b.addRunArtifact(template_instantiation_tests);
 
     // ========================================
     // Layer 4B: Renderer Tests
@@ -553,6 +577,7 @@ pub fn build(b: *std.Build) void {
         .name = "shapes-tests",
         .root_module = shapes_test_module,
     });
+    shapes_tests.linkLibrary(engine_lib);
     const run_shapes_tests = b.addRunArtifact(shapes_tests);
 
     // ========================================
@@ -570,6 +595,7 @@ pub fn build(b: *std.Build) void {
         .name = "integration-tests",
         .root_module = integration_test_module,
     });
+    integration_tests.linkLibrary(engine_lib);
     const run_integration_tests = b.addRunArtifact(integration_tests);
 
     // ========================================
@@ -592,7 +618,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_template_parser_tests.step);
     test_step.dependOn(&run_nested_block_parser_tests.step);
     test_step.dependOn(&run_scene_tests.step);
-    // test_step.dependOn(&run_template_instantiation_tests.step);
+    test_step.dependOn(&run_template_instantiation_tests.step);
     test_step.dependOn(&run_color_tests.step);
     test_step.dependOn(&run_shapes_tests.step);
     test_step.dependOn(&run_integration_tests.step);
@@ -741,32 +767,40 @@ fn configureMacOSExecutable(
     };
 
     const config = if (optimize == .Debug) "debug" else "release";
-    const swift_scratch = b.fmt("zig-out/swift-build/{s}", .{config});
+
+    // Use absolute paths so this works when building as a dependency
+    const package_path = b.path("src/platform/macos").getPath(b);
+    const swift_scratch_rel = b.fmt("swift-build/{s}", .{config});
+    const swift_scratch = b.cache_root.join(b.allocator, &.{swift_scratch_rel}) catch @panic("OOM");
+    const shaders_air = b.cache_root.join(b.allocator, &.{"shaders.air"}) catch @panic("OOM");
+    const metallib_path = b.cache_root.join(b.allocator, &.{"default.metallib"}) catch @panic("OOM");
+    const shaders_metal = b.path("src/platform/macos/swift/shaders.metal").getPath(b);
+    const swift_build_dir = b.path("src/platform/macos/.build").getPath(b);
 
     const swift_build = b.addSystemCommand(&.{
         "swift",          "build",
-        "--package-path", "src/platform/macos",
+        "--package-path", package_path,
         "--scratch-path", swift_scratch,
         "-c",             config,
         "--arch",         arch,
     });
 
     const metal_compile = b.addSystemCommand(&.{
-        "xcrun", "-sdk",                                    "macosx", "metal",
-        "-c",    "src/platform//macos/swift/shaders.metal", "-o",     "zig-out/shaders.air",
+        "xcrun", "-sdk",      "macosx", "metal",
+        "-c",    shaders_metal, "-o",     shaders_air,
     });
     metal_compile.step.dependOn(&swift_build.step);
 
     const metal_lib = b.addSystemCommand(&.{
-        "xcrun",               "-sdk", "macosx",                       "metallib",
-        "zig-out/shaders.air", "-o",   "zig-out/lib/default.metallib",
+        "xcrun",     "-sdk", "macosx",  "metallib",
+        shaders_air, "-o",   metallib_path,
     });
     metal_lib.step.dependOn(&metal_compile.step);
 
-    const install_metallib = b.addInstallFile(.{ .cwd_relative = "zig-out/lib/default.metallib" }, "bin/default.metallib");
+    const install_metallib = b.addInstallFile(.{ .cwd_relative = metallib_path }, "bin/default.metallib");
     install_metallib.step.dependOn(&metal_lib.step);
 
-    const swift_clean = b.addSystemCommand(&.{ "rm", "-rf", "./src/platform/macos/.build/" });
+    const swift_clean = b.addSystemCommand(&.{ "rm", "-rf", swift_build_dir });
 
     const lib_src = b.fmt("{s}/arm64-apple-macosx/{s}/libMacPlatform.a", .{ swift_scratch, config });
     const lib_dest = "lib/libMacPlatform.a";
@@ -776,6 +810,9 @@ fn configureMacOSExecutable(
 
     // Link c++ for Swift interop
     exe.linkSystemLibrary("c++");
+
+    // Link the Swift platform library
+    exe.addObjectFile(.{ .cwd_relative = lib_src });
 
     // Make executable depend on these build steps
     exe.step.dependOn(&swift_build.step);

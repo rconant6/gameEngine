@@ -1,5 +1,5 @@
 const std = @import("std");
-const V2 = @This();
+pub const V2 = @This();
 
 x: f32,
 y: f32,
@@ -24,6 +24,10 @@ pub fn div(self: V2, scalar: f32) V2 {
 pub fn eql(self: V2, other: V2) bool {
     const epsilon = 0.00001;
     return @abs(self.x - other.x) < epsilon and @abs(self.y - other.y) < epsilon;
+}
+
+pub fn negate(self: V2) V2 {
+    return self.mul(-1);
 }
 
 pub fn magnitude(self: V2) f32 {

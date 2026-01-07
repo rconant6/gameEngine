@@ -7,12 +7,10 @@ const rend = @import("renderer.zig");
 const Renderer = rend.Renderer;
 const GamePoint = rend.GamePoint;
 const Color = rend.Color;
-const ShapeData = rend.ShapeData;
-const Line = rend.Line;
-const Circle = rend.Circle;
-const Rectangle = rend.Rectangle;
-const Polygon = rend.Polygon;
-const Ellipse = rend.Ellipse;
+const core = @import("core");
+const ShapeRegistry = core.ShapeRegistry;
+const Shapes = core.Shapes;
+const ShapeData = core.ShapeData;
 const V2 = rend.V2;
 
 pub fn drawText(
@@ -74,8 +72,9 @@ fn drawGlyph(
         const t1 = V2{ .x = p1.x * scale + pos.x, .y = p1.y * scale + pos.y };
         const t2 = V2{ .x = p2.x * scale + pos.x, .y = p2.y * scale + pos.y };
 
+        const triangle: Shapes.Triangle = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
         renderer.drawGeometry(
-            .{ .triangle = .{ .v0 = t0, .v1 = t1, .v2 = t2 } },
+            ShapeRegistry.createShapeUnion(Shapes.Triangle, triangle),
             .{},
             color,
             null,

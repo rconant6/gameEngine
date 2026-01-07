@@ -1,4 +1,4 @@
-const Point = @import("core").V2;
+const Point = @import("V2.zig").V2;
 
 pub fn sortPointByX(context: void, a: Point, b: Point) bool {
     _ = context;

@@ -22,7 +22,8 @@ pub fn main() !void {
     // // leave to make sure it's ok if there are collisions or reimports
     // TODO: these all need to handle errors better or catch at engine level or be fatal
     {
-        try game.loadScene("master", "master");
+        // try game.loadScene("master", "master");
+        // try game.setActiveScene("master");
         // // Load and instantiate the collision test scene
         try game.loadScene("collision", "collision_test");
         try game.setActiveScene("collision");
@@ -45,7 +46,7 @@ pub fn main() !void {
     });
     game.addComponent(paddle, engine.Sprite, .{
         .geometry = .{
-            .rectangle = .{
+            .Rectangle = .{
                 .center = .{ .x = 0.0, .y = 0.0 },
                 .half_width = 2.0,
                 .half_height = 0.5,

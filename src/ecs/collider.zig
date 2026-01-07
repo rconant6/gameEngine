@@ -1,15 +1,12 @@
-pub const ColliderShape = union(enum) {
-    circle: struct {
-        radius: f32,
-    },
-    rectangle: struct {
-        half_w: f32,
-        half_h: f32,
-    },
-    // Future other shapes
-};
+const core = @import("core");
+const V2 = core.V2;
 
-pub const Collider = struct {
-    shape: ?ColliderShape,
-    // layer, masks for filtering
+pub const CircleCollider = struct {
+    origin: V2 = .{ .x = 0, .y = 0 },
+    radius: f32,
+};
+pub const RectangleCollider = struct {
+    center: V2 = .{ .x = 0, .y = 0 },
+    half_w: f32,
+    half_h: f32,
 };

@@ -1,7 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-const Point = @import("core").V2;
+const Point = @import("V2.zig").V2;
 
 // MARK: Data structures
 pub const Triangle = struct {

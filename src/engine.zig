@@ -13,6 +13,7 @@ pub const V2U = core.V2U;
 pub const ColliderRegistry = core.ColliderRegistry;
 pub const ShapeRegisty = core.ShapeRegistry;
 pub const ComponentRegistry = core.ComponentRegistry;
+pub const Collision = core.Collision;
 const renderer = @import("renderer");
 pub const Color = renderer.Color;
 pub const Colors = renderer.Colors;
@@ -22,7 +23,6 @@ pub const Triangle = renderer.Triangle;
 pub const Polygon = renderer.Polygon;
 pub const Line = renderer.Line;
 pub const RenderContext = renderer.RenderContext;
-pub const Shape = renderer.Shape;
 pub const RenderTransform = renderer.Transform;
 const assets = @import("asset");
 const AssetManager = assets.AssetManager;
@@ -45,7 +45,6 @@ pub const Destroy = ecs.Destroy;
 pub const Physics = ecs.Physics;
 pub const Box = ecs.Box;
 pub const Camera = ecs.Camera;
-pub const Collision = ecs.Collision;
 pub const Tag = ecs.Tag;
 pub const OnInput = ecs.OnInput;
 pub const OnCollision = ecs.OnCollision;
@@ -167,11 +166,11 @@ pub const Engine = struct {
             .window = window.*,
             .world = world,
             .running = true,
+            .action_system = action_system,
             .scene_manager = SceneManager.init(allocator),
-            .instantiator = Instantiator.init(allocator),
+            .instantiator = Instantiator.init(allocator, &world, &asset_manager),
             .error_logger = ErrorLogger.init(allocator),
             .collision_events = .empty,
-            .action_system = action_system,
         };
     }
 
@@ -243,7 +242,8 @@ pub const Engine = struct {
         return @call(.auto, Data.init, .{self.allocator} ++ args) catch |err| {
             std.debug.panic(
                 "Engine.create({s}) failed: {}\n memory leaking or to large",
-                .{ @typeName(Shape), err },
+                .{ @typeName(Data), err },
+                // .{ @typeName(Shape), err },
             );
         };
     }
@@ -251,14 +251,15 @@ pub const Engine = struct {
     // Drawing shapes
     pub fn draw(self: *Engine, shape: anytype, xform: ?RenderTransform) void {
         const T = @TypeOf(shape);
-        const shape_union = switch (T) {
-            Polygon => Shape{ .Polygon = shape },
-            Rectangle => Shape{ .Rectangle = shape },
-            Circle => Shape{ .Circle = shape },
-            Triangle => Shape{ .Triangle = shape },
-            Line => Shape{ .Line = shape },
-            else => @compileError("Unsupported shape type: " ++ @typeName(T)),
-        };
+        const shape_union = ShapeRegisty.createShapeUnion(T);
+        // const shape_union = switch (T) {
+        //     Polygon => Shape{ .Polygon = shape },
+        //     Rectangle => Shape{ .Rectangle = shape },
+        //     Circle => Shape{ .Circle = shape },
+        //     Triangle => Shape{ .Triangle = shape },
+        //     Line => Shape{ .Line = shape },
+        //     else => @compileError("Unsupported shape type: " ++ @typeName(T)),
+        // };
         self.renderer.drawShape(shape_union, xform);
     }
 
@@ -427,7 +428,7 @@ pub const Engine = struct {
 
     pub fn instantiateActiveScene(self: *Engine) !void {
         const scene_file = self.scene_manager.getActiveScene() orelse return error.NoActiveScene;
-        self.instantiator.instantiate(scene_file, &self.world, &self.assets) catch |err| {
+        self.instantiator.instantiate(scene_file) catch |err| {
             self.logError(.scene, "Failed to instantiate scene: {any}", .{err});
             return err;
         };

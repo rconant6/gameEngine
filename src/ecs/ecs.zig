@@ -12,19 +12,20 @@ pub const Lifetime = comps.Lifetime;
 pub const Box = comps.Box;
 pub const Physics = comps.Physics;
 pub const Camera = comps.Camera;
-const collide = @import("collider.zig");
-pub const Collider = collide.Collider;
-pub const ColliderShape = collide.ColliderShape;
+pub const Collider = comps.Collider;
+pub const colliders = @import("collider.zig");
+pub const CircleCollider = colliders.CircleCollider;
+pub const RectangleCollider = colliders.RectangleCollider;
 // MARK: Component Tags
 pub const ScreenWrap = comps.ScreenWrap;
 pub const ScreenClamp = comps.ScreenClamp;
 pub const Destroy = comps.Destroy;
 // MARK: Colllisions
-pub const Collision = @import("Collision.zig");
 pub const Tag = @import("Tag.zig");
 // MARK: Core
 const core = @import("core");
 pub const Input = core.Input;
+pub const Collision = core.Collision;
 // MARK: Action System
 const action = @import("action");
 pub const Action = action.Action;

@@ -4,7 +4,6 @@ const Vertex = types.Vertex;
 const MTLPrimitiveType = types.MTLPrimitiveType;
 const rend = @import("../../renderer.zig");
 const Color = rend.Color;
-const Shape = rend.Shape;
 const Transform = rend.Transform;
 const Circle = rend.Circle;
 const Rectangle = rend.Rectangle;
@@ -14,6 +13,7 @@ const Ellipse = rend.Ellipse;
 const Polygon = rend.Polygon;
 const core = @import("core");
 const GamePoint = core.GamePoint;
+const ShapeData = core.ShapeData;
 const RenderContext = @import("../../RenderContext.zig");
 const utils = @import("../../geometry_utils.zig");
 
@@ -46,59 +46,46 @@ pub const GeometryBatch = struct {
 
     pub fn addShape(
         self: *GeometryBatch,
-        shape: Shape,
+        shape: ShapeData,
         transform: ?Transform,
         fill_color: ?Color,
         stroke_color: ?Color,
         stroke_width: f32,
         ctx: RenderContext,
     ) !void {
-        switch (shape) {
-            .triangle => |tri| try addTriangle(
+        try addShapeDispatch(
+            self,
+            shape,
+            transform,
+            fill_color,
+            stroke_color,
+            stroke_width,
+            ctx,
+        );
+    }
+
+    fn addShapeDispatch(
+        self: *GeometryBatch,
+        shape: ShapeData,
+        transform: ?Transform,
+        fill_color: ?Color,
+        stroke_color: ?Color,
+        stroke_width: f32,
+        ctx: RenderContext,
+    ) !void {
+        const ShapeType = @TypeOf(shape);
+        const name = "add" ++ @typeName(ShapeType);
+
+        if (@hasDecl(@This(), name)) {
+            return @call(.auto, @field(@This(), name), .{
                 self,
-                tri,
+                shape,
                 transform,
                 fill_color,
                 stroke_color,
                 stroke_width,
                 ctx,
-            ),
-            .line => |l| try addLine(
-                self,
-                l,
-                transform,
-                stroke_color,
-                stroke_width,
-                ctx,
-            ),
-            .rectangle => |rect| try addRectangle(
-                self,
-                rect,
-                transform,
-                fill_color,
-                stroke_color,
-                stroke_width,
-                ctx,
-            ),
-            .polygon => |poly| try addPolygon(
-                self,
-                poly,
-                transform,
-                fill_color,
-                stroke_color,
-                stroke_width,
-                ctx,
-            ),
-            .circle => |circ| try addCircle(
-                self,
-                circ,
-                transform,
-                fill_color,
-                stroke_color,
-                stroke_width,
-                ctx,
-            ),
-            .ellipse => @panic("TODO: Ellipse not supported"),
+            });
         }
     }
     inline fn makeVertex(
@@ -115,10 +102,12 @@ pub const GeometryBatch = struct {
         self: *GeometryBatch,
         line: Line,
         transform: ?Transform,
+        fill_color: ?Color,
         stroke_color: ?Color,
         stroke_width: f32,
         ctx: RenderContext,
     ) !void {
+        _ = fill_color;
         _ = stroke_width;
         if (stroke_color == null) return;
 
