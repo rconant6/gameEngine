@@ -87,7 +87,7 @@ pub fn renderSystem(engine: *Engine) void {
     while (query.next()) |entry| {
         const transform = entry.get(0);
         const sprite = entry.get(1);
-        const geo = sprite.geometry orelse return;
+        const geo = sprite.geometry orelse continue;
 
         if (sprite.visible) {
             renderer.drawGeometry(
