@@ -22,6 +22,7 @@ const V2 = core.V2;
 const ComponentRegistry = core.ComponentRegistry;
 const ShapeRegistry = core.ShapeRegistry;
 const ColliderRegistry = core.ColliderRegistry;
+const Shapes = core.Shapes;
 
 const ecs = @import("entity");
 const World = ecs.World;
@@ -36,8 +37,6 @@ const AssetManager = asset.AssetManager;
 const rend = @import("renderer");
 const Color = rend.Color;
 const Colors = rend.Colors;
-const Shape = rend.Shape;
-const core_shapes = rend.cs;
 
 const acts = @import("action");
 const ActionTarget = acts.ActionTarget;
@@ -45,6 +44,7 @@ const ActionType = acts.ActionType;
 const CollisionTrigger = acts.CollisionTrigger;
 
 pub const InstantiatorError = error{
+    ShapeBuilding,
     InvalidValue,
     MissingAssetPath,
     MissingRequiredField,
@@ -52,19 +52,26 @@ pub const InstantiatorError = error{
     TypeMismatch,
     UnableToFindFont,
     UnableToLoadFont,
-    Unimplemented,
     UnknownComponent,
     UnknownProperty,
+
+    Unimplemented,
+    UnimplementedAction,
+    UnimplementedTopLevel,
 };
 
 pub const Instantiator = struct {
     allocator: Allocator,
     last_instantiated_entities: std.ArrayList(Entity),
+    world: *World,
+    assets: *AssetManager,
 
-    pub fn init(allocator: Allocator) Instantiator {
+    pub fn init(allocator: Allocator, world: *World, assets: *AssetManager) Instantiator {
         return .{
             .allocator = allocator,
             .last_instantiated_entities = .empty,
+            .world = world,
+            .assets = assets,
         };
     }
     pub fn deinit(self: *Instantiator) void {
@@ -80,48 +87,42 @@ pub const Instantiator = struct {
     pub fn instantiate(
         self: *Instantiator,
         scene_file: *const SceneFile,
-        world: *World,
-        asset_manager: *AssetManager,
     ) !void {
         self.last_instantiated_entities.clearRetainingCapacity();
 
-        for (scene_file.decls) |*decl| {
+        return for (scene_file.decls) |*decl| {
             switch (decl.*) {
                 .scene => |*scene_decl| {
-                    try self.instantiateScene(scene_decl, world, asset_manager);
+                    try self.instantiateScene(scene_decl);
                 },
                 .asset => |*asset_decl| try self.instantiateAsset(
                     asset_decl,
-                    asset_manager,
                 ),
                 .entity => |*entity_decl| try self.instantiateEntity(
                     entity_decl,
-                    world,
-                    asset_manager,
                 ),
+                .template => return error.TEMPLEATE,
                 else => {
                     // NOTE: .component cannot be at top level
                 },
             }
-        }
+        };
     }
 
     pub fn instantiateScene(
         self: *Instantiator,
         scene: *const scene_format.SceneDeclaration,
-        world: *World,
-        asset_manager: *AssetManager,
     ) !void {
         for (scene.decls) |*decl| {
             switch (decl.*) {
                 .entity => |*entity_decl| {
-                    try self.instantiateEntity(entity_decl, world, asset_manager);
+                    try self.instantiateEntity(entity_decl);
                 },
                 .scene => |*nested_scene| {
-                    try self.instantiateScene(nested_scene, world, asset_manager);
+                    try self.instantiateScene(nested_scene);
                 },
                 .asset => |*nested_asset| {
-                    try self.instantiateAsset(nested_asset, asset_manager);
+                    try self.instantiateAsset(nested_asset);
                 },
                 else => {
                     // NOTE: .component cannot be at top level
@@ -133,14 +134,12 @@ pub const Instantiator = struct {
     pub fn instantiateEntity(
         self: *Instantiator,
         entity_decl: *const EntityDeclaration,
-        world: *World,
-        asset_manager: *AssetManager,
     ) !void {
-        const entity = try world.createEntity();
+        const entity = try self.world.createEntity();
         try self.last_instantiated_entities.append(self.allocator, entity);
 
         for (entity_decl.components) |*comp_decl| {
-            try self.addComponent(entity, world, asset_manager, comp_decl);
+            try self.addComponent(entity, comp_decl);
         }
     }
 
@@ -148,12 +147,11 @@ pub const Instantiator = struct {
     pub fn instantiateAsset(
         self: *Instantiator,
         asset_decl: *const AssetDeclaration,
-        asset_manager: *AssetManager,
     ) !void {
         const asset_type = asset_decl.asset_type;
         return switch (asset_type) {
             .font => {
-                self.instantiateFont(asset_decl, asset_manager) catch {
+                self.instantiateFont(asset_decl) catch {
                     return InstantiatorError.UnableToLoadFont;
                 };
             },
@@ -163,58 +161,52 @@ pub const Instantiator = struct {
     fn instantiateFont(
         self: *Instantiator,
         asset_decl: *const AssetDeclaration,
-        asset_manager: *AssetManager,
     ) !void {
         const props = asset_decl.properties orelse return;
         const handle = if (getProperty(props, "abs_path")) |prop| blk: {
             const abs_path_value = try self.extractValueForType(
                 []const u8,
                 prop.value,
-                asset_manager,
             ) orelse
                 return InstantiatorError.NotOptionalValue;
-            break :blk try asset_manager.loadFontFromPath(abs_path_value);
+            break :blk try self.assets.loadFontFromPath(abs_path_value);
         } else if (getProperty(props, "filename")) |f| blk: {
             const file = try self.extractValueForType(
                 []const u8,
                 f.value,
-                asset_manager,
             ) orelse
                 return InstantiatorError.NotOptionalValue;
             if (getProperty(props, "path")) |p| {
                 const path = try self.extractValueForType(
                     []const u8,
                     p.value,
-                    asset_manager,
                 ) orelse
                     return InstantiatorError.NotOptionalValue;
 
                 const full = try std.fs.path.join(self.allocator, &.{ path, file });
                 defer self.allocator.free(full);
-                break :blk try asset_manager.loadFontFromPath(full);
+                break :blk try self.assets.loadFontFromPath(full);
             } else {
-                if (asset_manager.fonts.font_path.len < 0)
+                if (self.assets.fonts.font_path.len < 0)
                     return InstantiatorError.MissingAssetPath;
-                break :blk try asset_manager.loadFont(file);
+                break :blk try self.assets.loadFont(file);
             }
         } else {
             return InstantiatorError.MissingAssetPath;
         };
 
-        const gop = try asset_manager.name_to_font.getOrPut(asset_decl.name);
+        const gop = try self.assets.name_to_font.getOrPut(asset_decl.name);
         if (!gop.found_existing) {
-            const owned_name = try asset_manager.allocator.dupe(u8, asset_decl.name);
+            const owned_name = try self.allocator.dupe(u8, asset_decl.name);
             gop.key_ptr.* = owned_name;
             gop.value_ptr.* = handle;
         }
     }
 
     // MARK: Components
-    fn addComponent(
+    pub fn addComponent(
         self: *Instantiator,
         entity: Entity,
-        world: *World,
-        asset_manager: *AssetManager,
         comp_decl: *const ComponentDeclaration,
     ) !void {
         const comp_name = switch (comp_decl.*) {
@@ -225,17 +217,13 @@ pub const Instantiator = struct {
 
         switch (comp_decl.*) {
             .collider => |c| {
-                const shape_index = ColliderRegistry.getShapeIndex(c.shape_type) orelse
+                const shape_index = ColliderRegistry.getColliderIndex(c.shape_type) orelse
                     return InstantiatorError.UnknownComponent;
                 inline for (ColliderRegistry.shape_names, 0..) |_, i| {
                     if (shape_index == i) {
                         const ShapeType = ColliderRegistry.shape_types[i];
-                        const collider = try self.buildColliderComponent(
-                            ShapeType,
-                            c,
-                            asset_manager,
-                        );
-                        try world.addComponent(entity, Components.Collider, collider);
+                        const collider = try self.buildColliderComponent(ShapeType, c);
+                        try self.world.addComponent(entity, Components.Collider, collider);
                         return;
                     }
                 }
@@ -249,9 +237,8 @@ pub const Instantiator = struct {
                         const sprite = try self.buildSpriteComponent(
                             ShapeType,
                             s,
-                            asset_manager,
                         );
-                        try world.addComponent(entity, Components.Sprite, sprite);
+                        try self.world.addComponent(entity, Components.Sprite, sprite);
                         return;
                     }
                 }
@@ -265,44 +252,45 @@ pub const Instantiator = struct {
                         const component = try self.buildGenericComponent(
                             ComponentType,
                             g,
-                            asset_manager,
                         );
-                        try world.addComponent(entity, ComponentType, component);
+                        try self.world.addComponent(entity, ComponentType, component);
                         return;
                     }
                 }
             },
         }
     }
+
     fn buildGenericComponent(
         self: *Instantiator,
         comptime ComponentType: type,
         comp: GenericBlock,
-        asset_manager: *AssetManager,
     ) !ComponentType {
-        var component: ComponentType = std.mem.zeroInit(ComponentType, .{});
+        var component: ComponentType = getDefaultValue(ComponentType);
+
         if (comp.properties) |props| {
             for (props) |prop| {
                 var field_found = false;
+
                 inline for (std.meta.fields(ComponentType)) |field| {
                     if (std.mem.eql(u8, field.name, prop.name)) {
                         field_found = true;
+
                         const field_value = try self.extractValueForType(
                             field.type,
                             prop.value,
-                            asset_manager,
                         );
                         if (field_value) |val|
                             @field(component, field.name) = val;
                         break;
                     }
                 }
+
                 if (!field_found) {
                     return InstantiatorError.UnknownProperty;
                 }
             }
         }
-
         return component;
     }
 
@@ -310,12 +298,11 @@ pub const Instantiator = struct {
         self: *Instantiator,
         comptime ShapeType: type,
         sprite: SpriteBlock,
-        asset_manager: *AssetManager,
     ) !Components.Sprite {
-        if (ShapeType == core_shapes.Polygon) {
-            return try self.buildPolygonSprite(sprite, asset_manager);
+        if (ShapeType == Shapes.Polygon) {
+            return try self.buildPolygonSprite(sprite);
         }
-        if (ShapeType == core_shapes.Ellipse) {
+        if (ShapeType == Shapes.Ellipse) {
             return InstantiatorError.Unimplemented;
         }
 
@@ -332,7 +319,6 @@ pub const Instantiator = struct {
                         const field_value = try self.extractValueForType(
                             field.type,
                             prop.value,
-                            asset_manager,
                         );
                         if (field_value) |val| {
                             @field(component, field.name) = val;
@@ -348,7 +334,6 @@ pub const Instantiator = struct {
                             const field_value = try self.extractValueForType(
                                 shape_field.type,
                                 prop.value,
-                                asset_manager,
                             );
                             if (field_value) |val| {
                                 @field(shape, shape_field.name) = val;
@@ -370,7 +355,6 @@ pub const Instantiator = struct {
     fn buildPolygonSprite(
         self: *Instantiator,
         sprite: SpriteBlock,
-        asset_manager: *AssetManager,
     ) !Components.Sprite {
         var component = std.mem.zeroInit(Components.Sprite, .{});
         var owned_points: []const V2 = undefined;
@@ -381,7 +365,6 @@ pub const Instantiator = struct {
                     owned_points = try self.extractValueForType(
                         []const V2,
                         prop.value,
-                        asset_manager,
                     ) orelse return InstantiatorError.InvalidValue;
                     continue;
                 }
@@ -392,7 +375,6 @@ pub const Instantiator = struct {
                         const field_value = try self.extractValueForType(
                             field.type,
                             prop.value,
-                            asset_manager,
                         );
                         if (field_value) |val| {
                             @field(component, field.name) = val;
@@ -405,8 +387,9 @@ pub const Instantiator = struct {
                 }
             }
         }
-        const polygon = try core_shapes.Polygon.init(self.allocator, owned_points);
-        component.geometry = .{ .polygon = polygon };
+        const polygon = try Shapes.Polygon.init(self.allocator, owned_points);
+        component.geometry = ShapeRegistry.createShapeUnion(Shapes.Polygon, polygon);
+
         return component;
     }
 
@@ -414,7 +397,6 @@ pub const Instantiator = struct {
         self: *Instantiator,
         comptime ColliderShapeType: type,
         collider_block: SpriteBlock,
-        asset_manager: *AssetManager,
     ) !Components.Collider {
         var shape_data: ColliderShapeType = undefined;
 
@@ -426,7 +408,6 @@ pub const Instantiator = struct {
                         const field_value = try self.extractValueForType(
                             field.type,
                             prop.value,
-                            asset_manager,
                         );
                         if (field_value) |val| {
                             @field(shape_data, field.name) = val;
@@ -437,24 +418,18 @@ pub const Instantiator = struct {
         }
 
         // Create the ColliderShape union based on the shape type
-        const collider_shape = blk: {
-            inline for (ColliderRegistry.shape_names, 0..) |name, i| {
-                if (ColliderShapeType == ColliderRegistry.shape_types[i]) {
-                    break :blk @unionInit(ecs.ColliderShape, name, shape_data);
-                }
-            }
-            @compileError("Unknown collider shape type");
-        };
-
+        const collider_data = ColliderRegistry.createColliderUnion(
+            ColliderShapeType,
+            shape_data,
+        );
         return Components.Collider{
-            .shape = collider_shape,
+            .collider = collider_data,
         };
     }
 
     fn parseActionFromBlock(
         self: *Instantiator,
         block: GenericBlock,
-        asset_manager: *AssetManager, // TODO: just give the instantiator an asset manger and world to stop passing this all over the place. Make API availble only from an instance that is made in Engine.init()
     ) !CollisionTrigger {
         // var action_type: ActionType = undefined;
         // use get property function (below)
@@ -464,21 +439,19 @@ pub const Instantiator = struct {
                     const action_type_str = try self.extractValueForType(
                         []const u8,
                         prop.value,
-                        asset_manager,
                     ) orelse return InstantiatorError.InvalidValue;
                     _ = action_type_str;
                     continue;
                 }
             }
         }
-        return InstantiatorError.Unimplemented;
+        return InstantiatorError.UnimplementedAction;
     }
 
     fn extractValueForType(
         self: *Instantiator,
         comptime T: type,
         value: Value,
-        asset_manager: *AssetManager,
     ) !?T {
         switch (@typeInfo(T)) {
             .float => {
@@ -533,6 +506,42 @@ pub const Instantiator = struct {
                         else => InstantiatorError.TypeMismatch,
                     };
                 }
+                // For []const []const u8 (string arrays for Tag names)
+                if (ptr_info.size == .slice) {
+                    if (@typeInfo(ptr_info.child) == .pointer) {
+                        const child_ptr = @typeInfo(ptr_info.child).pointer;
+                        if (child_ptr.size == .slice and child_ptr.child == u8) {
+                            return switch (value) {
+                                .array => |arr| blk: {
+                                    const strings = try self.allocator.alloc(
+                                        []const u8,
+                                        arr.len,
+                                    );
+                                    errdefer {
+                                        for (strings, 0..) |s, idx| {
+                                            if (idx < arr.len) self.allocator.free(s);
+                                        }
+                                        self.allocator.free(strings);
+                                    }
+                                    for (arr, 0..) |val, i| {
+                                        switch (val) {
+                                            .string => |s| strings[i] = s,
+                                            else => {
+                                                for (strings[0..i]) |owned_s| {
+                                                    self.allocator.free(owned_s);
+                                                }
+                                                self.allocator.free(strings);
+                                                return InstantiatorError.TypeMismatch;
+                                            },
+                                        }
+                                    }
+                                    break :blk strings;
+                                },
+                                else => InstantiatorError.TypeMismatch,
+                            };
+                        }
+                    }
+                }
                 return InstantiatorError.TypeMismatch;
             },
             .@"struct" => {
@@ -554,7 +563,7 @@ pub const Instantiator = struct {
                 }
                 if (T == FontHandle) {
                     return switch (value) {
-                        .assetRef => |a| try asset_manager.getFontAssetHandle(a),
+                        .assetRef => |a| try self.assets.getFontAssetHandle(a),
                         else => InstantiatorError.TypeMismatch,
                     };
                 }
@@ -567,9 +576,9 @@ pub const Instantiator = struct {
                         .color => |c| Color.initFromU32Hex(c),
                         else => return null,
                     };
-                } else if (Child == Shape) {
+                } else if (Child == ShapeRegistry.getShapeType(@typeName(o.child))) {
                     // TODO buildShape
-                    return InstantiatorError.Unimplemented;
+                    return InstantiatorError.ShapeBuilding;
                 }
                 return InstantiatorError.TypeMismatch;
             },
@@ -577,6 +586,49 @@ pub const Instantiator = struct {
         }
     }
 };
+
+fn getDefaultValue(comptime T: type) T {
+    const type_info = @typeInfo(T);
+    return switch (type_info) {
+        .void => {},
+        .int, .comptime_int => 0,
+        .float, .comptime_float => 0.0,
+        .bool => false,
+        .optional => null,
+        .pointer => |ptr_info| {
+            if (ptr_info.size == .slice) {
+                return &[_]std.meta.Child(T){};
+            }
+            @compileError("Cannot provide default for pointer type: " ++ @typeName(T));
+        },
+        .@"struct" => |struct_info| {
+            var result: T = undefined;
+            inline for (struct_info.fields) |field| {
+                if (field.defaultValue()) |default_val| {
+                    @field(result, field.name) = default_val;
+                } else {
+                    @field(result, field.name) = getDefaultValue(field.type);
+                }
+            }
+            return result;
+        },
+        .@"enum" => |enum_info| {
+            if (enum_info.fields.len > 0) {
+                return @enumFromInt(enum_info.fields[0].value);
+            }
+            @compileError("Cannot provide default for empty enum: " ++ @typeName(T));
+        },
+        .@"union" => |union_info| {
+            if (union_info.fields.len > 0) {
+                const first_field = union_info.fields[0];
+                const field_value = getDefaultValue(first_field.type);
+                return @unionInit(T, first_field.name, field_value);
+            }
+            @compileError("Cannot provide default for empty union: " ++ @typeName(T));
+        },
+        else => @compileError("Cannot provide default value for type: " ++ @typeName(T)),
+    };
+}
 
 fn getProperty(props: []const Property, property: []const u8) ?Property {
     for (props) |prop| {

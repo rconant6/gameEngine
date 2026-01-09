@@ -8,13 +8,16 @@ const ComponentData = core.ComponentData;
 const ecs = @import("entity");
 const Entity = ecs.Entity;
 const World = ecs.World;
+const Transform = ecs.Transform;
 const load = @import("loader.zig");
 const scene_format = @import("scene-format");
 const SceneFile = scene_format.SceneFile;
 const TemplateDeclaration = scene_format.TemplateDeclaration;
+const Instantiator = @import("instantiator.zig").Instantiator;
 
 const TemplateError = error{
     TemplateAlreadyLoaded,
+    TemplateNotFound,
 };
 
 pub const Template = struct {
@@ -26,12 +29,17 @@ pub const TemplateManager = struct {
     allocator: Allocator,
     template_files: std.ArrayList(*SceneFile),
     templates: std.StringHashMap(Template),
+    instantiator: *Instantiator,
 
-    pub fn init(allocator: Allocator) TemplateManager {
+    pub fn init(
+        allocator: Allocator,
+        instantiator: *Instantiator,
+    ) TemplateManager {
         return .{
             .allocator = allocator,
             .templates = std.StringHashMap(Template).init(allocator),
             .template_files = .empty,
+            .instantiator = instantiator,
         };
     }
 
@@ -54,13 +62,22 @@ pub const TemplateManager = struct {
         self: *TemplateManager,
         name: []const u8,
         position: V2,
-        world: *World,
     ) !Entity {
-        _ = name;
-        _ = self;
-        _ = position;
-        _ = world;
-        return .{ .id = 0 };
+        const instantiator = self.instantiator;
+        const world = instantiator.world;
+        const template = self.templates.get(name) orelse return TemplateError.TemplateNotFound;
+        const entity = try instantiator.world.createEntity();
+
+        const components = template.declaration.components;
+        for (components) |*comp| {
+            try instantiator.addComponent(entity, comp);
+        }
+
+        if (world.getComponentMut(entity, Transform)) |transform| {
+            transform.position = position;
+        }
+
+        return entity;
     }
 
     pub fn loadTemplateFile(self: *TemplateManager, name: []const u8) !void {
