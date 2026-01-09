@@ -17,9 +17,9 @@ pub const OnCollision = struct { _dummy: u8 = 0 };
 
 // MARK: Spatial Components
 pub const Transform = struct {
-    position: V2,
-    rotation: f32,
-    scale: f32,
+    position: V2 = .{ .x = 0, .y = 0 },
+    rotation: f32 = 0,
+    scale: f32 = 1,
 };
 
 // MARK: Rendering Components
@@ -34,9 +34,8 @@ pub const Sprite = struct {
         if (self.geometry) |*geo| {
             switch (geo.*) {
                 inline else => |*shape| {
-                    if (@hasDecl(@TypeOf(shape.*), "deinit")) {
+                    if (@hasDecl(@TypeOf(shape.*), "deinit"))
                         shape.deinit();
-                    }
                 },
             }
         }
