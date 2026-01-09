@@ -1,0 +1,113 @@
+// Enemy Templates
+// For testing collision triggers and spawn_entity actions
+// Not from original zasteroids but useful for robust action system testing
+
+[BasicEnemy:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+
+  [Velocity]
+    linear:vec2 {0.0, 100.0}     // Slow downward movement
+    angular:f32 0.1
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 1.0
+    fill_color:color #FF0000      // Red
+    stroke_color:color #8B0000    // Dark red
+    stroke_width:f32 2.0
+
+  [Collider:circle]
+    radius:f32 1.0
+
+  [Tag]
+    tags:string "enemy,basic_enemy,hostile"
+
+  [ScreenWrap]
+
+[FastEnemy:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 0.8
+
+  [Velocity]
+    linear:vec2 {150.0, 150.0}   // Diagonal fast movement
+    angular:f32 0.5
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 0.8
+    fill_color:color #FF4500      // Orange-red
+    stroke_color:color #FF6347    // Tomato
+    stroke_width:f32 1.5
+
+  [Collider:circle]
+    radius:f32 0.8
+
+  [Tag]
+    tags:string "enemy,fast_enemy,hostile"
+
+  [ScreenClamp]
+
+[TankEnemy:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.5
+
+  [Velocity]
+    linear:vec2 {0.0, 50.0}      // Very slow
+    angular:f32 0.05
+
+  [Sprite:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.5
+    half_height:f32 1.5
+    fill_color:color #8B0000      // Dark red
+    stroke_color:color #A52A2A    // Brown
+    stroke_width:f32 3.0
+
+  [Collider:rectangle]
+    half_w:f32 1.5
+    half_h:f32 1.5
+
+  [Tag]
+    tags:string "enemy,tank_enemy,hostile,boss"
+
+  [ScreenWrap]
+
+[Boss:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 3.0
+
+  [Velocity]
+    linear:vec2 {100.0, 0.0}     // Horizontal movement
+    angular:f32 0.2
+
+  [Sprite:polygon]
+    points:vec2[] {
+      {0.0, 1.0},      // top
+      {0.7, 0.5},
+      {1.0, 0.0},
+      {0.7, -0.5},
+      {0.0, -1.0},     // bottom
+      {-0.7, -0.5},
+      {-1.0, 0.0},
+      {-0.7, 0.5}
+    }
+    fill_color:color #4B0082      // Indigo
+    stroke_color:color #8B008B    // Dark magenta
+    stroke_width:f32 4.0
+
+  [Collider:circle]
+    radius:f32 3.0
+
+  [Tag]
+    tags:string "enemy,boss,hostile,elite_boss"
+
+  [ScreenClamp]

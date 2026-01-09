@@ -1,0 +1,54 @@
+// PlayerShip Template
+// Translated from zasteroids ShipTemplate
+// Original: Multi-shape ship with hull, cockpit, wings, engine, and flame effects
+
+[PlayerShip:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+
+  [Velocity]
+    linear:vec2 {0.0, 0.0}
+    angular:f32 0.0
+
+  // Hull - Main ship body (9-point polygon)
+  [Sprite:polygon]
+    points:vec2[] {
+      {0.0, 0.5},      // nose
+      {0.15, 0.2},     // upper right
+      {0.25, -0.1},    // mid right
+      {0.2, -0.3},     // lower right curve
+      {0.1, -0.35},    // lower right end
+      {-0.1, -0.35},   // lower left end
+      {-0.2, -0.3},    // lower left curve
+      {-0.25, -0.1},   // mid left
+      {-0.15, 0.2}     // upper left
+    }
+    fill_color:color #2C3E50      // hullFill (dark blue-gray)
+    stroke_color:color #34495E    // hullOutline (lighter blue-gray)
+    stroke_width:f32 1.0
+
+  [Tag]
+    tags:string "player,ship"
+
+  [ScreenWrap]
+
+// NOTE: The original zasteroids template had 8 separate shapes:
+// 1. Hull (main body)
+// 2. Cockpit (window detail)
+// 3. Left Wing
+// 4. Right Wing
+// 5. Engine housing
+// 6. Engine port
+// 7. Inner flame
+// 8. Outer flame
+//
+// Current engine supports single Sprite per entity.
+// To recreate full ship, either:
+// - Create parent ship entity with child entities for each part
+// - OR combine all shapes into single polygon
+// - OR extend Sprite to support multiple geometries
+//
+// This template provides the main hull shape only.
+// Additional detail shapes would need separate entity templates.

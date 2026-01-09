@@ -1,0 +1,116 @@
+// Asteroid Templates
+// Translated from zasteroids AsteroidTemplate
+// Original had baseVelocity, scoreValue, scale, rotationSpeed, and shapes
+
+[LargeAsteroid:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 35.0               // Original scale value
+
+  [Velocity]
+    linear:vec2 {0.5, 0.15}      // Original baseVelocity
+    angular:f32 0.2              // Original rotationSpeed
+
+  [Sprite:polygon]
+    points:vec2[] {
+      {0.0, 1.0},
+      {0.951, 0.309},
+      {0.588, -0.809},
+      {-0.588, -0.809},
+      {-0.951, 0.309}
+    }
+    fill_color:color #8B4513      // rustyBrown
+    stroke_color:color #B87333    // copper
+    stroke_width:f32 1.5
+
+  [Collider:circle]
+    radius:f32 35.0
+
+  [Tag]
+    tags:string "asteroid,large_asteroid,destructible"
+
+  [ScreenWrap]
+
+  // NOTE: Original scoreValue was 50
+  // Could add custom ScoreValue component if needed
+
+[MediumAsteroid:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 28.0               // Original scale value
+
+  [Velocity]
+    linear:vec2 {0.5, 0.15}      // Original baseVelocity
+    angular:f32 0.1              // Original rotationSpeed
+
+  [Sprite:polygon]
+    points:vec2[] {
+      {1.0, 0.0},
+      {0.5, 0.866},
+      {-0.5, 0.866},
+      {-1.0, 0.0},
+      {-0.5, -0.866},
+      {0.5, -0.866}
+    }
+    fill_color:color #704214      // darkRust
+    stroke_color:color #A0522D    // rustRed
+    stroke_width:f32 1.0
+
+  [Collider:circle]
+    radius:f32 28.0
+
+  [Tag]
+    tags:string "asteroid,medium_asteroid,destructible"
+
+  [ScreenWrap]
+
+  // NOTE: Original scoreValue was 100
+
+[SmallAsteroid:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 20.0               // Original scale value
+
+  [Velocity]
+    linear:vec2 {0.5, -0.25}     // Original baseVelocity
+    angular:f32 0.5              // Original rotationSpeed
+
+  [Sprite:polygon]
+    points:vec2[] {
+      {0.0, 0.4},
+      {0.3, 0.2},
+      {0.4, -0.1},
+      {0.2, -0.3},
+      {-0.1, -0.3},
+      {-0.3, -0.2},
+      {-0.3, 0.0},
+      {-0.2, 0.3}
+    }
+    fill_color:color #36454F      // charcoal
+    stroke_color:color #3B3C3D    // darkGreyBrown
+    stroke_width:f32 0.8
+
+  [Collider:circle]
+    radius:f32 20.0
+
+  [Tag]
+    tags:string "asteroid,small_asteroid,destructible"
+
+  [ScreenWrap]
+
+  // NOTE: Original scoreValue was 200
+
+// DESIGN NOTES:
+// ============
+// Original zasteroids used:
+// - minVelocity: 0.1, maxVelocity: 1.0 for spawn randomization
+// - scoreValue stored per template
+// - Multiple shapes per asteroid (though only 1 was defined in practice)
+//
+// To fully replicate:
+// - Add ScoreValue component type
+// - Add spawn randomization to template spawner
+// - velocityRange could be stored in template metadata

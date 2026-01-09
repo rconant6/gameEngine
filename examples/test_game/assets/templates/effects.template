@@ -1,0 +1,119 @@
+// Visual Effect Templates
+// For testing spawn_entity with particle/explosion effects
+// These would typically be spawned on collision events
+
+[ExplosionParticle:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+
+  [Velocity]
+    linear:vec2 {0.0, 0.0}       // Will be randomized by spawner
+    angular:f32 2.0              // Fast spin
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 0.2
+    fill_color:color #FF4500      // Orange-red
+    stroke_width:f32 0.0
+
+  [Tag]
+    tags:string "particle,explosion,effect"
+
+  [Lifetime]
+    remaining:f32 0.5             // Very short lived
+
+[SmallExplosion:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 0.5
+
+  [Velocity]
+    linear:vec2 {0.0, 0.0}
+    angular:f32 0.0
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 1.5
+    fill_color:color #FFA500      // Orange
+    stroke_color:color #FF8C00    // Dark orange
+    stroke_width:f32 2.0
+
+  [Tag]
+    tags:string "explosion,effect"
+
+  [Lifetime]
+    remaining:f32 0.3
+
+[LargeExplosion:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 2.0
+
+  [Velocity]
+    linear:vec2 {0.0, 0.0}
+    angular:f32 0.0
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 3.0
+    fill_color:color #FF0000      // Red
+    stroke_color:color #FFD700    // Gold
+    stroke_width:f32 3.0
+
+  [Tag]
+    tags:string "explosion,effect,large"
+
+  [Lifetime]
+    remaining:f32 0.8
+
+[Debris:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 0.3
+
+  [Velocity]
+    linear:vec2 {50.0, 50.0}     // Will be randomized
+    angular:f32 5.0              // Very fast tumble
+
+  [Sprite:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 0.2
+    half_height:f32 0.4
+    fill_color:color #696969      // Dim gray
+    stroke_color:color #A9A9A9    // Dark gray
+    stroke_width:f32 0.5
+
+  [Tag]
+    tags:string "debris,particle,effect"
+
+  [Lifetime]
+    remaining:f32 2.0
+
+  [ScreenWrap]
+
+[Spark:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 0.2
+
+  [Velocity]
+    linear:vec2 {200.0, -200.0}  // Fast diagonal
+    angular:f32 0.0
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 0.15
+    fill_color:color #FFFF00      // Bright yellow
+    stroke_width:f32 0.0
+
+  [Tag]
+    tags:string "spark,particle,effect"
+
+  [Lifetime]
+    remaining:f32 0.2             // Very brief flash

@@ -1,0 +1,113 @@
+// Power-up Templates
+// For testing spawn mechanics and item collection
+// Would typically spawn from destroyed enemies
+
+[HealthPowerup:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+
+  [Velocity]
+    linear:vec2 {0.0, 50.0}      // Slow drift downward
+    angular:f32 0.3
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 0.8
+    fill_color:color #00FF00      // Green
+    stroke_color:color #32CD32    // Lime green
+    stroke_width:f32 2.0
+
+  [Collider:circle]
+    radius:f32 0.8
+
+  [Tag]
+    tags:string "powerup,health,collectible"
+
+  [Lifetime]
+    remaining:f32 5.0             // Disappears if not collected
+
+[WeaponPowerup:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+
+  [Velocity]
+    linear:vec2 {0.0, 50.0}
+    angular:f32 0.5
+
+  [Sprite:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 0.6
+    half_height:f32 0.6
+    fill_color:color #FF0000      // Red
+    stroke_color:color #FF6347    // Tomato
+    stroke_width:f32 2.0
+
+  [Collider:rectangle]
+    half_w:f32 0.6
+    half_h:f32 0.6
+
+  [Tag]
+    tags:string "powerup,weapon,collectible"
+
+  [Lifetime]
+    remaining:f32 5.0
+
+[ShieldPowerup:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.2
+
+  [Velocity]
+    linear:vec2 {0.0, 50.0}
+    angular:f32 0.2
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 1.0
+    fill_color:color #0000FF      // Blue
+    stroke_color:color #4169E1    // Royal blue
+    stroke_width:f32 2.5
+
+  [Collider:circle]
+    radius:f32 1.0
+
+  [Tag]
+    tags:string "powerup,shield,collectible"
+
+  [Lifetime]
+    remaining:f32 5.0
+
+[SpeedBoost:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 0.8
+
+  [Velocity]
+    linear:vec2 {0.0, 50.0}
+    angular:f32 1.0              // Fast spin to catch attention
+
+  [Sprite:polygon]
+    points:vec2[] {
+      {0.0, 0.8},      // top
+      {0.6, 0.0},      // right
+      {0.0, -0.8},     // bottom
+      {-0.6, 0.0}      // left
+    }
+    fill_color:color #FFFF00      // Yellow
+    stroke_color:color #FFD700    // Gold
+    stroke_width:f32 2.0
+
+  [Collider:circle]
+    radius:f32 0.8
+
+  [Tag]
+    tags:string "powerup,speed,collectible"
+
+  [Lifetime]
+    remaining:f32 5.0

@@ -1,0 +1,85 @@
+// Projectile Templates
+// These weren't in original zasteroids templates.zig but are common game entities
+// Adding here for robust testing of spawn_entity action
+
+[Missile:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}     // Will be overridden by spawn offset
+    rotation:f32 0.0
+    scale:f32 1.0
+
+  [Velocity]
+    linear:vec2 {0.0, -500.0}    // Fast upward movement
+    angular:f32 0.0
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 0.3
+    fill_color:color #FFFF00      // Bright yellow
+    stroke_color:color #FFA500    // Orange outline
+    stroke_width:f32 1.5
+
+  [Collider:circle]
+    radius:f32 0.3
+
+  [Tag]
+    tags:string "missile,projectile,player_weapon"
+
+  [Lifetime]
+    remaining:f32 2.0             // Auto-destroy after 2 seconds
+
+  [OnCollision]
+    // Destroy self and enemy on contact
+    // (These triggers will need to be parsed when OnCollision component is extended)
+
+[Bullet:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 0.5
+
+  [Velocity]
+    linear:vec2 {0.0, -800.0}    // Very fast
+    angular:f32 0.0
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 0.2
+    fill_color:color #FF0000      // Red
+    stroke_width:f32 0.0
+
+  [Collider:circle]
+    radius:f32 0.2
+
+  [Tag]
+    tags:string "bullet,projectile,player_weapon"
+
+  [Lifetime]
+    remaining:f32 1.5
+
+[Laser:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+
+  [Velocity]
+    linear:vec2 {0.0, -1000.0}   // Extremely fast
+    angular:f32 0.0
+
+  [Sprite:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 0.1
+    half_height:f32 1.0
+    fill_color:color #00FFFF      // Cyan
+    stroke_width:f32 0.0
+
+  [Collider:rectangle]
+    half_w:f32 0.1
+    half_h:f32 1.0
+
+  [Tag]
+    tags:string "laser,projectile,player_weapon"
+
+  [Lifetime]
+    remaining:f32 1.0
