@@ -4,7 +4,7 @@ const Tag = @import("Tag");
 
 test "Tag - hasTag exact match" {
     const tag = Tag{
-        .names = &[_][]const u8{ "player", "controllable", "visible" },
+        .tags = "player,controllable,visible",
     };
 
     try testing.expect(tag.hasTag("player"));
@@ -16,7 +16,7 @@ test "Tag - hasTag exact match" {
 
 test "Tag - matchesPattern exact match" {
     const tag = Tag{
-        .names = &[_][]const u8{ "brick", "destructible" },
+        .tags = "brick,destructible",
     };
 
     try testing.expect(tag.matchesPattern("brick"));
@@ -27,7 +27,7 @@ test "Tag - matchesPattern exact match" {
 
 test "Tag - matchesPattern prefix wildcard" {
     const tag = Tag{
-        .names = &[_][]const u8{ "enemy_grunt", "enemy_boss", "powerup" },
+        .tags = "enemy_grunt,enemy_boss,powerup",
     };
 
     // Prefix wildcard should match
@@ -42,7 +42,7 @@ test "Tag - matchesPattern prefix wildcard" {
 
 test "Tag - matchesPattern suffix wildcard" {
     const tag = Tag{
-        .names = &[_][]const u8{ "mini_boss", "final_boss", "player" },
+        .tags = "mini_boss,final_boss,player",
     };
 
     // Suffix wildcard should match
@@ -57,7 +57,7 @@ test "Tag - matchesPattern suffix wildcard" {
 
 test "Tag - matchesPattern mixed scenarios" {
     const tag = Tag{
-        .names = &[_][]const u8{ "enemy_flying_boss", "collectible_coin" },
+        .tags = "enemy_flying_boss,collectible_coin",
     };
 
     // Exact matches
@@ -79,7 +79,7 @@ test "Tag - matchesPattern mixed scenarios" {
 
 test "Tag - empty tag list" {
     const tag = Tag{
-        .names = &[_][]const u8{},
+        .tags = "",
     };
 
     try testing.expect(!tag.hasTag("anything"));
@@ -90,7 +90,7 @@ test "Tag - empty tag list" {
 
 test "Tag - single tag" {
     const tag = Tag{
-        .names = &[_][]const u8{"solo"},
+        .tags = "solo",
     };
 
     try testing.expect(tag.hasTag("solo"));
