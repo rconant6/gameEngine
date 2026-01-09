@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const V2 = @import("V2.zig");
 pub const V2I = @import("V2I.zig");
 pub const V2U = @import("V2U.zig");
@@ -22,3 +24,4 @@ pub const ColliderRegistry = @import("collider_shape_registry.zig").ColliderRegi
 pub const ColliderData = @import("collider_shape_registry.zig").ColliderData;
 
 pub const Shapes = @import("shapes.zig");
+
