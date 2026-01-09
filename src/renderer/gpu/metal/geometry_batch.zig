@@ -5,13 +5,13 @@ const MTLPrimitiveType = types.MTLPrimitiveType;
 const rend = @import("../../renderer.zig");
 const Color = rend.Color;
 const Transform = rend.Transform;
-const Circle = rend.Circle;
-const Rectangle = rend.Rectangle;
-const Triangle = rend.Triangle;
-const Line = rend.Line;
-const Ellipse = rend.Ellipse;
-const Polygon = rend.Polygon;
 const core = @import("core");
+const Circle = core.Shapes.Circle;
+const Rectangle = rend.Shapes.Rectangle;
+const Triangle = rend.Shapes.Triangle;
+const Line = rend.Shapes.Line;
+const Ellipse = rend.Shapes.Ellipse;
+const Polygon = rend.Shapes.Polygon;
 const GamePoint = core.GamePoint;
 const ShapeData = core.ShapeData;
 const RenderContext = @import("../../RenderContext.zig");
@@ -64,6 +64,15 @@ pub const GeometryBatch = struct {
         );
     }
 
+    fn stripModulePrefix(comptime full_name: []const u8) []const u8 {
+        comptime {
+            if (std.mem.lastIndexOf(u8, full_name, ".")) |idx| {
+                return full_name[idx + 1 ..];
+            }
+            return full_name;
+        }
+    }
+
     fn addShapeDispatch(
         self: *GeometryBatch,
         shape: ShapeData,
@@ -73,19 +82,21 @@ pub const GeometryBatch = struct {
         stroke_width: f32,
         ctx: RenderContext,
     ) !void {
-        const ShapeType = @TypeOf(shape);
-        const name = "add" ++ @typeName(ShapeType);
-
-        if (@hasDecl(@This(), name)) {
-            return @call(.auto, @field(@This(), name), .{
-                self,
-                shape,
-                transform,
-                fill_color,
-                stroke_color,
-                stroke_width,
-                ctx,
-            });
+        switch (shape) {
+            inline else => |s, tag| {
+                const name = "add" ++ @tagName(tag);
+                if (@hasDecl(@This(), name)) {
+                    return @call(.auto, @field(@This(), name), .{
+                        self,
+                        s,
+                        transform,
+                        fill_color,
+                        stroke_color,
+                        stroke_width,
+                        ctx,
+                    });
+                }
+            },
         }
     }
     inline fn makeVertex(
@@ -410,7 +421,7 @@ pub const GeometryBatch = struct {
         fill_color: ?Color,
         stroke_color: ?Color,
         stroke_width: f32,
-        ctx: *const RenderContext,
+        ctx: RenderContext,
     ) !void {
         _ = self;
         _ = shape;
