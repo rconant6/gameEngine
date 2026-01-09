@@ -324,9 +324,11 @@ fn parseGlyph(
             }
         }
 
+        const points_slice = try filtered_points.toOwnedSlice(alloc);
+        const contour_slice = try filtered_contour_end_pts.toOwnedSlice(alloc);
         return FilteredGlyph{
-            .points = try filtered_points.toOwnedSlice(alloc),
-            .contour_ends = try filtered_contour_end_pts.toOwnedSlice(alloc),
+            .points = points_slice,
+            .contour_ends = contour_slice,
             .contour_count = number_of_contours,
             .total_points = filtered_point_count,
         };
