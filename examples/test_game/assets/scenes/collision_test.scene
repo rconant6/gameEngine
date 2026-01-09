@@ -42,7 +42,9 @@
       stroke_width:f32 2.0
       visible:bool true
     [Collider:rectangle]
-      radius:f32 1.5
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.5
+      half_height:f32 1.8
 
   [StaticTarget3:entity]
     [Transform]
