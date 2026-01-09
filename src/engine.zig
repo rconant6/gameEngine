@@ -54,16 +54,17 @@ pub const ActionSystem = action.ActionSystem;
 pub const InputTrigger = action.InputTrigger;
 pub const CollisionTrigger = action.CollisionTrigger;
 pub const TriggerContext = action.TriggerContext;
-const Input = core.Input;
+pub const Input = core.Input;
 const ErrorLogger = core.error_logger.ErrorLogger;
 pub const Severity = core.error_logger.Severity;
 pub const Subsystem = core.error_logger.SubSystem;
 pub const ErrorEntry = core.error_logger.ErrorEntry;
 const Systems = @import("Systems.zig");
-const scene_instantiator = @import("scene_instantiator");
-const scene_manager = @import("scene_manager");
-const Instantiator = scene_instantiator.Instantiator;
-const SceneManager = scene_manager.SceneManager;
+const scene = @import("scene");
+pub const Instantiator = scene.Instantiator;
+pub const SceneManager = scene.SceneManager;
+pub const TemplateManager = scene.TemplateManager;
+pub const Template = scene.Template;
 
 pub const Engine = struct {
     allocator: Allocator,
@@ -77,6 +78,7 @@ pub const Engine = struct {
     running: bool,
 
     scene_manager: SceneManager,
+    template_manager: TemplateManager,
     instantiator: Instantiator,
 
     error_logger: ErrorLogger,
@@ -86,7 +88,7 @@ pub const Engine = struct {
         title: []const u8,
         width: u32,
         height: u32,
-    ) Engine {
+    ) !*Engine {
         var had_error = false;
         platform.init() catch |err| {
             std.log.err("[PLATFORM] Unable to platform layer: {any}", .{err});
@@ -158,7 +160,10 @@ pub const Engine = struct {
             @panic("Engine Broke");
         }
 
-        var engine = Engine{
+        const engine = try allocator.create(Engine);
+        errdefer allocator.destroy(engine);
+
+        engine.* = Engine{
             .allocator = allocator,
             .input = input,
             .assets = asset_manager,
@@ -168,19 +173,21 @@ pub const Engine = struct {
             .running = true,
             .action_system = action_system,
             .scene_manager = SceneManager.init(allocator),
-            .instantiator = undefined,
             .error_logger = ErrorLogger.init(allocator),
             .collision_events = .empty,
+            .instantiator = undefined,
+            .template_manager = undefined,
         };
 
-        // Initialize instantiator with pointers to the engine's fields
-        engine.instantiator = Instantiator.init(allocator, &engine.world, &engine.assets);
+        engine.instantiator = .init(allocator, &engine.world, &engine.assets);
+        engine.template_manager = .init(allocator, &engine.instantiator);
 
         return engine;
     }
 
     pub fn deinit(self: *Engine) void {
         self.logInfo(.engine, "Engine shutting down", .{});
+        const allocator = self.allocator;
         self.action_system.deinit();
         self.collision_events.deinit(self.allocator);
         self.scene_manager.deinit();
@@ -190,6 +197,8 @@ pub const Engine = struct {
         self.window.deinit();
         self.instantiator.deinit();
         self.error_logger.deinit();
+        self.template_manager.deinit();
+        allocator.destroy(self);
     }
 
     pub fn shouldClose(self: *const Engine) bool {
@@ -248,7 +257,6 @@ pub const Engine = struct {
             std.debug.panic(
                 "Engine.create({s}) failed: {}\n memory leaking or to large",
                 .{ @typeName(Data), err },
-                // .{ @typeName(Shape), err },
             );
         };
     }
@@ -257,14 +265,6 @@ pub const Engine = struct {
     pub fn draw(self: *Engine, shape: anytype, xform: ?RenderTransform) void {
         const T = @TypeOf(shape);
         const shape_union = ShapeRegisty.createShapeUnion(T);
-        // const shape_union = switch (T) {
-        //     Polygon => Shape{ .Polygon = shape },
-        //     Rectangle => Shape{ .Rectangle = shape },
-        //     Circle => Shape{ .Circle = shape },
-        //     Triangle => Shape{ .Triangle = shape },
-        //     Line => Shape{ .Line = shape },
-        //     else => @compileError("Unsupported shape type: " ++ @typeName(T)),
-        // };
         self.renderer.drawShape(shape_union, xform);
     }
 
@@ -405,7 +405,7 @@ pub const Engine = struct {
         return self.collision_events.items;
     }
 
-    // MARK: Scene Management
+    // MARK: Scene/Template Management
     pub fn loadScene(
         self: *Engine,
         scene_name: []const u8,
@@ -424,6 +424,25 @@ pub const Engine = struct {
             .scene,
             "Loaded scene '{s}' from '{s}'",
             .{ scene_name, filename },
+        );
+    }
+    pub fn loadTemplates(
+        self: *Engine,
+        dir_path: []const u8,
+    ) !void {
+        self.template_manager.loadTemplatesFromDirectory(dir_path) catch |err| {
+            self.logError(
+                .scene,
+                "Failed to load template(s) from '{s}': {any}",
+                .{ dir_path, err },
+            );
+            return;
+        };
+
+        self.logInfo(
+            .scene,
+            "Loaded template(s) from '{s}'",
+            .{dir_path},
         );
     }
 
