@@ -72,6 +72,8 @@ pub const Parser = struct {
 
     fn consume(self: *Parser, token_type: TokenTag) !Token {
         if (self.current_tok.tag != token_type) {
+            const curr = lexeme(self.lexer.src, self.current_tok);
+            std.log.debug("CONSUME: {} {s}, FOUND: {} at {f}", .{ token_type, curr, self.current_tok.tag, self.current_tok.src_loc });
             return ParseError.UnexpectedToken;
         }
 
@@ -472,10 +474,6 @@ pub const Parser = struct {
             .string => .string,
             .color => .color,
             .asset_ref => .asset,
-            .action => .action,
-            .action_target => .action_target,
-            .key => .key,
-            .mouse => .mouse,
             else => return ParseError.UnknownType,
         };
         _ = try self.advance(); // Consume the type token
@@ -562,34 +560,6 @@ pub const Parser = struct {
                 const asset_name = lex.lexeme(self.lexer.src, asset_token);
                 const asset_copy = try self.allocator.dupe(u8, asset_name);
                 break :blk Value{ .assetRef = asset_copy };
-            },
-            .action => blk: {
-                const action_token = try self.consume(.identifier);
-                const action_name = lex.lexeme(self.lexer.src, action_token);
-                break :blk Value{
-                    .action_type = try self.allocator.dupe(u8, action_name),
-                };
-            },
-            .action_target => blk: {
-                const target_token = try self.consume(.identifier);
-                const target_name = lex.lexeme(self.lexer.src, target_token);
-                break :blk Value{
-                    .action_target = try self.allocator.dupe(u8, target_name),
-                };
-            },
-            .key => blk: {
-                const key_token = try self.consume(.identifier);
-                const key_name = lex.lexeme(self.lexer.src, key_token);
-                break :blk Value{
-                    .key_input = try self.allocator.dupe(u8, key_name),
-                };
-            },
-            .mouse => blk: {
-                const mouse_token = try self.consume(.identifier);
-                const mouse_name = lex.lexeme(self.lexer.src, mouse_token);
-                break :blk Value{
-                    .mouse_input = try self.allocator.dupe(u8, mouse_name),
-                };
             },
         };
     }

@@ -200,10 +200,6 @@ pub const BaseType = enum {
     string,
     color,
     asset,
-    action,
-    action_target,
-    key,
-    mouse,
     // custom, // TODO: this is coming later
 };
 
@@ -215,20 +211,12 @@ pub const Value = union(enum) {
     vector: []f64,
     assetRef: []const u8,
     array: []Value,
-    action_type: []const u8,
-    action_target: []const u8,
-    key_input: []const u8,
-    mouse_input: []const u8,
 
     pub fn deinit(self: *Value, allocator: Allocator) void {
         switch (self.*) {
             .string => |s| allocator.free(s),
             .vector => |v| allocator.free(v),
             .assetRef => |a| allocator.free(a),
-            .action_type => |a| allocator.free(a),
-            .action_target => |t| allocator.free(t),
-            .key_input => |k| allocator.free(k),
-            .mouse_input => |m| allocator.free(m),
             .array => |arr| {
                 for (arr) |*val| {
                     val.deinit(allocator);
