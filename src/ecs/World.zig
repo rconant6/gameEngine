@@ -6,10 +6,15 @@ const Storages = std.StringHashMap(StorageInterface);
 const Entity = @import("Entity.zig");
 const Query = @import("Query.zig").Query;
 const ComponentStorage = @import("ComponentStorage.zig").ComponentStorage;
+const core = @import("core");
+const V2 = core.V2;
+const scene = @import("scene");
+const TemplateManager = scene.TemplateManager;
 
 allocator: std.mem.Allocator,
 next_entity_id: usize,
 component_storages: Storages,
+template_manager: *TemplateManager = undefined, // gets set by engine on init
 
 pub fn init(alloc: Allocator) !Self {
     return .{
@@ -18,6 +23,7 @@ pub fn init(alloc: Allocator) !Self {
         .component_storages = Storages.init(alloc),
     };
 }
+
 pub fn deinit(self: *Self) void {
     for (0..self.next_entity_id) |entity_id| {
         self.destroyEntity(Entity{ .id = entity_id });
@@ -43,6 +49,13 @@ pub fn destroyEntity(self: *Self, entity: Entity) void {
             interface.vtable.remove(interface.ptr, entity.id);
         }
     }
+}
+pub fn createEntityFromTemplate(
+    self: *Self,
+    template: []const u8,
+    offset: V2,
+) !Entity {
+    return self.template_manager.instantiate(template, offset);
 }
 
 pub fn addComponent(self: *Self, entity: Entity, comptime T: type, value: T) !void {
