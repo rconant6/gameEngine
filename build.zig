@@ -105,7 +105,6 @@ pub fn build(b: *std.Build) void {
     });
     component_registry_module.addImport("scene-format", scene_format_module);
     component_registry_module.addImport("entity", entity_module);
-
     const shape_registry_module = b.addModule("shape_registry", .{
         .root_source_file = b.path("src/core/shape_registry.zig"),
         .target = target,
@@ -113,7 +112,6 @@ pub fn build(b: *std.Build) void {
     });
     shape_registry_module.addImport("scene-format", scene_format_module);
     shape_registry_module.addImport("renderer", renderer_module);
-
     const collider_shape_registry_module = b.addModule("collider_shape_registry", .{
         .root_source_file = b.path("src/core/collider_shape_registry.zig"),
         .target = target,
@@ -137,7 +135,9 @@ pub fn build(b: *std.Build) void {
     scene_module.addImport("shape_registry", shape_registry_module);
     scene_module.addImport("collider_shape_registry", collider_shape_registry_module);
     scene_module.addImport("platform", platform_module);
+    scene_module.addImport("action", action_module);
 
+    entity_module.addImport("scene", scene_module);
     // ========================================
     // Engine Module and Library
     // ========================================
@@ -162,6 +162,8 @@ pub fn build(b: *std.Build) void {
 
     // Scene instantiator needs the Engine type
     scene_module.addImport("engine", engine_module);
+
+    entity_module.addImport("scene", scene_module);
 
     // Create a static library for the engine
     const engine_lib = b.addLibrary(.{
@@ -280,18 +282,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     world_test_module.addImport("core", core_module);
-    world_test_module.addAnonymousImport("World", .{
-        .root_source_file = b.path("src/ecs/World.zig"),
-    });
-    world_test_module.addAnonymousImport("Entity", .{
-        .root_source_file = b.path("src/ecs/Entity.zig"),
-    });
-    world_test_module.addAnonymousImport("ComponentStorage", .{
-        .root_source_file = b.path("src/ecs/ComponentStorage.zig"),
-    });
-    world_test_module.addAnonymousImport("Query", .{
-        .root_source_file = b.path("src/ecs/Query.zig"),
-    });
+    world_test_module.addImport("scene", scene_module);
+    world_test_module.addImport("entity", entity_module);
     const world_tests = b.addTest(.{
         .name = "world-tests",
         .root_module = world_test_module,
@@ -523,7 +515,6 @@ pub fn build(b: *std.Build) void {
     });
     const run_scene_tests = b.addRunArtifact(scene_tests);
 
-    // Template Instantiation Tests (will fail until template system is implemented)
     const template_instantiation_test_module = b.addModule("template_instantiation_tests", .{
         .root_source_file = b.path("tests/scene/test_template_instantiation.zig"),
         .target = target,
