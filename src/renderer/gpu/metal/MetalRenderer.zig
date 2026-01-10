@@ -30,6 +30,7 @@ const RenderConfig = rend.RendererConfig;
 const ShapeData = rend.ShapeData;
 
 const Self = @This();
+const MAX_VERT_SIZE: usize = 1024 * 1024 * 12; // 12MB of vertices storage
 
 device: *MTLDevice,
 command_queue: *MTLCommandQueue,
@@ -57,8 +58,7 @@ pub fn init(allocator: std.mem.Allocator, config: RenderConfig) (MTLError || std
     const pipeline_state = try createPipelineState(allocator, device);
 
     const vertex_size = @sizeOf(Vertex);
-    const max_vertices = 10000;
-    const buffer_size = max_vertices * vertex_size;
+    const buffer_size = MAX_VERT_SIZE * vertex_size;
     const options = @intFromEnum(MTLResourceOptions.storageModeShared);
     const vertex_buffer = try MetalBridge.createBuffer(device, buffer_size, options);
 
@@ -166,6 +166,16 @@ pub fn drawShape(
     stroke_width: f32,
 ) void {
     const ctx = self.getRenderContext();
+
+    // Check if batch is getting too full, flush early to prevent overflow
+    const estimated_vertices_per_shape = 64;
+    if (self.batch.vertices.items.len + estimated_vertices_per_shape > MAX_VERT_SIZE) {
+        self.flushBatch() catch {
+            // NOTE: Still trying to draw
+            std.debug.print("Warning: Failed to flush batch before adding shape\n", .{});
+        };
+    }
+
     self.batch.addShape(
         shape,
         transform,
@@ -184,10 +194,26 @@ fn flushBatch(self: *Self) !void {
     const buffer_ptr = try MetalBridge.getBufferContents(self.vertex_buffer);
     const vertex_size = @sizeOf(Vertex);
     const bytes_to_copy = vertices.len * vertex_size;
-    @memcpy(
-        @as([*]u8, @ptrCast(buffer_ptr))[0..bytes_to_copy],
-        @as([*]const u8, @ptrCast(vertices.ptr))[0..bytes_to_copy],
-    );
+
+    if (bytes_to_copy > self.vertex_buffer_size) {
+        std.log.err(
+            "Vertex buffer overflow: trying to copy {d} bytes but buffer size is {d} bytes ({d} vertices vs {d} max)",
+            .{ bytes_to_copy, self.vertex_buffer_size, vertices.len, self.vertex_buffer_size / vertex_size },
+        );
+        // NOTE: Clamp to buffer size to prevent crash, will produce artifacts on screen
+        const clamped_bytes = self.vertex_buffer_size;
+        const clamped_vertices = clamped_bytes / vertex_size;
+        @memcpy(
+            @as([*]u8, @ptrCast(buffer_ptr))[0..clamped_bytes],
+            @as([*]const u8, @ptrCast(vertices.ptr))[0..clamped_bytes],
+        );
+        std.log.warn("Rendering truncated to {d} vertices", .{clamped_vertices});
+    } else {
+        @memcpy(
+            @as([*]u8, @ptrCast(buffer_ptr))[0..bytes_to_copy],
+            @as([*]const u8, @ptrCast(vertices.ptr))[0..bytes_to_copy],
+        );
+    }
 
     const render_pass = try MetalBridge.createRenderPassDescriptor();
 
