@@ -13,7 +13,8 @@ const action = @import("action");
 // MARK: Action Components
 pub const Action = action.Action;
 pub const Trigger = action.TriggerComp;
-pub const OnCollision = struct { _dummy: u8 = 0 };
+pub const OnCollision = action.OnCollision;
+pub const OnInput = action.OnInput;
 
 // MARK: Spatial Components
 pub const Transform = struct {

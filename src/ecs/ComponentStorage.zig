@@ -81,7 +81,12 @@ pub fn ComponentStorage(comptime T: type) type {
             const dense_index = self.sparse.items[entity_id].?;
 
             if (@hasDecl(T, "deinit")) {
-                self.dense.items[dense_index].deinit();
+                const deinit_fn = @typeInfo(@TypeOf(T.deinit)).@"fn";
+                if (deinit_fn.params.len == 1) {
+                    self.dense.items[dense_index].deinit();
+                } else if (deinit_fn.params.len == 2) {
+                    self.dense.items[dense_index].deinit(self.gpa);
+                }
             }
 
             std.debug.assert(last_index == self.entities.items.len - 1);
