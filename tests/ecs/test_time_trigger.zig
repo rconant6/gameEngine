@@ -10,6 +10,10 @@ const Entity = ecs.Entity;
 const TimeTrigger = struct {
     interval: f32, // Time in seconds between triggers
     actions: []const Action.Action,
+
+    pub fn deinit(self: *TimeTrigger, gpa: std.mem.Allocator) void {
+        gpa.free(self.actions);
+    }
 };
 
 // Component that holds time-based triggers
@@ -116,8 +120,9 @@ test "OnTime - ActionBindings with TimeTrigger" {
         .actions = &[_]Action.Action{action},
     };
 
+    var triggers_array = [_]TimeTrigger{trigger};
     const time_bindings = OnTime{
-        .triggers = &[_]TimeTrigger{trigger},
+        .triggers = &triggers_array,
     };
 
     try testing.expect(time_bindings.hasTriggers());
@@ -146,8 +151,9 @@ test "OnTime - multiple triggers with different intervals" {
         .actions = &[_]Action.Action{action2},
     };
 
+    var triggers_array = [_]TimeTrigger{ trigger1, trigger2 };
     const time_bindings = OnTime{
-        .triggers = &[_]TimeTrigger{ trigger1, trigger2 },
+        .triggers = &triggers_array,
     };
 
     try testing.expectEqual(@as(usize, 2), time_bindings.triggers.len);
@@ -168,13 +174,21 @@ test "TimeBasedTriggerSystem - process with delta_time" {
         .priority = 0,
     };
 
+    // Allocate actions array on heap for proper cleanup
+    const actions = try allocator.alloc(Action.Action, 1);
+    actions[0] = action;
+
     const trigger = TimeTrigger{
         .interval = 1.0,
-        .actions = &[_]Action.Action{action},
+        .actions = actions,
     };
 
+    // Allocate triggers array on heap for proper cleanup
+    const triggers = try allocator.alloc(TimeTrigger, 1);
+    triggers[0] = trigger;
+
     try world.addComponent(entity, OnTime, .{
-        .triggers = &[_]TimeTrigger{trigger},
+        .triggers = triggers,
     });
 
     var elapsed = [_]f32{0.0};
@@ -218,21 +232,40 @@ test "TimeBasedTriggerSystem - multiple entities" {
         .priority = 0,
     };
 
-    const trigger = TimeTrigger{
+    // Allocate for entity1
+    const actions1 = try allocator.alloc(Action.Action, 1);
+    actions1[0] = action;
+
+    const trigger1 = TimeTrigger{
         .interval = 0.5,
-        .actions = &[_]Action.Action{action},
+        .actions = actions1,
     };
 
+    const triggers1 = try allocator.alloc(TimeTrigger, 1);
+    triggers1[0] = trigger1;
+
     try world.addComponent(entity1, OnTime, .{
-        .triggers = &[_]TimeTrigger{trigger},
+        .triggers = triggers1,
     });
     var elapsed1 = [_]f32{0.0};
     try world.addComponent(entity1, TimeAccumulator, .{
         .elapsed = &elapsed1,
     });
 
+    // Allocate for entity2
+    const actions2 = try allocator.alloc(Action.Action, 1);
+    actions2[0] = action;
+
+    const trigger2 = TimeTrigger{
+        .interval = 0.5,
+        .actions = actions2,
+    };
+
+    const triggers2 = try allocator.alloc(TimeTrigger, 1);
+    triggers2[0] = trigger2;
+
     try world.addComponent(entity2, OnTime, .{
-        .triggers = &[_]TimeTrigger{trigger},
+        .triggers = triggers2,
     });
     var elapsed2 = [_]f32{0.0};
     try world.addComponent(entity2, TimeAccumulator, .{

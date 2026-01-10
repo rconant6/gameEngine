@@ -8,6 +8,12 @@ const V2 = @import("core").V2;
 const TestTrigger = struct {
     condition: []const u8,
     actions: []const Action.Action,
+
+    pub fn deinit(self: *TestTrigger, gpa: std.mem.Allocator) void {
+        // Test triggers don't own their data, so nothing to free
+        _ = self;
+        _ = gpa;
+    }
 };
 
 test "ActionBindings - generic instantiation with TestTrigger" {
@@ -23,8 +29,9 @@ test "ActionBindings - generic instantiation with TestTrigger" {
         .actions = &[_]Action.Action{test_action},
     };
 
+    var triggers_array = [_]TestTrigger{trigger};
     const test_bindings = OnTest{
-        .triggers = &[_]TestTrigger{trigger},
+        .triggers = &triggers_array,
     };
 
     try testing.expectEqual(@as(usize, 1), test_bindings.triggers.len);
@@ -35,15 +42,17 @@ test "ActionBindings - generic instantiation with TestTrigger" {
 test "ActionBindings - hasTriggers helper" {
     const OnTest = ActionBindings(TestTrigger);
 
+    var with_triggers_array = [_]TestTrigger{.{
+        .condition = "test",
+        .actions = &[_]Action.Action{},
+    }};
     const with_triggers = OnTest{
-        .triggers = &[_]TestTrigger{.{
-            .condition = "test",
-            .actions = &[_]Action.Action{},
-        }},
+        .triggers = &with_triggers_array,
     };
 
+    var without_triggers_array = [_]TestTrigger{};
     const without_triggers = OnTest{
-        .triggers = &[_]TestTrigger{},
+        .triggers = &without_triggers_array,
     };
 
     try testing.expect(with_triggers.hasTriggers());
@@ -73,8 +82,9 @@ test "ActionBindings - multiple triggers" {
         .actions = &[_]Action.Action{action2},
     };
 
+    var triggers_array = [_]TestTrigger{ trigger1, trigger2 };
     const test_bindings = OnTest{
-        .triggers = &[_]TestTrigger{ trigger1, trigger2 },
+        .triggers = &triggers_array,
     };
 
     try testing.expectEqual(@as(usize, 2), test_bindings.triggers.len);
@@ -96,8 +106,9 @@ test "ActionBindings - trigger with multiple actions" {
         .actions = &actions,
     };
 
+    var triggers_array = [_]TestTrigger{trigger};
     const test_bindings = OnTest{
-        .triggers = &[_]TestTrigger{trigger},
+        .triggers = &triggers_array,
     };
 
     try testing.expectEqual(@as(usize, 1), test_bindings.triggers.len);
