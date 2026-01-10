@@ -138,13 +138,14 @@ pub const Engine = struct {
             }
         }
 
-        const asset_manager = AssetManager.init(allocator) catch |err| blk: {
-            std.log.err("[ASSETS] Unable to create an asset manager: {any}", .{err});
+        const world = World.init(allocator) catch |err| blk: {
+            std.log.err("[ECS] Unable to create a world entity manager: {any}", .{err});
             had_error = true;
             break :blk undefined;
         };
-        const world = World.init(allocator) catch |err| blk: {
-            std.log.err("[ECS] Unable to create a world entity manager: {any}", .{err});
+
+        const asset_manager = AssetManager.init(allocator) catch |err| blk: {
+            std.log.err("[ASSETS] Unable to create an asset manager: {any}", .{err});
             had_error = true;
             break :blk undefined;
         };
@@ -181,6 +182,7 @@ pub const Engine = struct {
 
         engine.instantiator = .init(allocator, &engine.world, &engine.assets);
         engine.template_manager = .init(allocator, &engine.instantiator);
+        engine.world.template_manager = &engine.template_manager;
 
         return engine;
     }
@@ -411,6 +413,11 @@ pub const Engine = struct {
         scene_name: []const u8,
         filename: []const u8,
     ) !void {
+        if (self.scene_manager.scenes.contains(scene_name)) {
+            self.logInfo(.scene, "Scene {s} is already loaded", .{scene_name});
+            return;
+        }
+
         self.scene_manager.loadScene(scene_name, filename) catch |err| {
             self.logError(
                 .scene,
@@ -420,11 +427,7 @@ pub const Engine = struct {
             return;
         };
 
-        self.logInfo(
-            .scene,
-            "Loaded scene '{s}' from '{s}'",
-            .{ scene_name, filename },
-        );
+        self.logInfo(.scene, "Loaded scene '{s}' from '{s}'", .{ scene_name, filename });
     }
     pub fn loadTemplates(
         self: *Engine,
@@ -447,7 +450,10 @@ pub const Engine = struct {
     }
 
     pub fn setActiveScene(self: *Engine, scene_name: []const u8) !void {
-        try self.scene_manager.setActiveScene(scene_name);
+        self.scene_manager.setActiveScene(scene_name) catch |err| {
+            self.logError(.scene, "Failed to set the active scene: {any}", .{err});
+            return {};
+        };
     }
 
     pub fn instantiateActiveScene(self: *Engine) !void {
