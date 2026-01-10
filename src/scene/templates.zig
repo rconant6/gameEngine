@@ -46,7 +46,8 @@ pub const TemplateManager = struct {
     pub fn deinit(self: *TemplateManager) void {
         var iter = self.templates.iterator();
         while (iter.next()) |entry| {
-            self.allocator.free(entry.key_ptr.*);
+            self.allocator.free(entry.key_ptr.*); // Free lowercase key
+            self.allocator.free(entry.value_ptr.name); // Free original name
         }
         self.templates.deinit();
 
@@ -65,7 +66,9 @@ pub const TemplateManager = struct {
     ) !Entity {
         const instantiator = self.instantiator;
         const world = instantiator.world;
-        const template = self.templates.get(name) orelse return TemplateError.TemplateNotFound;
+        var buf: [256]u8 = undefined;
+        const lower = std.ascii.lowerString(&buf, name);
+        const template = self.templates.get(lower) orelse return TemplateError.TemplateNotFound;
         const entity = try instantiator.world.createEntity();
 
         const components = template.declaration.components;
@@ -74,31 +77,40 @@ pub const TemplateManager = struct {
         }
 
         if (world.getComponentMut(entity, Transform)) |transform| {
-            transform.position = position;
+            transform.position = transform.position.add(position);
         }
 
         return entity;
     }
 
     pub fn loadTemplateFile(self: *TemplateManager, name: []const u8) !void {
-        if (self.templates.contains(name)) return TemplateError.TemplateAlreadyLoaded;
+        if (self.templates.contains(name)) {
+            std.log.warn("{s} is already loaded, skipping...", .{name});
+            return;
+        }
 
         const owned_file = try self.allocator.create(SceneFile);
         errdefer self.allocator.destroy(owned_file);
         owned_file.* = try load.loadTemplateFile(self.allocator, name);
-
         try self.template_files.append(self.allocator, owned_file);
 
         for (owned_file.decls) |decl| {
             switch (decl) {
                 .template => |t| {
+                    const owned_name_lower = try std.ascii.allocLowerString(
+                        self.allocator,
+                        t.name,
+                    );
+                    errdefer self.allocator.free(owned_name_lower);
+
                     const owned_name = try self.allocator.dupe(u8, t.name);
                     errdefer self.allocator.free(owned_name);
+
                     const template: Template = .{
                         .declaration = t,
                         .name = owned_name,
                     };
-                    try self.templates.put(owned_name, template);
+                    try self.templates.put(owned_name_lower, template);
                 },
                 else => {},
             }
@@ -129,10 +141,14 @@ pub const TemplateManager = struct {
         }
     }
     pub fn hasTemplate(self: *const TemplateManager, name: []const u8) bool {
-        return self.templates.contains(name);
+        var buf: [256]u8 = undefined;
+        const lower = std.ascii.lowerString(&buf, name);
+        return self.templates.contains(lower);
     }
 
     pub fn getTemplate(self: *const TemplateManager, name: []const u8) ?Template {
-        return self.templates.get(name);
+        var buf: [256]u8 = undefined;
+        const lower = std.ascii.lowerString(&buf, name);
+        return self.templates.get(lower);
     }
 };

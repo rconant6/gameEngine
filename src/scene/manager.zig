@@ -93,6 +93,7 @@ pub const SceneManager = struct {
 
         if (self.active_scene_name) |old_name| self.allocator.free(old_name);
         self.active_scene_name = try self.allocator.dupe(u8, name);
+        try self.reloadActiveScene();
     }
     pub fn getActiveScene(self: *SceneManager) ?*const SceneFile {
         if (self.active_scene_name) |active_scene|

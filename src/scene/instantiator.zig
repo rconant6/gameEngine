@@ -39,8 +39,10 @@ const Color = rend.Color;
 const Colors = rend.Colors;
 
 const acts = @import("action");
+const Action = acts.Action;
 const ActionTarget = acts.ActionTarget;
 const ActionType = acts.ActionType;
+const InputTrigger = acts.InputTrigger;
 const CollisionTrigger = acts.CollisionTrigger;
 
 pub const InstantiatorError = error{
@@ -137,7 +139,7 @@ pub const Instantiator = struct {
     ) !void {
         const entity = try self.world.createEntity();
         try self.last_instantiated_entities.append(self.allocator, entity);
-
+        std.log.debug("EntityName: {s} Id: {d}", .{ entity_decl.name, entity.id });
         for (entity_decl.components) |*comp_decl| {
             try self.addComponent(entity, comp_decl);
         }
@@ -214,6 +216,22 @@ pub const Instantiator = struct {
             .sprite => |s| s.name,
             .collider => |c| c.name,
         };
+
+        if (std.mem.eql(u8, comp_name, "OnCollision")) {
+            const component = try self.buildTriggerComponent(Components.OnCollision, CollisionTrigger, comp_decl.generic);
+            errdefer {
+                for (component.triggers) |trigger| {
+                    self.allocator.free(trigger.other_tag_pattern);
+                }
+            }
+            try self.world.addComponent(entity, Components.OnCollision, component);
+            return;
+        }
+        if (std.mem.eql(u8, comp_name, "OnInput")) {
+            const component = try self.buildTriggerComponent(Components.OnInput, InputTrigger, comp_decl.generic);
+            try self.world.addComponent(entity, Components.OnInput, component);
+            return;
+        }
 
         switch (comp_decl.*) {
             .collider => |c| {
@@ -400,7 +418,6 @@ pub const Instantiator = struct {
     ) !Components.Collider {
         var shape_data: ColliderShapeType = undefined;
 
-        // Extract properties for the collider shape
         if (collider_block.properties) |props| {
             for (props) |prop| {
                 inline for (std.meta.fields(ColliderShapeType)) |field| {
@@ -417,7 +434,6 @@ pub const Instantiator = struct {
             }
         }
 
-        // Create the ColliderShape union based on the shape type
         const collider_data = ColliderRegistry.createColliderUnion(
             ColliderShapeType,
             shape_data,
@@ -426,26 +442,149 @@ pub const Instantiator = struct {
             .collider = collider_data,
         };
     }
-
-    fn parseActionFromBlock(
+    fn buildTriggerComponent(
         self: *Instantiator,
-        block: GenericBlock,
-    ) !CollisionTrigger {
-        // var action_type: ActionType = undefined;
-        // use get property function (below)
-        if (block.properties) |props| {
-            for (props) |prop| {
-                if (std.mem.eql(u8, "type", prop.name)) {
-                    const action_type_str = try self.extractValueForType(
-                        []const u8,
-                        prop.value,
-                    ) orelse return InstantiatorError.InvalidValue;
-                    _ = action_type_str;
-                    continue;
+        comptime ComponentType: type,
+        comptime TriggerType: type,
+        comp: GenericBlock,
+    ) !ComponentType {
+        var triggers: std.ArrayList(TriggerType) = .empty;
+        errdefer triggers.deinit(self.allocator);
+
+        if (comp.nested_blocks) |blocks| {
+            for (blocks) |*nested_block| {
+                if (std.mem.eql(u8, nested_block.name, "trigger")) {
+                    const trigger = try self.buildTrigger(TriggerType, nested_block.*);
+                    try triggers.append(self.allocator, trigger);
                 }
             }
         }
-        return InstantiatorError.UnimplementedAction;
+
+        return ComponentType{
+            .triggers = try triggers.toOwnedSlice(self.allocator),
+        };
+    }
+
+    fn buildTrigger(
+        self: *Instantiator,
+        comptime TriggerType: type,
+        trigger_block: GenericBlock,
+    ) !TriggerType {
+        var trigger: TriggerType = undefined;
+
+        if (trigger_block.properties) |props| {
+            inline for (std.meta.fields(TriggerType)) |field| {
+                if (std.mem.eql(u8, field.name, "actions")) {
+                    // NOTE: skip the actions, will build at the end
+                } else if (@typeInfo(field.type) == .@"union") {
+                    var union_value: ?field.type = null;
+                    inline for (std.meta.fields(field.type)) |union_field| {
+                        if (getProperty(props, union_field.name)) |prop| {
+                            const value = try self.extractValueForType(union_field.type, prop.value) orelse {
+                                return InstantiatorError.MissingRequiredField;
+                            };
+                            union_value = @unionInit(field.type, union_field.name, value);
+                            break;
+                        }
+                    }
+                    if (union_value) |uv| {
+                        @field(trigger, field.name) = uv;
+                    } else {
+                        return InstantiatorError.MissingRequiredField;
+                    }
+                } else {
+                    if (getProperty(props, field.name)) |prop| {
+                        const value = try self.extractValueForType(field.type, prop.value) orelse {
+                            return InstantiatorError.MissingRequiredField;
+                        };
+                        @field(trigger, field.name) = value;
+                    } else {
+                        return InstantiatorError.MissingRequiredField;
+                    }
+                }
+            }
+        }
+
+        var actions: std.ArrayList(Action) = .empty;
+        errdefer actions.deinit(self.allocator);
+        if (trigger_block.nested_blocks) |blocks| {
+            for (blocks) |*nested_block| {
+                if (std.mem.eql(u8, nested_block.name, "action")) {
+                    const action = try self.buildAction(nested_block.*);
+                    try actions.append(self.allocator, action);
+                }
+            }
+        }
+
+        trigger.actions = try actions.toOwnedSlice(self.allocator);
+        return trigger;
+    }
+
+    fn buildAction(
+        self: *Instantiator,
+        action_block: GenericBlock,
+    ) !Action {
+        var priority: i32 = 0;
+        var action_type: ?ActionType = null;
+
+        if (action_block.properties) |props| {
+            if (getProperty(props, "priority")) |priority_prop| {
+                priority = try self.extractValueForType(i32, priority_prop.value) orelse 0;
+            }
+            const type_str = if (getProperty(props, "type")) |type_prop|
+                try self.extractValueForType([]const u8, type_prop.value) orelse {
+                    return InstantiatorError.MissingRequiredField;
+                }
+            else {
+                return InstantiatorError.MissingRequiredField;
+            };
+            inline for (std.meta.fields(ActionType)) |field| {
+                if (std.mem.eql(u8, type_str, field.name)) {
+                    if (field.type == void) {
+                        action_type = @unionInit(ActionType, field.name, {});
+                    } else if (@typeInfo(field.type) == .@"struct") {
+                        // Handle struct payloads spawn_entity, set_velocity...
+                        var payload: field.type = undefined;
+                        inline for (std.meta.fields(field.type)) |payload_field| {
+                            const field_value = if (getProperty(
+                                props,
+                                payload_field.name,
+                            )) |prop|
+                                try self.extractValueForType(payload_field.type, prop.value)
+                            else if (@typeInfo(payload_field.type) == .optional)
+                                null
+                            else
+                                getDefaultValue(payload_field.type);
+
+                            @field(payload, payload_field.name) = field_value orelse {
+                                return InstantiatorError.MissingRequiredField;
+                            };
+                        }
+                        action_type = @unionInit(ActionType, field.name, payload);
+                    } else {
+                        // Handle simple payloads of supported types
+                        for (props) |prop| {
+                            if (!std.mem.eql(u8, "type", prop.name) and
+                                !std.mem.eql(u8, "priority", prop.name))
+                            {
+                                const value = try self.extractValueForType(field.type, prop.value) orelse {
+                                    return InstantiatorError.MissingRequiredField;
+                                };
+                                action_type = @unionInit(ActionType, field.name, value);
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        return Action{
+            .action_type = action_type orelse {
+                return InstantiatorError.UnknownProperty;
+            },
+            .priority = priority,
+        };
     }
 
     fn extractValueForType(
@@ -506,42 +645,6 @@ pub const Instantiator = struct {
                         else => InstantiatorError.TypeMismatch,
                     };
                 }
-                // For []const []const u8 (string arrays for Tag names)
-                if (ptr_info.size == .slice) {
-                    if (@typeInfo(ptr_info.child) == .pointer) {
-                        const child_ptr = @typeInfo(ptr_info.child).pointer;
-                        if (child_ptr.size == .slice and child_ptr.child == u8) {
-                            return switch (value) {
-                                .array => |arr| blk: {
-                                    const strings = try self.allocator.alloc(
-                                        []const u8,
-                                        arr.len,
-                                    );
-                                    errdefer {
-                                        for (strings, 0..) |s, idx| {
-                                            if (idx < arr.len) self.allocator.free(s);
-                                        }
-                                        self.allocator.free(strings);
-                                    }
-                                    for (arr, 0..) |val, i| {
-                                        switch (val) {
-                                            .string => |s| strings[i] = s,
-                                            else => {
-                                                for (strings[0..i]) |owned_s| {
-                                                    self.allocator.free(owned_s);
-                                                }
-                                                self.allocator.free(strings);
-                                                return InstantiatorError.TypeMismatch;
-                                            },
-                                        }
-                                    }
-                                    break :blk strings;
-                                },
-                                else => InstantiatorError.TypeMismatch,
-                            };
-                        }
-                    }
-                }
                 return InstantiatorError.TypeMismatch;
             },
             .@"struct" => {
@@ -582,8 +685,26 @@ pub const Instantiator = struct {
                 }
                 return InstantiatorError.TypeMismatch;
             },
+            .@"enum" => {
+                if (T == ActionTarget)
+                    return getActionTarget(value.string) orelse
+                        return InstantiatorError.TypeMismatch;
+                if (T == KeyCode) {
+                    return getKeyCode(value.string) orelse
+                        return InstantiatorError.TypeMismatch;
+                }
+                if (T == MouseButton) {
+                    return getMouseButton(value.string) orelse
+                        return InstantiatorError.TypeMismatch;
+                }
+                return InstantiatorError.TypeMismatch;
+            },
+            .@"union" => {
+                return InstantiatorError.TypeMismatch;
+            },
             else => return InstantiatorError.TypeMismatch,
         }
+        return InstantiatorError.TypeMismatch;
     }
 };
 
@@ -638,15 +759,52 @@ fn getProperty(props: []const Property, property: []const u8) ?Property {
     return null;
 }
 
-fn getKeyCode(key_str: []const u8) !KeyCode {
+fn getKeyCode(key_str: []const u8) ?KeyCode {
     return std.meta.stringToEnum(KeyCode, key_str);
 }
-fn getMouseButton(button_str: []const u8) !MouseButton {
+fn getMouseButton(button_str: []const u8) ?MouseButton {
     return std.meta.stringToEnum(MouseButton, button_str);
 }
-fn getActionTarget(target: []const u8) !ActionTarget {
+fn getActionTarget(target: []const u8) ?ActionTarget {
     return std.meta.stringToEnum(ActionTarget, target);
 }
-fn getActionType(action: []const u8) !ActionType {
+fn getActionType(action: []const u8) ?ActionType {
     return std.meta.stringToEnum(ActionType, action);
 }
+
+// For []const []const u8 (string arrays for Tag names)
+// if (ptr_info.size == .slice) {
+//     if (@typeInfo(ptr_info.child) == .pointer) {
+//         const child_ptr = @typeInfo(ptr_info.child).pointer;
+//         if (child_ptr.size == .slice and child_ptr.child == u8) {
+//             return switch (value) {
+//                 .array => |arr| blk: {
+//                     const strings = try self.allocator.alloc(
+//                         []const u8,
+//                         arr.len,
+//                     );
+//                     errdefer {
+//                         for (strings, 0..) |s, idx| {
+//                             if (idx < arr.len) self.allocator.free(s);
+//                         }
+//                         self.allocator.free(strings);
+//                     }
+//                     for (arr, 0..) |val, i| {
+//                         switch (val) {
+//                             .string => |s| strings[i] = s,
+//                             else => {
+//                                 for (strings[0..i]) |owned_s| {
+//                                     self.allocator.free(owned_s);
+//                                 }
+//                                 self.allocator.free(strings);
+//                                 return InstantiatorError.TypeMismatch;
+//                             },
+//                         }
+//                     }
+//                     break :blk strings;
+//                 },
+//                 else => InstantiatorError.TypeMismatch,
+//             };
+//         }
+//     }
+// }
