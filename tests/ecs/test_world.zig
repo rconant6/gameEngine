@@ -1,7 +1,8 @@
 const std = @import("std");
 const testing = std.testing;
-const World = @import("World");
-const Entity = @import("entity");
+const ecs = @import("entity");
+const World = ecs.World;
+const Entity = ecs.Entity;
 
 // Test component types
 const Position = struct {

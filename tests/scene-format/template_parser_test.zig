@@ -368,10 +368,10 @@ test "template: nested - OnCollision with single trigger and action" {
         \\  [Transform]
         \\    position:vec2 {0.0, 0.0}
         \\  [OnCollision]
-        \\    [Trigger]
+        \\    [trigger]
         \\      other_tag_pattern:string "wall"
-        \\      [Action]
-        \\        type:action destroy_self
+        \\      [action]
+        \\        type:string "destroy_self"
         \\        priority:i32 0
     ;
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -394,7 +394,7 @@ test "template: nested - OnCollision with single trigger and action" {
                             try testing.expectEqual(@as(usize, 1), g.nested_blocks.?.len);
 
                             const trigger = g.nested_blocks.?[0];
-                            try testing.expectEqualStrings("Trigger", trigger.name);
+                            try testing.expectEqualStrings("trigger", trigger.name);
                             try testing.expect(trigger.nested_blocks != null);
                             try testing.expectEqual(@as(usize, 1), trigger.nested_blocks.?.len);
                         }
@@ -414,14 +414,14 @@ test "template: nested - OnCollision with multiple actions" {
         \\  [Transform]
         \\    position:vec2 {0.0, 0.0}
         \\  [OnCollision]
-        \\    [Trigger]
+        \\    [trigger]
         \\      other_tag_pattern:string "enemy*"
-        \\      [Action]
-        \\        type:action destroy_self
+        \\      [action]
+        \\        type:string "destroy_self"
         \\        priority:i32 0
-        \\      [Action]
-        \\        type:action play_sound
-        \\        sound_name:string "explosion"
+        \\      [action]
+        \\        type:string "play_sound"
+        \\        message:string "explosion"
         \\        priority:i32 1
     ;
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -442,9 +442,9 @@ test "template: nested - OnCollision with multiple actions" {
                             try testing.expect(trigger.nested_blocks != null);
                             try testing.expectEqual(@as(usize, 2), trigger.nested_blocks.?.len);
 
-                            // Verify both are Actions
-                            try testing.expectEqualStrings("Action", trigger.nested_blocks.?[0].name);
-                            try testing.expectEqualStrings("Action", trigger.nested_blocks.?[1].name);
+                            // Verify both are actions
+                            try testing.expectEqualStrings("action", trigger.nested_blocks.?[0].name);
+                            try testing.expectEqualStrings("action", trigger.nested_blocks.?[1].name);
                         }
                     },
                     else => {},
@@ -459,14 +459,14 @@ test "template: nested - OnCollision with property verification" {
     const src: [:0]const u8 =
         \\[Ball:template]
         \\  [OnCollision]
-        \\    [Trigger]
+        \\    [trigger]
         \\      other_tag_pattern:string "brick"
-        \\      [Action]
-        \\        type:action destroy_other
+        \\      [action]
+        \\        type:string "destroy_other"
         \\        priority:i32 0
-        \\      [Action]
-        \\        type:action play_sound
-        \\        sound_name:string "brick_break"
+        \\      [action]
+        \\        type:string "play_sound"
+        \\        message:string "brick_break"
         \\        priority:i32 1
     ;
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -516,11 +516,12 @@ test "template: nested - OnInput with keyboard trigger" {
     const src: [:0]const u8 =
         \\[Player:template]
         \\  [OnInput]
-        \\    [Trigger]
-        \\      input:key Space
-        \\      [Action]
-        \\        type:action spawn_entity
+        \\    [trigger]
+        \\      key:string "Space"
+        \\      [action]
+        \\        type:string "spawn_entity"
         \\        template_name:string "bullet"
+        \\        offset:vec2 {0.0, 0.0}
         \\        priority:i32 0
     ;
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -541,7 +542,7 @@ test "template: nested - OnInput with keyboard trigger" {
                             try testing.expectEqual(@as(usize, 1), g.nested_blocks.?.len);
 
                             const trigger = g.nested_blocks.?[0];
-                            try testing.expectEqualStrings("Trigger", trigger.name);
+                            try testing.expectEqualStrings("trigger", trigger.name);
                             try testing.expect(trigger.nested_blocks != null);
                             try testing.expectEqual(@as(usize, 1), trigger.nested_blocks.?.len);
                         }
@@ -560,10 +561,10 @@ test "template: nested - OnInput with spawn_entity action properties" {
         \\  [Transform]
         \\    position:vec2 {0.0, 500.0}
         \\  [OnInput]
-        \\    [Trigger]
-        \\      input:key Space
-        \\      [Action]
-        \\        type:action spawn_entity
+        \\    [trigger]
+        \\      key:string "Space"
+        \\      [action]
+        \\        type:string "spawn_entity"
         \\        template_name:string "missile"
         \\        offset:vec2 {0.0, -30.0}
         \\        priority:i32 0
