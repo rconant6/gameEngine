@@ -42,6 +42,10 @@ pub const CollisionTrigger = struct {
     other_tag_pattern: []const u8,
     actions: []const Action,
 
+    pub fn deinit(self: *CollisionTrigger, gpa: std.mem.Allocator) void {
+        gpa.free(self.actions);
+    }
+
     pub fn process(
         world: *World,
         ctx: TriggerContext,
@@ -102,6 +106,10 @@ pub const InputTrigger = struct {
         mouse: MouseButton,
     },
     actions: []const Action,
+
+    pub fn deinit(self: *InputTrigger, gpa: std.mem.Allocator) void {
+        gpa.free(self.actions);
+    }
 
     pub fn process(
         world: *World,

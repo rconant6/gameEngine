@@ -7,28 +7,55 @@ const Action = ecs.Action;
 const ActionType = ecs.ActionType;
 const ActionTarget = ecs.ActionTarget;
 const ActionQueue = @import("ActionQueue.zig").ActionQueue;
+const scene = @import("scene");
+const Template = scene.Template;
 
-pub fn executeActions(world: *World, action_queue: *ActionQueue) !void {
+pub fn executeActions(world: *World, action_queue: *ActionQueue) void {
     action_queue.sortByPriority();
 
     for (action_queue.actions.items) |queued| {
         const action = queued.action;
         switch (action.action_type) {
             .destroy_self => {
-                try world.addComponent(queued.context.self_ent, Destroy, .{});
+                world.addComponent(queued.context.self_ent, Destroy, .{}) catch |err| {
+                    std.log.err(
+                        "destroy_self failed on entity-id: {d}    {any}",
+                        .{ queued.context.self_ent.id, err },
+                    );
+                };
             },
             .destroy_other => {
                 if (queued.context.other_ent) |other| {
-                    try world.addComponent(other, Destroy, .{});
+                    world.addComponent(other, Destroy, .{}) catch |err| {
+                        std.log.err(
+                            "destroy_self failed on entity-id: {d}   {any}",
+                            .{ queued.context.self_ent.id, err },
+                        );
+                    };
                 } else {
                     std.log.warn("destroy_other action has no other_entity", .{});
                 }
             },
             .spawn_entity => |spawn_data| {
-                // TODO: world.spawnFromTemplate(spawn_data.template_name)
-                // TODO: set position based on self_entity + offset
-                _ = spawn_data;
-                std.log.warn("spawn_entity not yet implemented", .{});
+                const name = spawn_data.template_name;
+                const offset = spawn_data.offset;
+                //BUG: this is wrong...need transform and sprite
+                const location = if (queued.context.collision_loc) |loc| blk: {
+                    break :blk loc.add(offset);
+                } else offset;
+
+                const entity = world.createEntityFromTemplate(
+                    name,
+                    location,
+                ) catch |err| {
+                    std.log.err("Unable to find template: {s} {any}", .{ name, err });
+                    continue;
+                };
+                std.log.info("Created entity: {d} from {s} at {any}", .{
+                    entity.id,
+                    name,
+                    location,
+                });
             },
             .set_velocity => |vel_data| {
                 const target_entity = switch (vel_data.target) {
@@ -45,12 +72,8 @@ pub fn executeActions(world: *World, action_queue: *ActionQueue) !void {
                     std.log.warn("set_velocity: entity {d} has no Velocity component", .{target_entity.id});
                 }
             },
-            .debug_print => |t| std.debug.print("Key Pressed: {any}", .{t}),
-            .play_sound => |sound_name| {
-                // TODO: audio_system.play(sound_name)
-                _ = sound_name;
-                std.log.warn("play_sound not yet implemented", .{});
-            },
+            .debug_print => |t| std.debug.print("{s}", .{t}),
+            .play_sound => |s| std.debug.print("play sound {s}", .{s}),
         }
     }
 

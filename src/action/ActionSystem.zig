@@ -66,11 +66,7 @@ pub fn update(self: *Self, world: *World, ctx: TriggerContext) !void {
         try system.processFn(system.sys, world, ctx);
     }
 
-    const actionCount = self.action_queue.actions.items.len;
-    if (actionCount > 0) {
-        std.debug.print("ActionQueue len: {d}\n", .{actionCount});
-    }
-    try ActionExecutor.executeActions(world, &self.action_queue);
+    ActionExecutor.executeActions(world, &self.action_queue);
 
     self.action_queue.clear();
 }
