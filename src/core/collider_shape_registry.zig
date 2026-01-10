@@ -63,7 +63,6 @@ pub const ColliderRegistry = struct {
 
     pub fn getColliderIndex(name: []const u8) ?usize {
         inline for (shape_names, 0..) |shape_name, i| {
-            std.log.debug("in index: {s}, {s}", .{ name, shape_name });
             if (std.ascii.startsWithIgnoreCase(shape_name, name)) {
                 return i;
             }

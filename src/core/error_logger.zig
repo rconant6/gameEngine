@@ -36,7 +36,6 @@ pub const ErrorEntry = struct {
 };
 
 const MSG_MAX_SIZE: u32 = 256;
-
 pub const ErrorLogger = struct {
     allocator: Allocator,
 
@@ -108,7 +107,7 @@ pub const ErrorLogger = struct {
         }
 
         self.count += 1;
-        self.write_index += 1;
+        self.write_index = if (self.count >= 100) self.write_index + 1 else 0;
     }
     pub fn logInfo(
         self: *ErrorLogger,
