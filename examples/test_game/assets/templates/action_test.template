@@ -1,0 +1,101 @@
+// Templates for action_test.scene
+// Required templates for spawn_entity actions
+
+[ParticleBurst:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+
+  [Velocity]
+    linear:vec2 {0.0, 0.0}
+    angular:f32 0.0
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 0.3
+    fill_color:color #ffff00
+    stroke_color:color #ffffff
+    stroke_width:f32 1.0
+    visible:bool true
+
+  [Tag]
+    tags:string "particle"
+
+  [Lifetime]
+    remaining:f32 0.5
+
+[SpawnedDot:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+
+  [Velocity]
+    linear:vec2 {1.0, 1.0}
+    angular:f32 0.0
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 0.5
+    fill_color:color #ff00ff
+    stroke_color:color #ffffff
+    stroke_width:f32 1.0
+    visible:bool true
+
+  [Tag]
+    tags:string "spawned"
+
+  [Lifetime]
+    remaining:f32 2.0
+
+[Explosion:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+
+  [Velocity]
+    linear:vec2 {0.0, 0.0}
+    angular:f32 0.0
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 2.0
+    fill_color:color #ff8800
+    stroke_color:color #ff0000
+    stroke_width:f32 2.0
+    visible:bool true
+
+  [Tag]
+    tags:string "explosion"
+
+  [Lifetime]
+    remaining:f32 0.3
+
+[PlayerProjectile:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+
+  [Velocity]
+    linear:vec2 {0.0, 10.0}
+    angular:f32 0.0
+
+  [Sprite:circle]
+    origin:vec2 {0.0, 0.0}
+    radius:f32 0.4
+    fill_color:color #00ff00
+    stroke_color:color #00aa00
+    stroke_width:f32 1.0
+    visible:bool true
+
+  [Collider:circle]
+    radius:f32 0.4
+
+  [Tag]
+    tags:string "projectile player_weapon"
+
+  [Lifetime]
+    remaining:f32 3.0

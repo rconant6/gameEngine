@@ -1,0 +1,393 @@
+[OrbitronFont:asset font]
+  path:string "assets/fonts/"
+  filename: string "Orbitron.ttf"
+
+[ActionTestScene:scene]
+  // Simple background
+  [Ground:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, -1.0}
+      scale:f32 1.0
+    [Box]
+      size:vec2 {26.66, 20.0}
+      fill_color:color #1a1a2e
+      filled:bool true
+
+  // TEST 1: Mutual Destruction - Two balls that destroy each other and spawn particles
+  [MutualBall1:entity]
+    [Transform]
+      position:vec3 {-5.0, 3.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {3.0, 0.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #FF0000
+      stroke_color:color #ff6b6b
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.0
+    [Tag]
+      tags:string "mutual"
+    [ScreenClamp]
+    [OnCollision]
+      [trigger]
+        other_tag_pattern:string "mutual"
+        [action]
+          type:string "spawn_entity"
+          template_name:string "Missile"
+          offset:vec2 {0.0, 0.0}
+          priority:i32 0
+        [action]
+          type:string "destroy_self"
+          priority:i32 1
+        [action]
+          type:string "destroy_other"
+          priority:i32 2
+
+  [MutualBall2:entity]
+    [Transform]
+      position:vec3 {5.0, 3.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {-3.0, 0.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #FF0000
+      stroke_color:color #ff6b6b
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.0
+    [Tag]
+      tags:string "mutual"
+    [ScreenClamp]
+    [OnCollision]
+      [trigger]
+        other_tag_pattern:string "mutual"
+        [action]
+          type:string "spawn_entity"
+          priority:i32 0
+          template_name:string "Missile"
+          offset:vec2 {0.0, 0.0}
+        [action]
+          type:string "destroy_self"
+          priority:i32 1
+        [action]
+          type:string "destroy_other"
+          priority:i32 2
+
+  // TEST 2: Bounce Ball - Changes velocity on collision
+  [BounceBall:entity]
+    [Transform]
+      position:vec3 {-8.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {4.0, 2.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.2
+      fill_color:color #00ff88
+      stroke_color:color #06ffa5
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.2
+    [Tag]
+      tags:string "bouncer"
+    [ScreenClamp]
+    [OnCollision]
+      [trigger]
+        other_tag_pattern:string "target"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {-4.0, -2.0}
+          priority:i32 0
+
+  // TEST 3: Spawner Ball - Spawns entities but doesn't destroy itself
+  [SpawnerBall:entity]
+    [Transform]
+      position:vec3 {0.0, -3.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {2.0, 2.5}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #9d4edd
+      stroke_color:color #c77dff
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.0
+    [Tag]
+      tags:string "spawner"
+    [ScreenClamp]
+    [OnCollision]
+      [trigger]
+        other_tag_pattern:string "target"
+        [action]
+          type:string "spawn_entity"
+          template_name:string "SpawnedDot"
+          offset:vec2 {0.0, 0.0}
+          priority:i32 0
+
+  // TEST 4: Multi-Action Ball - Multiple actions in priority order
+  [MultiActionBall:entity]
+    [Transform]
+      position:vec3 {8.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {-3.5, 1.5}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #f9a825
+      stroke_color:color #ffd54f
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.0
+    [Tag]
+      tags:string "multi"
+    [ScreenClamp]
+    [OnCollision]
+      [trigger]
+        other_tag_pattern:string "target"
+        [action]
+          type:string "debug_print"
+          message:string "Multi-action ball hit target!"
+          priority:i32 0
+        [action]
+          type:string "set_velocity"
+          target:string "other"
+          velocity:vec2 {5.0, 5.0}
+          priority:i32 1
+        [action]
+          type:string "spawn_entity"
+          template_name:string "Explosion"
+          offset:vec2 {0.0, 0.0}
+          priority:i32 2
+        [action]
+          type:string "destroy_self"
+          priority:i32 3
+
+  // TEST 5: Tag-Specific Ball - Only reacts to specific tags
+  [TagSpecificBall:entity]
+    [Transform]
+      position:vec3 {0.0, 6.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {2.5, -2.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #00d9ff
+      stroke_color:color #00ffff
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.0
+    [Tag]
+      tags:string "selective"
+    [ScreenClamp]
+    [OnCollision]
+      [trigger]
+        other_tag_pattern:string "target_red"
+        [action]
+          type:string "debug_print"
+          message:string "Hit red target!"
+          priority:i32 0
+        [action]
+          type:string "destroy_other"
+          priority:i32 1
+      [trigger]
+        other_tag_pattern:string "target_blue"
+        [action]
+          type:string "debug_print"
+          message:string "Hit blue target - bouncing!"
+          priority:i32 0
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {-2.5, 2.0}
+          priority:i32 1
+
+  // TEST 6: Keyboard-Controlled Ball - OnInput test
+  [PlayerBall:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {0.0, 0.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #00ff00
+      stroke_color:color #00aa00
+      stroke_width:f32 3.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.5
+    [Tag]
+      tags:string "player"
+    [ScreenClamp]
+    [OnInput]
+      [trigger]
+        key:string "Space"
+        [action]
+          type:string "spawn_entity"
+          template_name:string "PlayerProjectile"
+          offset:vec2 {0.0, 2.0}
+          priority:i32 0
+        [action]
+          type:string "debug_print"
+          message:string "Player fired projectile!"
+          priority:i32 1
+      [trigger]
+        key:string "W"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 5.0}
+          priority:i32 0
+      [trigger]
+        key:string "S"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, -5.0}
+          priority:i32 0
+      [trigger]
+        key:string "A"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {-5.0, 0.0}
+          priority:i32 0
+      [trigger]
+        key:string "D"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {5.0, 0.0}
+          priority:i32 0
+
+  // STATIC TARGETS - Different tags for testing
+  [RedTarget:entity]
+    [Transform]
+      position:vec3 {-6.0, 6.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #FF0000
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.5
+    [Tag]
+      tags:string "target target_red"
+
+  [BlueTarget:entity]
+    [Transform]
+      position:vec3 {6.0, 6.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #0f3460
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.5
+    [Tag]
+      tags:string "target target_blue"
+
+  [GenericTarget1:entity]
+    [Transform]
+      position:vec3 {-8.0, -3.0, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.5
+      half_height:f32 1.8
+      fill_color:color #e94560
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.5
+      half_height:f32 1.8
+    [Tag]
+      tags:string "target"
+
+  [GenericTarget2:entity]
+    [Transform]
+      position:vec3 {8.0, -3.0, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.5
+      half_height:f32 1.8
+      fill_color:color #e94560
+      stroke_color:color #16213e
+      stroke_width:f32 2.0
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.5
+      half_height:f32 1.8
+    [Tag]
+      tags:string "target"
+
+  // Title text
+  [TitleText:entity]
+    [Transform]
+      position:vec2 {-13.0, 9.0}
+    [Text]
+      text:string "action system test"
+      font_asset:asset_ref "OrbitronFont"
+      text_color:color #ffffff
+      size:f32 0.6
+
+  // Legend
+  [LegendLine1:entity]
+    [Transform]
+      position:vec2 {-13.0, -9.0}
+    [Text]
+      text:string "red=mutual destroy | green=bounce | purple=spawner"
+      font_asset:asset_ref "OrbitronFont"
+      text_color:color #888888
+      size:f32 0.35
+
+  [LegendLine2:entity]
+    [Transform]
+      position:vec2 {-13.0, -9.5}
+    [Text]
+      text:string "yellow=multi-action | cyan=tag-specific | green-center=player (wasd+Space)"
+      font_asset:asset_ref "OrbitronFont"
+      text_color:color #888888
+      size:f32 0.35
+
+  [Camera:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 10.0}
+    [Camera]
+      fov:f32 60.0
+      near:f32 0.1
+      far:f32 100.0

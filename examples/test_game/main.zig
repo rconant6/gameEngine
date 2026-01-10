@@ -26,6 +26,11 @@ pub fn main() !void {
 
     try game.loadScene("collision", "collision_test");
     try game.setActiveScene("collision");
+
+    try game.loadScene("action", "action_test.scene");
+    try game.setActiveScene("action");
+
+    // NOTE loading all 3 andd setting to active to see where/when something breaks
     try game.instantiateActiveScene();
 
     try game.loadTemplates("assets/templates/");
@@ -39,84 +44,84 @@ pub fn main() !void {
     );
 
     // Create paddle (player-controlled)
-    {
-        const paddle = game.createEntity();
-        game.addComponent(paddle, engine.Transform, .{
-            .position = .{ .x = 0.0, .y = game_height / 2.0 - 20.0 },
-            .scale = 1.0,
-            .rotation = 0.0,
-        });
-        game.addComponent(paddle, engine.Sprite, .{
-            .geometry = .{
-                .Rectangle = .{
-                    .center = .{ .x = 0.0, .y = 0.0 },
-                    .half_width = 2.0,
-                    .half_height = 0.5,
-                },
-            },
-            .fill_color = Colors.WHITE,
-        });
-        game.addComponent(paddle, engine.Velocity, .{
-            .linear = .{ .x = 0.0, .y = 0.0 },
-            .angular = 0.0,
-        });
-        game.addComponent(paddle, engine.Tag, .{
-            .tags = "paddle",
-        });
+    // {
+    //     const paddle = game.createEntity();
+    //     game.addComponent(paddle, engine.Transform, .{
+    //         .position = .{ .x = 0.0, .y = game_height / 2.0 - 20.0 },
+    //         .scale = 1.0,
+    //         .rotation = 0.0,
+    //     });
+    //     game.addComponent(paddle, engine.Sprite, .{
+    //         .geometry = .{
+    //             .Rectangle = .{
+    //                 .center = .{ .x = 0.0, .y = 0.0 },
+    //                 .half_width = 2.0,
+    //                 .half_height = 0.5,
+    //             },
+    //         },
+    //         .fill_color = Colors.WHITE,
+    //     });
+    //     game.addComponent(paddle, engine.Velocity, .{
+    //         .linear = .{ .x = 0.0, .y = 0.0 },
+    //         .angular = 0.0,
+    //     });
+    //     game.addComponent(paddle, engine.Tag, .{
+    //         .tags = "paddle",
+    //     });
 
-        // Paddle input: Arrow keys move, Space spawns missile
-        const paddle_speed = 15.0; // Adjust this value to tune paddle movement speed
-        const paddle_input_triggers = [_]engine.InputTrigger{
-            // Left arrow - move left
-            .{
-                .input = .{ .key = KeyCode.Left },
-                .actions = &[_]engine.Action{
-                    .{
-                        .action_type = .{
-                            .set_velocity = .{
-                                .target = .self,
-                                .velocity = .{ .x = -paddle_speed, .y = 0.0 },
-                            },
-                        },
-                        .priority = 0,
-                    },
-                },
-            },
-            // Right arrow - move right
-            .{
-                .input = .{ .key = KeyCode.Right },
-                .actions = &[_]engine.Action{
-                    .{
-                        .action_type = .{
-                            .set_velocity = .{
-                                .target = .self,
-                                .velocity = .{ .x = paddle_speed, .y = 0.0 },
-                            },
-                        },
-                        .priority = 0,
-                    },
-                },
-            },
-            // Spacebar - spawn missile
-            .{
-                .input = .{ .key = KeyCode.Space },
-                .actions = &[_]engine.Action{
-                    .{
-                        .action_type = .{
-                            .spawn_entity = .{
-                                .template_name = "missile",
-                                .offset = .{ .x = 0.0, .y = -30.0 },
-                            },
-                        },
-                        .priority = 0,
-                    },
-                },
-            },
-        };
-        game.addComponent(paddle, engine.OnInput, .{
-            .triggers = &paddle_input_triggers,
-        });
-    }
+    //     // Paddle input: Arrow keys move, Space spawns missile
+    //     const paddle_speed = 15.0; // Adjust this value to tune paddle movement speed
+    //     var paddle_input_triggers = [_]engine.InputTrigger{
+    //         // Left arrow - move left
+    //         .{
+    //             .input = .{ .key = KeyCode.Left },
+    //             .actions = &[_]engine.Action{
+    //                 .{
+    //                     .action_type = .{
+    //                         .set_velocity = .{
+    //                             .target = .self,
+    //                             .velocity = .{ .x = -paddle_speed, .y = 0.0 },
+    //                         },
+    //                     },
+    //                     .priority = 0,
+    //                 },
+    //             },
+    //         },
+    //         // Right arrow - move right
+    //         .{
+    //             .input = .{ .key = KeyCode.Right },
+    //             .actions = &[_]engine.Action{
+    //                 .{
+    //                     .action_type = .{
+    //                         .set_velocity = .{
+    //                             .target = .self,
+    //                             .velocity = .{ .x = paddle_speed, .y = 0.0 },
+    //                         },
+    //                     },
+    //                     .priority = 0,
+    //                 },
+    //             },
+    //         },
+    //         // Spacebar - spawn missile
+    //         .{
+    //             .input = .{ .key = KeyCode.Space },
+    //             .actions = &[_]engine.Action{
+    //                 .{
+    //                     .action_type = .{
+    //                         .spawn_entity = .{
+    //                             .template_name = "missile",
+    //                             .offset = .{ .x = 0.0, .y = 0.0 },
+    //                         },
+    //                     },
+    //                     .priority = 0,
+    //                 },
+    //             },
+    //         },
+    //     };
+    //     game.addComponent(paddle, engine.OnInput, .{
+    //         .triggers = &paddle_input_triggers,
+    //     });
+    // }
 
     // +++++++ GAME LOOP FOR NOW ++++++++++ //
     var last_time = std.time.milliTimestamp();
@@ -137,12 +142,12 @@ pub fn main() !void {
         game.update(dt);
         game.endFrame();
 
-        if (game.hasErrors()) {
-            const errs = game.getErrors();
-            for (errs) |err| {
-                std.debug.print("{s}\n", .{err.message});
-            }
-        }
-        game.clearErrors();
+        // if (game.hasErrors()) {
+        //     const errs = game.getErrors();
+        //     for (errs) |err| {
+        //         std.debug.print("{s}\n", .{err.message});
+        //     }
+        // }
+        // game.clearErrors();
     }
 }
