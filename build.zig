@@ -21,6 +21,14 @@ pub fn build(b: *std.Build) void {
 
     const selected_renderer = renderer_backend orelse defaultRendererForTarget(target.result.os.tag);
 
+    // CPU renderer is currently not supported (commented out)
+    if (selected_renderer == .cpu) {
+        std.debug.print("ERROR: CPU renderer is not currently supported.\n", .{});
+        std.debug.print("       The CPU renderer has been disabled to focus on GPU rendering.\n", .{});
+        std.debug.print("       Use -Drenderer=metal for macOS or remove the -Drenderer flag.\n", .{});
+        std.posix.exit(1);
+    }
+
     const core_module = b.addModule("core", .{
         .root_source_file = b.path("src/core/types.zig"),
         .target = target,
@@ -642,7 +650,11 @@ pub fn configurePlatformModule(
                     module.linkSystemLibrary("vulkan", .{});
                     module.linkSystemLibrary("MoltenVK", .{});
                 },
-                .cpu => {},
+                .cpu => {
+                    // Link Metal frameworks weakly for Swift package dependencies
+                    module.linkFramework("Metal", .{ .weak = true });
+                    module.linkFramework("MetalKit", .{ .weak = true });
+                },
             }
 
             // Add Swift library paths
@@ -666,9 +678,18 @@ pub fn configurePlatformModule(
             module.linkSystemLibrary("swift_StringProcessing", .{});
             module.linkSystemLibrary("swiftDispatch", .{});
             module.linkSystemLibrary("swiftCoreGraphics", .{});
-            module.linkSystemLibrary("swiftMetal", .{});
-            module.linkSystemLibrary("swiftMetalKit", .{});
-            module.linkSystemLibrary("swiftModelIO", .{});
+
+            // Link Metal Swift libraries (weak for CPU renderer to resolve package dependencies)
+            if (renderer == .metal) {
+                module.linkSystemLibrary("swiftMetal", .{});
+                module.linkSystemLibrary("swiftMetalKit", .{});
+                module.linkSystemLibrary("swiftModelIO", .{});
+            } else {
+                // Weak link for Swift package auto-load symbols
+                module.linkSystemLibrary("swiftMetal", .{ .weak = true });
+                module.linkSystemLibrary("swiftMetalKit", .{ .weak = true });
+                module.linkSystemLibrary("swiftModelIO", .{ .weak = true });
+            }
             module.linkSystemLibrary("swiftIOKit", .{});
             module.linkSystemLibrary("swiftXPC", .{});
             module.linkSystemLibrary("swiftDarwin", .{});
@@ -729,10 +750,9 @@ pub fn configurePlatform(
     renderer: RendererBackend,
 ) void {
     _ = module;
-    _ = renderer;
 
     switch (target.result.os.tag) {
-        .macos => configureMacOSExecutable(b, exe, target, optimize),
+        .macos => configureMacOSExecutable(b, exe, target, optimize, renderer),
         .linux => {}, // Linux doesn't need extra executable configuration
         .windows => {}, // Windows doesn't need extra executable configuration
         else => @panic("Unsupported operating system"),
@@ -745,6 +765,7 @@ fn configureMacOSExecutable(
     exe: *std.Build.Step.Compile,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    renderer: RendererBackend,
 ) void {
     const arch = switch (target.result.cpu.arch) {
         .aarch64 => "arm64",
@@ -763,28 +784,40 @@ fn configureMacOSExecutable(
     const shaders_metal = b.path("src/platform/macos/swift/shaders.metal").getPath(b);
     const swift_build_dir = b.path("src/platform/macos/.build").getPath(b);
 
+    // Pass renderer type to Swift build via define
+    const renderer_define = switch (renderer) {
+        .metal => "-DUSE_METAL",
+        .cpu => "-DUSE_CPU",
+        else => "-DUSE_CPU",
+    };
+
     const swift_build = b.addSystemCommand(&.{
         "swift",          "build",
         "--package-path", package_path,
         "--scratch-path", swift_scratch,
         "-c",             config,
         "--arch",         arch,
+        "-Xswiftc",       renderer_define,
     });
 
-    const metal_compile = b.addSystemCommand(&.{
-        "xcrun", "-sdk",        "macosx", "metal",
-        "-c",    shaders_metal, "-o",     shaders_air,
-    });
-    metal_compile.step.dependOn(&swift_build.step);
+    // Only compile Metal shaders when using Metal renderer
+    if (renderer == .metal) {
+        const metal_compile = b.addSystemCommand(&.{
+            "xcrun", "-sdk",        "macosx", "metal",
+            "-c",    shaders_metal, "-o",     shaders_air,
+        });
+        metal_compile.step.dependOn(&swift_build.step);
 
-    const metal_lib = b.addSystemCommand(&.{
-        "xcrun",     "-sdk", "macosx",      "metallib",
-        shaders_air, "-o",   metallib_path,
-    });
-    metal_lib.step.dependOn(&metal_compile.step);
+        const metal_lib = b.addSystemCommand(&.{
+            "xcrun",     "-sdk", "macosx",      "metallib",
+            shaders_air, "-o",   metallib_path,
+        });
+        metal_lib.step.dependOn(&metal_compile.step);
 
-    const install_metallib = b.addInstallFile(.{ .cwd_relative = metallib_path }, "bin/default.metallib");
-    install_metallib.step.dependOn(&metal_lib.step);
+        const install_metallib = b.addInstallFile(.{ .cwd_relative = metallib_path }, "bin/default.metallib");
+        install_metallib.step.dependOn(&metal_lib.step);
+        exe.step.dependOn(&install_metallib.step);
+    }
 
     const swift_clean = b.addSystemCommand(&.{ "rm", "-rf", swift_build_dir });
 
@@ -804,5 +837,4 @@ fn configureMacOSExecutable(
     exe.step.dependOn(&swift_build.step);
     exe.step.dependOn(&swift_clean.step);
     exe.step.dependOn(&install_lib.step);
-    exe.step.dependOn(&install_metallib.step);
 }

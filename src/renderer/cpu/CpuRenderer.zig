@@ -1,3 +1,22 @@
+// ============================================================================
+// CPU RENDERER - CURRENTLY DISABLED
+// ============================================================================
+// This renderer has been disabled to focus development on GPU rendering.
+// The code is kept for reference and potential future re-enabling.
+//
+// Issues that prevented continued support:
+// - Different coordinate system (i32 ScreenPoint vs float clip space)
+// - Manual software rasterization for all primitives
+// - Integer overflow issues with font rendering (see geometry_utils.zig)
+// - Maintenance burden of keeping in sync with Metal renderer changes
+//
+// To re-enable:
+// 1. Remove the check in build.zig (line ~25)
+// 2. Uncomment CpuRenderer import in renderer.zig (line ~26)
+// 3. Uncomment BackendImpl switch case in renderer.zig (line ~56)
+// 4. Fix any compilation errors from API changes
+// ============================================================================
+
 const std = @import("std");
 const RenderConfig = @import("../../renderer/renderer.zig").RendererConfig;
 const Circle = shapes.Circle;
@@ -6,9 +25,9 @@ const Ellipse = shapes.Ellipse;
 const Line = shapes.Line;
 const Polygon = shapes.Polygon;
 const Rectangle = shapes.Rectangle;
-const Shape = shapes.Shape;
 const Triangle = shapes.Triangle;
 const core = @import("core");
+const ShapeData = core.ShapeData;
 const shapes = core.Shapes;
 const GamePoint = core.GamePoint;
 const ScreenPoint = core.ScreenPoint;
@@ -84,7 +103,7 @@ pub fn screenToGame(renderer: *const CpuRenderer, sp: ScreenPoint) GamePoint {
 
 pub fn drawShape(
     self: *CpuRenderer,
-    shape: Shape,
+    shape: ShapeData,
     transform: ?Transform,
     fill_color: ?Color,
     stroke_color: ?Color,
@@ -92,7 +111,7 @@ pub fn drawShape(
 ) void {
     if (transform) |xform| {
         switch (shape) {
-            .circle => |circle| {
+            .Circle => |circle| {
                 self.drawCircleWithTransform(
                     circle,
                     xform,
@@ -101,11 +120,11 @@ pub fn drawShape(
                     stroke_width,
                 );
             },
-            .ellipse => |ellipse| {
+            .Ellipse => |ellipse| {
                 _ = ellipse;
                 std.debug.panic("Ellipse has not been implemented yet!!\n", .{});
             },
-            .line => |line| {
+            .Line => |line| {
                 self.drawLineWithTransform(
                     line,
                     xform,
@@ -113,7 +132,7 @@ pub fn drawShape(
                     stroke_width,
                 );
             },
-            .rectangle => |rect| {
+            .Rectangle => |rect| {
                 self.drawRectangleWithTransform(
                     rect,
                     xform,
@@ -122,7 +141,7 @@ pub fn drawShape(
                     stroke_width,
                 );
             },
-            .triangle => |tri| {
+            .Triangle => |tri| {
                 self.drawTriangleWithTransform(
                     tri,
                     xform,
@@ -131,7 +150,7 @@ pub fn drawShape(
                     stroke_width,
                 );
             },
-            .polygon => |poly| {
+            .Polygon => |poly| {
                 self.drawPolygonWithTransform(
                     poly,
                     xform,
@@ -143,23 +162,23 @@ pub fn drawShape(
         }
     } else {
         switch (shape) {
-            .circle => |circle| {
+            .Circle => |circle| {
                 self.drawCircle(circle, fill_color, stroke_color, stroke_width);
             },
-            .ellipse => |ellipse| {
+            .Ellipse => |ellipse| {
                 _ = ellipse;
                 std.debug.panic("TODO: Ellipse has not been implemented yet!!\n", .{});
             },
-            .line => |line| {
+            .Line => |line| {
                 self.drawLine(line.start, line.end, stroke_color, stroke_width);
             },
-            .rectangle => |rect| {
+            .Rectangle => |rect| {
                 self.drawRectangle(rect, null, fill_color, stroke_color, stroke_width);
             },
-            .triangle => |tri| {
+            .Triangle => |tri| {
                 self.drawTriangle(tri, null, fill_color, stroke_color, stroke_width);
             },
-            .polygon => |poly| {
+            .Polygon => |poly| {
                 self.drawPolygon(poly, null, fill_color, stroke_color, stroke_width);
             },
         }
@@ -531,12 +550,14 @@ fn drawRectFilled(
             std.mem.sort(GamePoint, &verts2, {}, sortPointByY);
 
             const tri1 = Triangle{
-                .allocator = renderer.allocator,
-                .vertices = &verts1,
+                .v0 = verts1[0],
+                .v1 = verts1[1],
+                .v2 = verts1[2],
             };
             const tri2 = Triangle{
-                .allocator = renderer.allocator,
-                .vertices = &verts2,
+                .v0 = verts2[0],
+                .v1 = verts2[1],
+                .v2 = verts2[2],
             };
 
             drawTriangle(renderer, tri1, null, fill_color, null, 0);

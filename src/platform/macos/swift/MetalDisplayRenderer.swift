@@ -1,3 +1,4 @@
+#if USE_METAL
 import MetalKit
 
 class MetalDisplayRenderer: NSObject, MTKViewDelegate {
@@ -84,3 +85,4 @@ class MetalDisplayRenderer: NSObject, MTKViewDelegate {
 
   }
 }
+#endif

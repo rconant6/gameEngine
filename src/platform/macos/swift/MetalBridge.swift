@@ -1,3 +1,4 @@
+#if USE_METAL
 import Metal
 import MetalKit
 import QuartzCore
@@ -245,3 +246,4 @@ public func metal_render_encoder_end(encoder: OpaquePointer) {
     .takeUnretainedValue()
   enc.endEncoding()
 }
+#endif

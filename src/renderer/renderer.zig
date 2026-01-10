@@ -22,8 +22,9 @@ pub const RenderContext = @import("RenderContext.zig");
 const text_module = @import("text.zig");
 const Font = text_module.Font;
 
-const CpuRenderer = if (build_options.backend == .cpu)
-    @import("./cpu/CpuRenderer.zig");
+// CPU renderer is currently disabled - code kept for reference
+// const CpuRenderer = if (build_options.backend == .cpu)
+//     @import("./cpu/CpuRenderer.zig");
 const MetalRenderer = if (build_options.backend == .metal)
     @import("./gpu/metal/MetalRenderer.zig")
 else
@@ -52,7 +53,8 @@ pub const Renderer = struct {
     height: u32,
 
     const BackendImpl = switch (build_options.backend) {
-        .cpu => CpuRenderer,
+        // .cpu => CpuRenderer, // CPU renderer disabled
+        .cpu => unreachable, // Should be caught by build.zig
         .metal => MetalRenderer,
         .vulkan => VulkanRenderer,
         .opengl => OpenGLRenderer,
