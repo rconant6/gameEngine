@@ -7,6 +7,9 @@ const Font = font_mgr.Font;
 
 const Self = @This();
 
+// Embed the default font at compile time (relative to this file)
+const embedded_orbitron_font = @embedFile("default_orbitron.ttf");
+
 allocator: std.mem.Allocator,
 fonts: FontManager,
 name_to_font: std.StringHashMap(FontHandle),
@@ -15,10 +18,16 @@ pub fn init(alloc: std.mem.Allocator) !Self {
     var font_manager: FontManager = .init(alloc);
     try font_manager.setFontPath("assets/fonts/");
 
+    var name_to_font = std.StringHashMap(FontHandle).init(alloc);
+
+    // Load the embedded default font
+    const default_handle = try font_manager.loadFontFromMemory("default_orbitron", embedded_orbitron_font);
+    try name_to_font.put(try alloc.dupe(u8, "__default__"), default_handle);
+
     return Self{
         .allocator = alloc,
         .fonts = font_manager,
-        .name_to_font = std.StringHashMap(FontHandle).init(alloc),
+        .name_to_font = name_to_font,
     };
 }
 

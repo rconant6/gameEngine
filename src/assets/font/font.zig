@@ -28,6 +28,12 @@ fn loadFile(alloc: std.mem.Allocator, path: []const u8) ![]const u8 {
     return raw_data;
 }
 
+fn loadFromMemory(alloc: std.mem.Allocator, data: []const u8) ![]const u8 {
+    const raw_data = try alloc.alloc(u8, data.len);
+    @memcpy(raw_data, data);
+    return raw_data;
+}
+
 fn parseFontDir(reader: *FontReader) !FontDirHeader {
     const header = reader.readStruct(FontDirHeader);
     reader.rewind(getBytesOfPadding(FontDirHeader));
@@ -354,10 +360,32 @@ pub const Font = struct {
         var arena = std.heap.ArenaAllocator.init(alloc);
         defer arena.deinit();
 
-        var temp_alloc = arena.allocator();
+        const temp_alloc = arena.allocator();
         var table_directory = std.AutoArrayHashMap(u32, TableEntry).init(temp_alloc);
 
         const raw_data = try loadFile(temp_alloc, path);
+
+        return try initFromData(alloc, temp_alloc, raw_data, &table_directory);
+    }
+
+    pub fn initFromMemory(alloc: std.mem.Allocator, data: []const u8) !Font {
+        var arena = std.heap.ArenaAllocator.init(alloc);
+        defer arena.deinit();
+
+        const temp_alloc = arena.allocator();
+        var table_directory = std.AutoArrayHashMap(u32, TableEntry).init(temp_alloc);
+
+        const raw_data = try loadFromMemory(temp_alloc, data);
+
+        return try initFromData(alloc, temp_alloc, raw_data, &table_directory);
+    }
+
+    fn initFromData(
+        alloc: std.mem.Allocator,
+        temp_alloc: std.mem.Allocator,
+        raw_data: []const u8,
+        table_directory: *std.AutoArrayHashMap(u32, TableEntry),
+    ) !Font {
 
         var reader = FontReader{ .data = raw_data };
 
@@ -368,35 +396,36 @@ pub const Font = struct {
             try table_directory.put(table_entry.tag, table_entry);
         }
 
-        const head_entry = getTable(&table_directory, "head") orelse return error.HeadTableNotFound;
+        const head_entry = getTable(table_directory, "head") orelse return error.HeadTableNotFound;
         const head_table = try parseHeadTable(&reader, head_entry);
         const index_to_loc = head_table.index_to_loc_format;
         const units_per_em = head_table.units_per_em;
         _ = index_to_loc;
 
-        const maxp_entry = getTable(&table_directory, "maxp") orelse return error.MaxpTableNotFound;
+        const maxp_entry = getTable(table_directory, "maxp") orelse return error.MaxpTableNotFound;
         const maxp_table = try parseMaxpTable(&reader, maxp_entry);
         const number_glyphs = maxp_table.num_glyphs;
 
-        const hhea_entry = getTable(&table_directory, "hhea") orelse return error.HheaTableNotFound;
+        const hhea_entry = getTable(table_directory, "hhea") orelse return error.HheaTableNotFound;
         const hhea_table = try parseHheaTable(&reader, hhea_entry);
         const number_hMetrics = hhea_table.number_hMetrics;
 
-        const hmtx_entry = getTable(&table_directory, "hmtx") orelse return error.HmtxTableNotFound;
+        const hmtx_entry = getTable(table_directory, "hmtx") orelse return error.HmtxTableNotFound;
         var hMetrics = try std.ArrayList(Hmetric).initCapacity(alloc, number_glyphs);
         errdefer hMetrics.deinit(alloc);
         try parseHmetrics(&reader, &hMetrics, hmtx_entry, number_glyphs, number_hMetrics);
 
-        const cmap_entry = getTable(&table_directory, "cmap") orelse return error.CmapTableNotFound;
+        const cmap_entry = getTable(table_directory, "cmap") orelse return error.CmapTableNotFound;
         const cmap_format4_header = try parseCmapTable(&reader, cmap_entry);
         var map_indicies = std.AutoHashMap(u32, u16).init(alloc);
         errdefer map_indicies.deinit();
         try parseCmapFormatData(&reader, &map_indicies, temp_alloc, cmap_format4_header);
 
-        const glyph_entry = getTable(&table_directory, "glyf") orelse return error.GlyfTableNotFound;
+        const glyph_entry = getTable(table_directory, "glyf") orelse return error.GlyfTableNotFound;
 
-        const loca_entry = getTable(&table_directory, "loca") orelse return error.LocaTableNotFound;
-        const offsets = try parseLocaTable(&reader, &temp_alloc, loca_entry, number_glyphs);
+        const loca_entry = getTable(table_directory, "loca") orelse return error.LocaTableNotFound;
+        var temp_alloc_mut = temp_alloc;
+        const offsets = try parseLocaTable(&reader, &temp_alloc_mut, loca_entry, number_glyphs);
 
         var glyphs = std.AutoHashMap(u16, FilteredGlyph).init(alloc);
         errdefer glyphs.deinit();

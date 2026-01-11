@@ -52,6 +52,30 @@ pub const FontManager = struct {
         return self.load(normalized_path);
     }
 
+    pub fn loadFontFromMemory(self: *FontManager, name: []const u8, data: []const u8) !FontHandle {
+        // Use a synthetic path name for embedded fonts
+        const synthetic_path = try std.fmt.allocPrint(self.allocator, "<embedded:{s}>", .{name});
+        errdefer self.allocator.free(synthetic_path);
+
+        // Check if already loaded
+        if (self.path_to_handle.get(synthetic_path)) |handle| {
+            self.allocator.free(synthetic_path);
+            return handle;
+        }
+
+        const font = try Font.initFromMemory(self.allocator, data);
+        const entry = FontEntry{
+            .font = font,
+            .normalized_path = synthetic_path,
+        };
+        try self.fonts.append(self.allocator, entry);
+
+        const new_handle = FontHandle{ .id = self.fonts.items.len - 1 };
+        try self.path_to_handle.put(synthetic_path, new_handle);
+
+        return new_handle;
+    }
+
     fn load(self: *FontManager, normalized_path: []const u8) !FontHandle {
         if (self.path_to_handle.get(normalized_path)) |handle| {
             self.allocator.free(normalized_path);
