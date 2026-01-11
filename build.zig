@@ -18,14 +18,21 @@ pub fn build(b: *std.Build) void {
         "validation",
         "Enable validation layers (default: debug builds)",
     ) orelse (optimize == .Debug);
+    // const enable_debug_tools = b.option(
+    //     bool,
+    //     "debug-tools",
+    //     "Enable debug overlay and tools",
+    // ) orelse (optimize == .Debug);
 
     const selected_renderer = renderer_backend orelse defaultRendererForTarget(target.result.os.tag);
 
     // CPU renderer is currently not supported (commented out)
     if (selected_renderer == .cpu) {
-        std.debug.print("ERROR: CPU renderer is not currently supported.\n", .{});
-        std.debug.print("       The CPU renderer has been disabled to focus on GPU rendering.\n", .{});
-        std.debug.print("       Use -Drenderer=metal for macOS or remove the -Drenderer flag.\n", .{});
+        std.debug.print(
+            \\ERROR: CPU renderer is not currently supported.
+            \\      The CPU renderer has been disabled to focus on GPU rendering.
+            \\     Use -Drenderer=metal for macOS or remove the -Drenderer flag.;
+        , .{});
         std.posix.exit(1);
     }
 
@@ -146,6 +153,15 @@ pub fn build(b: *std.Build) void {
     scene_module.addImport("action", action_module);
 
     entity_module.addImport("scene", scene_module);
+    // MARK: Debug Module
+    const debug_module = b.addModule("debug", .{
+        .root_source_file = b.path("src/debug/debug.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    debug_module.addImport("core", core_module);
+    debug_module.addImport("renderer", renderer_module);
+
     // ========================================
     // Engine Module and Library
     // ========================================
@@ -167,10 +183,11 @@ pub fn build(b: *std.Build) void {
     engine_module.addImport("scene", scene_module);
     engine_module.addImport("component_registry", component_registry_module);
     engine_module.addImport("shape_registry", shape_registry_module);
+    engine_module.addImport("debug", debug_module);
 
     // Scene instantiator needs the Engine type
     scene_module.addImport("engine", engine_module);
-
+    // ECS needs the scene module
     entity_module.addImport("scene", scene_module);
 
     // Create a static library for the engine
@@ -190,7 +207,6 @@ pub fn build(b: *std.Build) void {
     // ========================================
     const test_game_module = b.addModule("test_game", .{
         .root_source_file = b.path("examples/test_game/main.zig"),
-        // .root_source_file = b.path("examples/test_game/action_test_scenario.zig"),
         .target = target,
         .optimize = optimize,
     });

@@ -55,7 +55,7 @@ pub const InputTrigger = action.InputTrigger;
 pub const CollisionTrigger = action.CollisionTrigger;
 pub const TriggerContext = action.TriggerContext;
 pub const Input = core.Input;
-const ErrorLogger = core.error_logger.ErrorLogger;
+pub const ErrorLogger = core.error_logger.ErrorLogger;
 pub const Severity = core.error_logger.Severity;
 pub const Subsystem = core.error_logger.SubSystem;
 pub const ErrorEntry = core.error_logger.ErrorEntry;
@@ -65,6 +65,8 @@ pub const Instantiator = scene.Instantiator;
 pub const SceneManager = scene.SceneManager;
 pub const TemplateManager = scene.TemplateManager;
 pub const Template = scene.Template;
+pub const debug = @import("debug");
+pub const Debugger = debug.DebugManager;
 
 pub const Engine = struct {
     allocator: Allocator,
@@ -81,6 +83,7 @@ pub const Engine = struct {
     template_manager: TemplateManager,
     instantiator: Instantiator,
 
+    debugger: Debugger,
     error_logger: ErrorLogger,
 
     pub fn init(
@@ -178,11 +181,13 @@ pub const Engine = struct {
             .collision_events = .empty,
             .instantiator = undefined,
             .template_manager = undefined,
+            .debugger = undefined,
         };
 
         engine.instantiator = .init(allocator, &engine.world, &engine.assets);
         engine.template_manager = .init(allocator, &engine.instantiator);
         engine.world.template_manager = &engine.template_manager;
+        engine.debugger = .init(allocator, &engine.renderer);
 
         return engine;
     }
@@ -200,6 +205,8 @@ pub const Engine = struct {
         self.instantiator.deinit();
         self.error_logger.deinit();
         self.template_manager.deinit();
+        self.debugger.deinit();
+
         allocator.destroy(self);
     }
 
@@ -225,10 +232,8 @@ pub const Engine = struct {
         };
         Systems.cleanupSystem(self);
         Systems.renderSystem(self);
+        self.debugger.run(dt);
     }
-    // pub fn render(self: *Engine) void {
-    //     Systems.renderSystem(self);
-    // }
 
     pub fn beginFrame(self: *Engine) void {
         platform.clearInputStates();
