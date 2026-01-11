@@ -1,6 +1,7 @@
 const std = @import("std");
 const engine = @import("engine");
 const KeyCode = engine.KeyCode;
+const debug = engine.debug;
 
 const Colors = engine.Colors;
 
@@ -19,13 +20,14 @@ pub fn main() !void {
         logical_height,
     );
     defer game.deinit();
+
     // leave to make sure it's ok if there are collisions or reimports
     // TODO: these all need to handle errors better or catch at engine level or be fatal
     try game.loadScene("master", "master");
-    try game.setActiveScene("master");
+    // try game.setActiveScene("master");
 
     try game.loadScene("collision", "collision_test");
-    try game.setActiveScene("collision");
+    // try game.setActiveScene("collision");
 
     try game.loadScene("action", "action_test.scene");
     try game.setActiveScene("action");
@@ -139,7 +141,70 @@ pub fn main() !void {
             game.running = false;
         }
 
+        // DEBUG TEST: Add some test debug primitives
+        // Screen coords are ~26.67 wide x 20 high
+
+        // Test line - diagonal across screen
+        try game.debugger.draw.addLine(.{
+            .start = .{ .x = 5.0, .y = 5.0 },
+            .end = .{ .x = 21.0, .y = 15.0 },
+            .color = Colors.RED,
+            .duration = null, // one-frame
+            .cat = .{ .custom = true },
+        });
+
+        // Test circle - center of screen
+        try game.debugger.draw.addCircle(.{
+            .origin = .{ .x = 13.33, .y = 10.0 },
+            .radius = 3.0,
+            .color = Colors.GREEN,
+            .filled = false,
+            .duration = null,
+            .cat = .{ .collision = true },
+        });
+
+        // Test arrow - pointing right
+        try game.debugger.draw.addArrow(.{
+            .start = .{ .x = 8.0, .y = 10.0 },
+            .end = .{ .x = 18.0, .y = 10.0 },
+            .color = Colors.BLUE,
+            .head_size = 1.0,
+            .duration = null,
+            .cat = .{ .velocity = true },
+        });
+
+        // Test rectangle - top-left corner
+        try game.debugger.draw.addRect(.{
+            .min = .{ .x = 2.0, .y = 2.0 },
+            .max = .{ .x = 6.0, .y = 5.0 },
+            .color = Colors.YELLOW,
+            .filled = false,
+            .duration = null,
+            .cat = .{ .entity_info = true },
+        });
+
+        // Test arrow from rectangle center pointing WSW
+        try game.debugger.draw.addArrow(.{
+            .start = .{ .x = 4.0, .y = 3.5 },
+            .end = .{ .x = 1.0, .y = 0.5 },
+            .color = Colors.CYAN,
+            .head_size = 0.7,
+            .duration = null,
+            .cat = .{ .velocity = true },
+        });
+
+        // Test persistent circle (stays for 2 seconds)
+        try game.debugger.draw.addCircle(.{
+            .origin = .{ .x = 20.0, .y = 15.0 },
+            .radius = 1.5,
+            .color = Colors.MAGENTA,
+            .filled = true,
+            .duration = 2.0,
+            .cat = .{ .custom = true },
+        });
+
         game.update(dt);
+
         game.endFrame();
 
         // if (game.hasErrors()) {

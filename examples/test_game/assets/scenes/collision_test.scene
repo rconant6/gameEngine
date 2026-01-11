@@ -1,6 +1,6 @@
 [OrbitronFont:asset font]
   path:string "assets/fonts/"
-  filename: string "Orbitron.ttf"
+  filename: string "inconsolata.ttf"
 
 [CollisionTestScene:scene]
   // Simple background

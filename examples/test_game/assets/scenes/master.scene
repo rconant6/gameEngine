@@ -351,6 +351,15 @@
       text_color:color #FF8800
       size:f32 0.80
 
+  [BigText:entity]
+    [Transform]
+      position:vec2 {-13.0, 5.5}
+    [Text]
+      text:string "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+      font_asset:asset_ref "OrbitronFont"
+      text_color:color #FF8800
+      size:f32 0.80
+
   [Camera:entity]
     [Transform]
       position:vec3 {0.0, 0.0, 10.0}
