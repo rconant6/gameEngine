@@ -110,7 +110,7 @@ pub const Renderer = struct {
     }
     pub fn drawText(
         self: *Renderer,
-        font: *Font,
+        font: *const Font,
         text: []const u8,
         position: GamePoint,
         scale: f32,

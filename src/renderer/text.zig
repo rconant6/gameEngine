@@ -15,20 +15,21 @@ const V2 = rend.V2;
 
 pub fn drawText(
     renderer: *Renderer,
-    font: *Font,
+    font: *const Font,
     text: []const u8,
     position: GamePoint,
     scale: f32,
     color: Color,
 ) void {
+    const f = @constCast(font);
     var x_pos = position.x;
     for (text) |char| {
         const ascii_val: u32 = @intCast(char);
         const glyph_index = font.char_to_glyph.get(ascii_val) orelse continue;
-        if (font.glyph_shapes.get(glyph_index)) |glyph| {
+        if (f.glyph_shapes.get(glyph_index)) |glyph| {
             drawGlyph(
                 renderer,
-                font,
+                f,
                 glyph_index,
                 &glyph,
                 scale,
@@ -40,8 +41,8 @@ pub fn drawText(
             };
         }
 
-        const advance_f: f32 = @floatFromInt(font.glyph_advance_width.items[glyph_index].advance_width);
-        const em_f: f32 = @floatFromInt(font.units_per_em);
+        const advance_f: f32 = @floatFromInt(f.glyph_advance_width.items[glyph_index].advance_width);
+        const em_f: f32 = @floatFromInt(f.units_per_em);
         x_pos += (advance_f / em_f) * scale;
     }
 }

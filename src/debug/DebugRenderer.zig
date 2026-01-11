@@ -16,12 +16,16 @@ const DebugCircle = draw.DebugCircle;
 const DebugLine = draw.DebugLine;
 const DebugRect = draw.DebugRect;
 const DebugText = draw.DebugText;
+const assets = @import("asset");
+const Font = assets.Font;
 
 renderer: *Renderer,
+default_font: *const Font,
 
-pub fn init(renderer: *Renderer) Self {
+pub fn init(renderer: *Renderer, default_font: *const Font) Self {
     return .{
         .renderer = renderer,
+        .default_font = default_font,
     };
 }
 
@@ -98,11 +102,13 @@ pub fn renderRect(self: *Self, rect: DebugRect) void {
     );
 }
 pub fn renderText(self: *Self, text: DebugText) void {
-    _ = self;
-    _ = text;
-    // TODO: need to deal w/ font (default font in the engine)
-    // Simple call once that is done and acrchitected
-    // self.renderer.drawText(font, text.text, text.position, text.size, text.color);
+    self.renderer.drawText(
+        self.default_font,
+        text.text,
+        text.position,
+        text.size,
+        text.color,
+    );
 }
 
 pub fn render(self: *Self, data: *const DebugDraw) void {

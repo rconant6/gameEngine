@@ -11,9 +11,10 @@ pub const DebugManager = if (debug_enabled) DebugManagerImpl else DebugManagerSt
 const DebugManagerStub = struct {
     draw: DebugDrawStub = .{},
     renderer: DebugRendererStub = .{},
-    pub fn init(allocator: Allocator, renderer: *Renderer) @This() {
+    pub fn init(allocator: Allocator, renderer: *Renderer, default_font: anytype) @This() {
         _ = allocator;
         _ = renderer;
+        _ = default_font;
         return .{};
     }
     pub fn deinit(self: *@This()) void {
@@ -30,8 +31,9 @@ const DebugManagerStub = struct {
 const DebugRendererImpl = @import("DebugRenderer.zig");
 pub const DebugRenderer = if (debug_enabled) DebugRendererImpl else DebugRendererStub;
 const DebugRendererStub = struct {
-    pub fn init(renderer: *Renderer) @This() {
+    pub fn init(renderer: *Renderer, default_font: anytype) @This() {
         _ = renderer;
+        _ = default_font;
         return .{};
     }
 };

@@ -161,6 +161,7 @@ pub fn build(b: *std.Build) void {
     });
     debug_module.addImport("core", core_module);
     debug_module.addImport("renderer", renderer_module);
+    debug_module.addImport("asset", asset_module);
 
     // ========================================
     // Engine Module and Library

@@ -187,7 +187,10 @@ pub const Engine = struct {
         engine.instantiator = .init(allocator, &engine.world, &engine.assets);
         engine.template_manager = .init(allocator, &engine.instantiator);
         engine.world.template_manager = &engine.template_manager;
-        engine.debugger = .init(allocator, &engine.renderer);
+
+        // Get the default font for debug rendering
+        const default_font = try engine.assets.getFontByName("__default__");
+        engine.debugger = .init(allocator, &engine.renderer, default_font);
 
         return engine;
     }

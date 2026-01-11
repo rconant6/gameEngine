@@ -5,16 +5,18 @@ const DebugDraw = @import("DebugDraw.zig").DebugDraw;
 const DebugRenderer = @import("DebugRenderer.zig");
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
+const assets = @import("asset");
+const Font = assets.Font;
 
 gpa: Allocator,
 draw: DebugDraw,
 renderer: DebugRenderer,
 
-pub fn init(allocator: Allocator, renderer: *Renderer) Self {
+pub fn init(allocator: Allocator, renderer: *Renderer, default_font: *const Font) Self {
     return .{
         .gpa = allocator,
         .draw = .init(allocator),
-        .renderer = .init(renderer),
+        .renderer = .init(renderer, default_font),
     };
 }
 pub fn deinit(self: *Self) void {
