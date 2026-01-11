@@ -375,9 +375,8 @@ pub const Font = struct {
         const temp_alloc = arena.allocator();
         var table_directory = std.AutoArrayHashMap(u32, TableEntry).init(temp_alloc);
 
-        const raw_data = try loadFromMemory(temp_alloc, data);
-
-        return try initFromData(alloc, temp_alloc, raw_data, &table_directory);
+        // Use the data directly without copying since @embedFile data is already in memory
+        return try initFromData(alloc, temp_alloc, data, &table_directory);
     }
 
     fn initFromData(

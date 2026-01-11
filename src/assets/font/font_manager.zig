@@ -7,7 +7,7 @@ pub const FontHandle = struct {
 
 const FontEntry = struct {
     normalized_path: []const u8,
-    font: Font,
+    font: *Font,
 };
 
 pub const FontManager = struct {
@@ -27,6 +27,7 @@ pub const FontManager = struct {
     pub fn deinit(self: *FontManager) void {
         for (self.fonts.items) |*entry| {
             entry.font.deinit();
+            self.allocator.destroy(entry.font);
             self.allocator.free(entry.normalized_path);
         }
         self.fonts.deinit(self.allocator);
@@ -63,9 +64,12 @@ pub const FontManager = struct {
             return handle;
         }
 
-        const font = try Font.initFromMemory(self.allocator, data);
+        const font_ptr = try self.allocator.create(Font);
+        errdefer self.allocator.destroy(font_ptr);
+        font_ptr.* = try Font.initFromMemory(self.allocator, data);
+
         const entry = FontEntry{
-            .font = font,
+            .font = font_ptr,
             .normalized_path = synthetic_path,
         };
         try self.fonts.append(self.allocator, entry);
@@ -82,9 +86,12 @@ pub const FontManager = struct {
             return handle;
         }
 
-        const font = try Font.init(self.allocator, normalized_path);
+        const font_ptr = try self.allocator.create(Font);
+        errdefer self.allocator.destroy(font_ptr);
+        font_ptr.* = try Font.init(self.allocator, normalized_path);
+
         const entry = FontEntry{
-            .font = font,
+            .font = font_ptr,
             .normalized_path = normalized_path,
         };
         try self.fonts.append(self.allocator, entry);
@@ -97,7 +104,7 @@ pub const FontManager = struct {
 
     pub fn getFont(self: *FontManager, handle: FontHandle) ?*Font {
         if (handle.id >= self.fonts.items.len) return null;
-        return &self.fonts.items[handle.id].font;
+        return self.fonts.items[handle.id].font;
     }
 
     fn normalizePath(

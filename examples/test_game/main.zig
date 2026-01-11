@@ -203,6 +203,43 @@ pub fn main() !void {
             .cat = .{ .custom = true },
         });
 
+        // Test debug text - various positions and sizes
+        try game.debugger.draw.addText(.{
+            .text = "Debug Overlay Test",
+            .position = .{ .x = -12.0, .y = 9.0 },
+            .color = Colors.WHITE,
+            .size = 0.6,
+            .duration = null,
+            .cat = .{ .custom = true },
+        });
+
+        try game.debugger.draw.addText(.{
+            .text = "FPS: 60",
+            .position = .{ .x = 10.0, .y = 9.0 },
+            .color = Colors.GREEN,
+            .size = 0.5,
+            .duration = null,
+            .cat = .{ .fps = true },
+        });
+
+        try game.debugger.draw.addText(.{
+            .text = "Collision Active",
+            .position = .{ .x = -12.0, .y = -8.5 },
+            .color = Colors.YELLOW,
+            .size = 0.4,
+            .duration = null,
+            .cat = .{ .collision = true },
+        });
+
+        try game.debugger.draw.addText(.{
+            .text = "Entity Info",
+            .position = .{ .x = 2.0, .y = 6.0 },
+            .color = Colors.CYAN,
+            .size = 0.35,
+            .duration = null,
+            .cat = .{ .entity_info = true },
+        });
+
         game.update(dt);
 
         game.endFrame();
