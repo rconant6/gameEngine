@@ -7,6 +7,6 @@ pub const CircleCollider = struct {
 };
 pub const RectangleCollider = struct {
     center: V2 = .{ .x = 0, .y = 0 },
-    half_w: f32,
-    half_h: f32,
+    half_width: f32,
+    half_height: f32,
 };

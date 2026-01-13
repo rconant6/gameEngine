@@ -39,7 +39,7 @@ const MSG_MAX_SIZE: u32 = 256;
 pub const ErrorLogger = struct {
     allocator: Allocator,
 
-    entries: [100]ErrorEntry,
+    entries: [200]ErrorEntry,
     write_index: usize,
     count: usize,
 

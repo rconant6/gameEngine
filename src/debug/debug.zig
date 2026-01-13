@@ -67,6 +67,7 @@ pub const DebugLine = draw.DebugLine;
 pub const DebugRect = draw.DebugRect;
 pub const DebugText = draw.DebugText;
 const DebugDrawImpl = draw.DebugDraw;
+const DebugCategoryEnum = draw.DebugCategoryEnum;
 pub const DebugDraw = if (debug_enabled) DebugDrawImpl else DebugDrawStub;
 pub const DebugCategory = draw.DebugCategory;
 const DebugDrawStub = struct {
@@ -74,7 +75,7 @@ const DebugDrawStub = struct {
         _ = self;
         _ = dt;
     }
-    pub fn toggleCategory(self: *DebugDraw, category: DebugCategory) void {
+    pub fn toggleCategory(self: *DebugDraw, category: DebugCategoryEnum) void {
         _ = self;
         _ = category;
     }
@@ -92,23 +93,23 @@ const DebugDrawStub = struct {
     pub fn deinit(self: *@This()) void {
         _ = self;
     }
-    pub fn addArrow(self: *@This(), none: DebugArrow) !void {
+    pub fn addArrow(self: *@This(), none: DebugArrow) void {
         _ = self;
         _ = none;
     }
-    pub fn addCircle(self: *@This(), none: DebugCircle) !void {
+    pub fn addCircle(self: *@This(), none: DebugCircle) void {
         _ = self;
         _ = none;
     }
-    pub fn addLine(self: *@This(), none: DebugLine) !void {
+    pub fn addLine(self: *@This(), none: DebugLine) void {
         _ = self;
         _ = none;
     }
-    pub fn addRect(self: *@This(), none: DebugRect) !void {
+    pub fn addRect(self: *@This(), none: DebugRect) void {
         _ = self;
         _ = none;
     }
-    pub fn addText(self: *@This(), none: DebugText) !void {
+    pub fn addText(self: *@This(), none: DebugText) void {
         _ = self;
         _ = none;
     }

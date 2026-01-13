@@ -1,6 +1,7 @@
 const self = @This();
 const std = @import("std");
 const rend = @import("renderer");
+const Colors = rend.Colors;
 const ecs = @import("entity");
 const Entity = ecs.Entity;
 const Transform = ecs.Transform;
@@ -13,11 +14,14 @@ const Text = ecs.Text;
 const LifeTime = ecs.Lifetime;
 const Destroy = ecs.Destroy;
 const Box = ecs.Box;
+const Collider = ecs.Collider;
 const Engine = @import("engine.zig").Engine;
 const core = @import("core");
 const shapes = core.Shapes;
 const CollisionDetection = core.CollisionDetection;
 const ShapeRegistry = core.ShapeRegistry;
+const db = @import("debug");
+const DebugCategory = db.DebugCategory;
 
 const Renderer = rend.Renderer;
 pub fn movementSystem(engine: *Engine, dt: f32) void {
@@ -124,6 +128,7 @@ pub fn lifetimeSystem(engine: *Engine, dt: f32) void {
             };
         }
     }
+    cleanupSystem(engine);
 }
 
 // TODO: This needs work to 'split'?
@@ -184,12 +189,60 @@ pub fn screenClampSystem(engine: *Engine) void {
 pub fn collisionDetectionSystem(engine: *Engine) void {
     engine.clearCollisionEvents();
     CollisionDetection.detectCollisions(&engine.world, &engine.collision_events) catch |err| {
-        engine.logError(
-            .engine,
-            "Failed to run detection system: {any}",
-            .{err},
-        );
+        engine.logError(.engine, "Failed to run detection system: {any}", .{err});
     };
+
+    // DEBUG
+    var query = engine.world.query(.{ Transform, Collider });
+    while (query.next()) |entry| {
+        const transform = entry.get(0);
+        const collider = entry.get(1);
+
+        switch (collider.collider) {
+            .CircleCollider => |circle| {
+                engine.debugger.draw.addCircle(.{
+                    .origin = circle.origin.add(transform.position),
+                    .radius = circle.radius * transform.scale,
+                    .color = Colors.GREEN,
+                    .filled = false,
+                    .duration = null,
+                    .cat = DebugCategory.single(.collision),
+                });
+            },
+            .RectangleCollider => |rect| {
+                const pos = rect.center.add(transform.position);
+                const hw = rect.half_width * transform.scale;
+                const hh = rect.half_height * transform.scale;
+                engine.debugger.draw.addRect(.{
+                    .min = .{ .x = pos.x - hw, .y = pos.y - hh },
+                    .max = .{ .x = pos.x + hw, .y = pos.y + hh },
+                    .color = Colors.GREEN,
+                    .filled = false,
+                    .duration = null,
+                    .cat = DebugCategory.single(.collision),
+                });
+            },
+        }
+    }
+    for (engine.collision_events.items) |collision| {
+        engine.debugger.draw.addCircle(.{
+            .origin = collision.point,
+            .radius = 0.1,
+            .color = Colors.RED,
+            .filled = true,
+            .duration = null,
+            .cat = DebugCategory.single(.collision),
+        });
+        const normal_end = collision.point.add(collision.normal.mul(2.0));
+        engine.debugger.draw.addArrow(.{
+            .start = collision.point,
+            .end = normal_end,
+            .color = Colors.NEON_YELLOW,
+            .head_size = 0.5,
+            .duration = null,
+            .cat = DebugCategory.single(.collision),
+        });
+    }
 }
 
 pub fn cleanupSystem(engine: *Engine) void {

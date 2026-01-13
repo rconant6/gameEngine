@@ -150,8 +150,8 @@ pub fn collideCircleColliderRectangleCollider(
     const radius_a = a.radius * ta.scale;
     const pos_a = a.origin.add(ta.position);
     const pos_b = b.center.add(tb.position);
-    const b_half_w = b.half_w * tb.scale;
-    const b_half_h = b.half_h * tb.scale;
+    const b_half_w = b.half_width * tb.scale;
+    const b_half_h = b.half_height * tb.scale;
 
     const left_x = pos_b.x - b_half_w;
     const right_x = pos_b.x + b_half_w;
@@ -201,8 +201,8 @@ pub fn collideRectangleColliderCircleCollider(
     const radius_a = a.radius * ta.scale;
     const pos_a = a.origin.add(ta.position);
     const pos_b = b.center.add(tb.position);
-    const b_half_w = b.half_w * tb.scale;
-    const b_half_h = b.half_h * tb.scale;
+    const b_half_w = b.half_width * tb.scale;
+    const b_half_h = b.half_height * tb.scale;
 
     const left_x = pos_b.x - b_half_w;
     const right_x = pos_b.x + b_half_w;
@@ -250,16 +250,16 @@ pub fn collideRectangleColliderRectangleCollider(
     tb: Transform,
 ) ?CollisionData {
     const pos_a = a.center.add(ta.position);
-    const a_half_w = a.half_w * ta.scale;
-    const a_half_h = a.half_h * ta.scale;
+    const a_half_w = a.half_width * ta.scale;
+    const a_half_h = a.half_height * ta.scale;
     const a_left_x = pos_a.x - a_half_w;
     const a_right_x = pos_a.x + a_half_w;
     const a_top = pos_a.y + a_half_h;
     const a_bottom = pos_a.y - a_half_h;
 
     const pos_b = b.center.add(tb.position);
-    const b_half_w = b.half_w * tb.scale;
-    const b_half_h = b.half_h * tb.scale;
+    const b_half_w = b.half_width * tb.scale;
+    const b_half_h = b.half_height * tb.scale;
     const b_left_x = pos_b.x - b_half_w;
     const b_right_x = pos_b.x + b_half_w;
     const b_top = pos_b.y + b_half_h;

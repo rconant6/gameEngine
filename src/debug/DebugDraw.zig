@@ -245,9 +245,10 @@ pub const DebugDraw = struct {
             .duration = 1.5,
             .cat = DebugCategory.single(.custom),
             .owns_text = true,
-        }) catch {
-            self.gpa.free(message);
-        };
+        });
+        // }) catch {
+        //     self.gpa.free(message);
+        // };
     }
     pub fn clear(self: *DebugDraw) void {
         self.arrows.clearRetainingCapacity();
@@ -274,20 +275,20 @@ pub const DebugDraw = struct {
         }
     }
 
-    pub fn addArrow(self: *DebugDraw, arrow: DebugArrow) !void {
-        try self.arrows.append(self.gpa, arrow);
+    pub fn addArrow(self: *DebugDraw, arrow: DebugArrow) void {
+        self.arrows.append(self.gpa, arrow) catch {};
     }
-    pub fn addCircle(self: *DebugDraw, circle: DebugCircle) !void {
-        try self.circles.append(self.gpa, circle);
+    pub fn addCircle(self: *DebugDraw, circle: DebugCircle) void {
+        self.circles.append(self.gpa, circle) catch {};
     }
-    pub fn addLine(self: *DebugDraw, line: DebugLine) !void {
-        try self.lines.append(self.gpa, line);
+    pub fn addLine(self: *DebugDraw, line: DebugLine) void {
+        self.lines.append(self.gpa, line) catch {};
     }
-    pub fn addRect(self: *DebugDraw, rect: DebugRect) !void {
-        try self.rects.append(self.gpa, rect);
+    pub fn addRect(self: *DebugDraw, rect: DebugRect) void {
+        self.rects.append(self.gpa, rect) catch {};
     }
-    pub fn addText(self: *DebugDraw, text: DebugText) !void {
-        try self.texts.append(self.gpa, text);
+    pub fn addText(self: *DebugDraw, text: DebugText) void {
+        self.texts.append(self.gpa, text) catch {};
     }
 
     pub fn init(allocator: Allocator) DebugDraw {

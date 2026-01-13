@@ -125,27 +125,6 @@ pub fn main() !void {
     //         .triggers = &paddle_input_triggers,
     //     });
     // }
-    // DEBUG TEST: Add some test debug primitives
-    // Screen coords are ~26.67 wide x 20 high
-
-    // Test line - diagonal across screen
-    try game.debugger.draw.addLine(.{
-        .start = .{ .x = -21.0, .y = -10.0 },
-        .end = .{ .x = 21.0, .y = 10.0 },
-        .color = Colors.RED,
-        .duration = std.math.inf(f32), // one-frame
-        .cat = DebugCategory.single(.collision),
-    });
-
-    // Test persistent circle (stays for 2 seconds)
-    try game.debugger.draw.addCircle(.{
-        .origin = .{ .x = -10.0, .y = 5.0 },
-        .radius = 1.5,
-        .color = Colors.MAGENTA,
-        .filled = false,
-        .duration = 2.0,
-        .cat = DebugCategory.single(.custom),
-    });
 
     // +++++++ GAME LOOP FOR NOW ++++++++++ //
     var last_time = std.time.milliTimestamp();
@@ -157,81 +136,6 @@ pub fn main() !void {
         game.beginFrame();
         game.clear(engine.Colors.DARK_GRAY);
 
-        // Test circle - center of screen
-        try game.debugger.draw.addCircle(.{
-            .origin = .{ .x = 0, .y = 0 },
-            .radius = 3.0,
-            .color = Colors.GREEN,
-            .filled = false,
-            .duration = null,
-            .cat = DebugCategory.single(.collision),
-        });
-
-        // Test arrow - pointing right
-        try game.debugger.draw.addArrow(.{
-            .start = .{ .x = 8.0, .y = 10.0 },
-            .end = .{ .x = 18.0, .y = 10.0 },
-            .color = Colors.BLUE,
-            .head_size = 1.0,
-            .duration = null,
-            .cat = DebugCategory.single(.velocity),
-        });
-
-        // Test rectangle - top-left corner
-        try game.debugger.draw.addRect(.{
-            .min = .{ .x = 2.0, .y = 2.0 },
-            .max = .{ .x = 6.0, .y = 5.0 },
-            .color = Colors.YELLOW,
-            .filled = false,
-            .duration = null,
-            .cat = DebugCategory.single(.entity_info),
-        });
-
-        // Test arrow from rectangle center pointing WSW
-        try game.debugger.draw.addArrow(.{
-            .start = .{ .x = 4.0, .y = 3.5 },
-            .end = .{ .x = 1.0, .y = 0.5 },
-            .color = Colors.CYAN,
-            .head_size = 0.7,
-            .duration = null,
-            .cat = DebugCategory.single(.velocity),
-        });
-        // Test debug text - various positions and sizes
-        try game.debugger.draw.addText(.{
-            .text = "Debug Overlay Test",
-            .position = .{ .x = -12.0, .y = 8.0 },
-            .color = Colors.WHITE,
-            .size = 0.4,
-            .duration = null,
-            .cat = DebugCategory.single(.custom),
-        });
-
-        try game.debugger.draw.addText(.{
-            .text = "FPS: 60",
-            .position = .{ .x = 10.0, .y = 9.0 },
-            .color = Colors.GREEN,
-            .size = 0.5,
-            .duration = null,
-            .cat = DebugCategory.single(.fps),
-        });
-
-        try game.debugger.draw.addText(.{
-            .text = "Collision Active",
-            .position = .{ .x = -12.0, .y = -8.5 },
-            .color = Colors.YELLOW,
-            .size = 0.4,
-            .duration = null,
-            .cat = DebugCategory.single(.collision),
-        });
-
-        try game.debugger.draw.addText(.{
-            .text = "Entity Info",
-            .position = .{ .x = 2.0, .y = 6.0 },
-            .color = Colors.CYAN,
-            .size = 0.35,
-            .duration = null,
-            .cat = DebugCategory.single(.entity_info),
-        });
         game.update(dt);
 
         game.endFrame();
