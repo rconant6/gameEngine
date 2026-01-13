@@ -217,7 +217,32 @@ pub const Engine = struct {
         return !self.running or self.window.shouldClose();
     }
 
+    pub fn checkInternals(self: *Engine) void {
+        if (self.input.isPressed(KeyCode.Esc)) {
+            self.running = false;
+        }
+        if (self.input.wasJustPressed(KeyCode.F1)) {
+            self.debugger.draw.toggleCategory(.collision);
+        }
+        if (self.input.wasJustPressed(KeyCode.F2)) {
+            self.debugger.draw.toggleCategory(.velocity);
+        }
+        if (self.input.wasJustPressed(KeyCode.F3)) {
+            self.debugger.draw.toggleCategory(.entity_info);
+        }
+        if (self.input.wasJustPressed(KeyCode.F4)) {
+            self.debugger.draw.toggleCategory(.grid);
+        }
+        if (self.input.wasJustPressed(KeyCode.F5)) {
+            self.debugger.draw.toggleCategory(.fps);
+        }
+        if (self.input.wasJustPressed(KeyCode.F6)) {
+            self.debugger.draw.toggleCategory(.custom);
+        }
+    }
+
     pub fn update(self: *Engine, dt: f32) void {
+        self.checkInternals();
         Systems.lifetimeSystem(self, dt);
         Systems.screenWrapSystem(self);
         Systems.screenClampSystem(self);

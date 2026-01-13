@@ -66,7 +66,7 @@ pub fn renderCircle(self: *Self, circle: DebugCircle) void {
     self.renderer.drawGeometry(
         ShapeRegistry.createShapeUnion(Circle, geo),
         null,
-        null,
+        if (circle.filled) circle.color else null,
         circle.color,
         1,
     );
@@ -96,7 +96,7 @@ pub fn renderRect(self: *Self, rect: DebugRect) void {
     self.renderer.drawGeometry(
         ShapeRegistry.createShapeUnion(Rectangle, geo),
         null,
-        null,
+        if (rect.filled) rect.color else null,
         rect.color,
         1,
     );

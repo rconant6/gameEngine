@@ -2,6 +2,7 @@ const std = @import("std");
 const engine = @import("engine");
 const KeyCode = engine.KeyCode;
 const debug = engine.debug;
+const DebugCategory = debug.DebugCategory;
 
 const Colors = engine.Colors;
 
@@ -124,6 +125,27 @@ pub fn main() !void {
     //         .triggers = &paddle_input_triggers,
     //     });
     // }
+    // DEBUG TEST: Add some test debug primitives
+    // Screen coords are ~26.67 wide x 20 high
+
+    // Test line - diagonal across screen
+    try game.debugger.draw.addLine(.{
+        .start = .{ .x = -21.0, .y = -10.0 },
+        .end = .{ .x = 21.0, .y = 10.0 },
+        .color = Colors.RED,
+        .duration = std.math.inf(f32), // one-frame
+        .cat = DebugCategory.single(.collision),
+    });
+
+    // Test persistent circle (stays for 2 seconds)
+    try game.debugger.draw.addCircle(.{
+        .origin = .{ .x = -10.0, .y = 5.0 },
+        .radius = 1.5,
+        .color = Colors.MAGENTA,
+        .filled = false,
+        .duration = 2.0,
+        .cat = DebugCategory.single(.custom),
+    });
 
     // +++++++ GAME LOOP FOR NOW ++++++++++ //
     var last_time = std.time.milliTimestamp();
@@ -135,32 +157,14 @@ pub fn main() !void {
         game.beginFrame();
         game.clear(engine.Colors.DARK_GRAY);
 
-        // TEST: finally quit!
-        // this should be handled by a trigger and update the game state
-        if (game.input.isPressed(KeyCode.Esc)) {
-            game.running = false;
-        }
-
-        // DEBUG TEST: Add some test debug primitives
-        // Screen coords are ~26.67 wide x 20 high
-
-        // Test line - diagonal across screen
-        try game.debugger.draw.addLine(.{
-            .start = .{ .x = 5.0, .y = 5.0 },
-            .end = .{ .x = 21.0, .y = 15.0 },
-            .color = Colors.RED,
-            .duration = null, // one-frame
-            .cat = .{ .custom = true },
-        });
-
         // Test circle - center of screen
         try game.debugger.draw.addCircle(.{
-            .origin = .{ .x = 13.33, .y = 10.0 },
+            .origin = .{ .x = 0, .y = 0 },
             .radius = 3.0,
             .color = Colors.GREEN,
             .filled = false,
             .duration = null,
-            .cat = .{ .collision = true },
+            .cat = DebugCategory.single(.collision),
         });
 
         // Test arrow - pointing right
@@ -170,7 +174,7 @@ pub fn main() !void {
             .color = Colors.BLUE,
             .head_size = 1.0,
             .duration = null,
-            .cat = .{ .velocity = true },
+            .cat = DebugCategory.single(.velocity),
         });
 
         // Test rectangle - top-left corner
@@ -180,7 +184,7 @@ pub fn main() !void {
             .color = Colors.YELLOW,
             .filled = false,
             .duration = null,
-            .cat = .{ .entity_info = true },
+            .cat = DebugCategory.single(.entity_info),
         });
 
         // Test arrow from rectangle center pointing WSW
@@ -190,27 +194,16 @@ pub fn main() !void {
             .color = Colors.CYAN,
             .head_size = 0.7,
             .duration = null,
-            .cat = .{ .velocity = true },
+            .cat = DebugCategory.single(.velocity),
         });
-
-        // Test persistent circle (stays for 2 seconds)
-        try game.debugger.draw.addCircle(.{
-            .origin = .{ .x = 20.0, .y = 15.0 },
-            .radius = 1.5,
-            .color = Colors.MAGENTA,
-            .filled = true,
-            .duration = 2.0,
-            .cat = .{ .custom = true },
-        });
-
         // Test debug text - various positions and sizes
         try game.debugger.draw.addText(.{
             .text = "Debug Overlay Test",
-            .position = .{ .x = -12.0, .y = 9.0 },
+            .position = .{ .x = -12.0, .y = 8.0 },
             .color = Colors.WHITE,
-            .size = 0.6,
+            .size = 0.4,
             .duration = null,
-            .cat = .{ .custom = true },
+            .cat = DebugCategory.single(.custom),
         });
 
         try game.debugger.draw.addText(.{
@@ -219,7 +212,7 @@ pub fn main() !void {
             .color = Colors.GREEN,
             .size = 0.5,
             .duration = null,
-            .cat = .{ .fps = true },
+            .cat = DebugCategory.single(.fps),
         });
 
         try game.debugger.draw.addText(.{
@@ -228,7 +221,7 @@ pub fn main() !void {
             .color = Colors.YELLOW,
             .size = 0.4,
             .duration = null,
-            .cat = .{ .collision = true },
+            .cat = DebugCategory.single(.collision),
         });
 
         try game.debugger.draw.addText(.{
@@ -237,9 +230,8 @@ pub fn main() !void {
             .color = Colors.CYAN,
             .size = 0.35,
             .duration = null,
-            .cat = .{ .entity_info = true },
+            .cat = DebugCategory.single(.entity_info),
         });
-
         game.update(dt);
 
         game.endFrame();

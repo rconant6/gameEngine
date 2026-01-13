@@ -212,7 +212,7 @@ comptime {
 pub fn mapToGameKeyCode(osKeyCode: u16) KeyCode {
     return switch (comptime builtin.os.tag) {
         .macos => switch (osKeyCode) {
-            // Letters A-Z
+            // Letters A-Z (macOS keycodes from NSEvent)
             0x00 => .A,
             0x0B => .B,
             0x08 => .C,
@@ -240,7 +240,7 @@ pub fn mapToGameKeyCode(osKeyCode: u16) KeyCode {
             0x10 => .Y,
             0x06 => .Z,
 
-            // Numbers 0-9
+            // Numbers 0-9 (macOS keycodes)
             0x1D => .Key0,
             0x12 => .Key1,
             0x13 => .Key2,
@@ -252,13 +252,13 @@ pub fn mapToGameKeyCode(osKeyCode: u16) KeyCode {
             0x1C => .Key8,
             0x19 => .Key9,
 
-            // Arrow keys
+            // Arrow keys (macOS keycodes)
             0x7B => .Left,
             0x7C => .Right,
             0x7E => .Up,
             0x7D => .Down,
 
-            // Function keys
+            // Function keys (macOS keycodes)
             0x7A => .F1,
             0x78 => .F2,
             0x63 => .F3,
@@ -272,7 +272,7 @@ pub fn mapToGameKeyCode(osKeyCode: u16) KeyCode {
             0x67 => .F11,
             0x6F => .F12,
 
-            // Special keys
+            // Special keys (macOS keycodes)
             0x24 => .Enter,
             0x31 => .Space,
             0x35 => .Esc,
@@ -280,7 +280,7 @@ pub fn mapToGameKeyCode(osKeyCode: u16) KeyCode {
             0x33 => .Backspace,
             0x75 => .Delete,
 
-            // Modifier keys
+            // Modifier keys (macOS keycodes)
             0x38 => .LeftShift,
             0x3C => .RightShift,
             0x3B => .LeftCtrl,
@@ -290,9 +290,9 @@ pub fn mapToGameKeyCode(osKeyCode: u16) KeyCode {
             0x37 => .LeftCmd,
             0x36 => .RightCmd,
 
-            // Punctuation
-            0x27 => .Semicolon,
-            0x29 => .Quote,
+            // Punctuation (macOS keycodes)
+            0x29 => .Semicolon,
+            0x27 => .Quote,
             0x2B => .Comma,
             0x2F => .Period,
             0x2C => .Slash,
@@ -303,7 +303,7 @@ pub fn mapToGameKeyCode(osKeyCode: u16) KeyCode {
             0x1E => .RightBracket,
             0x2A => .Backslash,
 
-            // Number pad
+            // Number pad (macOS keycodes)
             0x52 => .Numpad0,
             0x53 => .Numpad1,
             0x54 => .Numpad2,
