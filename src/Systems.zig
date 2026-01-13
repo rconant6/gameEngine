@@ -37,7 +37,7 @@ pub fn movementSystem(engine: *Engine, dt: f32) void {
         transform.rotation += velocity.angular * dt;
 
         if (velocity.linear.x != 0 and velocity.linear.y != 0) {
-            const end = transform.position.add(velocity.linear.mul(0.5));
+            const end = transform.position.add(velocity.linear.mul(velocity.linear.magnitude()).mul(0.12));
             engine.debugger.draw.addArrow(.{
                 .start = transform.position,
                 .end = end,
