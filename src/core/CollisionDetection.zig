@@ -192,57 +192,6 @@ pub fn collideCircleColliderRectangleCollider(
         .penetration = radius_a - dist,
     };
 }
-pub fn collideRectangleColliderCircleCollider(
-    b: RectangleCollider,
-    tb: Transform,
-    a: CircleCollider,
-    ta: Transform,
-) ?CollisionData {
-    const radius_a = a.radius * ta.scale;
-    const pos_a = a.origin.add(ta.position);
-    const pos_b = b.center.add(tb.position);
-    const b_half_w = b.half_width * tb.scale;
-    const b_half_h = b.half_height * tb.scale;
-
-    const left_x = pos_b.x - b_half_w;
-    const right_x = pos_b.x + b_half_w;
-    const top = pos_b.y + b_half_h;
-    const bottom = pos_b.y - b_half_h;
-
-    const closest_x = @max(left_x, @min(pos_a.x, right_x));
-    const closest_y = @max(bottom, @min(pos_a.y, top));
-
-    const dx = pos_a.x - closest_x;
-    const dy = pos_a.y - closest_y;
-
-    const dist_sq = (dx * dx) + (dy * dy);
-    const radii_sq = radius_a * radius_a;
-
-    if (dist_sq > radii_sq) return null;
-
-    const dist = @sqrt(dist_sq);
-
-    const normal = if (dist > 0.00001)
-        V2{ .x = dx / dist, .y = dy / dist }
-    else blk: {
-        const dl = @abs(pos_a.x - left_x);
-        const dr = @abs(pos_a.x - right_x);
-        const dt = @abs(pos_a.y - top);
-        const db = @abs(pos_a.y - bottom);
-        const min = @min(dl, @min(dr, @min(dt, db)));
-
-        if (min == dl) break :blk V2{ .x = -1, .y = 0 };
-        if (min == dr) break :blk V2{ .x = 1, .y = 0 };
-        if (min == dt) break :blk V2{ .x = 0, .y = 1 };
-        break :blk V2{ .x = 0, .y = -1 };
-    };
-
-    return .{
-        .point = .{ .x = closest_x, .y = closest_y },
-        .normal = normal,
-        .penetration = radius_a - dist,
-    };
-}
 pub fn collideRectangleColliderRectangleCollider(
     a: RectangleCollider,
     ta: Transform,
