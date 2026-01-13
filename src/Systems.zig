@@ -35,6 +35,18 @@ pub fn movementSystem(engine: *Engine, dt: f32) void {
         transform.position.x += velocity.linear.x * dt;
         transform.position.y += velocity.linear.y * dt;
         transform.rotation += velocity.angular * dt;
+
+        if (velocity.linear.x != 0 and velocity.linear.y != 0) {
+            const end = transform.position.add(velocity.linear.mul(0.5));
+            engine.debugger.draw.addArrow(.{
+                .start = transform.position,
+                .end = end,
+                .color = Colors.NEON_ORANGE,
+                .head_size = 0.2,
+                .duration = null,
+                .cat = DebugCategory.single(.velocity),
+            });
+        }
     }
 }
 pub fn physicsSystem(engine: *Engine, dt: f32) void {
