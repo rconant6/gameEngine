@@ -46,6 +46,25 @@ pub fn main() !void {
         .{ game_width, game_height },
     );
 
+    game.debugger.draw.addText(.{
+        .text = "ABCDEFGHIJKLMNOPQURSTUVWXYZ",
+        .owns_text = false,
+        .color = Colors.ORANGE,
+        .duration = std.math.inf(f32),
+        .position = .{ .x = -13, .y = -8.0 },
+        .size = 0.6,
+        .cat = DebugCategory.single(.custom),
+    });
+    game.debugger.draw.addText(.{
+        .text = "abcdefghijklmnopqrstuvwxyz",
+        .owns_text = false,
+        .color = Colors.ORANGE,
+        .duration = std.math.inf(f32),
+        .position = .{ .x = -13, .y = -8.5 },
+        .size = 0.2,
+        .cat = DebugCategory.single(.custom),
+    });
+
     // Create paddle (player-controlled)
     // {
     //     const paddle = game.createEntity();

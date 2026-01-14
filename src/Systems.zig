@@ -5,6 +5,7 @@ const Colors = rend.Colors;
 const ecs = @import("entity");
 const Entity = ecs.Entity;
 const Transform = ecs.Transform;
+const Lifetime = ecs.Lifetime;
 const ScreenWrap = ecs.ScreenWrap;
 const ScreenClamp = ecs.ScreenClamp;
 const Sprite = ecs.Sprite;
@@ -141,6 +142,75 @@ pub fn lifetimeSystem(engine: *Engine, dt: f32) void {
         }
     }
     cleanupSystem(engine);
+}
+
+pub fn debugEntityInfoSystem(engine: *Engine) void {
+    var world = &engine.world;
+    var query = world.query(.{Transform});
+
+    while (query.next()) |entry| {
+        const transform = entry.get(0);
+        const entity_id = entry.entity.id;
+
+        // Build component indicator string
+        var indicators: [32]u8 = undefined;
+        var idx: usize = 0;
+
+        // Check for common components and add indicators
+        if (world.hasComponent(entry.entity, Velocity)) {
+            indicators[idx] = 'V';
+            idx += 1;
+        }
+        if (world.hasComponent(entry.entity, Collider)) {
+            indicators[idx] = 'C';
+            idx += 1;
+        }
+        if (world.hasComponent(entry.entity, Lifetime)) {
+            indicators[idx] = 'L';
+            idx += 1;
+        }
+        if (world.hasComponent(entry.entity, Sprite)) {
+            indicators[idx] = 'S';
+            idx += 1;
+        }
+        if (world.hasComponent(entry.entity, ecs.Tag)) {
+            const tag = world.getComponent(entry.entity, ecs.Tag) orelse break;
+            indicators[idx] = 't';
+            idx += 1;
+            var buf: [64]u8 = undefined;
+            const tags = std.fmt.bufPrint(&buf, "t: {s}", .{tag.tags}) catch "ERROR";
+            engine.debugger.draw.addText(.{
+                .text = engine.allocator.dupe(u8, tags) catch "",
+                .position = .{ .x = transform.position.x, .y = transform.position.y + 1.0 },
+                .color = Colors.LIGHT_GRAY,
+                .size = 0.3,
+                .duration = null,
+                .cat = DebugCategory.single(.entity_info),
+                .owns_text = true,
+            });
+        }
+
+        // Draw text above entity
+        var buf: [64]u8 = undefined;
+        const text = std.fmt.bufPrint(&buf, "id: {d}  {s}", .{ entity_id, indicators[0..idx] }) catch "ERROR";
+
+        engine.debugger.draw.addCircle(.{
+            .filled = true,
+            .origin = transform.position,
+            .radius = 0.025,
+            .color = Colors.YELLOW,
+            .cat = DebugCategory.single(.entity_info),
+        });
+        engine.debugger.draw.addText(.{
+            .text = engine.allocator.dupe(u8, text) catch "",
+            .position = .{ .x = transform.position.x, .y = transform.position.y + 1.5 },
+            .color = Colors.WHITE,
+            .size = 0.3,
+            .duration = null,
+            .cat = DebugCategory.single(.entity_info),
+            .owns_text = true,
+        });
+    }
 }
 
 // TODO: This needs work to 'split'?

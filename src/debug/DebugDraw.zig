@@ -309,7 +309,9 @@ pub const DebugDraw = struct {
         self.lines.deinit(self.gpa);
         self.rects.deinit(self.gpa);
         for (self.texts.items) |*ts| {
-            self.gpa.free(ts.text);
+            if (ts.owns_text) {
+                self.gpa.free(ts.text);
+            }
         }
         self.texts.deinit(self.gpa);
     }

@@ -67,6 +67,43 @@ pub const TemplateManager = scene.TemplateManager;
 pub const Template = scene.Template;
 pub const debug = @import("debug");
 pub const Debugger = debug.DebugManager;
+pub const DebugCategory = debug.DebugCategory;
+const builtin = @import("builtin");
+const debug_enabled = builtin.mode == .Debug;
+
+const PerformanceMetrics = struct {
+    current_fps: f32 = 0,
+    frame_time_ms: f32 = 0,
+    frame_count: u64 = 0,
+
+    fps_frame_accum: f32 = 0,
+    fps_time_accum: f32 = 0,
+    fps_update_interval: f32 = 0.25,
+
+    min_fps: f32 = std.math.inf(f32),
+    max_fps: f32 = 0,
+
+    pub fn update(self: *PerformanceMetrics, dt: f32) void {
+        self.frame_count += 1;
+        self.fps_frame_accum += 1.0;
+        self.fps_time_accum += dt;
+
+        if (self.fps_time_accum >= self.fps_update_interval) {
+            self.current_fps = self.fps_frame_accum / self.fps_time_accum;
+            self.frame_time_ms = (self.fps_time_accum / self.fps_frame_accum) * 1000.0;
+
+            if (self.current_fps < self.min_fps) {
+                self.min_fps = self.current_fps;
+            }
+            if (self.current_fps > self.max_fps) {
+                self.max_fps = self.current_fps;
+            }
+
+            self.fps_frame_accum = 0.0;
+            self.fps_time_accum = 0.0;
+        }
+    }
+};
 
 pub const Engine = struct {
     allocator: Allocator,
@@ -84,6 +121,7 @@ pub const Engine = struct {
     instantiator: Instantiator,
 
     debugger: Debugger,
+    performance_metrics: PerformanceMetrics = .{},
     error_logger: ErrorLogger,
 
     pub fn init(
@@ -242,6 +280,7 @@ pub const Engine = struct {
     }
 
     pub fn update(self: *Engine, dt: f32) void {
+        self.performance_metrics.update(dt);
         self.checkInternals();
         Systems.lifetimeSystem(self, dt);
         Systems.screenWrapSystem(self);
@@ -260,6 +299,22 @@ pub const Engine = struct {
         };
         Systems.cleanupSystem(self);
         Systems.renderSystem(self);
+        if (debug_enabled) {
+            Systems.debugEntityInfoSystem(self);
+            var buf: [64]u8 = undefined;
+            const fps: f32 = self.performance_metrics.current_fps;
+            const color = if (fps > 55) Colors.GREEN else if (fps > 30 and fps < 55) Colors.YELLOW else Colors.RED;
+            const fps_text = std.fmt.bufPrint(&buf, "FPS: {d:.1}", .{fps}) catch "FPS: --";
+            self.debugger.draw.addText(.{
+                .text = self.allocator.dupe(u8, fps_text) catch "",
+                .position = .{ .x = 10.0, .y = 9.0 },
+                .color = color,
+                .size = 0.5,
+                .duration = null,
+                .cat = DebugCategory.single(.fps),
+                .owns_text = true,
+            });
+        }
         self.debugger.run(dt);
     }
 
