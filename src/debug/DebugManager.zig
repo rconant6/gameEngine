@@ -4,7 +4,6 @@ const Self = @This();
 const DebugDraw = @import("DebugDraw.zig").DebugDraw;
 const DebugRenderer = @import("DebugRenderer.zig");
 const rend = @import("renderer");
-const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
 const assets = @import("asset");
 const Font = assets.Font;

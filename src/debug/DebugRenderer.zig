@@ -30,6 +30,7 @@ pub fn init(renderer: *Renderer, default_font: *const Font) Self {
     };
 }
 
+pub fn renderArrow(self: *Self, arrow: DebugArrow) void {
 pub fn renderArrow(self: *Self, arrow: DebugArrow, ctx: RenderContext) void {
     const delta = arrow.end.sub(arrow.start);
     const direction = delta.normalize();
