@@ -153,7 +153,7 @@ test "E2E: multiple entities with different collision shapes" {
         .scale = 1.0,
     });
     try world.addComponent(rect, Collider, Collider{
-        .collider = ColliderData{ .RectangleCollider = .{ .half_w = 2.0, .half_h = 2.0 } },
+        .collider = ColliderData{ .RectangleCollider = .{ .half_width = 2.0, .half_height = 2.0 } },
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;

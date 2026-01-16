@@ -39,53 +39,53 @@ test "ColliderData: circle with large radius" {
 }
 
 test "ColliderData: rectangle creation" {
-    const rect = RectangleCollider{ .half_w = 10.0, .half_h = 20.0 };
+    const rect = RectangleCollider{ .half_width = 10.0, .half_height = 20.0 };
     const shape = ColliderRegistry.createColliderUnion(RectangleCollider, rect);
 
     switch (shape) {
         .CircleCollider => try testing.expect(false),
         .RectangleCollider => |r| {
-            try testing.expectEqual(@as(f32, 10.0), r.half_w);
-            try testing.expectEqual(@as(f32, 20.0), r.half_h);
+            try testing.expectEqual(@as(f32, 10.0), r.half_width);
+            try testing.expectEqual(@as(f32, 20.0), r.half_height);
         },
     }
 }
 
 test "ColliderData: rectangle with equal dimensions (square)" {
-    const rect = RectangleCollider{ .half_w = 15.0, .half_h = 15.0 };
+    const rect = RectangleCollider{ .half_width = 15.0, .half_height = 15.0 };
     const shape = ColliderRegistry.createColliderUnion(RectangleCollider, rect);
 
     switch (shape) {
         .CircleCollider => try testing.expect(false),
         .RectangleCollider => |r| {
-            try testing.expectEqual(@as(f32, 15.0), r.half_w);
-            try testing.expectEqual(@as(f32, 15.0), r.half_h);
+            try testing.expectEqual(@as(f32, 15.0), r.half_width);
+            try testing.expectEqual(@as(f32, 15.0), r.half_height);
         },
     }
 }
 
 test "ColliderData: rectangle with zero dimensions" {
-    const rect = RectangleCollider{ .half_w = 0.0, .half_h = 0.0 };
+    const rect = RectangleCollider{ .half_width = 0.0, .half_height = 0.0 };
     const shape = ColliderRegistry.createColliderUnion(RectangleCollider, rect);
 
     switch (shape) {
         .CircleCollider => try testing.expect(false),
         .RectangleCollider => |r| {
-            try testing.expectEqual(@as(f32, 0.0), r.half_w);
-            try testing.expectEqual(@as(f32, 0.0), r.half_h);
+            try testing.expectEqual(@as(f32, 0.0), r.half_width);
+            try testing.expectEqual(@as(f32, 0.0), r.half_height);
         },
     }
 }
 
 test "ColliderData: rectangle with asymmetric dimensions" {
-    const rect = RectangleCollider{ .half_w = 5.0, .half_h = 50.0 };
+    const rect = RectangleCollider{ .half_width = 5.0, .half_height = 50.0 };
     const shape = ColliderRegistry.createColliderUnion(RectangleCollider, rect);
 
     switch (shape) {
         .CircleCollider => try testing.expect(false),
         .RectangleCollider => |r| {
-            try testing.expectEqual(@as(f32, 5.0), r.half_w);
-            try testing.expectEqual(@as(f32, 50.0), r.half_h);
+            try testing.expectEqual(@as(f32, 5.0), r.half_width);
+            try testing.expectEqual(@as(f32, 50.0), r.half_height);
         },
     }
 }
@@ -102,15 +102,15 @@ test "Collider: creation with circle shape" {
 }
 
 test "Collider: creation with rectangle shape" {
-    const rect = RectangleCollider{ .half_w = 10.0, .half_h = 15.0 };
+    const rect = RectangleCollider{ .half_width = 10.0, .half_height = 15.0 };
     const shape_data = ColliderRegistry.createColliderUnion(RectangleCollider, rect);
     const c = Collider{ .collider = shape_data };
 
     switch (c.collider) {
         .CircleCollider => try testing.expect(false),
         .RectangleCollider => |rectangle| {
-            try testing.expectEqual(@as(f32, 10.0), rectangle.half_w);
-            try testing.expectEqual(@as(f32, 15.0), rectangle.half_h);
+            try testing.expectEqual(@as(f32, 10.0), rectangle.half_width);
+            try testing.expectEqual(@as(f32, 15.0), rectangle.half_height);
         },
     }
 }
@@ -119,14 +119,14 @@ test "Collider: shape modification from circle to rectangle" {
     const circle = CircleCollider{ .radius = 5.0 };
     var c = Collider{ .collider = ColliderRegistry.createColliderUnion(CircleCollider, circle) };
 
-    const rect = RectangleCollider{ .half_w = 8.0, .half_h = 12.0 };
+    const rect = RectangleCollider{ .half_width = 8.0, .half_height = 12.0 };
     c.collider = ColliderRegistry.createColliderUnion(RectangleCollider, rect);
 
     switch (c.collider) {
         .CircleCollider => try testing.expect(false),
         .RectangleCollider => |rectangle| {
-            try testing.expectEqual(@as(f32, 8.0), rectangle.half_w);
-            try testing.expectEqual(@as(f32, 12.0), rectangle.half_h);
+            try testing.expectEqual(@as(f32, 8.0), rectangle.half_width);
+            try testing.expectEqual(@as(f32, 12.0), rectangle.half_height);
         },
     }
 }
@@ -141,7 +141,7 @@ test "ColliderData: union size" {
 
 test "Collider: array of colliders with different shapes" {
     const circle1 = CircleCollider{ .radius = 1.0 };
-    const rect1 = RectangleCollider{ .half_w = 2.0, .half_h = 3.0 };
+    const rect1 = RectangleCollider{ .half_width = 2.0, .half_height = 3.0 };
     const circle2 = CircleCollider{ .radius = 4.0 };
 
     const colliders = [_]Collider{
@@ -162,8 +162,8 @@ test "Collider: array of colliders with different shapes" {
     switch (colliders[1].collider) {
         .CircleCollider => try testing.expect(false),
         .RectangleCollider => |r| {
-            try testing.expectEqual(@as(f32, 2.0), r.half_w);
-            try testing.expectEqual(@as(f32, 3.0), r.half_h);
+            try testing.expectEqual(@as(f32, 2.0), r.half_width);
+            try testing.expectEqual(@as(f32, 3.0), r.half_height);
         },
     }
 
