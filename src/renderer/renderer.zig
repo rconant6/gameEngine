@@ -1,7 +1,7 @@
 const std = @import("std");
 const core = @import("core");
 pub const V2 = core.V2;
-pub const GamePoint = core.GamePoint;
+pub const WorldPoint = core.WorldPoint;
 pub const ScreenPoint = core.ScreenPoint;
 pub const ShapeData = core.ShapeData;
 pub const Shapes = core.Shapes;
@@ -99,6 +99,7 @@ pub const Renderer = struct {
         fill_color: ?Color,
         stroke_color: ?Color,
         stroke_width: f32,
+        ctx: RenderContext,
     ) void {
         self.backend.drawShape(
             shape_data,
@@ -106,17 +107,19 @@ pub const Renderer = struct {
             fill_color,
             stroke_color,
             stroke_width,
+            ctx,
         );
     }
     pub fn drawText(
         self: *Renderer,
         font: *const Font,
         text: []const u8,
-        position: GamePoint,
+        position: WorldPoint,
         scale: f32,
         color: Color,
+        ctx: RenderContext,
     ) void {
-        text_module.drawText(self, font, text, position, scale, color);
+        text_module.drawText(self, font, text, position, scale, color, ctx);
     }
 
     // TODO: All of these need to return errors/nil if called for the wrong backend

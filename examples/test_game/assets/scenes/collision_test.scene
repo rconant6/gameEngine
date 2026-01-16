@@ -12,6 +12,8 @@
       size:vec2 {26.66, 20.0}
       fill_color:color #1a1a2e
       filled:bool true
+    [TAG]
+      tags: "background"
 
   // STATIONARY TARGETS - arranged in a grid
   // Top row
@@ -287,11 +289,3 @@
       font_asset:asset_ref "OrbitronFont"
       text_color:color #888888
       size:f32 0.4
-
-  [Camera:entity]
-    [Transform]
-      position:vec3 {0.0, 0.0, 10.0}
-    [Camera]
-      fov:f32 60.0
-      near:f32 0.1
-      far:f32 100.0

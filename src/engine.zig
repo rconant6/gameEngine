@@ -48,6 +48,7 @@ pub const Camera = ecs.Camera;
 pub const Tag = ecs.Tag;
 pub const OnInput = ecs.OnInput;
 pub const OnCollision = ecs.OnCollision;
+pub const ActiveCamera = ecs.ActiveCamera;
 const action = @import("action");
 pub const Action = action.Action;
 pub const ActionSystem = action.ActionSystem;
@@ -124,6 +125,8 @@ pub const Engine = struct {
     performance_metrics: PerformanceMetrics = .{},
     error_logger: ErrorLogger,
 
+    active_camera_entity: ?Entity = null,
+
     pub fn init(
         allocator: Allocator,
         title: []const u8,
@@ -179,11 +182,29 @@ pub const Engine = struct {
             }
         }
 
-        const world = World.init(allocator) catch |err| blk: {
+        var world = World.init(allocator) catch |err| blk: {
             std.log.err("[ECS] Unable to create a world entity manager: {any}", .{err});
             had_error = true;
             break :blk undefined;
         };
+        // Create main camera
+        const camera = world.createEntity() catch |err| blk: {
+            std.log.err("[ASSETS] Unable to create main_default_camera: {any}", .{err});
+            had_error = true;
+            break :blk undefined;
+        };
+        try world.addComponent(camera, ActiveCamera, ActiveCamera{});
+        try world.addComponent(camera, Transform, Transform{});
+        try world.addComponent(camera, Camera, Camera{
+            .position = .{ .x = 0, .y = 0 },
+            .ortho_size = 15.0,
+            .viewport = .{
+                .center = V2.ZERO,
+                .half_width = @floatFromInt(scaled_width / 2),
+                .half_height = @floatFromInt(scaled_height / 2),
+            },
+            .priority = 1,
+        });
 
         const asset_manager = AssetManager.init(allocator) catch |err| blk: {
             std.log.err("[ASSETS] Unable to create an asset manager: {any}", .{err});
@@ -220,6 +241,7 @@ pub const Engine = struct {
             .instantiator = undefined,
             .template_manager = undefined,
             .debugger = undefined,
+            .active_camera_entity = camera,
         };
 
         engine.instantiator = .init(allocator, &engine.world, &engine.assets);
@@ -298,7 +320,7 @@ pub const Engine = struct {
             self.logError(.assets, "Action system failure: {any}", .{err});
         };
         Systems.cleanupSystem(self);
-        Systems.renderSystem(self);
+        Systems.renderSystem(self, dt);
         if (debug_enabled) {
             Systems.debugEntityInfoSystem(self);
             var buf: [64]u8 = undefined;
@@ -315,7 +337,7 @@ pub const Engine = struct {
                 .owns_text = true,
             });
         }
-        self.debugger.run(dt);
+        // self.debugger.run(dt);
     }
 
     pub fn beginFrame(self: *Engine) void {
@@ -349,6 +371,35 @@ pub const Engine = struct {
                 .{ @typeName(Data), err },
             );
         };
+    }
+
+    // Camera helpers
+    pub fn createCamera(
+        self: *Engine,
+    ) !Entity {
+        const camera = try self.world.createEntity();
+        try self.world.addComponent(camera, ActiveCamera, ActiveCamera{});
+        try self.world.addComponent(camera, Transform, Transform{});
+        try self.world.addComponent(camera, Camera, Camera{
+            .position = .{ .x = 0, .y = 0 },
+            .orthoSize = 10.0,
+            .viewport = .{
+                .center = V2.ZERO,
+                .half_width = @floatFromInt(self.getGameWidth() / 2),
+                .half_height = @floatFromInt(self.getGameHeight() / 2),
+            },
+            .priority = 1,
+        });
+        return camera;
+    }
+    pub fn setActiveCamera(self: *Engine, camera: Entity) void {
+        self.active_camera_entity = camera;
+    }
+    pub fn getActiveCamera(self: *const Engine) ?Entity {
+        return self.active_camera_entity;
+    }
+    pub fn getActiveCameraTransform(self: *const Engine) ?*const Transform {
+        return self.world.getComponent(self.active_camera_entity, Transform);
     }
 
     // Drawing shapes

@@ -4,8 +4,9 @@ pub const Font = asset.Font;
 pub const glyph_builder = asset.glyph_builder;
 const FilteredGlyph = asset.FilteredGlyph;
 const rend = @import("renderer.zig");
+const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
-const GamePoint = rend.GamePoint;
+const WorldPoint = rend.WorldPoint;
 const Color = rend.Color;
 const core = @import("core");
 const ShapeRegistry = core.ShapeRegistry;
@@ -17,9 +18,10 @@ pub fn drawText(
     renderer: *Renderer,
     font: *const Font,
     text: []const u8,
-    position: GamePoint,
+    position: WorldPoint,
     scale: f32,
     color: Color,
+    ctx: RenderContext,
 ) void {
     const f = @constCast(font);
     var x_pos = position.x;
@@ -35,6 +37,7 @@ pub fn drawText(
                 scale,
                 .{ .x = x_pos, .y = position.y },
                 color,
+                ctx,
             ) catch {
                 // Skip glyphs that fail to render
                 continue;
@@ -55,6 +58,7 @@ fn drawGlyph(
     scale: f32,
     pos: V2,
     color: Color,
+    ctx: RenderContext,
 ) !void {
     const triangles = if (font.glyph_triangles.get(glyph_index)) |cached|
         cached
@@ -80,6 +84,7 @@ fn drawGlyph(
             color,
             null,
             1.0,
+            ctx,
         );
     }
 }

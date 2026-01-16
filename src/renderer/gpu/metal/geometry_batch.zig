@@ -12,7 +12,7 @@ const Triangle = rend.Shapes.Triangle;
 const Line = rend.Shapes.Line;
 const Ellipse = rend.Shapes.Ellipse;
 const Polygon = rend.Shapes.Polygon;
-const GamePoint = core.GamePoint;
+const WorldPoint = core.WorldPoint;
 const ShapeData = core.ShapeData;
 const RenderContext = @import("../../RenderContext.zig");
 const utils = @import("../../geometry_utils.zig");
@@ -100,13 +100,13 @@ pub const GeometryBatch = struct {
         }
     }
     inline fn makeVertex(
-        point: GamePoint,
+        point: WorldPoint,
         xform: ?Transform,
         ctx: RenderContext,
         color: [4]f32,
     ) Vertex {
         const transformed = if (xform) |t| utils.transformPoint(point, t) else point;
-        const clip_pos = utils.gameToClipSpace(transformed, ctx);
+        const clip_pos = utils.worldToClipSpace(transformed, ctx);
         return .{ .position = clip_pos, .color = color };
     }
     fn addLine(
@@ -377,11 +377,11 @@ pub const GeometryBatch = struct {
             const angle1 = i_f * angle_step;
             const angle2 = (i_f + 1.0) * angle_step;
 
-            const p1 = GamePoint{
+            const p1 = WorldPoint{
                 .x = circle.origin.x + circle.radius * @cos(angle1),
                 .y = circle.origin.y + circle.radius * @sin(angle1),
             };
-            const p2 = GamePoint{
+            const p2 = WorldPoint{
                 .x = circle.origin.x + circle.radius * @cos(angle2),
                 .y = circle.origin.y + circle.radius * @sin(angle2),
             };

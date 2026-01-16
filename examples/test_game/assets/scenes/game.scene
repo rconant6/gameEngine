@@ -94,13 +94,13 @@
       fill_color:color #2F8223
       filled:bool true
 
-  [Camera:entity]
-    [Transform]
-      position:vec3 {0.0, 0.0, 10.0}
-    [Camera]
-      fov:f32 60.0
-      near:f32 0.1
-      far:f32 100.0
+//  [Camera:entity]
+//    [Transform]
+//      position:vec3 {0.0, 0.0, 10.0}
+//    [Camera]
+//      fov:f32 60.0
+//      near:f32 0.1
+//      far:f32 100.0
 
   [Pentagon:entity]
     [Transform]

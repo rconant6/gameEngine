@@ -18,12 +18,13 @@ pub const OnInput = action.OnInput;
 
 // MARK: Spatial Components
 pub const Transform = struct {
-    position: V2 = .{ .x = 0, .y = 0 },
+    position: V2 = .ZERO,
     rotation: f32 = 0,
     scale: f32 = 1,
 };
 
 // MARK: Rendering Components
+pub const Camera = @import("Camera.zig");
 pub const Sprite = struct {
     geometry: ?ShapeData,
     fill_color: ?Color = null,
@@ -53,11 +54,6 @@ pub const Box = struct {
     fill_color: ?Color = null,
     filled: bool,
 };
-pub const Camera = struct {
-    fov: f32,
-    near: f32,
-    far: f32,
-};
 pub const RenderLayer = struct {
     z_order: i32 = 0,
 };
@@ -76,9 +72,12 @@ pub const Collider = struct {
     collider: ColliderData,
 };
 
-// MARK: Utility Components
+// MARK: Generic Game Components
 pub const Lifetime = struct {
     remaining: f32, // seconds
+};
+pub const Health = struct {
+    remaining: i32,
 };
 pub const Tag = @import("Tag.zig");
 
@@ -86,3 +85,5 @@ pub const Tag = @import("Tag.zig");
 pub const ScreenWrap = struct { _dummy: u8 = 0 };
 pub const ScreenClamp = struct { _dummy: u8 = 0 };
 pub const Destroy = struct { _dummy: u8 = 0 };
+pub const ActiveCamera = struct { _dummy: u8 = 0 };
+pub const MinimapCamera = struct { _dummy: u8 = 0 };

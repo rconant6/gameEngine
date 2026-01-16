@@ -20,8 +20,10 @@ pub const RectangleCollider = colliders.RectangleCollider;
 pub const ScreenWrap = comps.ScreenWrap;
 pub const ScreenClamp = comps.ScreenClamp;
 pub const Destroy = comps.Destroy;
+pub const ActiveCamera = comps.ActiveCamera;
+pub const MinimapCamera = comps.MinimapCamera;
 // MARK: Colllisions
-pub const Tag = @import("Tag.zig");
+pub const Tag = @import("Tag.zig"); // tags in string form for scene/template use
 // MARK: Core
 const core = @import("core");
 pub const Input = core.Input;

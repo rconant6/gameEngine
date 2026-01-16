@@ -26,6 +26,7 @@ const RenderContext = @import("../../RenderContext.zig");
 const utils = @import("../../geometry_utils.zig");
 const Transform = utils.Transform;
 const rend = @import("../../renderer.zig");
+const WorldPoint = rend.WorldPoint;
 const RenderConfig = rend.RendererConfig;
 const ShapeData = rend.ShapeData;
 
@@ -164,9 +165,8 @@ pub fn drawShape(
     fill_color: ?Color,
     stroke_color: ?Color,
     stroke_width: f32,
+    ctx: RenderContext,
 ) void {
-    const ctx = self.getRenderContext();
-
     // Check if batch is getting too full, flush early to prevent overflow
     const estimated_vertices_per_shape = 64;
     if (self.batch.vertices.items.len + estimated_vertices_per_shape > MAX_VERT_SIZE) {
@@ -242,15 +242,4 @@ fn flushBatch(self: *Self) !void {
     }
 
     MetalBridge.endEncoding(encoder);
-}
-
-fn getRenderContext(self: *const Self) RenderContext {
-    return RenderContext{
-        .width = self.width,
-        .height = self.height,
-        .scale_factor = self.scale_factor,
-        .frame_number = self.frame_number,
-        .time = 0.0, // TODO
-        .delta_time = 0.0, // TODO
-    };
 }

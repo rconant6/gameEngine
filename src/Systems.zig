@@ -2,7 +2,10 @@ const self = @This();
 const std = @import("std");
 const rend = @import("renderer");
 const Colors = rend.Colors;
+const RenderContext = rend.RenderContext;
 const ecs = @import("entity");
+const Camera = ecs.Camera;
+const ActiveCamera = ecs.ActiveCamera;
 const Entity = ecs.Entity;
 const Transform = ecs.Transform;
 const Lifetime = ecs.Lifetime;
@@ -55,9 +58,22 @@ pub fn physicsSystem(engine: *Engine, dt: f32) void {
     _ = engine;
     _ = dt;
 }
-pub fn renderSystem(engine: *Engine) void {
+pub fn renderSystem(engine: *Engine, dt: f32) void {
     var world = &engine.world;
     var renderer = &engine.renderer;
+    const cam_entity = engine.active_camera_entity orelse return;
+    const camera_loc = world.getComponent(cam_entity, Transform) orelse return;
+    const camera = world.getComponent(cam_entity, Camera) orelse return;
+    const ctx: RenderContext = .{
+        .camera_loc = camera_loc.position,
+        .delta_time = dt,
+        .frame_number = 0,
+        .ortho_size = camera.ortho_size,
+        .height = renderer.height,
+        .width = renderer.width,
+        .scale_factor = 1.0,
+        .time = 0,
+    };
 
     var box_query = world.query(.{ Transform, Box });
     while (box_query.next()) |entry| {
@@ -74,13 +90,13 @@ pub fn renderSystem(engine: *Engine) void {
                 .offset = transform.position,
                 .rotation = transform.rotation,
                 .scale = transform.scale,
-            }, box.fill_color, null, 1.0);
+            }, box.fill_color, null, 1.0, ctx);
         } else {
             renderer.drawGeometry(ShapeRegistry.createShapeUnion(shapes.Rectangle, geo), .{
                 .offset = transform.position,
                 .rotation = transform.rotation,
                 .scale = transform.scale,
-            }, null, box.fill_color, 1.0);
+            }, null, box.fill_color, 1.0, ctx);
         }
     }
 
@@ -98,6 +114,7 @@ pub fn renderSystem(engine: *Engine) void {
             transform.position,
             text.size,
             text.text_color,
+            ctx,
         );
     }
     var query = world.query(.{ Transform, Sprite });
@@ -117,9 +134,11 @@ pub fn renderSystem(engine: *Engine) void {
                 sprite.fill_color,
                 sprite.stroke_color,
                 sprite.stroke_width,
+                ctx,
             );
         }
     }
+    engine.debugger.run(dt, ctx);
 }
 
 pub fn lifetimeSystem(engine: *Engine, dt: f32) void {
@@ -171,6 +190,10 @@ pub fn debugEntityInfoSystem(engine: *Engine) void {
         }
         if (world.hasComponent(entry.entity, Sprite)) {
             indicators[idx] = 'S';
+            idx += 1;
+        }
+        if (world.hasComponent(entry.entity, ActiveCamera)) {
+            indicators[idx] = 'A';
             idx += 1;
         }
         if (world.hasComponent(entry.entity, ecs.Tag)) {

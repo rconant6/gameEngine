@@ -12,6 +12,8 @@
       size:vec2 {26.66, 20.0}
       fill_color:color #1a1a2e
       filled:bool true
+    [Tag]
+      tags:string "background"
 
   // TEST 1: Mutual Destruction - Two balls that destroy each other and spawn particles
   [MutualBall1:entity]
@@ -88,7 +90,7 @@
       position:vec3 {-8.0, 0.0, 0.0}
       scale:f32 1.0
     [Velocity]
-      linear:vec2 {4.0, 2.0}
+      linear:vec2 {3.0, 8.0}
       angular:f32 0.0
     [Sprite:circle]
       origin:vec2 {0.0, 0.0}
@@ -383,11 +385,4 @@
       font_asset:asset_ref "OrbitronFont"
       text_color:color #888888
       size:f32 0.35
-
-  [Camera:entity]
-    [Transform]
-      position:vec3 {0.0, 0.0, 10.0}
-    [Camera]
-      fov:f32 60.0
-      near:f32 0.1
-      far:f32 100.0
+      
