@@ -34,7 +34,6 @@
       radius:f32 1.0
     [Tag]
       tags:string "mutual"
-    [ScreenClamp]
     [OnCollision]
       [trigger]
         other_tag_pattern:string "mutual"
@@ -68,7 +67,6 @@
       radius:f32 1.0
     [Tag]
       tags:string "mutual"
-    [ScreenClamp]
     [OnCollision]
       [trigger]
         other_tag_pattern:string "mutual"
@@ -103,7 +101,6 @@
       radius:f32 1.2
     [Tag]
       tags:string "bouncer"
-    [ScreenClamp]
     [OnCollision]
       [trigger]
         other_tag_pattern:string "target"
@@ -132,7 +129,6 @@
       radius:f32 1.0
     [Tag]
       tags:string "spawner"
-    [ScreenClamp]
     [OnCollision]
       [trigger]
         other_tag_pattern:string "target"
@@ -161,7 +157,6 @@
       radius:f32 1.0
     [Tag]
       tags:string "multi"
-    [ScreenClamp]
     [OnCollision]
       [trigger]
         other_tag_pattern:string "target"
@@ -202,7 +197,6 @@
       radius:f32 1.0
     [Tag]
       tags:string "selective"
-    [ScreenClamp]
     [OnCollision]
       [trigger]
         other_tag_pattern:string "target_red"
@@ -244,7 +238,6 @@
       radius:f32 1.5
     [Tag]
       tags:string "player"
-    [ScreenClamp]
     [OnInput]
       [trigger]
         key:string "Space"

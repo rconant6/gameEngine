@@ -32,8 +32,6 @@
   [Tag]
     tags:string "player,ship"
 
-  [ScreenWrap]
-
 // NOTE: The original zasteroids template had 8 separate shapes:
 // 1. Hull (main body)
 // 2. Cockpit (window detail)

@@ -24,7 +24,6 @@
       stroke_color:color #FFFFFF
       stroke_width:f32 1.0
       visible:bool true
-    [ScreenClamp]
 
   [Wrapper:entity]
     [Transform]
@@ -42,7 +41,6 @@
       stroke_color:color #FFFFFF
       stroke_width:f32 1.0
       visible:bool true
-    [ScreenWrap]
 
   [StaticTriangle:entity]
     [Transform]
@@ -114,7 +112,6 @@
       fill_color:color #00FFAA
       stroke_color:color #00FFFF
       visible:bool true
-    [ScreenWrap]
 
   [UI:scene]
     [HealthBar:entity]

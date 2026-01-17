@@ -30,8 +30,6 @@
   [Tag]
     tags:string "asteroid,large_asteroid,destructible"
 
-  [ScreenWrap]
-
   // NOTE: Original scoreValue was 50
   // Could add custom ScoreValue component if needed
 
@@ -63,8 +61,6 @@
 
   [Tag]
     tags:string "asteroid,medium_asteroid,destructible"
-
-  [ScreenWrap]
 
   // NOTE: Original scoreValue was 100
 
@@ -98,8 +94,6 @@
 
   [Tag]
     tags:string "asteroid,small_asteroid,destructible"
-
-  [ScreenWrap]
 
   // NOTE: Original scoreValue was 200
 

@@ -151,7 +151,6 @@
       visible:bool true
     [Collider:circle]
       radius:f32 1.0
-    [ScreenClamp]
 
   [MovingBall2:entity]
     [Transform]
@@ -169,7 +168,6 @@
       visible:bool true
     [Collider:circle]
       radius:f32 1.0
-    [ScreenClamp]
 
   [MovingBall3:entity]
     [Transform]
@@ -185,7 +183,6 @@
       stroke_color:color #ff6b6b
       stroke_width:f32 2.0
       visible:bool true
-    [ScreenClamp]
 
   // SLOWER MOVING BALLS - easier to see collisions
   [SlowBall1:entity]
@@ -202,7 +199,6 @@
       stroke_color:color #ffd54f
       stroke_width:f32 2.0
       visible:bool true
-    [ScreenClamp]
 
   [SlowBall2:entity]
     [Transform]
@@ -218,7 +214,6 @@
       stroke_color:color #ffd54f
       stroke_width:f32 2.0
       visible:bool true
-    [ScreenClamp]
 
   // SCALED CIRCLES - test that collision respects scale
   [TinyBall:entity]
@@ -235,7 +230,6 @@
       stroke_color:color #00ffff
       stroke_width:f32 2.0
       visible:bool true
-    [ScreenClamp]
 
   [BigBall:entity]
     [Transform]
@@ -251,7 +245,6 @@
       stroke_color:color #c77dff
       stroke_width:f32 2.0
       visible:bool true
-    [ScreenClamp]
 
   // WRAPPING BALL - test collision detection with screen wrap
   [WrappingBall:entity]
@@ -268,7 +261,6 @@
       stroke_color:color #00ff88
       stroke_width:f32 2.0
       visible:bool true
-    [ScreenWrap]
 
   // Title text
   [TitleText:entity]

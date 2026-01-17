@@ -94,8 +94,6 @@
   [Lifetime]
     remaining:f32 2.0
 
-  [ScreenWrap]
-
 [Spark:template]
   [Transform]
     position:vec2 {0.0, 0.0}

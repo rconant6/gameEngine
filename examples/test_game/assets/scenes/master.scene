@@ -120,7 +120,6 @@
       stroke_color:color #FF0000
       stroke_width:f32 1.0
       visible:bool true
-    [ScreenClamp]
 
   // TRIANGLES - Row 3
   [TriFilled:entity]
@@ -265,7 +264,6 @@
       stroke_color:color #FF00FF
       stroke_width:f32 1.0
       visible:bool true
-    [ScreenWrap]
 
   // COMPLEX MOTION - Right side
   [ComplexCircle1:entity]
@@ -282,7 +280,6 @@
       stroke_color:color #FFFFFF
       stroke_width:f32 1.0
       visible:bool true
-    [ScreenClamp]
 
   [ComplexRect1:entity]
     [Transform]
@@ -299,7 +296,6 @@
       stroke_color:color #0000FF
       stroke_width:f32 1.5
       visible:bool true
-    [ScreenWrap]
 
   [ComplexTri1:entity]
     [Transform]
@@ -316,7 +312,6 @@
       stroke_color:color #FFFF00
       stroke_width:f32 1.0
       visible:bool true
-    [ScreenClamp]
 
   // SCALED SHAPES - Bottom right
   [TinyCircle:entity]
