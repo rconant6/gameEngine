@@ -8,7 +8,7 @@ const db = @import("debug");
 const DebugCategory = db.DebugCategory;
 const Debugger = db.DebugManager;
 
-pub fn movementSystem(world: *World, dt: f32, debug: *Debugger) void {
+pub fn run(world: *World, dt: f32, debug: *Debugger) void {
     var query = world.query(.{ Transform, Velocity });
 
     while (query.next()) |entry| {

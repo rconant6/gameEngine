@@ -17,11 +17,12 @@ const Colors = rend.Colors;
 const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
 
-pub const movementSystem = @import("MovementSys.zig").movementSystem;
-pub const physicsSystem = @import("PhysicsSys.zig").physicsSystem;
-pub const renderSystem = @import("RenderSys.zig").renderSystem;
-pub const lifetimeSystem = @import("LifetimeSys.zig").lifetimeSystem;
-pub const collisionDetectionSystem = @import("CollisionDetectionSys.zig").collisionDetectionSystem;
+pub const movementSystem = @import("MovementSys.zig").run;
+pub const physicsSystem = @import("PhysicsSys.zig").run;
+pub const renderSystem = @import("RenderSys.zig").run;
+pub const lifetimeSystem = @import("LifetimeSys.zig").run;
+pub const collisionDetectionSystem = @import("CollisionDetectionSys.zig").run;
+// TODO: need to move actionSystem here and split off ActionManager
 
 pub fn debugEntityInfoSystem(world: *World, debugger: *DebugManager) void {
     var query = world.query(.{Transform});

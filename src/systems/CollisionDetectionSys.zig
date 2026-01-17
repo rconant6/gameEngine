@@ -10,7 +10,7 @@ const World = ecs.World;
 const rend = @import("renderer");
 const Colors = rend.Colors;
 
-pub fn collisionDetectionSystem(
+pub fn run(
     world: *World,
     collisions: anytype,
     debugger: *DebugManager,

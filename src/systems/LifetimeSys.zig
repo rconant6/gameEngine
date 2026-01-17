@@ -10,7 +10,7 @@ fn cleanup(world: *World) void {
     }
 }
 
-pub fn lifetimeSystem(world: *World, dt: f32) void {
+pub fn run(world: *World, dt: f32) void {
     var query = world.query(.{Lifetime});
 
     while (query.next()) |entry| {

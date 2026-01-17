@@ -18,7 +18,7 @@ const rend = @import("renderer");
 const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
 
-pub fn renderSystem(
+pub fn run(
     renderer: *Renderer,
     world: *World,
     asset_manager: *AssetManager,
