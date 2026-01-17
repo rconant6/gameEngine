@@ -422,12 +422,19 @@ pub const Engine = struct {
         const camera = self.active_camera_entity orelse return;
         Camera.setOrthoSize(&self.world, camera, new_size);
     }
-    pub fn zoomCamera(self: *Engine, camera: Entity, factor: f32) void {
+    pub fn zoomCameraInc(self: *Engine, camera: Entity, factor: f32) void {
         Camera.zoom(&self.world, camera, factor);
     }
-    pub fn zoomActiveCamera(self: *Engine, factor: f32) void {
+    pub fn zoomActiveCameraInc(self: *Engine, factor: f32) void {
         const camera = self.active_camera_entity orelse return;
         Camera.zoom(&self.world, camera, factor);
+    }
+    pub fn zoomCameraSmooth(self: *Engine, camera: Entity, delta: f32) void {
+        Camera.smoothZoom(&self.world, camera, delta);
+    }
+    pub fn zoomActiveCameraSmooth(self: *Engine, factor: f32) void {
+        const camera = self.active_camera_entity orelse return;
+        Camera.smoothZoom(&self.world, camera, factor);
     }
     pub fn getCameraViewBounds(self: *Engine, camera: Entity) Rectangle {
         return Camera.getViewBounds(&self.world, camera);
@@ -452,6 +459,10 @@ pub const Engine = struct {
     }
     pub fn getAxis2d(self: *const Engine, left: anytype, right: anytype, up: anytype, down: anytype) V2 {
         return self.input.getAxis2d(left, right, up, down);
+    }
+    pub fn getMouseScrollDelta(self: *const Engine) ?V2 {
+        const delta = self.input.mouse.scroll_delta;
+        return if (delta.x == 0 and delta.y == 0) null else delta;
     }
 
     // Drawing shapes

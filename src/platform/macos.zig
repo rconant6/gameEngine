@@ -89,16 +89,15 @@ pub fn pollEvent() ?Event {
         keyboard_state.updateState(key, is_down != 0);
     }
 
-    var x: f16 = undefined;
-    var y: f16 = undefined;
+    var x: f32 = undefined;
+    var y: f32 = undefined;
+    var scroll_x: f32 = 0;
+    var scroll_y: f32 = 0;
     var button: u8 = undefined;
     is_down = undefined;
-    var scroll_x: f16 = undefined;
-    var scroll_y: f16 = undefined;
 
-    while (poll_mouse_event(&button, &is_down, &x, &y, &scroll_x, &scroll_y)) {
+    while (poll_mouse_event(&x, &y, &scroll_x, &scroll_y, &button, &is_down)) {
         const b = plat.mapToGameMouseButton(button);
-
         if (b == .Unused) {
             continue;
         }
@@ -161,4 +160,4 @@ extern fn set_pixel_buffer(
 
 extern fn swap_buffers(window: c.WindowHandle, offset: usize) void;
 extern fn poll_key_event(keycode: *u16, is_down: *u8) bool;
-extern fn poll_mouse_event(button: *u8, isDown: *u8, x: *f16, y: *f16, scroll_x: *f16, scroll_y: *f16) bool;
+extern fn poll_mouse_event(x: *f32, y: *f32, scroll_x: *f32, scroll_y: *f32, button: *u8, isDown: *u8) bool;

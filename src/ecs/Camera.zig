@@ -10,6 +10,10 @@ const Rect = rend.Shapes.Rectangle;
 const World = @import("World.zig");
 const Entity = @import("Entity.zig");
 
+const zoom_scale: f32 = 0.10;
+const min_zoom: f32 = 1.0;
+const max_zoom: f32 = 1000.0;
+
 ortho_size: f32, // vertical half_height in WORLDSPACE
 viewport: Rect,
 priority: i32,
@@ -41,6 +45,7 @@ pub fn getOrthoSize(world: *World, entity: Entity) f32 {
     const cam = world.getComponent(entity, Self) orelse return 10.0;
     return cam.ortho_size;
 }
+/// zoom steps incrementally
 /// factor > 1.0 = zoom out (see more)
 /// factor < 1.0 = zoom in (see less)
 /// factor = 0.5 = half orthosize = zoom * 2.0
@@ -49,6 +54,13 @@ pub fn zoom(world: *World, entity: Entity, factor: f32) void {
     const cam = world.getComponentMut(entity, Self) orelse return;
     const new_size = cam.ortho_size * factor;
     if (new_size <= 0) return; // TODO: Log error
+    cam.ortho_size = new_size;
+}
+pub fn smoothZoom(world: *World, entity: Entity, delta: f32) void {
+    const cam = world.getComponentMut(entity, Self) orelse return;
+    var new_size = cam.ortho_size + delta * zoom_scale * -1.0;
+    new_size = if (new_size <= min_zoom) min_zoom else new_size;
+    new_size = if (new_size >= max_zoom) max_zoom else new_size;
     cam.ortho_size = new_size;
 }
 pub fn getViewBounds(world: *World, entity: Entity) Rect {

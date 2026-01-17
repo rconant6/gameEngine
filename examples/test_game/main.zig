@@ -178,7 +178,7 @@ pub fn main() !void {
     var last_time = std.time.milliTimestamp();
 
     // Camera control settings
-    const camera_pan_speed: f32 = 5.0; // units per second
+    const camera_pan_speed: f32 = 10.0; // units per second
     const zoom_in_factor: f32 = 0.9; // 10% closer each press
     const zoom_out_factor: f32 = 1.1; // 10% farther each press
 
@@ -193,24 +193,34 @@ pub fn main() !void {
         // ===== CAMERA CONTROLS (Arrow keys for pan, Q/E for zoom, R for reset) =====
         // Arrow key panning
         if (game.isDown(KeyCode.Up)) {
-            game.translateActiveCamera(.{ .x = 0, .y = camera_pan_speed * dt });
+            game.translateActiveCamera(
+                .{ .x = 0, .y = camera_pan_speed * dt },
+            );
         }
         if (game.isDown(KeyCode.Down)) {
-            game.translateActiveCamera(.{ .x = 0, .y = -camera_pan_speed * dt });
+            game.translateActiveCamera(
+                .{ .x = 0, .y = -camera_pan_speed * dt },
+            );
         }
         if (game.isDown(KeyCode.Left)) {
-            game.translateActiveCamera(.{ .x = -camera_pan_speed * dt, .y = 0 });
+            game.translateActiveCamera(
+                .{ .x = -camera_pan_speed * dt, .y = 0 },
+            );
         }
         if (game.isDown(KeyCode.Right)) {
-            game.translateActiveCamera(.{ .x = camera_pan_speed * dt, .y = 0 });
+            game.translateActiveCamera(
+                .{ .x = camera_pan_speed * dt, .y = 0 },
+            );
         }
-
+        if (game.getMouseScrollDelta()) |scroll_delta| {
+            game.zoomActiveCameraSmooth(scroll_delta.y);
+        }
         // Q/E zoom
         if (game.isPressed(KeyCode.Q)) {
-            game.zoomActiveCamera(zoom_in_factor); // Zoom in
+            game.zoomActiveCameraInc(zoom_in_factor); // Zoom in
         }
         if (game.isPressed(KeyCode.E)) {
-            game.zoomActiveCamera(zoom_out_factor); // Zoom out
+            game.zoomActiveCameraInc(zoom_out_factor); // Zoom out
         }
 
         // R reset camera

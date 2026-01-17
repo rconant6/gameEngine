@@ -92,19 +92,19 @@ public func poll_events() {
 public func poll_mouse_event(
   x: UnsafeMutablePointer<Float>,
   y: UnsafeMutablePointer<Float>,
-  button: UnsafeMutablePointer<UInt8>,
-  isDown: UnsafeMutablePointer<UInt8>,
   scroll_x: UnsafeMutablePointer<Float>,
   scroll_y: UnsafeMutablePointer<Float>,
+  button: UnsafeMutablePointer<UInt8>,
+  isDown: UnsafeMutablePointer<UInt8>
 ) -> Bool {
   guard let event = globalEventHandler.pollNextMouse() else { return false }
 
   x.pointee = event.x
   y.pointee = event.y
-  button.pointee = event.button
-  isDown.pointee = event.isDown
   scroll_x.pointee = event.scroll_x
   scroll_y.pointee = event.scroll_y
+  button.pointee = event.button
+  isDown.pointee = event.isDown
 
   return true
 }
