@@ -24,14 +24,18 @@ pub fn main() !void {
 
     // leave to make sure it's ok if there are collisions or reimports
     // TODO: these all need to handle errors better or catch at engine level or be fatal
-    try game.loadScene("master", "master");
+    // try game.loadScene("master", "master");
     // try game.setActiveScene("master");
 
-    try game.loadScene("collision", "collision_test");
+    // try game.loadScene("collision", "collision_test");
     // try game.setActiveScene("collision");
 
-    try game.loadScene("action", "action_test.scene");
-    try game.setActiveScene("action");
+    // try game.loadScene("action", "action_test.scene");
+    // try game.setActiveScene("action");
+
+    // Camera test scene - simple scene to test camera controls
+    try game.loadScene("camera", "camera_test.scene");
+    try game.setActiveScene("camera");
 
     // NOTE loading all 3 andd setting to active to see where/when something breaks
     try game.instantiateActiveScene();
@@ -46,24 +50,49 @@ pub fn main() !void {
         .{ game_width, game_height },
     );
 
-    game.debugger.draw.addText(.{
-        .text = "ABCDEFGHIJKLMNOPQURSTUVWXYZ",
-        .owns_text = false,
-        .color = Colors.ORANGE,
-        .duration = std.math.inf(f32),
-        .position = .{ .x = -13, .y = -8.0 },
-        .size = 0.6,
-        .cat = DebugCategory.single(.custom),
-    });
-    game.debugger.draw.addText(.{
-        .text = "abcdefghijklmnopqrstuvwxyz",
-        .owns_text = false,
-        .color = Colors.ORANGE,
-        .duration = std.math.inf(f32),
-        .position = .{ .x = -13, .y = -8.5 },
-        .size = 0.2,
-        .cat = DebugCategory.single(.custom),
-    });
+    // ===== CAMERA TEST SCENE NOTES =====
+    // This scene tests camera controls and coordinate systems:
+    // - Pink circle at origin (0, 0) - world center reference
+    // - Red rectangles at N/S (±20 Y) - vertical extent markers
+    // - Blue rectangles at E/W (±30 X) - horizontal extent markers
+    // - Yellow circles at corners - world bounds visualization
+    // - Green circle (player) - WASD to move, demonstrates object movement vs camera
+    // - Gray dots - grid pattern to show culling when camera moves
+    //
+    // CONTROLS:
+    //   Arrow Keys: Pan camera (smooth movement)
+    //   Q/E: Zoom in/out
+    //   R: Reset camera to origin
+    //   WASD: Move green player (separate from camera)
+    //
+    // WHAT TO TEST:
+    //   1. Arrow keys pan camera - world appears to move opposite direction
+    //   2. Q zooms in - see less world, entities appear larger
+    //   3. E zooms out - see more world, entities appear smaller
+    //   4. R resets camera - return to default view
+    //   5. WASD moves player - player moves independently of camera
+    //   6. Pan camera far from origin - markers should move/disappear correctly
+    // =======================================
+
+    // Debug text for font testing (comment out if not needed)
+    // game.debugger.draw.addText(.{
+    //     .text = "ABCDEFGHIJKLMNOPQURSTUVWXYZ",
+    //     .owns_text = false,
+    //     .color = Colors.ORANGE,
+    //     .duration = std.math.inf(f32),
+    //     .position = .{ .x = -13, .y = -8.0 },
+    //     .size = 0.6,
+    //     .cat = DebugCategory.single(.custom),
+    // });
+    // game.debugger.draw.addText(.{
+    //     .text = "abcdefghijklmnopqrstuvwxyz",
+    //     .owns_text = false,
+    //     .color = Colors.ORANGE,
+    //     .duration = std.math.inf(f32),
+    //     .position = .{ .x = -13, .y = -8.5 },
+    //     .size = 0.2,
+    //     .cat = DebugCategory.single(.custom),
+    // });
 
     // Create paddle (player-controlled)
     // {
@@ -147,6 +176,12 @@ pub fn main() !void {
 
     // +++++++ GAME LOOP FOR NOW ++++++++++ //
     var last_time = std.time.milliTimestamp();
+
+    // Camera control settings
+    const camera_pan_speed: f32 = 5.0; // units per second
+    const zoom_in_factor: f32 = 0.9; // 10% closer each press
+    const zoom_out_factor: f32 = 1.1; // 10% farther each press
+
     while (!game.shouldClose()) {
         const current_time = std.time.milliTimestamp();
         const dt: f32 = @as(f32, @floatFromInt(current_time - last_time)) / 1000.0;
@@ -154,6 +189,36 @@ pub fn main() !void {
 
         game.beginFrame();
         game.clear(engine.Colors.DARK_GRAY);
+
+        // ===== CAMERA CONTROLS (Arrow keys for pan, Q/E for zoom, R for reset) =====
+        // Arrow key panning
+        if (game.isDown(KeyCode.Up)) {
+            game.translateActiveCamera(.{ .x = 0, .y = camera_pan_speed * dt });
+        }
+        if (game.isDown(KeyCode.Down)) {
+            game.translateActiveCamera(.{ .x = 0, .y = -camera_pan_speed * dt });
+        }
+        if (game.isDown(KeyCode.Left)) {
+            game.translateActiveCamera(.{ .x = -camera_pan_speed * dt, .y = 0 });
+        }
+        if (game.isDown(KeyCode.Right)) {
+            game.translateActiveCamera(.{ .x = camera_pan_speed * dt, .y = 0 });
+        }
+
+        // Q/E zoom
+        if (game.isPressed(KeyCode.Q)) {
+            game.zoomActiveCamera(zoom_in_factor); // Zoom in
+        }
+        if (game.isPressed(KeyCode.E)) {
+            game.zoomActiveCamera(zoom_out_factor); // Zoom out
+        }
+
+        // R reset camera
+        if (game.isPressed(KeyCode.R)) {
+            game.setActiveCameraPosition(.{ .x = 0, .y = 0 });
+            game.setActiveCameraOrthoSize(10.0);
+        }
+        // ===== END CAMERA CONTROLS =====
 
         game.update(dt);
 

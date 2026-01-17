@@ -1,0 +1,304 @@
+[OrbitronFont:asset font]
+  path:string "assets/fonts/"
+  filename: string "Orbitron.ttf"
+
+[CameraTestScene:scene]
+  // Background grid helper
+  [Background:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, -1.0}
+      scale:f32 1.0
+    [Box]
+      size:vec2 {200.0, 200.0}
+      fill_color:color #0a0a0a
+      filled:bool true
+    [Tag]
+      tags:string "background"
+
+  // World origin marker (center reference)
+  [OriginMarker:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 0.5
+      fill_color:color #ff00ff
+      stroke_color:color #ffffff
+      stroke_width:f32 2.0
+      visible:bool true
+    [Tag]
+      tags:string "origin"
+
+  // Player - camera will follow this
+  [Player:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 0.5}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {0.0, 0.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.5
+      fill_color:color #00ff00
+      stroke_color:color #00aa00
+      stroke_width:f32 3.0
+      visible:bool true
+    [Collider:circle]
+      radius:f32 1.5
+    [Tag]
+      tags:string "player"
+    [OnInput]
+      [trigger]
+        key:string "W"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 10.0}
+          priority:i32 0
+      [trigger]
+        key:string "S"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, -10.0}
+          priority:i32 0
+      [trigger]
+        key:string "A"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {-10.0, 0.0}
+          priority:i32 0
+      [trigger]
+        key:string "D"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {10.0, 0.0}
+          priority:i32 0
+
+  // Reference markers at known world positions
+  // North marker (+Y)
+  [NorthMarker:entity]
+    [Transform]
+      position:vec3 {0.0, 20.0, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 2.0
+      half_height:f32 1.0
+      fill_color:color #ff0000
+      stroke_color:color #ffffff
+      stroke_width:f32 1.0
+      visible:bool true
+    [Tag]
+      tags:string "marker north"
+
+  // South marker (-Y)
+  [SouthMarker:entity]
+    [Transform]
+      position:vec3 {0.0, -20.0, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 2.0
+      half_height:f32 1.0
+      fill_color:color #ff0000
+      stroke_color:color #ffffff
+      stroke_width:f32 1.0
+      visible:bool true
+    [Tag]
+      tags:string "marker south"
+
+  // East marker (+X)
+  [EastMarker:entity]
+    [Transform]
+      position:vec3 {30.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.0
+      half_height:f32 2.0
+      fill_color:color #0000ff
+      stroke_color:color #ffffff
+      stroke_width:f32 1.0
+      visible:bool true
+    [Tag]
+      tags:string "marker east"
+
+  // West marker (-X)
+  [WestMarker:entity]
+    [Transform]
+      position:vec3 {-30.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.0
+      half_height:f32 2.0
+      fill_color:color #0000ff
+      stroke_color:color #ffffff
+      stroke_width:f32 1.0
+      visible:bool true
+    [Tag]
+      tags:string "marker west"
+
+  // Corner markers to test bounds
+  [CornerNE:entity]
+    [Transform]
+      position:vec3 {30.0, 20.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #ffff00
+      stroke_color:color #ffffff
+      stroke_width:f32 1.0
+      visible:bool true
+    [Tag]
+      tags:string "corner"
+
+  [CornerNW:entity]
+    [Transform]
+      position:vec3 {-30.0, 20.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #ffff00
+      stroke_color:color #ffffff
+      stroke_width:f32 1.0
+      visible:bool true
+    [Tag]
+      tags:string "corner"
+
+  [CornerSE:entity]
+    [Transform]
+      position:vec3 {30.0, -20.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #ffff00
+      stroke_color:color #ffffff
+      stroke_width:f32 1.0
+      visible:bool true
+    [Tag]
+      tags:string "corner"
+
+  [CornerSW:entity]
+    [Transform]
+      position:vec3 {-30.0, -20.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.0
+      fill_color:color #ffff00
+      stroke_color:color #ffffff
+      stroke_width:f32 1.0
+      visible:bool true
+    [Tag]
+      tags:string "corner"
+
+  // Grid of entities to show culling
+  [GridDot1:entity]
+    [Transform]
+      position:vec3 {-15.0, 10.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 0.5
+      fill_color:color #888888
+      visible:bool true
+    [Tag]
+      tags:string "grid"
+
+  [GridDot2:entity]
+    [Transform]
+      position:vec3 {-10.0, 10.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 0.5
+      fill_color:color #888888
+      visible:bool true
+    [Tag]
+      tags:string "grid"
+
+  [GridDot3:entity]
+    [Transform]
+      position:vec3 {-5.0, 10.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 0.5
+      fill_color:color #888888
+      visible:bool true
+    [Tag]
+      tags:string "grid"
+
+  [GridDot4:entity]
+    [Transform]
+      position:vec3 {5.0, 10.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 0.5
+      fill_color:color #888888
+      visible:bool true
+    [Tag]
+      tags:string "grid"
+
+  [GridDot5:entity]
+    [Transform]
+      position:vec3 {10.0, 10.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 0.5
+      fill_color:color #888888
+      visible:bool true
+    [Tag]
+      tags:string "grid"
+
+  [GridDot6:entity]
+    [Transform]
+      position:vec3 {15.0, 10.0, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 0.5
+      fill_color:color #888888
+      visible:bool true
+    [Tag]
+      tags:string "grid"
+
+  // Title and instructions
+  [TitleText:entity]
+    [Transform]
+      position:vec2 {-13.0, 9.0}
+    [Text]
+      text:string "camera test scene"
+      font_asset:asset_ref "OrbitronFont"
+      text_color:color #ffffff
+      size:f32 0.7
+
+  [Instructions1:entity]
+    [Transform]
+      position:vec2 {-13.0, -8.5}
+    [Text]
+      text:string "arrow keys: pan camera | q/e: zoom in/out | r: reset camera"
+      font_asset:asset_ref "OrbitronFont"
+      text_color:color #888888
+      size:f32 0.35
+
+  [Instructions2:entity]
+    [Transform]
+      position:vec2 {-13.0, -9.0}
+    [Text]
+      text:string "wasd: move green player | pink=origin | red=n/s | blue=e/w | yellow=corners"
+      font_asset:asset_ref "OrbitronFont"
+      text_color:color #888888
+      size:f32 0.35
+

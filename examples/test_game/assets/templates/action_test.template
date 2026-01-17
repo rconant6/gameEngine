@@ -37,7 +37,7 @@
 
   [Sprite:circle]
     origin:vec2 {0.0, 0.0}
-    radius:f32 0.5
+    radius:f32 0.25
     fill_color:color #ff00ff
     stroke_color:color #ffffff
     stroke_width:f32 1.0
@@ -71,7 +71,7 @@
     tags:string "explosion"
 
   [Lifetime]
-    remaining:f32 0.3
+    remaining:f32 0.8
 
 [PlayerProjectile:template]
   [Transform]
@@ -80,7 +80,7 @@
     scale:f32 1.0
 
   [Velocity]
-    linear:vec2 {0.0, 10.0}
+    linear:vec2 {0.0, 1.0}
     angular:f32 0.0
 
   [Sprite:circle]
