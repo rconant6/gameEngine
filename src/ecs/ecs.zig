@@ -18,8 +18,6 @@ pub const CircleCollider = colliders.CircleCollider;
 pub const RectangleCollider = colliders.RectangleCollider;
 // MARK: Component Tags
 pub const ScreenSpace = comps.ScreenSpace;
-pub const ScreenWrap = comps.ScreenWrap;
-pub const ScreenClamp = comps.ScreenClamp;
 pub const Destroy = comps.Destroy;
 pub const ActiveCamera = comps.ActiveCamera;
 pub const MinimapCamera = comps.MinimapCamera;
@@ -36,3 +34,6 @@ pub const ActionType = action.ActionType;
 pub const ActionTarget = action.ActionTarget;
 pub const OnCollision = action.OnCollision;
 pub const OnInput = action.OnInput;
+const ct = @import("CameraTracking.zig");
+pub const CameraTracking = ct.CameraTracking;
+pub const TrackingMode = ct.TrackingMode;

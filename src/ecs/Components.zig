@@ -23,8 +23,11 @@ pub const Transform = struct {
     scale: f32 = 1,
 };
 
-// MARK: Rendering Components
+// MARK: Camera Components
 pub const Camera = @import("Camera.zig");
+const ct = @import("CameraTracking.zig");
+pub const CameraTracking = ct.CameraTracking;
+// MARK: Rendering Components
 pub const Sprite = struct {
     geometry: ?ShapeData,
     fill_color: ?Color = null,
@@ -82,8 +85,6 @@ pub const Health = struct {
 pub const Tag = @import("Tag.zig");
 
 // MARK: Tagging Comonents
-pub const ScreenWrap = struct { _dummy: u8 = 0 };
-pub const ScreenClamp = struct { _dummy: u8 = 0 };
 pub const ScreenSpace = struct { _dummy: u8 = 0 };
 pub const Destroy = struct { _dummy: u8 = 0 };
 pub const ActiveCamera = struct { _dummy: u8 = 0 };

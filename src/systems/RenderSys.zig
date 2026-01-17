@@ -1,0 +1,105 @@
+const assets = @import("asset");
+const AssetManager = assets.AssetManager;
+const core = @import("core");
+const ShapeRegistry = core.ShapeRegistry;
+const shapes = core.Shapes;
+const db = @import("debug");
+const DebugManager = db.DebugManager;
+const ecs = @import("entity");
+const Box = ecs.Box;
+const Camera = ecs.Camera;
+const Destroy = ecs.Destroy;
+const Entity = ecs.Entity;
+const Sprite = ecs.Sprite;
+const Text = ecs.Text;
+const Transform = ecs.Transform;
+const World = ecs.World;
+const rend = @import("renderer");
+const RenderContext = rend.RenderContext;
+const Renderer = rend.Renderer;
+
+pub fn renderSystem(
+    renderer: *Renderer,
+    world: *World,
+    asset_manager: *AssetManager,
+    active_camera: Entity,
+    dt: f32,
+    debugger: *DebugManager,
+) void {
+    const camera_loc = world.getComponent(active_camera, Transform) orelse return;
+    const camera = world.getComponent(active_camera, Camera) orelse return;
+    const ctx: RenderContext = .{
+        .camera_loc = camera_loc.position,
+        .delta_time = dt,
+        .frame_number = 0,
+        .ortho_size = camera.ortho_size,
+        .height = renderer.height,
+        .width = renderer.width,
+        .scale_factor = 1.0,
+        .time = 0,
+    };
+
+    var box_query = world.query(.{ Transform, Box });
+    while (box_query.next()) |entry| {
+        const transform = entry.get(0);
+        const box = entry.get(1);
+        const geo = shapes.Rectangle.initFromCenter(
+            .{ .x = 0, .y = 0 },
+            box.size.x,
+            box.size.y,
+        );
+
+        if (box.filled) {
+            renderer.drawGeometry(ShapeRegistry.createShapeUnion(shapes.Rectangle, geo), .{
+                .offset = transform.position,
+                .rotation = transform.rotation,
+                .scale = transform.scale,
+            }, box.fill_color, null, 1.0, ctx);
+        } else {
+            renderer.drawGeometry(ShapeRegistry.createShapeUnion(shapes.Rectangle, geo), .{
+                .offset = transform.position,
+                .rotation = transform.rotation,
+                .scale = transform.scale,
+            }, null, box.fill_color, 1.0, ctx);
+        }
+    }
+
+    var text_query = world.query(.{ Transform, Text });
+    while (text_query.next()) |entry| {
+        const transform = entry.get(0);
+        const text = entry.get(1);
+
+        const font = asset_manager.getFont(text.font_asset) orelse continue;
+
+        renderer.drawText(
+            font,
+            text.text,
+            transform.position,
+            text.size,
+            text.text_color,
+            ctx,
+        );
+    }
+    var query = world.query(.{ Transform, Sprite });
+    while (query.next()) |entry| {
+        const transform = entry.get(0);
+        const sprite = entry.get(1);
+        const geo = sprite.geometry orelse continue;
+
+        if (sprite.visible) {
+            renderer.drawGeometry(
+                geo,
+                .{
+                    .offset = transform.position,
+                    .rotation = transform.rotation,
+                    .scale = transform.scale,
+                },
+                sprite.fill_color,
+                sprite.stroke_color,
+                sprite.stroke_width,
+                ctx,
+            );
+        }
+    }
+    debugger.run(dt, ctx);
+}

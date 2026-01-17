@@ -164,6 +164,19 @@ pub fn build(b: *std.Build) void {
     debug_module.addImport("renderer", renderer_module);
     debug_module.addImport("asset", asset_module);
 
+    // Systems module
+    const systems_module = b.addModule("systems", .{
+        .root_source_file = b.path("src/systems/Systems.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    systems_module.addImport("core", core_module);
+    systems_module.addImport("entity", entity_module);
+    systems_module.addImport("debug", debug_module);
+    systems_module.addImport("renderer", renderer_module);
+    systems_module.addImport("asset", asset_module);
+
     // ========================================
     // Engine Module and Library
     // ========================================
@@ -186,6 +199,7 @@ pub fn build(b: *std.Build) void {
     engine_module.addImport("component_registry", component_registry_module);
     engine_module.addImport("shape_registry", shape_registry_module);
     engine_module.addImport("debug", debug_module);
+    engine_module.addImport("systems", systems_module);
 
     // Scene instantiator needs the Engine type
     scene_module.addImport("engine", engine_module);

@@ -30,48 +30,48 @@ const AssetManager = assets.AssetManager;
 pub const FontHandle = assets.FontHandle;
 pub const Font = assets.Font;
 const ecs = @import("entity");
-const World = ecs.World;
-pub const Entity = ecs.Entity;
-pub const Transform = ecs.Transform;
-pub const Velocity = ecs.Velocity;
-pub const Sprite = ecs.Sprite;
-pub const Text = ecs.Text;
-pub const RenderLayer = ecs.RenderLayer;
-pub const ColliderShape = ecs.ColliderShape;
-pub const Collider = ecs.Collider;
-pub const Lifetime = ecs.Lifetime;
-pub const ScreenWrap = ecs.ScreenWrap;
-pub const ScreenClamp = ecs.ScreenClamp;
-pub const Destroy = ecs.Destroy;
-pub const Physics = ecs.Physics;
+pub const ActiveCamera = ecs.ActiveCamera;
 pub const Box = ecs.Box;
 pub const Camera = ecs.Camera;
-pub const Tag = ecs.Tag;
-pub const OnInput = ecs.OnInput;
+pub const CameraTracking = ecs.CameraTracking;
+pub const Collider = ecs.Collider;
+pub const ColliderShape = ecs.ColliderShape;
+pub const Destroy = ecs.Destroy;
+pub const Entity = ecs.Entity;
+pub const Lifetime = ecs.Lifetime;
 pub const OnCollision = ecs.OnCollision;
-pub const ActiveCamera = ecs.ActiveCamera;
+pub const OnInput = ecs.OnInput;
+pub const Physics = ecs.Physics;
+pub const RenderLayer = ecs.RenderLayer;
+pub const Sprite = ecs.Sprite;
+pub const Tag = ecs.Tag;
+pub const Text = ecs.Text;
+pub const TrackingMode = ecs.TrackingMode;
+pub const Transform = ecs.Transform;
+pub const Velocity = ecs.Velocity;
+pub const World = ecs.World;
 const action = @import("action");
 pub const Action = action.Action;
 pub const ActionSystem = action.ActionSystem;
-pub const InputTrigger = action.InputTrigger;
 pub const CollisionTrigger = action.CollisionTrigger;
-pub const TriggerContext = action.TriggerContext;
-pub const Input = core.Input;
+pub const ErrorEntry = core.error_logger.ErrorEntry;
 pub const ErrorLogger = core.error_logger.ErrorLogger;
+pub const Input = core.Input;
+pub const InputTrigger = action.InputTrigger;
 pub const Severity = core.error_logger.Severity;
 pub const Subsystem = core.error_logger.SubSystem;
-pub const ErrorEntry = core.error_logger.ErrorEntry;
-const Systems = @import("Systems.zig");
+pub const TriggerContext = action.TriggerContext;
 const scene = @import("scene");
 pub const Instantiator = scene.Instantiator;
 pub const SceneManager = scene.SceneManager;
-pub const TemplateManager = scene.TemplateManager;
 pub const Template = scene.Template;
+pub const TemplateManager = scene.TemplateManager;
 pub const debug = @import("debug");
-pub const Debugger = debug.DebugManager;
 pub const DebugCategory = debug.DebugCategory;
+pub const Debugger = debug.DebugManager;
 const builtin = @import("builtin");
 const debug_enabled = builtin.mode == .Debug;
+const Systems = @import("systems");
 
 const PerformanceMetrics = struct {
     current_fps: f32 = 0,
@@ -126,7 +126,7 @@ pub const Engine = struct {
     performance_metrics: PerformanceMetrics = .{},
     error_logger: ErrorLogger,
 
-    active_camera_entity: ?Entity = null,
+    active_camera_entity: Entity,
 
     pub fn init(
         allocator: Allocator,
@@ -188,9 +188,10 @@ pub const Engine = struct {
             had_error = true;
             break :blk undefined;
         };
-        // Create main camera
+
+        // Create main default camera
         const camera = world.createEntity() catch |err| blk: {
-            std.log.err("[ASSETS] Unable to create main_default_camera: {any}", .{err});
+            std.log.err("[ECS] Unable to create main_default_camera: {any}", .{err});
             had_error = true;
             break :blk undefined;
         };
@@ -306,12 +307,14 @@ pub const Engine = struct {
         if (debug_enabled) {
             self.checkInternals();
         }
-        Systems.lifetimeSystem(self, dt);
-        Systems.screenWrapSystem(self);
-        Systems.screenClampSystem(self);
-        Systems.movementSystem(self, dt);
-        Systems.physicsSystem(self, dt);
-        Systems.collisionDetectionSystem(self);
+        Systems.movementSystem(&self.world, dt, &self.debugger);
+        Systems.physicsSystem(&self.world, dt);
+        Systems.collisionDetectionSystem(
+            &self.world,
+            &self.collision_events,
+            &self.debugger,
+        );
+
         const context: TriggerContext = .{
             .collision_events = self.collision_events.items,
             .input = &self.input,
@@ -321,10 +324,17 @@ pub const Engine = struct {
         self.action_system.update(&self.world, context) catch |err| {
             self.logError(.assets, "Action system failure: {any}", .{err});
         };
-        Systems.cleanupSystem(self);
-        Systems.renderSystem(self, dt);
+        Systems.lifetimeSystem(&self.world, dt);
+        Systems.renderSystem(
+            &self.renderer,
+            &self.world,
+            &self.assets,
+            self.active_camera_entity,
+            dt,
+            &self.debugger,
+        );
         if (debug_enabled) {
-            Systems.debugEntityInfoSystem(self);
+            Systems.debugEntityInfoSystem(&self.world, &self.debugger);
             var buf: [64]u8 = undefined;
             const fps: f32 = self.performance_metrics.current_fps;
             const color = if (fps > 55) Colors.GREEN else if (fps > 30 and fps < 55) Colors.YELLOW else Colors.RED;
@@ -405,42 +415,42 @@ pub const Engine = struct {
         Camera.setPosition(self.world, camera, location.x, location.y);
     }
     pub fn setActiveCameraPosition(self: *Engine, location: WorldPoint) void {
-        const camera = self.active_camera_entity orelse return;
+        const camera = self.active_camera_entity;
         Camera.setPosition(&self.world, camera, location.x, location.y);
     }
     pub fn translateCamera(self: *Engine, camera: Entity, dxy: V2) void {
         Camera.translate(&self.world, camera, dxy.x, dxy.y);
     }
     pub fn translateActiveCamera(self: *Engine, dxy: V2) void {
-        const camera = self.active_camera_entity orelse return;
+        const camera = self.active_camera_entity;
         Camera.translate(&self.world, camera, dxy.x, dxy.y);
     }
     pub fn setCameraOrthoSize(self: *Engine, camera: Entity, new_size: f32) void {
         Camera.setOrthoSize(&self.world, camera, new_size);
     }
     pub fn setActiveCameraOrthoSize(self: *Engine, new_size: f32) void {
-        const camera = self.active_camera_entity orelse return;
+        const camera = self.active_camera_entity;
         Camera.setOrthoSize(&self.world, camera, new_size);
     }
     pub fn zoomCameraInc(self: *Engine, camera: Entity, factor: f32) void {
         Camera.zoom(&self.world, camera, factor);
     }
     pub fn zoomActiveCameraInc(self: *Engine, factor: f32) void {
-        const camera = self.active_camera_entity orelse return;
+        const camera = self.active_camera_entity;
         Camera.zoom(&self.world, camera, factor);
     }
     pub fn zoomCameraSmooth(self: *Engine, camera: Entity, delta: f32) void {
         Camera.smoothZoom(&self.world, camera, delta);
     }
     pub fn zoomActiveCameraSmooth(self: *Engine, factor: f32) void {
-        const camera = self.active_camera_entity orelse return;
+        const camera = self.active_camera_entity;
         Camera.smoothZoom(&self.world, camera, factor);
     }
     pub fn getCameraViewBounds(self: *Engine, camera: Entity) Rectangle {
         return Camera.getViewBounds(&self.world, camera);
     }
     pub fn getActiveCameraViewBounds(self: *Engine) Rectangle {
-        const camera = self.active_camera_entity orelse return;
+        const camera = self.active_camera_entity;
         return Camera.getViewBounds(&self.world, camera);
     }
 
