@@ -1,9 +1,18 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const core = @import("core");
+const V2 = core.V2;
 
 pub const Keyboard = InputDevice(KeyCode);
-pub const Mouse = InputDevice(MouseButton);
+pub const Mouse = @import("Mouse.zig");
+pub const MouseButton = Mouse.MouseButton;
+pub const MouseData = Mouse.MouseData;
 
+pub const GamePad = struct {};
+
+/// InputDevice is a state management machine
+/// Tracks pressed, just_pressed, just_released for
+/// the provided InputType ie. MouseButton, KeyCode, PadButton
 pub fn InputDevice(comptime Device: type) type {
     const fields = @typeInfo(Device).@"enum".fields;
 
@@ -56,16 +65,6 @@ pub const KeyModifiers = packed struct {
     control: bool = false,
     alt: bool = false,
     caps_lock: bool = false,
-};
-
-pub const MouseButton = enum(u8) {
-    Left = 0,
-    Right = 1,
-    Middle = 2,
-    Extra1 = 3,
-    Extra2 = 4,
-
-    Unused = 5,
 };
 
 pub fn mapToGameMouseButton(button_num: u8) MouseButton {

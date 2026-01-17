@@ -1,11 +1,13 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const id = @import("input_device.zig");
+const id = @import("InputDevice.zig");
+pub const InputDevice = id.InputDevice;
 pub const Keyboard = id.Keyboard;
 pub const KeyCode = id.KeyCode;
 pub const KeyModifiers = id.KeyModifiers;
 pub const Mouse = id.Mouse;
 pub const MouseButton = id.MouseButton;
+pub const MouseData = id.MouseData;
 pub const Window = PlatformImpl.Window;
 // Internal use only - used by platform implementations
 pub const mapToGameKeyCode = id.mapToGameKeyCode;

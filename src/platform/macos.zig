@@ -8,16 +8,21 @@ const plat = @import("platform.zig");
 const Capabilities = plat.Capabilities;
 const DisplayInfo = plat.DisplayInfo;
 const Event = plat.Event;
+const InputDevice = plat.InputDevice;
 const Key = plat.Key;
 const KeyModifiers = plat.KeyModifiers;
-const MouseButton = plat.MouseButton;
-const PlatformImpl = plat.PlatformImpl;
-const WindowConfig = plat.WindowConfig;
 const Keyboard = plat.Keyboard;
 const Mouse = plat.Mouse;
+const MouseButton = plat.MouseButton;
+const MouseData = plat.MouseData;
+const PlatformImpl = plat.PlatformImpl;
+const WindowConfig = plat.WindowConfig;
+const V2 = @import("core").V2;
 
 var keyboard_state: Keyboard = .{};
-var mouse_state: Mouse = .{};
+var mouse_state: Mouse = .{
+    .buttons = InputDevice(MouseButton){},
+};
 
 pub const Window = struct {
     handle: c.WindowHandle,
@@ -88,14 +93,21 @@ pub fn pollEvent() ?Event {
     var y: f16 = undefined;
     var button: u8 = undefined;
     is_down = undefined;
+    var scroll_x: f16 = undefined;
+    var scroll_y: f16 = undefined;
 
-    while (poll_mouse_event(&button, &is_down, &x, &y)) {
+    while (poll_mouse_event(&button, &is_down, &x, &y, &scroll_x, &scroll_y)) {
         const b = plat.mapToGameMouseButton(button);
 
         if (b == .Unused) {
             continue;
         }
-        mouse_state.updateState(b, is_down != 0);
+        mouse_state.update(MouseData{
+            .loc = .{ .x = x, .y = y },
+            .scroll_data = .{ .x = scroll_x, .y = scroll_y },
+            .button = b,
+            .is_down = if (is_down == 0) false else true,
+        });
     }
 
     return null;
@@ -136,7 +148,7 @@ pub fn getMouse() *const Mouse {
 
 pub fn clearInputFrameStates() void {
     keyboard_state.clearFrameStates();
-    mouse_state.clearFrameStates();
+    mouse_state.clearState();
 }
 
 extern fn set_pixel_buffer(
@@ -149,4 +161,4 @@ extern fn set_pixel_buffer(
 
 extern fn swap_buffers(window: c.WindowHandle, offset: usize) void;
 extern fn poll_key_event(keycode: *u16, is_down: *u8) bool;
-extern fn poll_mouse_event(button: *u8, isDown: *u8, x: *f16, y: *f16) bool;
+extern fn poll_mouse_event(button: *u8, isDown: *u8, x: *f16, y: *f16, scroll_x: *f16, scroll_y: *f16) bool;

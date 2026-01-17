@@ -78,6 +78,7 @@ pub fn build(b: *std.Build) void {
     });
     platform_module.addIncludePath(b.path("src/platform/macos/swift/include"));
     platform_module.addImport("build_options", build_options_module);
+    platform_module.addImport("core", core_module);
 
     // Configure platform-specific linking on the platform module
     configurePlatformModule(b, platform_module, target, optimize, selected_renderer);

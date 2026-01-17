@@ -33,7 +33,7 @@ pub inline fn isDown(self: *const Self, input: anytype) bool {
     validateSupportedType(T);
 
     if (T == KeyCode) return self.keyboard.isDown(input);
-    if (T == MouseButton) return self.mouse.isDown(input);
+    if (T == MouseButton) return self.mouse.buttons.isDown(input);
     unreachable;
 }
 pub inline fn isPressed(self: *const Self, input: anytype) bool {
@@ -41,7 +41,7 @@ pub inline fn isPressed(self: *const Self, input: anytype) bool {
     validateSupportedType(T);
 
     if (T == KeyCode) return self.keyboard.isPressed(input);
-    if (T == MouseButton) return self.mouse.isPressed(input);
+    if (T == MouseButton) return self.mouse.buttons.isPressed(input);
     unreachable;
 }
 pub inline fn isReleased(self: *const Self, input: anytype) bool {
@@ -49,7 +49,7 @@ pub inline fn isReleased(self: *const Self, input: anytype) bool {
     validateSupportedType(T);
 
     if (T == KeyCode) return self.keyboard.isReleased(input);
-    if (T == MouseButton) return self.mouse.isReleased(input);
+    if (T == MouseButton) return self.mouse.buttons.isReleased(input);
     unreachable;
 }
 

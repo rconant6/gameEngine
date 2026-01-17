@@ -18,6 +18,8 @@ public struct RawKeyEvent {
 public struct RawMouseEvent {
   var x: Float
   var y: Float
+  var scroll_x: Float
+  var scroll_y: Float
   var button: UInt8
   var isDown: UInt8
   var _padding: UInt16 = 0
@@ -25,14 +27,19 @@ public struct RawMouseEvent {
   public init(
     x: Float,
     y: Float,
+    scroll_x: Float,
+    scroll_y: Float,
     button: UInt8,
     isDown: UInt8,
-    _padding: UInt16 = 0,
+    padding: UInt16,
   ) {
     self.x = x
     self.y = y
+    self.scroll_x = scroll_x
+    self.scroll_y = scroll_y
     self.button = button
     self.isDown = isDown
+    self._padding = 0
   }
 }
 
@@ -46,7 +53,8 @@ class EventHandler {
       handleKeyEvent(event)
     case .leftMouseDown, .leftMouseUp,
       .rightMouseDown, .rightMouseUp,
-      .otherMouseDown, .otherMouseUp:
+      .otherMouseDown, .otherMouseUp,
+      .scrollWheel:
       handleMouseEvent(event)
     default: break  // stuff not needed/supported (yet)
     }
@@ -65,10 +73,13 @@ class EventHandler {
       (event.type == .leftMouseDown || event.type == .rightMouseDown
         || event.type == .otherMouseDown) ? 1 : 0
     let loc = event.locationInWindow
-    let x = loc.x
-    let y = loc.y
+    let (scroll_x, scroll_y) =
+      (event.type == .scrollWheel) ? (event.scrollingDeltaX, event.scrollingDeltaY) : (0, 0)
     let rawEvent = RawMouseEvent(
-      x: Float(x), y: Float(y), button: UInt8(mouseButton), isDown: isDown, _padding: 0)
+      x: Float(loc.x), y: Float(loc.y),
+      scroll_x: Float(scroll_x),
+      scroll_y: Float(scroll_y),
+      button: UInt8(mouseButton), isDown: isDown, padding: 0)
 
     self.mouseEventQueue.append(rawEvent)
   }

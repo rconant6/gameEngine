@@ -13,6 +13,8 @@ struct RawKeyEvent {
 struct RawMouseEvent {
   float x;
   float y;
+  float scroll_x;
+  float scroll_y;
   uint8_t button;
   uint8_t isDown;
   uint16_t _padding;
@@ -31,6 +33,7 @@ void set_pixel_buffer(WindowHandle window, void *pixels, uint32_t width,
 
 void poll_events();
 bool poll_key_event(uint16_t *keycode, uint8_t *isDown);
-bool poll_mouse_event(float *x, float *y, uint8_t *button, uint8_t *isDown);
+bool poll_mouse_event(float *x, float *y, uint8_t *button, uint8_t *isDown,
+                      float *scroll_x, float *scroll_y);
 
 #endif
