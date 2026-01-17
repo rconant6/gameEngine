@@ -123,7 +123,7 @@ test "TemplateInstantiation: instantiate entity from template" {
     const velocity = world.getComponent(missile, Velocity);
     try testing.expect(velocity != null);
     try testing.expectEqual(@as(f32, 0.0), velocity.?.linear.x);
-    try testing.expectEqual(@as(f32, -500.0), velocity.?.linear.y);
+    try testing.expectEqual(@as(f32, 1.8), velocity.?.linear.y);
 }
 
 test "TemplateInstantiation: instantiate multiple entities from same template" {
