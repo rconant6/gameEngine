@@ -80,7 +80,10 @@ public func poll_events() {
     matching: .any, until: nil, inMode: .default, dequeue: true
   ) {
     globalEventHandler.handleEvent(event)
-    NSApp.sendEvent(event)
+
+    if event.type != .keyDown && event.type != .keyUp {
+      NSApp.sendEvent(event)
+    }
   }
 }
 

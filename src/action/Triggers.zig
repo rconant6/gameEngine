@@ -123,8 +123,8 @@ pub const InputTrigger = struct {
 
             for (on_input.triggers) |trigger| {
                 const should_fire = switch (trigger.input) {
-                    .key => |keycode| input.wasJustPressed(keycode),
-                    .mouse => |button| input.wasJustPressed(button),
+                    .key => |keycode| input.isPressed(keycode),
+                    .mouse => |button| input.isPressed(button),
                 };
 
                 if (should_fire) {

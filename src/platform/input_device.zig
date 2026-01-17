@@ -22,13 +22,13 @@ pub fn InputDevice(comptime Device: type) type {
         just_pressed: [count]bool = @splat(false),
         just_released: [count]bool = @splat(false),
 
-        pub fn isPressed(self: *const Self, dev: Device) bool {
+        pub fn isDown(self: *const Self, dev: Device) bool {
             return self.pressed[@intFromEnum(dev)];
         }
-        pub fn wasJustPressed(self: *const Self, dev: Device) bool {
+        pub fn isPressed(self: *const Self, dev: Device) bool {
             return self.just_pressed[@intFromEnum(dev)];
         }
-        pub fn wasJustReleased(self: *const Self, dev: Device) bool {
+        pub fn isReleased(self: *const Self, dev: Device) bool {
             return self.just_released[@intFromEnum(dev)];
         }
 

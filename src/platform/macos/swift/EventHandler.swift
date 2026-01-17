@@ -11,7 +11,7 @@ public struct RawKeyEvent {
     isDown: Bool,
   ) {
     self.keycode = keycode
-    self.isDown = isDown ? 0 : 1
+    self.isDown = isDown ? 1 : 0
   }
 }
 @frozen

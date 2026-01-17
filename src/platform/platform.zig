@@ -159,12 +159,6 @@ pub fn getNativeWindowHandle(window: *Window) *anyopaque {
     return PlatformImpl.getNativeWindowHandle(window);
 }
 
-// pub const NativeHandles = PlatformImpl.NativeHandles;
-
-// pub fn getNativeHandles(window: *Window) NativeHandles {
-//     return PlatformImpl.getNativeHandles(window);
-// }
-
 pub fn getDisplays(allocator: std.mem.Allocator) ![]DisplayInfo {
     return PlatformImpl.getDisplays(allocator);
 }
