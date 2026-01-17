@@ -50,4 +50,7 @@ pub fn cross(self: V2, other: V2) f32 {
     return self.x * other.y - self.y * other.x;
 }
 
+pub fn format(self: *const V2, w: *std.Io.Writer) !void {
+    try w.print("x:{d:2}, y:{d:2}", .{ self.x, self.y });
+}
 pub const ZERO = V2{ .x = 0, .y = 0 };

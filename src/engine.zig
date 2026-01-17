@@ -10,6 +10,7 @@ const core = @import("core");
 pub const V2 = core.V2;
 pub const V2I = core.V2I;
 pub const V2U = core.V2U;
+pub const WorldPoint = V2;
 pub const ColliderRegistry = core.ColliderRegistry;
 pub const ShapeRegisty = core.ShapeRegistry;
 pub const ComponentRegistry = core.ComponentRegistry;
@@ -196,8 +197,7 @@ pub const Engine = struct {
         try world.addComponent(camera, ActiveCamera, ActiveCamera{});
         try world.addComponent(camera, Transform, Transform{});
         try world.addComponent(camera, Camera, Camera{
-            .position = .{ .x = 0, .y = 0 },
-            .ortho_size = 15.0,
+            .ortho_size = 25.0,
             .viewport = .{
                 .center = V2.ZERO,
                 .half_width = @floatFromInt(scaled_width / 2),
@@ -278,32 +278,34 @@ pub const Engine = struct {
     }
 
     pub fn checkInternals(self: *Engine) void {
-        if (self.input.isPressed(KeyCode.Esc)) {
+        if (self.input.isDown(KeyCode.Esc)) {
             self.running = false;
         }
-        if (self.input.wasJustPressed(KeyCode.F1)) {
+        if (self.input.isPressed(KeyCode.F1)) {
             self.debugger.draw.toggleCategory(.collision);
         }
-        if (self.input.wasJustPressed(KeyCode.F2)) {
+        if (self.input.isPressed(KeyCode.F2)) {
             self.debugger.draw.toggleCategory(.velocity);
         }
-        if (self.input.wasJustPressed(KeyCode.F3)) {
+        if (self.input.isPressed(KeyCode.F3)) {
             self.debugger.draw.toggleCategory(.entity_info);
         }
-        if (self.input.wasJustPressed(KeyCode.F4)) {
+        if (self.input.isPressed(KeyCode.F4)) {
             self.debugger.draw.toggleCategory(.grid);
         }
-        if (self.input.wasJustPressed(KeyCode.F5)) {
+        if (self.input.isPressed(KeyCode.F5)) {
             self.debugger.draw.toggleCategory(.fps);
         }
-        if (self.input.wasJustPressed(KeyCode.F6)) {
+        if (self.input.isPressed(KeyCode.F6)) {
             self.debugger.draw.toggleCategory(.custom);
         }
     }
 
     pub fn update(self: *Engine, dt: f32) void {
         self.performance_metrics.update(dt);
-        self.checkInternals();
+        if (debug_enabled) {
+            self.checkInternals();
+        }
         Systems.lifetimeSystem(self, dt);
         Systems.screenWrapSystem(self);
         Systems.screenClampSystem(self);
@@ -337,7 +339,6 @@ pub const Engine = struct {
                 .owns_text = true,
             });
         }
-        // self.debugger.run(dt);
     }
 
     pub fn beginFrame(self: *Engine) void {
@@ -363,7 +364,7 @@ pub const Engine = struct {
         self.renderer.clear();
     }
 
-    // Creating shapes
+    // Creating shapes by hand
     pub fn create(self: *Engine, comptime Data: type, args: anytype) Data {
         return @call(.auto, Data.init, .{self.allocator} ++ args) catch |err| {
             std.debug.panic(
@@ -373,7 +374,7 @@ pub const Engine = struct {
         };
     }
 
-    // Camera helpers
+    // MARK: Camera
     pub fn createCamera(
         self: *Engine,
     ) !Entity {
@@ -381,7 +382,6 @@ pub const Engine = struct {
         try self.world.addComponent(camera, ActiveCamera, ActiveCamera{});
         try self.world.addComponent(camera, Transform, Transform{});
         try self.world.addComponent(camera, Camera, Camera{
-            .position = .{ .x = 0, .y = 0 },
             .orthoSize = 10.0,
             .viewport = .{
                 .center = V2.ZERO,
@@ -399,7 +399,59 @@ pub const Engine = struct {
         return self.active_camera_entity;
     }
     pub fn getActiveCameraTransform(self: *const Engine) ?*const Transform {
-        return self.world.getComponent(self.active_camera_entity, Transform);
+        return self.world.getComponent(self.active_camera_entity.?, Transform);
+    }
+    pub fn setCameraPosition(self: *Engine, camera: Entity, location: WorldPoint) void {
+        Camera.setPosition(self.world, camera, location.x, location.y);
+    }
+    pub fn setActiveCameraPosition(self: *Engine, location: WorldPoint) void {
+        const camera = self.active_camera_entity orelse return;
+        Camera.setPosition(&self.world, camera, location.x, location.y);
+    }
+    pub fn translateCamera(self: *Engine, camera: Entity, dxy: V2) void {
+        Camera.translate(&self.world, camera, dxy.x, dxy.y);
+    }
+    pub fn translateActiveCamera(self: *Engine, dxy: V2) void {
+        const camera = self.active_camera_entity orelse return;
+        Camera.translate(&self.world, camera, dxy.x, dxy.y);
+    }
+    pub fn setCameraOrthoSize(self: *Engine, camera: Entity, new_size: f32) void {
+        Camera.setOrthoSize(&self.world, camera, new_size);
+    }
+    pub fn setActiveCameraOrthoSize(self: *Engine, new_size: f32) void {
+        const camera = self.active_camera_entity orelse return;
+        Camera.setOrthoSize(&self.world, camera, new_size);
+    }
+    pub fn zoomCamera(self: *Engine, camera: Entity, factor: f32) void {
+        Camera.zoom(&self.world, camera, factor);
+    }
+    pub fn zoomActiveCamera(self: *Engine, factor: f32) void {
+        const camera = self.active_camera_entity orelse return;
+        Camera.zoom(&self.world, camera, factor);
+    }
+    pub fn getCameraViewBounds(self: *Engine, camera: Entity) Rectangle {
+        return Camera.getViewBounds(&self.world, camera);
+    }
+    pub fn getActiveCameraViewBounds(self: *Engine) Rectangle {
+        const camera = self.active_camera_entity orelse return;
+        return Camera.getViewBounds(&self.world, camera);
+    }
+
+    // MARK: Input
+    pub fn isDown(self: *const Engine, input: anytype) bool {
+        return self.input.isDown(input);
+    }
+    pub fn isPressed(self: *const Engine, input: anytype) bool {
+        return self.input.isPressed(input);
+    }
+    pub fn isReleased(self: *const Engine, input: anytype) bool {
+        return self.input.isReleased(input);
+    }
+    pub fn getAxis(self: *const Engine, negative: anytype, positive: anytype) f32 {
+        return self.input.getAxis2d(negative, positive);
+    }
+    pub fn getAxis2d(self: *const Engine, left: anytype, right: anytype, up: anytype, down: anytype) V2 {
+        return self.input.getAxis2d(left, right, up, down);
     }
 
     // Drawing shapes

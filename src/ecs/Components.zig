@@ -84,6 +84,7 @@ pub const Tag = @import("Tag.zig");
 // MARK: Tagging Comonents
 pub const ScreenWrap = struct { _dummy: u8 = 0 };
 pub const ScreenClamp = struct { _dummy: u8 = 0 };
+pub const ScreenSpace = struct { _dummy: u8 = 0 };
 pub const Destroy = struct { _dummy: u8 = 0 };
 pub const ActiveCamera = struct { _dummy: u8 = 0 };
 pub const MinimapCamera = struct { _dummy: u8 = 0 };

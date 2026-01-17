@@ -17,6 +17,7 @@ pub const colliders = @import("collider.zig");
 pub const CircleCollider = colliders.CircleCollider;
 pub const RectangleCollider = colliders.RectangleCollider;
 // MARK: Component Tags
+pub const ScreenSpace = comps.ScreenSpace;
 pub const ScreenWrap = comps.ScreenWrap;
 pub const ScreenClamp = comps.ScreenClamp;
 pub const Destroy = comps.Destroy;

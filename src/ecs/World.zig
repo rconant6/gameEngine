@@ -81,7 +81,7 @@ pub fn hasComponent(self: *Self, entity: Entity, comptime T: type) bool {
     const storage = self.getStorage(T);
     return storage.has(entity.id);
 }
-pub fn getComponent(self: *Self, entity: Entity, comptime T: type) ?*const T {
+pub fn getComponent(self: *const Self, entity: Entity, comptime T: type) ?*const T {
     const name = @typeName(T);
     if (!self.component_storages.contains(name)) return null;
 
