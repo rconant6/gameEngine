@@ -10,6 +10,8 @@ const core = @import("math");
 const V2 = core.V2;
 const scene = @import("scene");
 const TemplateManager = scene.TemplateManager;
+const comps = @import("Components.zig");
+const Tag = comps.Tag;
 
 allocator: std.mem.Allocator,
 next_entity_id: usize,
@@ -94,6 +96,41 @@ pub fn getComponentMut(self: *Self, entity: Entity, comptime T: type) ?*T {
 
     const storage = self.getStorage(T);
     return storage.getMut(entity.id);
+}
+
+pub fn findEntityByTag(self: *Self, tag: []const u8) ?Entity {
+    var q = self.query(.{Tag});
+    while (q.next()) |entry| {
+        const tags = entry.get(0);
+        if (tags.hasTag(tag)) return entry.entity;
+    }
+    return null;
+}
+pub fn findEntitiesByTag(self: *Self, tag: []const u8) []Entity {
+    var entities: ArrayList(Entity) = .empty;
+    errdefer entities.deinit(self.allocator);
+    var q = self.query(.{Tag});
+    while (q.next()) |entry| {
+        const tags = entry.get(0);
+        if (tags.hasTag(tag))
+            entities.append(self.allocator, entry.entity) catch {
+                // TODO: logging
+            };
+    }
+    return entities.toOwnedSlice(self.allocator) catch &[_]Entity{};
+}
+pub fn findEntitiesByPattern(self: *Self, pattern: []const u8) []Entity {
+    var entities: ArrayList(Entity) = .empty;
+    errdefer entities.deinit(self.allocator);
+    var q = self.query(.{Tag});
+    while (q.next()) |entry| {
+        const tags = entry.get(0);
+        if (tags.matchesPattern(pattern))
+            entities.append(self.allocator, entry.entity) catch {
+                // TODO: logging
+            };
+    }
+    return entities.toOwnedSlice(self.allocator) catch &[_]Entity{};
 }
 
 pub fn query(self: *Self, comptime component_types: anytype) Query(buildStorageTupleType(component_types)) {

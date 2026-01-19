@@ -21,19 +21,19 @@ pub const TrackingMode = packed struct {
 };
 
 pub const CameraTracking = struct {
-    target: ?Entity,
-    target_offset: V2,
+    target: ?Entity = null,
+    target_offset: V2 = .ZERO,
 
-    mode: TrackingMode,
+    mode: TrackingMode = .{},
 
-    follow_stiffness: V2,
-    follow_damping: V2,
+    follow_stiffness: V2 = .ZERO,
+    follow_damping: V2 = .ZERO,
 
-    lead_distance: V2,
-    lead_smoothing: f32,
-    lead_speed_threshold: f32,
+    lead_distance: V2 = .ZERO,
+    lead_smoothing: f32 = 0,
+    lead_speed_threshold: f32 = 0,
 
-    current_lead_offset: V2,
-    velocity_tracker: V2,
-    last_taget_position: V2,
+    current_lead_offset: V2 = .ZERO,
+    velocity_tracker: V2 = .ZERO,
+    last_target_position: V2 = .ZERO,
 };

@@ -6,8 +6,6 @@ const Transform = ecs.Transform;
 const World = ecs.World;
 const CircleCollider = ecs.CircleCollider;
 const RectangleCollider = ecs.RectangleCollider;
-
-// Re-export Collision for test convenience
 pub const Collision = ecs.Collision;
 const db = @import("debug");
 const DebugCategory = db.DebugCategory;

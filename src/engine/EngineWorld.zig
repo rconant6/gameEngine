@@ -19,7 +19,7 @@ pub const TrackingMode = ecs.TrackingMode;
 pub const Transform = ecs.Transform;
 pub const Velocity = ecs.Velocity;
 pub const World = ecs.World;
-const Engine = @import("../engine.zig");
+const Engine = @import("../engine.zig").Engine;
 
 pub fn createEntity(self: *Engine) Entity {
     return self.world.createEntity() catch |err| {
@@ -44,4 +44,14 @@ pub fn addComponent(
             .{ entity.id, err },
         );
     };
+}
+
+pub fn findEntityByTag(self: *Engine, tag: []const u8) ?Entity {
+    return self.world.findEntityByTag(tag);
+}
+pub fn findEntitiesByTag(self: *Engine, tag: []const u8) ?Entity {
+    return self.world.findEntitiesByTag(tag);
+}
+pub fn findEntitiesByPattern(self: *Engine, pattern: []const u8) ?Entity {
+    return self.world.findEntityByPattern(pattern);
 }

@@ -3,6 +3,7 @@ const Engine = @import("../engine.zig").Engine;
 const ecs = @import("ecs");
 const Entity = ecs.Entity;
 const Camera = ecs.Camera;
+const CameraTracking = ecs.CameraTracking;
 const Transform = ecs.Transform;
 const ActiveCamera = ecs.ActiveCamera;
 const core = @import("math");
@@ -88,6 +89,24 @@ pub fn getCameraViewBounds(self: *Engine, camera: Entity) Rectangle {
 }
 
 pub fn getActiveCameraViewBounds(self: *Engine) Rectangle {
-    const camera = self.active_camera_entity;
-    return Camera.getViewBounds(&self.world, camera);
+    return Camera.getViewBounds(&self.world, self.active_camera_entity);
+}
+
+pub fn setActiveCameraTrackingTarget(self: *Engine, target: Entity) void {
+    Camera.setTrackingTarget(&self.world, self.active_camera_entity, target);
+}
+
+pub fn enableActiveCameraTracking(self: *Engine) void {
+    Camera.enableCameraTracking(&self.world, self.active_camera_entity);
+}
+pub fn disableActiveCameraTracking(self: *Engine) void {
+    Camera.disableCameraTracking(&self.world, self.active_camera_entity);
+}
+
+pub fn setActiveCameraFollowStiffness(self: *Engine, x: f32, y: f32) void {
+    Camera.setCameraFollowStiffness(&self.world, self.active_camera_entity, x, y);
+}
+
+pub fn setActiveCameraFollowDamping(self: *Engine, x: f32, y: f32) void {
+    Camera.setCameraFollowDamping(&self.world, self.active_camera_entity, x, y);
 }

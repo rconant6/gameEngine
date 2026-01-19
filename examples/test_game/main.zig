@@ -24,14 +24,14 @@ pub fn main() !void {
 
     // leave to make sure it's ok if there are collisions or reimports
     // TODO: these all need to handle errors better or catch at engine level or be fatal
-    // try game.loadScene("master", "master");
-    // try game.setActiveScene("master");
+    try game.loadScene("master", "master");
+    try game.setActiveScene("master");
 
-    // try game.loadScene("collision", "collision_test");
-    // try game.setActiveScene("collision");
+    try game.loadScene("collision", "collision_test");
+    try game.setActiveScene("collision");
 
-    // try game.loadScene("action", "action_test.scene");
-    // try game.setActiveScene("action");
+    try game.loadScene("action", "action_test.scene");
+    try game.setActiveScene("action");
 
     // Camera test scene - simple scene to test camera controls
     try game.loadScene("camera", "camera_test.scene");
@@ -51,16 +51,18 @@ pub fn main() !void {
     );
 
     // ===== CAMERA TRACKING SETUP =====
-    // TODO: Implement findEntityByTag, setActiveCameraTrackingTarget, enableActiveCameraTracking
     // Find the player entity and set camera to track it
-    // const player_entity = game.findEntityByTag("player");
-    // if (player_entity) |player| {
-    //     game.setActiveCameraTrackingTarget(player);
-    //     game.enableActiveCameraTracking();
-    //
-    //     // Start with smooth follow mode (tight tracking)
-    //     game.setActiveCameraFollowStiffness(0.25, 0.25);
-    // }
+    const player_entity = game.findEntityByTag("player");
+    if (player_entity) |player| {
+        game.enableActiveCameraTracking();
+        game.setActiveCameraTrackingTarget(player);
+
+        // Spring-damper settings for smooth, natural camera follow
+        // Higher stiffness = stronger pull toward target
+        // Higher damping = less overshoot/bounce
+        game.setActiveCameraFollowStiffness(20.0, 20.0);
+        game.setActiveCameraFollowDamping(10.0, 10.0);
+    }
     // ===== END CAMERA TRACKING SETUP =====
 
     // ===== CAMERA TEST SCENE NOTES =====
@@ -73,18 +75,21 @@ pub fn main() !void {
     // - Gray dots - grid pattern to show culling when camera moves
     //
     // CONTROLS:
-    //   Arrow Keys: Pan camera (smooth movement)
+    //   WASD: Move green player - camera follows with spring-damper smoothing
+    //   T: Toggle camera tracking on/off
+    //   Arrow Keys: Pan camera manually (only when tracking disabled)
     //   Q/E: Zoom in/out
     //   R: Reset camera to origin
-    //   WASD: Move green player (separate from camera)
+    //   [: Loose camera follow (laggy, floaty)
+    //   ]: Tight camera follow (responsive, snappy)
     //
     // WHAT TO TEST:
-    //   1. Arrow keys pan camera - world appears to move opposite direction
-    //   2. Q zooms in - see less world, entities appear larger
-    //   3. E zooms out - see more world, entities appear smaller
-    //   4. R resets camera - return to default view
-    //   5. WASD moves player - player moves independently of camera
-    //   6. Pan camera far from origin - markers should move/disappear correctly
+    //   1. WASD moves player - camera smoothly follows with spring physics
+    //   2. T toggles tracking - switch between manual and automatic camera
+    //   3. [ and ] adjust follow feel - test different tracking personalities
+    //   4. Arrow keys pan when tracking off - manual camera control
+    //   5. Q/E zoom - see more or less of the world
+    //   6. R resets camera - return to default view
     // =======================================
 
     // Debug text for font testing (comment out if not needed)
@@ -196,8 +201,7 @@ pub fn main() !void {
     const zoom_out_factor: f32 = 1.1; // 10% farther each press
 
     // Camera tracking tuning
-    _ = true; // TODO: camera_tracking_enabled will be used when camera tracking is implemented
-
+    var camera_tracking_enabled = true;
     while (!game.shouldClose()) {
         const current_time = std.time.milliTimestamp();
         const dt: f32 = @as(f32, @floatFromInt(current_time - last_time)) / 1000.0;
@@ -207,30 +211,30 @@ pub fn main() !void {
         game.clear(engine.Colors.DARK_GRAY);
 
         // ===== CAMERA TRACKING TOGGLE (T key) =====
-        // TODO: Implement camera tracking enable/disable functions
-        // if (game.isPressed(KeyCode.T)) {
-        //     camera_tracking_enabled = !camera_tracking_enabled;
-        //     if (camera_tracking_enabled) {
-        //         game.enableActiveCameraTracking();
-        //     } else {
-        //         game.disableActiveCameraTracking();
-        //     }
-        // }
+        if (game.isPressed(KeyCode.T)) {
+            camera_tracking_enabled = !camera_tracking_enabled;
+            if (camera_tracking_enabled) {
+                game.enableActiveCameraTracking();
+            } else {
+                game.disableActiveCameraTracking();
+            }
+        }
 
-        // ===== CAMERA STIFFNESS TUNING ([ and ] keys) =====
-        // TODO: Implement setActiveCameraFollowStiffness
-        // if (game.isPressed(KeyCode.LeftBracket)) {
-        //     // Decrease stiffness (more loose/laggy)
-        //     game.setActiveCameraFollowStiffness(0.1, 0.1);
-        // }
-        // if (game.isPressed(KeyCode.RightBracket)) {
-        //     // Increase stiffness (more tight/responsive)
-        //     game.setActiveCameraFollowStiffness(0.5, 0.5);
-        // }
+        // ===== CAMERA SPRING-DAMPER TUNING ([ and ] keys) =====
+        if (game.isPressed(KeyCode.LeftBracket)) {
+            // Loose follow - low stiffness, low damping (very laggy)
+            game.setActiveCameraFollowStiffness(3.0, 3.0);
+            game.setActiveCameraFollowDamping(1.5, 1.5);
+        }
+        if (game.isPressed(KeyCode.RightBracket)) {
+            // Tight follow - high stiffness, high damping (responsive, no overshoot)
+            game.setActiveCameraFollowStiffness(20.0, 20.0);
+            game.setActiveCameraFollowDamping(10.0, 10.0);
+        }
 
         // ===== CAMERA CONTROLS (Arrow keys for pan, Q/E for zoom, R for reset) =====
         // Only allow manual panning when tracking is disabled
-        if (true) { // TODO: Replace with !camera_tracking_enabled when implemented
+        if (!camera_tracking_enabled) {
             // Arrow key panning
             if (game.isDown(KeyCode.Up)) {
                 game.translateActiveCamera(
@@ -267,7 +271,7 @@ pub fn main() !void {
         // R reset camera
         if (game.isPressed(KeyCode.R)) {
             game.setActiveCameraPosition(.{ .x = 0, .y = 0 });
-            game.setActiveCameraOrthoSize(10.0);
+            game.setActiveCameraOrthoSize(20.0);
         }
         // ===== END CAMERA CONTROLS =====
 

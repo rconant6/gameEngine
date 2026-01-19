@@ -3,6 +3,7 @@ const core = @import("math");
 const WorldPoint = core.WorldPoint;
 const comps = @import("Components.zig");
 const Transform = comps.Transform;
+const CameraTracking = comps.CameraTracking;
 const rend = @import("renderer");
 const Color = rend.Color;
 const Colors = rend.Colors;
@@ -72,4 +73,33 @@ pub fn getViewBounds(world: *World, entity: Entity) Rect {
         .half_height = cam.ortho_size,
         .half_width = cam.ortho_size * aspect,
     };
+}
+
+pub fn enableCameraTracking(world: *World, camera: Entity) void {
+    if (!world.hasComponent(camera, CameraTracking)) {
+        world.addComponent(camera, CameraTracking, .{}) catch {
+            //TODO: proper logging/handling
+        };
+    }
+    const camera_tracking = world.getComponentMut(camera, CameraTracking).?;
+    camera_tracking.mode.enabled = true;
+}
+pub fn disableCameraTracking(world: *World, camera: Entity) void {
+    const camera_tracking = world.getComponentMut(camera, CameraTracking) orelse return;
+    camera_tracking.mode.enabled = false;
+}
+
+pub fn setCameraFollowStiffness(world: *World, camera: Entity, x: f32, y: f32) void {
+    var camera_tracking = world.getComponentMut(camera, CameraTracking) orelse return; // TODO: Log error
+    camera_tracking.follow_stiffness.x = x;
+    camera_tracking.follow_stiffness.y = y;
+}
+pub fn setCameraFollowDamping(world: *World, camera: Entity, x: f32, y: f32) void {
+    var camera_tracking = world.getComponentMut(camera, CameraTracking) orelse return; // TODO: Log error
+    camera_tracking.follow_damping.x = x;
+    camera_tracking.follow_damping.y = y;
+}
+pub fn setTrackingTarget(world: *World, camera: Entity, target: Entity) void {
+    var camera_tracking = world.getComponentMut(camera, CameraTracking) orelse return; // TODO: Log error
+    camera_tracking.target = target;
 }

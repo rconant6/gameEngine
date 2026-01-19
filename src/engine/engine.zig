@@ -285,6 +285,7 @@ pub const Engine = struct {
         Systems.actionSystem(&self.world, &self.action_system, context) catch |err| {
             self.logError(.assets, "Action system failure: {any}", .{err});
         };
+        Systems.cameraTrackingSystem(&self.world, dt);
         Systems.lifetimeSystem(&self.world, dt);
         Systems.renderSystem(
             &self.renderer,
@@ -362,6 +363,11 @@ pub const Engine = struct {
     pub const zoomActiveCameraSmooth = @import("EngineCamera.zig").zoomActiveCameraSmooth;
     pub const getCameraViewBounds = @import("EngineCamera.zig").getCameraViewBounds;
     pub const getActiveCameraViewBounds = @import("EngineCamera.zig").getActiveCameraViewBounds;
+    pub const setActiveCameraTrackingTarget = @import("EngineCamera.zig").setActiveCameraTrackingTarget;
+    pub const enableActiveCameraTracking = @import("EngineCamera.zig").enableActiveCameraTracking;
+    pub const disableActiveCameraTracking = @import("EngineCamera.zig").disableActiveCameraTracking;
+    pub const setActiveCameraFollowStiffness = @import("EngineCamera.zig").setActiveCameraFollowStiffness;
+    pub const setActiveCameraFollowDamping = @import("EngineCamera.zig").setActiveCameraFollowDamping;
 
     // MARK: Input methods
     pub const isDown = @import("EngineInput.zig").isDown;
@@ -395,6 +401,9 @@ pub const Engine = struct {
     pub const createEntity = @import("EngineWorld.zig").createEntity;
     pub const destroyEntity = @import("EngineWorld.zig").destroyEntity;
     pub const addComponent = @import("EngineWorld.zig").addComponent;
+    pub const findEntityByTag = @import("EngineWorld.zig").findEntityByTag;
+    pub const findEntitiesByTag = @import("EngineWorld.zig").findEntitiesByTag;
+    pub const findEntitiesByPattern = @import("EngineWorld.zig").findEntitiesByPattern;
 
     // MARK: Asset methods
     pub const getFont = @import("EngineAssets.zig").getFont;

@@ -23,6 +23,7 @@ pub const collisionDetectionSystem = @import("CollisionDetectionSys.zig").run;
 pub const actionSystem = @import("ActionSys.zig").run;
 pub const lifetimeSystem = @import("LifetimeSys.zig").run;
 pub const renderSystem = @import("RenderSys.zig").run;
+pub const cameraTrackingSystem = @import("CameraTrackingSys.zig").run;
 
 pub const CollisionDetectionSys = @import("CollisionDetectionSys.zig");
 
