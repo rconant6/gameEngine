@@ -1,5 +1,5 @@
 const std = @import("std");
-const asset = @import("asset");
+const asset = @import("assets");
 pub const Font = asset.Font;
 pub const glyph_builder = asset.glyph_builder;
 const FilteredGlyph = asset.FilteredGlyph;
@@ -8,10 +8,9 @@ const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
 const WorldPoint = rend.WorldPoint;
 const Color = rend.Color;
-const core = @import("core");
-const ShapeRegistry = core.ShapeRegistry;
-const Shapes = core.Shapes;
-const ShapeData = core.ShapeData;
+const ShapeRegistry = rend.ShapeRegistry;
+const Shapes = rend.Shapes;
+const ShapeData = rend.ShapeData;
 const V2 = rend.V2;
 
 pub fn drawText(

@@ -10,7 +10,7 @@ pub const InstantiatorError = instantiator.InstantiatorError;
 
 pub const loader = @import("loader.zig");
 
-const core = @import("core");
+const core = @import("math");
 pub const ComponentRegistry = core.ComponentRegistry;
 pub const ShapeRegistry = core.ShapeRegistry;
 

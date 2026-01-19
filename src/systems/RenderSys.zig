@@ -1,11 +1,9 @@
-const assets = @import("asset");
+const assets = @import("assets");
 const AssetManager = assets.AssetManager;
-const core = @import("core");
-const ShapeRegistry = core.ShapeRegistry;
-const shapes = core.Shapes;
+const math = @import("math");
 const db = @import("debug");
 const DebugManager = db.DebugManager;
-const ecs = @import("entity");
+const ecs = @import("ecs");
 const Box = ecs.Box;
 const Camera = ecs.Camera;
 const Destroy = ecs.Destroy;
@@ -17,6 +15,8 @@ const World = ecs.World;
 const rend = @import("renderer");
 const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
+const ShapeRegistry = rend.ShapeRegistry;
+const shapes = rend.Shapes;
 
 pub fn run(
     renderer: *Renderer,

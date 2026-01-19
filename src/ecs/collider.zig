@@ -1,4 +1,4 @@
-const core = @import("core");
+const core = @import("math");
 const V2 = core.V2;
 
 pub const CircleCollider = struct {

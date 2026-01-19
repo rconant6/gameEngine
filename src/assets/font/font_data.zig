@@ -1,4 +1,4 @@
-const core = @import("core");
+const core = @import("math");
 pub const V2 = core.V2;
 // # TrueType File Structure (Top-Down)
 // ## Font Directory Header (File Start)

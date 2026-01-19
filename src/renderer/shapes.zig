@@ -1,7 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const Point = @import("V2.zig").V2;
-const hf = @import("helper_funtions.zig");
+const Point = @import("math").V2;
+const hf = @import("math").utils;
 const tris = @import("triangulation.zig");
 // NOTE: These need to be in the right order in the file
 // inorder to keep collision working

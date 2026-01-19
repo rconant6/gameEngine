@@ -1,16 +1,16 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
-const V2 = @import("V2.zig");
-const entity = @import("entity");
-const Collider = entity.comps.Collider;
-const CircleCollider = entity.CircleCollider;
-const RectangleCollider = entity.RectangleCollider;
-const Entity = entity.Entity;
-const Transform = entity.Transform;
-const World = entity.World;
-const csr = @import("collider_shape_registry.zig");
+const V2 = V2 = @import("math").V2;
+const entity = ecs = @import("ecs");
+const Collider = comps.Collider;
+const CircleCollider = CircleCollider;
+const RectangleCollider = RectangleCollider;
+const Entity = Entity;
+const Transform = Transform;
+const World = World;
+const csr = @import("ecs").ColliderRegistry;
 const ColliderData = csr.ColliderData;
-const ColliderRegistry = csr.ColliderRegistry;
+const ColliderRegistry = csr;
 
 pub const Collision = struct {
     entity_a: Entity,

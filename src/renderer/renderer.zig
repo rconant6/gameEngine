@@ -1,10 +1,15 @@
 const std = @import("std");
-const core = @import("core");
-pub const V2 = core.V2;
-pub const WorldPoint = core.WorldPoint;
-pub const ScreenPoint = core.ScreenPoint;
-pub const ShapeData = core.ShapeData;
-pub const Shapes = core.Shapes;
+const math = @import("math");
+pub const V2 = math.V2;
+pub const WorldPoint = math.WorldPoint;
+pub const ScreenPoint = math.ScreenPoint;
+// Shapes
+const shapes_module = @import("shapes.zig");
+pub const Shapes = shapes_module;
+const registry = @import("registry");
+pub const ShapeRegistry = registry.ShapeRegistry;
+pub const ShapeData = registry.ShapeData;
+pub const triangulation = @import("triangulation.zig");
 const build_options = @import("build_options");
 const col = @import("color.zig");
 pub const Color = col.Color;

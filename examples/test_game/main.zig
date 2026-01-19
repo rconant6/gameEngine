@@ -50,6 +50,19 @@ pub fn main() !void {
         .{ game_width, game_height },
     );
 
+    // ===== CAMERA TRACKING SETUP =====
+    // TODO: Implement findEntityByTag, setActiveCameraTrackingTarget, enableActiveCameraTracking
+    // Find the player entity and set camera to track it
+    // const player_entity = game.findEntityByTag("player");
+    // if (player_entity) |player| {
+    //     game.setActiveCameraTrackingTarget(player);
+    //     game.enableActiveCameraTracking();
+    //
+    //     // Start with smooth follow mode (tight tracking)
+    //     game.setActiveCameraFollowStiffness(0.25, 0.25);
+    // }
+    // ===== END CAMERA TRACKING SETUP =====
+
     // ===== CAMERA TEST SCENE NOTES =====
     // This scene tests camera controls and coordinate systems:
     // - Pink circle at origin (0, 0) - world center reference
@@ -182,6 +195,9 @@ pub fn main() !void {
     const zoom_in_factor: f32 = 0.9; // 10% closer each press
     const zoom_out_factor: f32 = 1.1; // 10% farther each press
 
+    // Camera tracking tuning
+    _ = true; // TODO: camera_tracking_enabled will be used when camera tracking is implemented
+
     while (!game.shouldClose()) {
         const current_time = std.time.milliTimestamp();
         const dt: f32 = @as(f32, @floatFromInt(current_time - last_time)) / 1000.0;
@@ -190,27 +206,52 @@ pub fn main() !void {
         game.beginFrame();
         game.clear(engine.Colors.DARK_GRAY);
 
+        // ===== CAMERA TRACKING TOGGLE (T key) =====
+        // TODO: Implement camera tracking enable/disable functions
+        // if (game.isPressed(KeyCode.T)) {
+        //     camera_tracking_enabled = !camera_tracking_enabled;
+        //     if (camera_tracking_enabled) {
+        //         game.enableActiveCameraTracking();
+        //     } else {
+        //         game.disableActiveCameraTracking();
+        //     }
+        // }
+
+        // ===== CAMERA STIFFNESS TUNING ([ and ] keys) =====
+        // TODO: Implement setActiveCameraFollowStiffness
+        // if (game.isPressed(KeyCode.LeftBracket)) {
+        //     // Decrease stiffness (more loose/laggy)
+        //     game.setActiveCameraFollowStiffness(0.1, 0.1);
+        // }
+        // if (game.isPressed(KeyCode.RightBracket)) {
+        //     // Increase stiffness (more tight/responsive)
+        //     game.setActiveCameraFollowStiffness(0.5, 0.5);
+        // }
+
         // ===== CAMERA CONTROLS (Arrow keys for pan, Q/E for zoom, R for reset) =====
-        // Arrow key panning
-        if (game.isDown(KeyCode.Up)) {
-            game.translateActiveCamera(
-                .{ .x = 0, .y = camera_pan_speed * dt },
-            );
-        }
-        if (game.isDown(KeyCode.Down)) {
-            game.translateActiveCamera(
-                .{ .x = 0, .y = -camera_pan_speed * dt },
-            );
-        }
-        if (game.isDown(KeyCode.Left)) {
-            game.translateActiveCamera(
-                .{ .x = -camera_pan_speed * dt, .y = 0 },
-            );
-        }
-        if (game.isDown(KeyCode.Right)) {
-            game.translateActiveCamera(
-                .{ .x = camera_pan_speed * dt, .y = 0 },
-            );
+        // Only allow manual panning when tracking is disabled
+        if (true) { // TODO: Replace with !camera_tracking_enabled when implemented
+            // Arrow key panning
+            if (game.isDown(KeyCode.Up)) {
+                game.translateActiveCamera(
+                    .{ .x = 0, .y = camera_pan_speed * dt },
+                );
+            }
+            if (game.isDown(KeyCode.Down)) {
+                game.translateActiveCamera(
+                    .{ .x = 0, .y = -camera_pan_speed * dt },
+                );
+            }
+            if (game.isDown(KeyCode.Left)) {
+                game.translateActiveCamera(
+                    .{ .x = -camera_pan_speed * dt, .y = 0 },
+                );
+            }
+            if (game.isDown(KeyCode.Right)) {
+                game.translateActiveCamera(
+                    .{ .x = camera_pan_speed * dt, .y = 0 },
+                );
+            }
         }
         if (game.getMouseScrollDelta()) |scroll_delta| {
             game.zoomActiveCameraSmooth(scroll_delta.y);

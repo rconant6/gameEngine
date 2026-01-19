@@ -1,4 +1,4 @@
-const ecs = @import("entity");
+const ecs = @import("ecs");
 const Transform = ecs.Transform;
 const Velocity = ecs.Velocity;
 const World = ecs.World;

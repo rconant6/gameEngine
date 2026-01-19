@@ -1,6 +1,6 @@
 const std = @import("std");
 const Self = @This();
-const core = @import("core");
+const core = @import("math");
 const V2 = core.V2;
 const id = @import("InputDevice.zig");
 const InputDevice = id.InputDevice;

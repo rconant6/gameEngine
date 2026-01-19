@@ -1,5 +1,5 @@
 const std = @import("std");
-const core = @import("core");
+const core = @import("math");
 const Color = @import("../renderer/color.zig").Color;
 const WorldPoint = core.WorldPoint;
 const ScreenPoint = core.ScreenPoint;

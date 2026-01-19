@@ -1,5 +1,5 @@
 const Self = @This();
-const core = @import("core");
+const core = @import("math");
 const WorldPoint = core.WorldPoint;
 const comps = @import("Components.zig");
 const Transform = comps.Transform;

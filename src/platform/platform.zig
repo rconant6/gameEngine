@@ -13,6 +13,9 @@ pub const Window = PlatformImpl.Window;
 pub const mapToGameKeyCode = id.mapToGameKeyCode;
 pub const mapToGameMouseButton = id.mapToGameMouseButton;
 
+// Input system
+pub const Input = @import("Input.zig");
+
 const PlatformImpl = switch (builtin.os.tag) {
     .macos => @import("macos.zig"),
     .linux => @import("linux.zig"),

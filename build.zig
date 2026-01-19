@@ -36,8 +36,8 @@ pub fn build(b: *std.Build) void {
         std.posix.exit(1);
     }
 
-    const core_module = b.addModule("core", .{
-        .root_source_file = b.path("src/core/types.zig"),
+    const math_module = b.addModule("math", .{
+        .root_source_file = b.path("src/math/math.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -53,20 +53,20 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    renderer_module.addImport("core", core_module);
+    renderer_module.addImport("math", math_module);
 
-    const asset_module = b.addModule("asset", .{
+    const assets_module = b.addModule("assets", .{
         .root_source_file = b.path("src/assets/assets.zig"),
         .target = target,
         .optimize = optimize,
     });
-    asset_module.addImport("core", core_module);
-    asset_module.addImport("renderer", renderer_module);
+    assets_module.addImport("math", math_module);
+    assets_module.addImport("renderer", renderer_module);
 
     const renderer_options = b.addOptions();
     renderer_options.addOption(RendererBackend, "backend", selected_renderer);
     renderer_options.addOption(bool, "enable_validation", enable_validation);
-    renderer_module.addImport("asset", asset_module);
+    renderer_module.addImport("assets", assets_module);
 
     const build_options_module = renderer_options.createModule();
     renderer_module.addImport("build_options", build_options_module);
@@ -78,135 +78,127 @@ pub fn build(b: *std.Build) void {
     });
     platform_module.addIncludePath(b.path("src/platform/macos/swift/include"));
     platform_module.addImport("build_options", build_options_module);
-    platform_module.addImport("core", core_module);
-
-    // Configure platform-specific linking on the platform module
+    platform_module.addImport("math", math_module);
     configurePlatformModule(b, platform_module, target, optimize, selected_renderer);
-
-    // Configure platform-specific linking on the renderer module (needs Metal frameworks)
     configurePlatformModule(b, renderer_module, target, optimize, selected_renderer);
 
-    // Core needs platform for Input.zig
-    core_module.addImport("platform", platform_module);
-
-    const entity_module = b.addModule("entity", .{
+    const ecs_module = b.addModule("ecs", .{
         .root_source_file = b.path("src/ecs/ecs.zig"),
         .target = target,
         .optimize = optimize,
     });
-    entity_module.addImport("core", core_module);
-    entity_module.addImport("renderer", renderer_module);
-    entity_module.addImport("asset", asset_module);
-
-    // Core needs entity for CollisionDetection.zig and shape_registry.zig needs renderer
-    core_module.addImport("entity", entity_module);
-    core_module.addImport("renderer", renderer_module);
+    ecs_module.addImport("math", math_module);
+    ecs_module.addImport("renderer", renderer_module);
+    ecs_module.addImport("assets", assets_module);
 
     const action_module = b.addModule("action", .{
         .root_source_file = b.path("src/action/Action.zig"),
         .target = target,
         .optimize = optimize,
     });
-    action_module.addImport("core", core_module);
-    action_module.addImport("entity", entity_module);
+    action_module.addImport("math", math_module);
     action_module.addImport("platform", platform_module);
+    action_module.addImport("ecs", ecs_module);
 
-    entity_module.addImport("action", action_module);
+    ecs_module.addImport("action", action_module);
 
-    // Core registry modules (already exported via core.zig but needed for separate imports)
     const component_registry_module = b.addModule("component_registry", .{
-        .root_source_file = b.path("src/core/component_registry.zig"),
+        .root_source_file = b.path("src/registry/component_registry.zig"),
         .target = target,
         .optimize = optimize,
     });
     component_registry_module.addImport("scene-format", scene_format_module);
-    component_registry_module.addImport("entity", entity_module);
     const shape_registry_module = b.addModule("shape_registry", .{
-        .root_source_file = b.path("src/core/shape_registry.zig"),
+        .root_source_file = b.path("src/registry/shape_registry.zig"),
         .target = target,
         .optimize = optimize,
     });
     shape_registry_module.addImport("scene-format", scene_format_module);
-    shape_registry_module.addImport("renderer", renderer_module);
     const collider_shape_registry_module = b.addModule("collider_shape_registry", .{
-        .root_source_file = b.path("src/core/collider_shape_registry.zig"),
+        .root_source_file = b.path("src/registry/collider_shape_registry.zig"),
         .target = target,
         .optimize = optimize,
     });
-    collider_shape_registry_module.addImport("entity", entity_module);
 
-    // Scene modules
+    const registry_module = b.addModule("registry", .{
+        .root_source_file = b.path("src/registry/registry.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    registry_module.addImport("component_registry", component_registry_module);
+    registry_module.addImport("shape_registry", shape_registry_module);
+    registry_module.addImport("collider_shape_registry", collider_shape_registry_module);
+    registry_module.addImport("ecs", ecs_module);
+    registry_module.addImport("renderer", renderer_module);
+
+    component_registry_module.addImport("ecs", ecs_module);
+    collider_shape_registry_module.addImport("ecs", ecs_module);
+    shape_registry_module.addImport("renderer", renderer_module);
+
+    ecs_module.addImport("registry", registry_module);
+    renderer_module.addImport("registry", registry_module);
+
     const scene_module = b.addModule("scene", .{
         .root_source_file = b.path("src/scene/scene.zig"),
         .target = target,
         .optimize = optimize,
     });
     scene_module.addImport("scene-format", scene_format_module);
-    scene_module.addImport("core", core_module);
-    scene_module.addImport("entity", entity_module);
-    scene_module.addImport("asset", asset_module);
+    scene_module.addImport("math", math_module);
+    scene_module.addImport("ecs", ecs_module);
+    scene_module.addImport("assets", assets_module);
     scene_module.addImport("renderer", renderer_module);
     scene_module.addImport("build_options", build_options_module);
-    scene_module.addImport("component_registry", component_registry_module);
-    scene_module.addImport("shape_registry", shape_registry_module);
-    scene_module.addImport("collider_shape_registry", collider_shape_registry_module);
+    scene_module.addImport("registry", registry_module);
     scene_module.addImport("platform", platform_module);
     scene_module.addImport("action", action_module);
 
-    entity_module.addImport("scene", scene_module);
-    // MARK: Debug Module
+    ecs_module.addImport("scene", scene_module);
+
     const debug_module = b.addModule("debug", .{
         .root_source_file = b.path("src/debug/debug.zig"),
         .target = target,
         .optimize = optimize,
     });
-    debug_module.addImport("core", core_module);
+    debug_module.addImport("math", math_module);
     debug_module.addImport("renderer", renderer_module);
-    debug_module.addImport("asset", asset_module);
+    debug_module.addImport("assets", assets_module);
 
-    // Systems module
     const systems_module = b.addModule("systems", .{
         .root_source_file = b.path("src/systems/Systems.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    systems_module.addImport("core", core_module);
-    systems_module.addImport("entity", entity_module);
+    systems_module.addImport("math", math_module);
+    systems_module.addImport("ecs", ecs_module);
     systems_module.addImport("debug", debug_module);
     systems_module.addImport("renderer", renderer_module);
-    systems_module.addImport("asset", asset_module);
+    systems_module.addImport("assets", assets_module);
+    systems_module.addImport("action", action_module);
 
-    // ========================================
-    // Engine Module and Library
-    // ========================================
     const engine_module = b.addModule("engine", .{
-        .root_source_file = b.path("src/engine.zig"),
+        .root_source_file = b.path("src/Engine.zig"),
         .target = target,
         .optimize = optimize,
     });
 
-    // Add all module dependencies
-    engine_module.addImport("core", core_module);
+    engine_module.addImport("math", math_module);
     engine_module.addImport("platform", platform_module);
     engine_module.addImport("renderer", renderer_module);
     engine_module.addImport("build_options", build_options_module);
-    engine_module.addImport("asset", asset_module);
-    engine_module.addImport("entity", entity_module);
+    engine_module.addImport("assets", assets_module);
+    engine_module.addImport("ecs", ecs_module);
     engine_module.addImport("scene-format", scene_format_module);
     engine_module.addImport("action", action_module);
     engine_module.addImport("scene", scene_module);
-    engine_module.addImport("component_registry", component_registry_module);
-    engine_module.addImport("shape_registry", shape_registry_module);
+    engine_module.addImport("registry", registry_module);
     engine_module.addImport("debug", debug_module);
     engine_module.addImport("systems", systems_module);
 
-    // Scene instantiator needs the Engine type
     scene_module.addImport("engine", engine_module);
-    // ECS needs the scene module
-    entity_module.addImport("scene", scene_module);
+    ecs_module.addImport("scene", scene_module);
 
-    // Create a static library for the engine
     const engine_lib = b.addLibrary(.{
         .name = "game-engine",
         .root_module = engine_module,
@@ -270,7 +262,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     v2_test_module.addAnonymousImport("V2", .{
-        .root_source_file = b.path("src/core/V2.zig"),
+        .root_source_file = b.path("src/math/V2.zig"),
     });
 
     const v2_tests = b.addTest(.{
@@ -288,7 +280,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    ecs_test_module.addImport("core", core_module);
+    ecs_test_module.addImport("math", math_module);
     ecs_test_module.addAnonymousImport("ComponentStorage", .{
         .root_source_file = b.path("src/ecs/ComponentStorage.zig"),
     });
@@ -305,8 +297,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    query_test_module.addImport("core", core_module);
-    query_test_module.addImport("entity", entity_module);
+    query_test_module.addImport("math", math_module);
+    query_test_module.addImport("ecs", ecs_module);
 
     const query_tests = b.addTest(.{
         .name = "query-tests",
@@ -321,9 +313,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    world_test_module.addImport("core", core_module);
+    world_test_module.addImport("math", math_module);
     world_test_module.addImport("scene", scene_module);
-    world_test_module.addImport("entity", entity_module);
+    world_test_module.addImport("ecs", ecs_module);
     const world_tests = b.addTest(.{
         .name = "world-tests",
         .root_module = world_test_module,
@@ -337,8 +329,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    collider_test_module.addImport("core", core_module);
-    collider_test_module.addImport("entity", entity_module);
+    collider_test_module.addImport("math", math_module);
+    collider_test_module.addImport("ecs", ecs_module);
 
     const collider_tests = b.addTest(.{
         .name = "collider-tests",
@@ -364,13 +356,12 @@ pub fn build(b: *std.Build) void {
     const run_tag_tests = b.addRunArtifact(tag_tests);
 
     // Action Tests
-
     const action_test_module = b.addModule("action_tests", .{
         .root_source_file = b.path("tests/ecs/test_action.zig"),
         .target = target,
         .optimize = optimize,
     });
-    action_test_module.addImport("core", core_module);
+    action_test_module.addImport("math", math_module);
     action_test_module.addImport("Action", action_module);
 
     const action_tests = b.addTest(.{
@@ -386,17 +377,17 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    triggers_module.addImport("core", core_module);
+    triggers_module.addImport("math", math_module);
     triggers_module.addImport("action", action_module);
     triggers_module.addImport("platform", platform_module);
-    triggers_module.addImport("entity", entity_module);
+    triggers_module.addImport("ecs", ecs_module);
 
     const action_bindings_module = b.addModule("ActionBindings", .{
         .root_source_file = b.path("src/action/ActionBindings.zig"),
         .target = target,
         .optimize = optimize,
     });
-    action_bindings_module.addImport("core", core_module);
+    action_bindings_module.addImport("math", math_module);
     action_bindings_module.addImport("triggers", triggers_module);
 
     const action_bindings_test_module = b.addModule("action_bindings_tests", .{
@@ -404,7 +395,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    action_bindings_test_module.addImport("core", core_module);
+    action_bindings_test_module.addImport("math", math_module);
     action_bindings_test_module.addImport("Action", action_module);
 
     const action_bindings_tests = b.addTest(.{
@@ -420,7 +411,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    collision_trigger_test_module.addImport("core", core_module);
+    collision_trigger_test_module.addImport("math", math_module);
     collision_trigger_test_module.addImport("Action", action_module);
 
     const collision_trigger_tests = b.addTest(.{
@@ -436,7 +427,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    input_trigger_test_module.addImport("core", core_module);
+    input_trigger_test_module.addImport("math", math_module);
     input_trigger_test_module.addImport("Action", action_module);
     input_trigger_test_module.addImport("platform", platform_module);
 
@@ -453,9 +444,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    time_trigger_test_module.addImport("core", core_module);
+    time_trigger_test_module.addImport("math", math_module);
     time_trigger_test_module.addImport("Action", action_module);
-    time_trigger_test_module.addImport("entity", entity_module);
+    time_trigger_test_module.addImport("ecs", ecs_module);
 
     const time_trigger_tests = b.addTest(.{
         .name = "time-trigger-tests",
@@ -472,8 +463,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    collision_test_module.addImport("core", core_module);
-    collision_test_module.addImport("entity", entity_module);
+    collision_test_module.addImport("math", math_module);
+    collision_test_module.addImport("ecs", ecs_module);
+    collision_test_module.addImport("systems", systems_module);
 
     const collision_tests = b.addTest(.{
         .name = "collision-tests",
@@ -561,10 +553,10 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     template_instantiation_test_module.addImport("scene-format", scene_format_module);
-    template_instantiation_test_module.addImport("entity", entity_module);
+    template_instantiation_test_module.addImport("ecs", ecs_module);
     template_instantiation_test_module.addImport("scene", scene_module);
-    template_instantiation_test_module.addImport("asset", asset_module);
-    template_instantiation_test_module.addImport("core", core_module);
+    template_instantiation_test_module.addImport("assets", assets_module);
+    template_instantiation_test_module.addImport("math", math_module);
 
     const template_instantiation_tests = b.addTest(.{
         .name = "template-instantiation-tests",
@@ -596,7 +588,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    shapes_test_module.addImport("core", core_module);
+    shapes_test_module.addImport("math", math_module);
     shapes_test_module.addImport("renderer", renderer_module);
 
     const shapes_tests = b.addTest(.{
@@ -614,8 +606,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    integration_test_module.addImport("core", core_module);
-    integration_test_module.addImport("entity", entity_module);
+    integration_test_module.addImport("math", math_module);
+    integration_test_module.addImport("ecs", ecs_module);
+    integration_test_module.addImport("systems", systems_module);
 
     const integration_tests = b.addTest(.{
         .name = "integration-tests",

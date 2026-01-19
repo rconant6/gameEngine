@@ -1,7 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 
-const entity = @import("entity");
+const entity = @import("ecs");
 const ComponentStorage = entity.ComponentStorage;
 const Query = entity.Query;
 

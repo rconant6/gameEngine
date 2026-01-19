@@ -5,6 +5,13 @@ const rend = @import("renderer");
 const Renderer = rend.Renderer;
 
 pub const debug_enabled = builtin.mode == .Debug;
+
+// Error logging (temporary home until proper logging system is implemented)
+pub const error_logger = @import("error_logger.zig");
+pub const ErrorLogger = error_logger.ErrorLogger;
+pub const ErrorEntry = error_logger.ErrorEntry;
+pub const Severity = error_logger.Severity;
+pub const SubSystem = error_logger.SubSystem;
 // MARK: DebugManager
 const DebugManagerImpl = @import("DebugManager.zig");
 pub const DebugManager = if (debug_enabled) DebugManagerImpl else DebugManagerStub;

@@ -21,19 +21,16 @@ pub const ScreenSpace = comps.ScreenSpace;
 pub const Destroy = comps.Destroy;
 pub const ActiveCamera = comps.ActiveCamera;
 pub const MinimapCamera = comps.MinimapCamera;
-// MARK: Colllisions
+// MARK: Collisions
 pub const Tag = @import("Tag.zig"); // tags in string form for scene/template use
-// MARK: Core
-const core = @import("core");
-pub const Input = core.Input;
-pub const Collision = core.Collision;
-// MARK: Action System
-const action = @import("action");
-pub const Action = action.Action;
-pub const ActionType = action.ActionType;
-pub const ActionTarget = action.ActionTarget;
-pub const OnCollision = action.OnCollision;
-pub const OnInput = action.OnInput;
+pub const Collision = @import("CollisionDetection.zig").Collision;
+// MARK: Registries
+const registry = @import("registry");
+pub const ComponentRegistry = registry.ComponentRegistry;
+pub const ComponentData = registry.ComponentData;
+pub const ColliderRegistry = registry.ColliderRegistry;
+pub const ColliderData = registry.ColliderData;
+pub const ColliderShape = registry.ColliderShape;
 const ct = @import("CameraTracking.zig");
 pub const CameraTracking = ct.CameraTracking;
 pub const TrackingMode = ct.TrackingMode;

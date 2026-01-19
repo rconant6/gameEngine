@@ -3,7 +3,7 @@ const std = @import("std");
 const db = @import("debug");
 const DebugManager = db.DebugManager;
 const DebugCategory = db.DebugCategory;
-const ecs = @import("entity");
+const ecs = @import("ecs");
 const ActiveCamera = ecs.ActiveCamera;
 const Collider = ecs.Collider;
 const Destroy = ecs.Destroy;
@@ -19,10 +19,12 @@ const Renderer = rend.Renderer;
 
 pub const movementSystem = @import("MovementSys.zig").run;
 pub const physicsSystem = @import("PhysicsSys.zig").run;
-pub const renderSystem = @import("RenderSys.zig").run;
-pub const lifetimeSystem = @import("LifetimeSys.zig").run;
 pub const collisionDetectionSystem = @import("CollisionDetectionSys.zig").run;
-// TODO: need to move actionSystem here and split off ActionManager
+pub const actionSystem = @import("ActionSys.zig").run;
+pub const lifetimeSystem = @import("LifetimeSys.zig").run;
+pub const renderSystem = @import("RenderSys.zig").run;
+
+pub const CollisionDetectionSys = @import("CollisionDetectionSys.zig");
 
 pub fn debugEntityInfoSystem(world: *World, debugger: *DebugManager) void {
     var query = world.query(.{Transform});

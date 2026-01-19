@@ -1,7 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 const scene_format = @import("scene-format");
-const ecs = @import("entity");
+const ecs = @import("ecs");
 const World = ecs.World;
 const Transform = ecs.Transform;
 const Velocity = ecs.Velocity;
@@ -10,9 +10,9 @@ const scene = @import("scene");
 const TemplateManager = scene.TemplateManager;
 const Template = scene.Template;
 const Instantiator = scene.Instantiator;
-const asset = @import("asset");
+const asset = @import("assets");
 const AssetManager = asset.AssetManager;
-const core = @import("core");
+const core = @import("math");
 const V2 = core.V2;
 
 // These tests document the expected behavior of template instantiation

@@ -3,7 +3,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const ActionQueue = @import("ActionQueue.zig").ActionQueue;
-const World = @import("entity").World;
+const World = @import("ecs").World;
 const triggers = @import("Triggers.zig");
 const TriggerSystem = triggers.TriggerSystem;
 const TriggerContext = triggers.TriggerContext;
@@ -59,14 +59,4 @@ pub fn deinit(self: *Self) void {
 
 pub fn registerTrigger(self: *Self, trigger_system: TriggerSystem) !void {
     try self.trigger_systems.append(self.allocator, trigger_system);
-}
-
-pub fn update(self: *Self, world: *World, ctx: TriggerContext) !void {
-    for (self.trigger_systems.items) |system| {
-        try system.processFn(system.sys, world, ctx);
-    }
-
-    ActionExecutor.executeActions(world, &self.action_queue);
-
-    self.action_queue.clear();
 }

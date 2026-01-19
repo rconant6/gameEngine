@@ -1,11 +1,11 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-const ecs = @import("entity");
+const ecs = @import("ecs");
 const Entity = ecs.Entity;
 const action_mod = @import("Action.zig");
 const Action = action_mod.Action;
-const V2 = @import("core").V2;
+const V2 = @import("math").V2;
 
 pub const ActionContext = struct {
     self_ent: Entity,

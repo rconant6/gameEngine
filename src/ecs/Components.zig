@@ -1,18 +1,17 @@
-const core = @import("core");
-const V2 = core.V2;
-const ColliderData = core.ColliderData;
-const ShapeRegistry = core.ShapeRegistry;
-const ShapeData = core.ShapeData;
+const math = @import("math");
+const V2 = math.V2;
+const registry = @import("registry");
+const ColliderData = registry.ColliderData;
+const ShapeRegistry = registry.ShapeRegistry;
+const ShapeData = registry.ShapeData;
 const rend = @import("renderer");
 const Color = rend.Color;
 const Shape = rend.Shape;
-const asset = @import("asset");
+const asset = @import("assets");
 const FontHandle = asset.FontHandle;
 const action = @import("action");
 
-// MARK: Action Components
-pub const Action = action.Action;
-pub const Trigger = action.TriggerComp;
+// MARK: Action Components (defined in action module, re-exported for ECS use)
 pub const OnCollision = action.OnCollision;
 pub const OnInput = action.OnInput;
 

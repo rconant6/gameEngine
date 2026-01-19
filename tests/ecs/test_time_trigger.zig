@@ -1,8 +1,8 @@
 const std = @import("std");
 const testing = std.testing;
 const Action = @import("Action");
-const V2 = @import("core").V2;
-const ecs = @import("entity");
+const V2 = @import("math").V2;
+const ecs = @import("ecs");
 const World = ecs.World;
 const Entity = ecs.Entity;
 

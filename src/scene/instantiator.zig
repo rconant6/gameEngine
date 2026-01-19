@@ -17,19 +17,19 @@ const Property = scene_format.Property;
 const Value = scene_format.Value;
 const BaseType = scene_format.BaseType;
 
-const core = @import("core");
+const core = @import("math");
 const V2 = core.V2;
-const ComponentRegistry = core.ComponentRegistry;
-const ShapeRegistry = core.ShapeRegistry;
-const ColliderRegistry = core.ColliderRegistry;
-const Shapes = core.Shapes;
+const ComponentRegistry = @import("ecs").ComponentRegistry;
+const ShapeRegistry = @import("renderer").ShapeRegistry;
+const ColliderRegistry = @import("ecs").ColliderRegistry;
+const Shapes = @import("renderer").Shapes;
 
-const ecs = @import("entity");
+const ecs = @import("ecs");
 const World = ecs.World;
 const Entity = ecs.Entity;
 const Components = ecs.comps;
 
-const asset = @import("asset");
+const asset = @import("assets");
 const Font = asset.Font;
 const FontHandle = asset.FontHandle;
 const AssetManager = asset.AssetManager;

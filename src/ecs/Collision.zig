@@ -1,3 +1,2 @@
-pub const Self = @This();
-const V2 = @import("core").V2;
+const V2 = @import("math").V2;
 const Entity = @import("Entity.zig");

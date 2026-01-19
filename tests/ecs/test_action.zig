@@ -1,7 +1,7 @@
 const std = @import("std");
 const testing = std.testing;
 const Action = @import("Action");
-const V2 = @import("core").V2;
+const V2 = @import("math").V2;
 
 test "Action - destroy_self" {
     const action = Action.Action{

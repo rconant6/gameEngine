@@ -7,9 +7,9 @@ const Circle = rend.Shapes.Circle;
 const Line = rend.Shapes.Line;
 const Rectangle = rend.Shapes.Rectangle;
 const Triangle = rend.Shapes.Triangle;
-const core = @import("core");
-const ShapeRegistry = core.ShapeRegistry;
-const V2 = core.V2;
+const math = @import("math");
+const V2 = math.V2;
+const ShapeRegistry = rend.ShapeRegistry;
 const draw = @import("DebugDraw.zig");
 const DebugDraw = draw.DebugDraw;
 const DebugArrow = draw.DebugArrow;
@@ -17,7 +17,7 @@ const DebugCircle = draw.DebugCircle;
 const DebugLine = draw.DebugLine;
 const DebugRect = draw.DebugRect;
 const DebugText = draw.DebugText;
-const assets = @import("asset");
+const assets = @import("assets");
 const Font = assets.Font;
 
 renderer: *Renderer,

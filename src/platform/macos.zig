@@ -17,7 +17,7 @@ const MouseButton = plat.MouseButton;
 const MouseData = plat.MouseData;
 const PlatformImpl = plat.PlatformImpl;
 const WindowConfig = plat.WindowConfig;
-const V2 = @import("core").V2;
+const V2 = @import("math").V2;
 
 var keyboard_state: Keyboard = .{};
 var mouse_state: Mouse = .{

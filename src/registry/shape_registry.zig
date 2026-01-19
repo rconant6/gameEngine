@@ -1,15 +1,15 @@
 const std = @import("std");
-const ecs = @import("entity");
-const Colliders = ecs.colliders;
+const renderer = @import("renderer");
+const Shapes = renderer.Shapes;
 const Type = std.builtin.Type;
 
-pub const ColliderData = blk: {
-    const registry = ColliderRegistry;
+pub const ShapeData = blk: {
+    const registry = ShapeRegistry;
 
-    var enum_fields: [registry.shape_types.len]Type.EnumField = undefined;
+    var enum_fields: [ShapeRegistry.shape_types.len]Type.EnumField = undefined;
     for (registry.shape_names, 0..) |name, i| {
         enum_fields[i] = .{
-            .name = name,
+            .name = name[0..name.len :0],
             .value = i,
         };
     }
@@ -26,7 +26,7 @@ pub const ColliderData = blk: {
     var union_fields: [registry.shape_types.len]Type.UnionField = undefined;
     for (registry.shape_types, registry.shape_names, 0..) |shape_type, name, i| {
         union_fields[i] = .{
-            .name = name,
+            .name = name[0..name.len :0],
             .type = shape_type,
             .alignment = @alignOf(shape_type),
         };
@@ -42,35 +42,35 @@ pub const ColliderData = blk: {
     });
 };
 
-pub const ColliderRegistry = struct {
+pub const ShapeRegistry = struct {
     pub const shape_types = blk: {
-        const decls = @typeInfo(Colliders).@"struct".decls;
+        const decls = @typeInfo(Shapes).@"struct".decls;
         var types: [decls.len]type = undefined;
         for (decls, 0..) |decl, i| {
-            types[i] = @field(Colliders, decl.name);
+            types[i] = @field(Shapes, decl.name);
         }
         break :blk types;
     };
 
     pub const shape_names = blk: {
-        const decls = @typeInfo(Colliders).@"struct".decls;
-        var names: [decls.len][:0]const u8 = undefined;
+        const decls = @typeInfo(Shapes).@"struct".decls;
+        var names: [decls.len][]const u8 = undefined;
         for (decls, 0..) |decl, i| {
             names[i] = decl.name;
         }
         break :blk names;
     };
 
-    pub fn getColliderIndex(name: []const u8) ?usize {
+    pub fn getShapeIndex(name: []const u8) ?usize {
         inline for (shape_names, 0..) |shape_name, i| {
-            if (std.ascii.startsWithIgnoreCase(shape_name, name)) {
+            if (std.ascii.eqlIgnoreCase(name, shape_name)) {
                 return i;
             }
         }
         return null;
     }
 
-    pub fn getColliderType(comptime name: []const u8) ?type {
+    pub fn getShapeType(comptime name: []const u8) ?type {
         inline for (shape_names, 0..) |shape_name, i| {
             if (std.mem.eql(u8, shape_name, name)) {
                 return shape_types[i];
@@ -79,12 +79,12 @@ pub const ColliderRegistry = struct {
         return null;
     }
 
-    pub fn createColliderUnion(comptime ColliderType: type, shape: ColliderType) ColliderData {
+    pub fn createShapeUnion(comptime ShapeType: type, shape: ShapeType) ShapeData {
         inline for (shape_names, 0..) |name, i| {
-            if (ColliderType == shape_types[i]) {
-                return @unionInit(ColliderData, name, shape);
+            if (ShapeType == shape_types[i]) {
+                return @unionInit(ShapeData, name, shape);
             }
         }
-        @compileError("Unknown collider shape type: " ++ @typeName(ColliderType));
+        @compileError("Unknown shape type: " ++ @typeName(ShapeType));
     }
 };

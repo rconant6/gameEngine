@@ -1,16 +1,17 @@
 const std = @import("std");
 const testing = std.testing;
-const core = @import("core");
-const V2 = core.V2;
-const ColliderData = core.ColliderData;
-const ecs = @import("entity");
+const math = @import("math");
+const V2 = math.V2;
+const ecs = @import("ecs");
+const ColliderData = ecs.ColliderData;
 const World = ecs.World;
 const Transform = ecs.Transform;
 const Collider = ecs.Collider;
 const Collision = ecs.Collision;
 const CircleCollider = ecs.CircleCollider;
 const RectangleCollider = ecs.RectangleCollider;
-const CollisionDetection = core.CollisionDetection;
+const systems = @import("systems");
+const CollisionDetectionSys = systems.CollisionDetectionSys;
 
 // MARK: Circle-Circle Collision Tests
 
@@ -21,7 +22,7 @@ test "CollisionDetection: circle-circle no collision (far apart)" {
     const circle_b = CircleCollider{ .radius = 5.0 };
     const transform_b = Transform{ .position = V2{ .x = 20, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
+    const result = CollisionDetectionSys.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
     try testing.expect(result == null);
 }
 
@@ -32,7 +33,7 @@ test "CollisionDetection: circle-circle touching (edge case)" {
     const circle_b = CircleCollider{ .radius = 5.0 };
     const transform_b = Transform{ .position = V2{ .x = 10, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
+    const result = CollisionDetectionSys.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
     try testing.expect(result != null);
 }
 
@@ -43,7 +44,7 @@ test "CollisionDetection: circle-circle overlapping" {
     const circle_b = CircleCollider{ .radius = 5.0 };
     const transform_b = Transform{ .position = V2{ .x = 7, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
+    const result = CollisionDetectionSys.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
     try testing.expect(result != null);
 }
 
@@ -54,7 +55,7 @@ test "CollisionDetection: circle-circle fully overlapping (same position)" {
     const circle_b = CircleCollider{ .radius = 5.0 };
     const transform_b = Transform{ .position = V2{ .x = 0, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
+    const result = CollisionDetectionSys.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
     try testing.expect(result != null);
 }
 
@@ -65,7 +66,7 @@ test "CollisionDetection: circle-circle with scale" {
     const circle_b = CircleCollider{ .radius = 5.0 };
     const transform_b = Transform{ .position = V2{ .x = 15, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
+    const result = CollisionDetectionSys.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
     try testing.expect(result != null);
 }
 
@@ -76,7 +77,7 @@ test "CollisionDetection: circle-circle diagonal collision" {
     const circle_b = CircleCollider{ .radius = 5.0 };
     const transform_b = Transform{ .position = V2{ .x = 7, .y = 7 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
+    const result = CollisionDetectionSys.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
     try testing.expect(result != null);
 }
 
@@ -87,7 +88,7 @@ test "CollisionDetection: circle-circle different sizes" {
     const circle_b = CircleCollider{ .radius = 2.0 };
     const transform_b = Transform{ .position = V2{ .x = 11, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
+    const result = CollisionDetectionSys.collideCircleColliderCircleCollider(circle_a, transform_a, circle_b, transform_b);
     try testing.expect(result != null);
 }
 
@@ -100,7 +101,7 @@ test "CollisionDetection: circle-rect no collision (far apart)" {
     const rect = RectangleCollider{ .half_width = 10.0, .half_height = 10.0 };
     const transform_rect = Transform{ .position = V2{ .x = 30, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
+    const result = CollisionDetectionSys.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
     try testing.expect(result == null);
 }
 
@@ -111,7 +112,7 @@ test "CollisionDetection: circle-rect center overlap" {
     const rect = RectangleCollider{ .half_width = 10.0, .half_height = 10.0 };
     const transform_rect = Transform{ .position = V2{ .x = 0, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
+    const result = CollisionDetectionSys.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
     try testing.expect(result != null);
 }
 
@@ -122,7 +123,7 @@ test "CollisionDetection: circle-rect edge collision" {
     const rect = RectangleCollider{ .half_width = 10.0, .half_height = 10.0 };
     const transform_rect = Transform{ .position = V2{ .x = 0, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
+    const result = CollisionDetectionSys.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
     try testing.expect(result != null);
 }
 
@@ -133,7 +134,7 @@ test "CollisionDetection: circle-rect corner collision" {
     const rect = RectangleCollider{ .half_width = 10.0, .half_height = 10.0 };
     const transform_rect = Transform{ .position = V2{ .x = 0, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
+    const result = CollisionDetectionSys.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
     try testing.expect(result != null);
 }
 
@@ -146,7 +147,7 @@ test "CollisionDetection: rect-circle no collision (far apart)" {
     const circle = CircleCollider{ .radius = 5.0 };
     const transform_circle = Transform{ .position = V2{ .x = 30, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
+    const result = CollisionDetectionSys.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
     try testing.expect(result == null);
 }
 
@@ -157,7 +158,7 @@ test "CollisionDetection: rect-circle center overlap" {
     const circle = CircleCollider{ .radius = 5.0 };
     const transform_circle = Transform{ .position = V2{ .x = 0, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
+    const result = CollisionDetectionSys.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
     try testing.expect(result != null);
 }
 
@@ -168,7 +169,7 @@ test "CollisionDetection: rect-circle edge collision" {
     const circle = CircleCollider{ .radius = 5.0 };
     const transform_circle = Transform{ .position = V2{ .x = 12, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
+    const result = CollisionDetectionSys.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
     try testing.expect(result != null);
 }
 
@@ -179,7 +180,7 @@ test "CollisionDetection: rect-circle corner collision" {
     const circle = CircleCollider{ .radius = 5.0 };
     const transform_circle = Transform{ .position = V2{ .x = 13, .y = 13 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
+    const result = CollisionDetectionSys.collideCircleColliderRectangleCollider(circle, transform_circle, rect, transform_rect);
     try testing.expect(result != null);
 }
 
@@ -192,7 +193,7 @@ test "CollisionDetection: rect-rect no collision (far apart)" {
     const rect_b = RectangleCollider{ .half_width = 5.0, .half_height = 5.0 };
     const transform_b = Transform{ .position = V2{ .x = 20, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideRectangleColliderRectangleCollider(rect_a, transform_a, rect_b, transform_b);
+    const result = CollisionDetectionSys.collideRectangleColliderRectangleCollider(rect_a, transform_a, rect_b, transform_b);
     try testing.expect(result == null);
 }
 
@@ -203,7 +204,7 @@ test "CollisionDetection: rect-rect overlapping" {
     const rect_b = RectangleCollider{ .half_width = 5.0, .half_height = 5.0 };
     const transform_b = Transform{ .position = V2{ .x = 7, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideRectangleColliderRectangleCollider(rect_a, transform_a, rect_b, transform_b);
+    const result = CollisionDetectionSys.collideRectangleColliderRectangleCollider(rect_a, transform_a, rect_b, transform_b);
     try testing.expect(result != null);
 }
 
@@ -214,7 +215,7 @@ test "CollisionDetection: rect-rect fully overlapping (same position)" {
     const rect_b = RectangleCollider{ .half_width = 5.0, .half_height = 5.0 };
     const transform_b = Transform{ .position = V2{ .x = 0, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideRectangleColliderRectangleCollider(rect_a, transform_a, rect_b, transform_b);
+    const result = CollisionDetectionSys.collideRectangleColliderRectangleCollider(rect_a, transform_a, rect_b, transform_b);
     try testing.expect(result != null);
 }
 
@@ -225,7 +226,7 @@ test "CollisionDetection: rect-rect edge touching" {
     const rect_b = RectangleCollider{ .half_width = 5.0, .half_height = 5.0 };
     const transform_b = Transform{ .position = V2{ .x = 10, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideRectangleColliderRectangleCollider(rect_a, transform_a, rect_b, transform_b);
+    const result = CollisionDetectionSys.collideRectangleColliderRectangleCollider(rect_a, transform_a, rect_b, transform_b);
     try testing.expect(result != null);
 }
 
@@ -236,7 +237,7 @@ test "CollisionDetection: rect-rect different sizes" {
     const rect_b = RectangleCollider{ .half_width = 2.0, .half_height = 2.0 };
     const transform_b = Transform{ .position = V2{ .x = 11, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideRectangleColliderRectangleCollider(rect_a, transform_a, rect_b, transform_b);
+    const result = CollisionDetectionSys.collideRectangleColliderRectangleCollider(rect_a, transform_a, rect_b, transform_b);
     try testing.expect(result != null);
 }
 
@@ -247,7 +248,7 @@ test "CollisionDetection: rect-rect with scale" {
     const rect_b = RectangleCollider{ .half_width = 5.0, .half_height = 5.0 };
     const transform_b = Transform{ .position = V2{ .x = 15, .y = 0 }, .scale = 1.0, .rotation = 0 };
 
-    const result = CollisionDetection.collideRectangleColliderRectangleCollider(rect_a, transform_a, rect_b, transform_b);
+    const result = CollisionDetectionSys.collideRectangleColliderRectangleCollider(rect_a, transform_a, rect_b, transform_b);
     try testing.expect(result != null);
 }
 
@@ -278,10 +279,10 @@ test "CollisionDetection: detect collisions in world with two circles" {
         .collider = ColliderData{ .CircleCollider = .{ .radius = 5.0 } },
     });
 
-    var collisions: std.ArrayList(CollisionDetection.Collision) = .empty;
+    var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
     defer collisions.deinit(allocator);
 
-    try CollisionDetection.detectCollisions(&world, &collisions);
+    try CollisionDetectionSys.detectCollisions(&world, &collisions);
 
     try testing.expectEqual(@as(usize, 1), collisions.items.len);
     const collision = collisions.items[0];
@@ -316,10 +317,10 @@ test "CollisionDetection: detect no collisions when circles far apart" {
         .collider = ColliderData{ .CircleCollider = .{ .radius = 5.0 } },
     });
 
-    var collisions: std.ArrayList(CollisionDetection.Collision) = .empty;
+    var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
     defer collisions.deinit(allocator);
 
-    try CollisionDetection.detectCollisions(&world, &collisions);
+    try CollisionDetectionSys.detectCollisions(&world, &collisions);
 
     try testing.expectEqual(@as(usize, 0), collisions.items.len);
 }
@@ -359,10 +360,10 @@ test "CollisionDetection: detect multiple collisions" {
         .collider = ColliderData{ .CircleCollider = .{ .radius = 5.0 } },
     });
 
-    var collisions: std.ArrayList(CollisionDetection.Collision) = .empty;
+    var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
     defer collisions.deinit(allocator);
 
-    try CollisionDetection.detectCollisions(&world, &collisions);
+    try CollisionDetectionSys.detectCollisions(&world, &collisions);
 
     try testing.expectEqual(@as(usize, 2), collisions.items.len);
 }
@@ -389,10 +390,10 @@ test "CollisionDetection: ignore entities without collider" {
         .scale = 1.0,
     });
 
-    var collisions: std.ArrayList(CollisionDetection.Collision) = .empty;
+    var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
     defer collisions.deinit(allocator);
 
-    try CollisionDetection.detectCollisions(&world, &collisions);
+    try CollisionDetectionSys.detectCollisions(&world, &collisions);
 
     try testing.expectEqual(@as(usize, 0), collisions.items.len);
 }
@@ -422,10 +423,10 @@ test "CollisionDetection: collision events contain correct entity IDs" {
         .collider = ColliderData{ .CircleCollider = .{ .radius = 5.0 } },
     });
 
-    var collisions: std.ArrayList(CollisionDetection.Collision) = .empty;
+    var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
     defer collisions.deinit(allocator);
 
-    try CollisionDetection.detectCollisions(&world, &collisions);
+    try CollisionDetectionSys.detectCollisions(&world, &collisions);
 
     try testing.expectEqual(@as(usize, 1), collisions.items.len);
     const collision = collisions.items[0];

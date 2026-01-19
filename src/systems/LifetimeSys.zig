@@ -1,4 +1,4 @@
-const ecs = @import("entity");
+const ecs = @import("ecs");
 const World = ecs.World;
 const Lifetime = ecs.Lifetime;
 const Destroy = ecs.Destroy;

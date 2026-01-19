@@ -1,6 +1,6 @@
 const Self = @This();
 const std = @import("std");
-const core = @import("core");
+const core = @import("math");
 const WorldPoint = core.WorldPoint;
 const WorldBounds = core.WorldBounds;
 

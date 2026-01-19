@@ -1,4 +1,4 @@
-const V2 = @import("core").V2;
+const V2 = @import("math").V2;
 pub const action_bind = @import("ActionBindings.zig");
 pub const ActionBindings = action_bind.ActionBindings;
 pub const OnCollision = action_bind.OnCollision;

@@ -2,7 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 const Action = @import("Action");
 const CollisionTrigger = Action.CollisionTrigger;
-const V2 = @import("core").V2;
+const V2 = @import("math").V2;
 
 test "CollisionTrigger - basic structure" {
     const action = Action.Action{

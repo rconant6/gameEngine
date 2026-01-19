@@ -1,13 +1,13 @@
-const std = @import("std");
-const plat = @import("platform");
-pub const Keyboard = plat.Keyboard;
-pub const Mouse = plat.Mouse;
-pub const KeyCode = plat.KeyCode;
-pub const MouseButton = plat.MouseButton;
-const core = @import("core");
-const V2 = core.V2;
-
 const Self = @This();
+const std = @import("std");
+const math = @import("math");
+const V2 = math.V2;
+const id = @import("InputDevice.zig");
+pub const Keyboard = id.Keyboard;
+pub const Mouse = id.Mouse;
+pub const KeyCode = id.KeyCode;
+pub const MouseButton = id.MouseButton;
+const platform = @import("platform.zig");
 
 keyboard: *const Keyboard,
 mouse: *const Mouse,
@@ -16,8 +16,8 @@ const SupportedInputTypes = .{ KeyCode, MouseButton };
 
 pub fn init() Self {
     return .{
-        .keyboard = plat.getKeyboard(),
-        .mouse = plat.getMouse(),
+        .keyboard = platform.getKeyboard(),
+        .mouse = platform.getMouse(),
     };
 }
 

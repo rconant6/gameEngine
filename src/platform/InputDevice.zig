@@ -1,6 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const core = @import("core");
+const core = @import("math");
 const V2 = core.V2;
 
 pub const Keyboard = InputDevice(KeyCode);

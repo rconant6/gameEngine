@@ -1,4 +1,4 @@
-const ecs = @import("entity");
+const ecs = @import("ecs");
 const World = ecs.World;
 
 pub fn run(world: *World, dt: f32) void {

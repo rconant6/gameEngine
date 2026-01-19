@@ -6,7 +6,7 @@ const DebugRenderer = @import("DebugRenderer.zig");
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
 const RenderContext = rend.RenderContext;
-const assets = @import("asset");
+const assets = @import("assets");
 const Font = assets.Font;
 
 gpa: Allocator,

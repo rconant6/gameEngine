@@ -1,5 +1,5 @@
 const std = @import("std");
-const ecs = @import("entity");
+const ecs = @import("ecs");
 const Components = ecs.comps;
 const Type = std.builtin.Type;
 

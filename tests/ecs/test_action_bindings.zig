@@ -2,7 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 const Action = @import("Action");
 const ActionBindings = Action.ActionBindings;
-const V2 = @import("core").V2;
+const V2 = @import("math").V2;
 
 // Mock trigger type for testing the generic
 const TestTrigger = struct {
