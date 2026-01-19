@@ -323,6 +323,22 @@ pub fn build(b: *std.Build) void {
     world_tests.linkLibrary(engine_lib);
     const run_world_tests = b.addRunArtifact(world_tests);
 
+    // World Query Tests
+    const world_query_test_module = b.addModule("world_query_tests", .{
+        .root_source_file = b.path("tests/ecs/test_world_queries.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    world_query_test_module.addImport("math", math_module);
+    world_query_test_module.addImport("scene", scene_module);
+    world_query_test_module.addImport("ecs", ecs_module);
+    const world_query_tests = b.addTest(.{
+        .name = "world-query-tests",
+        .root_module = world_query_test_module,
+    });
+    world_query_tests.linkLibrary(engine_lib);
+    const run_world_query_tests = b.addRunArtifact(world_query_tests);
+
     // Collider Component Tests
     const collider_test_module = b.addModule("collider_tests", .{
         .root_source_file = b.path("tests/ecs/test_collider.zig"),
@@ -629,6 +645,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_ecs_tests.step);
     test_step.dependOn(&run_query_tests.step);
     test_step.dependOn(&run_world_tests.step);
+    test_step.dependOn(&run_world_query_tests.step);
     test_step.dependOn(&run_collider_tests.step);
     test_step.dependOn(&run_action_tests.step);
     test_step.dependOn(&run_action_bindings_tests.step);
