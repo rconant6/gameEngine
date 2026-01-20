@@ -25,8 +25,6 @@ pub const lifetimeSystem = @import("LifetimeSys.zig").run;
 pub const renderSystem = @import("RenderSys.zig").run;
 pub const cameraTrackingSystem = @import("CameraTrackingSys.zig").run;
 
-pub const CollisionDetectionSys = @import("CollisionDetectionSys.zig");
-
 pub fn debugEntityInfoSystem(world: *World, debugger: *DebugManager) void {
     var query = world.query(.{Transform});
 

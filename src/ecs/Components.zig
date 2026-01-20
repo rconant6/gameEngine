@@ -5,6 +5,7 @@ const ColliderData = registry.ColliderData;
 const ShapeRegistry = registry.ShapeRegistry;
 const ShapeData = registry.ShapeData;
 const rend = @import("renderer");
+const ScreenAnchor = rend.ScreenAnchor;
 const Color = rend.Color;
 const Shape = rend.Shape;
 const asset = @import("assets");
@@ -58,6 +59,10 @@ pub const Box = struct {
 };
 pub const RenderLayer = struct {
     z_order: i32 = 0,
+};
+pub const UIElement = struct {
+    anchor: ScreenAnchor,
+    offset: V2,
 };
 
 // MARK: Physics Components
