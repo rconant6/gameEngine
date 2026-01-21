@@ -4,11 +4,12 @@ const math = @import("math");
 const V2 = math.V2;
 const renderer = @import("renderer");
 const Shapes = renderer.Shapes;
-const Line = Shapes.Line;
-const Triangle = Shapes.Triangle;
-const Rectangle = Shapes.Rectangle;
-const Circle = Shapes.Circle;
-const Ellipse = Shapes.Ellipse;
+const WorldPoint = math.WorldPoint;
+const Line = Shapes.Line(WorldPoint);
+const Triangle = Shapes.Triangle(WorldPoint);
+const Rectangle = Shapes.Rectangle(WorldPoint);
+const Circle = Shapes.Circle(WorldPoint);
+const Ellipse = Shapes.Ellipse(WorldPoint);
 
 test "Line: init with start and end points" {
     const allocator = testing.allocator;

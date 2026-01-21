@@ -319,17 +319,19 @@ test "SceneFormat: parse Camera component" {
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 }
 
-test "SceneFormat: parse Box component" {
+test "SceneFormat: parse Rectangle sprite component" {
     const allocator = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [Ground:entity]
         \\    [Transform]
         \\      position:vec3 {0.0, 0.0, 0.0}
-        \\    [Box]
-        \\      size:vec2 {20.0, 10.0}
+        \\    [Sprite:rectangle]
+        \\      center:vec2 {0.0, 0.0}
+        \\      half_width:f32 10.0
+        \\      half_height:f32 5.0
         \\      fill_color:color #000000
-        \\      filled:bool true
+        \\      visible:bool true
     ;
 
     var scene = try scene_format.parseString(allocator, source, "test.scene");

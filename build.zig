@@ -125,6 +125,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    registry_module.addImport("math", math_module);
     registry_module.addImport("component_registry", component_registry_module);
     registry_module.addImport("shape_registry", shape_registry_module);
     registry_module.addImport("collider_shape_registry", collider_shape_registry_module);

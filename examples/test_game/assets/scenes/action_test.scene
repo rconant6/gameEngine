@@ -8,10 +8,12 @@
     [Transform]
       position:vec3 {0.0, 0.0, -1.0}
       scale:f32 1.0
-    [Box]
-      size:vec2 {26.66, 20.0}
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 13.33
+      half_height:f32 10.0
       fill_color:color #1a1a2e
-      filled:bool true
+      visible:bool true
     [Tag]
       tags:string "background"
 

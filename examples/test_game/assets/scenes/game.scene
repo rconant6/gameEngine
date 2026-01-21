@@ -87,10 +87,12 @@
     [Transform]
       position:vec3 {0.0, 0.0, 0.0}
       scale:f32 4.0
-    [Box]
-      size:vec2 {7.0, 7.0}
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 3.5
+      half_height:f32 3.5
       fill_color:color #2F8223
-      filled:bool true
+      visible:bool true
 
 //  [Camera:entity]
 //    [Transform]
@@ -118,7 +120,9 @@
       [Transform]
         position:vec2 {-10.0, -8.0}
         scale:f32 4
-      [Box]
-        size:vec2 {0.4, 0.1}
+      [Sprite:rectangle]
+        center:vec2 {0.0, 0.0}
+        half_width:f32 0.2
+        half_height:f32 0.05
         fill_color:color #FF0000
-        filled:bool true
+        visible:bool true
