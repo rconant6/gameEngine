@@ -10,7 +10,6 @@ pub const Sprite = comps.Sprite;
 pub const Text = comps.Text;
 pub const RenderLayer = comps.RenderLayer;
 pub const Lifetime = comps.Lifetime;
-pub const Box = comps.Box;
 pub const Physics = comps.Physics;
 pub const Camera = comps.Camera;
 pub const CameraTracking = comps.CameraTracking;

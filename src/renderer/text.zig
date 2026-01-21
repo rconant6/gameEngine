@@ -76,9 +76,9 @@ fn drawGlyph(
         const t1 = V2{ .x = p1.x * scale + pos.x, .y = p1.y * scale + pos.y };
         const t2 = V2{ .x = p2.x * scale + pos.x, .y = p2.y * scale + pos.y };
 
-        const triangle: Shapes.Triangle = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
+        const triangle: Shapes.Triangle(WorldPoint) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
         renderer.drawGeometry(
-            ShapeRegistry.createShapeUnion(Shapes.Triangle, triangle),
+            ShapeRegistry.createShapeUnion(Shapes.Triangle(WorldPoint), triangle),
             .{},
             color,
             null,

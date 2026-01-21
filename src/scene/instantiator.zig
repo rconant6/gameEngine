@@ -8,17 +8,16 @@ const AssetDeclaration = scene_format.AssetDeclaration;
 const ShapeDeclaration = scene_format.ShapeDeclaration;
 const SpriteBlock = scene_format.SpriteBlock;
 const GenericBlock = scene_format.GenericBlock;
-
 const plat = @import("platform");
 const KeyCode = plat.KeyCode;
 const MouseButton = plat.MouseButton;
-
 const Property = scene_format.Property;
 const Value = scene_format.Value;
 const BaseType = scene_format.BaseType;
-
-const core = @import("math");
-const V2 = core.V2;
+const math = @import("math");
+const V2 = math.V2;
+const WorldPoint = math.WorldPoint;
+const ScreenPoint = math.ScreenPoint;
 const ComponentRegistry = @import("ecs").ComponentRegistry;
 const ShapeRegistry = @import("renderer").ShapeRegistry;
 const ColliderRegistry = @import("ecs").ColliderRegistry;
@@ -317,10 +316,10 @@ pub const Instantiator = struct {
         comptime ShapeType: type,
         sprite: SpriteBlock,
     ) !Components.Sprite {
-        if (ShapeType == Shapes.Polygon) {
+        if (ShapeType == Shapes.Polygon(WorldPoint) or ShapeType == Shapes.Polygon(ScreenPoint)) {
             return try self.buildPolygonSprite(sprite);
         }
-        if (ShapeType == Shapes.Ellipse) {
+        if (ShapeType == Shapes.Ellipse(WorldPoint) or ShapeType == Shapes.Ellipse(ScreenPoint)) {
             return InstantiatorError.Unimplemented;
         }
 
@@ -405,8 +404,8 @@ pub const Instantiator = struct {
                 }
             }
         }
-        const polygon = try Shapes.Polygon.init(self.allocator, owned_points);
-        component.geometry = ShapeRegistry.createShapeUnion(Shapes.Polygon, polygon);
+        const polygon = try Shapes.Polygon(WorldPoint).init(self.allocator, owned_points);
+        component.geometry = ShapeRegistry.createShapeUnion(Shapes.Polygon(WorldPoint), polygon);
 
         return component;
     }

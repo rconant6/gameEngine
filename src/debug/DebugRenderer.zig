@@ -9,6 +9,7 @@ const Rectangle = rend.Shapes.Rectangle;
 const Triangle = rend.Shapes.Triangle;
 const math = @import("math");
 const V2 = math.V2;
+const WorldPoint = math.WorldPoint;
 const ShapeRegistry = rend.ShapeRegistry;
 const draw = @import("DebugDraw.zig");
 const DebugDraw = draw.DebugDraw;
@@ -42,18 +43,18 @@ pub fn renderArrow(self: *Self, arrow: DebugArrow, ctx: RenderContext) void {
     const base_left = head_base.add(perpendicular.mul(half_width));
     const base_right = head_base.sub(perpendicular.mul(half_width));
 
-    const line_geo = Line{ .start = arrow.start, .end = head_base };
+    const line_geo = Line(WorldPoint){ .start = arrow.start, .end = head_base };
     self.renderer.drawGeometry(
-        ShapeRegistry.createShapeUnion(Line, line_geo),
+        ShapeRegistry.createShapeUnion(Line(WorldPoint), line_geo),
         null,
         arrow.color,
         arrow.color,
         1,
         ctx,
     );
-    const triangle_geo = Triangle{ .v0 = tip, .v1 = base_right, .v2 = base_left };
+    const triangle_geo = Triangle(WorldPoint){ .v0 = tip, .v1 = base_right, .v2 = base_left };
     self.renderer.drawGeometry(
-        ShapeRegistry.createShapeUnion(Triangle, triangle_geo),
+        ShapeRegistry.createShapeUnion(Triangle(WorldPoint), triangle_geo),
         null,
         null,
         arrow.color,
@@ -62,12 +63,12 @@ pub fn renderArrow(self: *Self, arrow: DebugArrow, ctx: RenderContext) void {
     );
 }
 pub fn renderCircle(self: *Self, circle: DebugCircle, ctx: RenderContext) void {
-    const geo = rend.Shapes.Circle{
+    const geo = rend.Shapes.Circle(WorldPoint){
         .origin = circle.origin,
         .radius = circle.radius,
     };
     self.renderer.drawGeometry(
-        ShapeRegistry.createShapeUnion(Circle, geo),
+        ShapeRegistry.createShapeUnion(Circle(WorldPoint), geo),
         null,
         if (circle.filled) circle.color else null,
         circle.color,
@@ -76,12 +77,12 @@ pub fn renderCircle(self: *Self, circle: DebugCircle, ctx: RenderContext) void {
     );
 }
 pub fn renderLine(self: *Self, line: DebugLine, ctx: RenderContext) void {
-    const geo = rend.Shapes.Line{
+    const geo = rend.Shapes.Line(WorldPoint){
         .start = line.start,
         .end = line.end,
     };
     self.renderer.drawGeometry(
-        ShapeRegistry.createShapeUnion(Line, geo),
+        ShapeRegistry.createShapeUnion(Line(WorldPoint), geo),
         null,
         null,
         line.color,
@@ -93,13 +94,13 @@ pub fn renderRect(self: *Self, rect: DebugRect, ctx: RenderContext) void {
     const half_w = (rect.max.x - rect.min.x) / 2;
     const half_h = (rect.max.y - rect.min.y) / 2;
     const center = rect.min.add(V2{ .x = half_w, .y = half_h });
-    const geo = Rectangle{
+    const geo = Rectangle(WorldPoint){
         .center = center,
         .half_width = half_w,
         .half_height = half_h,
     };
     self.renderer.drawGeometry(
-        ShapeRegistry.createShapeUnion(Rectangle, geo),
+        ShapeRegistry.createShapeUnion(Rectangle(WorldPoint), geo),
         null,
         if (rect.filled) rect.color else null,
         rect.color,

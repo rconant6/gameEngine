@@ -2,6 +2,12 @@ const std = @import("std");
 const renderer = @import("renderer");
 const Shapes = renderer.Shapes;
 const Type = std.builtin.Type;
+const math = @import("math");
+const WorldPoint = math.WorldPoint;
+const ScreenPoint = math.ScreenPoint;
+
+pub const point_types = .{ WorldPoint, ScreenPoint };
+pub const point_type_names = .{ "World", "Screen" };
 
 pub const ShapeData = blk: {
     const registry = ShapeRegistry;
@@ -45,25 +51,46 @@ pub const ShapeData = blk: {
 pub const ShapeRegistry = struct {
     pub const shape_types = blk: {
         const decls = @typeInfo(Shapes).@"struct".decls;
-        var types: [decls.len]type = undefined;
+        const decls_len = decls.len;
+        const point_types_count = point_types.len;
+        const total_size = decls_len * point_types_count;
+        var types: [total_size]type = undefined;
         for (decls, 0..) |decl, i| {
-            types[i] = @field(Shapes, decl.name);
+            if (@typeInfo(@TypeOf(@field(Shapes, decl.name))) == .@"fn") {
+                for (point_types, 0..) |point_type, j| {
+                    types[i * point_types_count + j] = @field(Shapes, decl.name)(point_type);
+                }
+            }
         }
         break :blk types;
     };
 
     pub const shape_names = blk: {
         const decls = @typeInfo(Shapes).@"struct".decls;
-        var names: [decls.len][]const u8 = undefined;
+        const decls_len = decls.len;
+        const point_types_count = point_types.len;
+        const total_size = decls_len * point_types_count;
+        var names: [total_size][]const u8 = undefined;
         for (decls, 0..) |decl, i| {
-            names[i] = decl.name;
+            if (@typeInfo(@TypeOf(@field(Shapes, decl.name))) == .@"fn") {
+                for (point_type_names, 0..) |type_name, j| {
+                    names[i * point_types_count + j] = decl.name ++ type_name;
+                }
+            }
         }
         break :blk names;
     };
 
     pub fn getShapeIndex(name: []const u8) ?usize {
         inline for (shape_names, 0..) |shape_name, i| {
-            if (std.ascii.eqlIgnoreCase(name, shape_name)) {
+            if (std.ascii.eqlIgnoreCase(shape_name, name)) {
+                return i;
+            }
+        }
+        inline for (shape_names, 0..) |shape_name, i| {
+            if (std.ascii.startsWithIgnoreCase(shape_name, name) and
+                std.mem.endsWith(u8, shape_name, "World"))
+            {
                 return i;
             }
         }

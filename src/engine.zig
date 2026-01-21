@@ -41,7 +41,6 @@ pub const Font = assets.Font;
 // MARK: ECS Types
 const ecs = @import("ecs");
 pub const ActiveCamera = ecs.ActiveCamera;
-pub const Box = ecs.Box;
 pub const Camera = ecs.Camera;
 pub const CameraTracking = ecs.CameraTracking;
 pub const Collider = ecs.Collider;

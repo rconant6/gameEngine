@@ -16,7 +16,7 @@ const min_zoom: f32 = 1.0;
 const max_zoom: f32 = 1000.0;
 
 ortho_size: f32, // vertical half_height in WORLDSPACE
-viewport: Rect,
+viewport: Rect(WorldPoint),
 priority: i32,
 rotation: f32 = 0,
 background: ?Color = Colors.CLEAR,

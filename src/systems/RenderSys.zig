@@ -1,10 +1,10 @@
 const assets = @import("assets");
 const AssetManager = assets.AssetManager;
 const math = @import("math");
+const WorldPoint = math.WorldPoint;
 const db = @import("debug");
 const DebugManager = db.DebugManager;
 const ecs = @import("ecs");
-const Box = ecs.Box;
 const Camera = ecs.Camera;
 const Destroy = ecs.Destroy;
 const Entity = ecs.Entity;
@@ -38,31 +38,6 @@ pub fn run(
         .scale_factor = 1.0,
         .time = 0,
     };
-
-    var box_query = world.query(.{ Transform, Box });
-    while (box_query.next()) |entry| {
-        const transform = entry.get(0);
-        const box = entry.get(1);
-        const geo = shapes.Rectangle.initFromCenter(
-            .{ .x = 0, .y = 0 },
-            box.size.x,
-            box.size.y,
-        );
-
-        if (box.filled) {
-            renderer.drawGeometry(ShapeRegistry.createShapeUnion(shapes.Rectangle, geo), .{
-                .offset = transform.position,
-                .rotation = transform.rotation,
-                .scale = transform.scale,
-            }, box.fill_color, null, 1.0, ctx);
-        } else {
-            renderer.drawGeometry(ShapeRegistry.createShapeUnion(shapes.Rectangle, geo), .{
-                .offset = transform.position,
-                .rotation = transform.rotation,
-                .scale = transform.scale,
-            }, null, box.fill_color, 1.0, ctx);
-        }
-    }
 
     var text_query = world.query(.{ Transform, Text });
     while (text_query.next()) |entry| {

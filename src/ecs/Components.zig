@@ -52,11 +52,6 @@ pub const Text = struct {
     size: f32,
     text_color: Color,
 };
-pub const Box = struct {
-    size: V2,
-    fill_color: ?Color = null,
-    filled: bool,
-};
 pub const RenderLayer = struct {
     z_order: i32 = 0,
 };
