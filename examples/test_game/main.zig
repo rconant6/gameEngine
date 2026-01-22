@@ -45,14 +45,6 @@ pub fn main() !void {
     try game.instantiateActiveScene();
 
     try game.loadTemplates("assets/templates/");
-    // }
-    const game_width = game.getGameWidth();
-    const game_height = game.getGameHeight();
-    game.logDebug(
-        .engine,
-        "GameWidth(f32): {d} GameHeight(f32): {d}",
-        .{ game_width, game_height },
-    );
 
     // ===== CAMERA TRACKING SETUP =====
     // Find the player entity and set camera to track it

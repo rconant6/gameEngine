@@ -29,7 +29,6 @@ const TemplateManager = scene.TemplateManager;
 const debug = @import("debug");
 const DebugCategory = debug.DebugCategory;
 const Debugger = debug.DebugManager;
-const ErrorLogger = debug.ErrorLogger;
 const builtin = @import("builtin");
 const debug_enabled = builtin.mode == .Debug;
 const Systems = @import("systems");
@@ -85,12 +84,10 @@ pub const Engine = struct {
 
     debugger: Debugger,
     performance_metrics: PerformanceMetrics = .{},
-    error_logger: ErrorLogger,
 
     active_camera_entity: Entity,
 
     // Logical window dimensions (for UIElement / ScreenPoint Rendering
-    // BUG: This logic needs to be set correctly from data from the platform
     window_width: u32,
     window_height: u32,
 
@@ -207,7 +204,6 @@ pub const Engine = struct {
             .running = true,
             .action_system = action_system,
             .scene_manager = SceneManager.init(allocator),
-            .error_logger = ErrorLogger.init(allocator),
             .collision_events = .empty,
             .instantiator = undefined,
             .template_manager = undefined,
@@ -229,7 +225,6 @@ pub const Engine = struct {
     }
 
     pub fn deinit(self: *Engine) void {
-        self.logInfo(.engine, "Engine shutting down", .{});
         const allocator = self.allocator;
         self.action_system.deinit();
         self.collision_events.deinit(self.allocator);
@@ -239,7 +234,6 @@ pub const Engine = struct {
         self.world.deinit();
         self.window.deinit();
         self.instantiator.deinit();
-        self.error_logger.deinit();
         self.template_manager.deinit();
         self.debugger.deinit();
 
@@ -293,9 +287,7 @@ pub const Engine = struct {
             .delta_time = dt,
             .action_queue = &self.action_system.action_queue,
         };
-        Systems.actionSystem(&self.world, &self.action_system, context) catch |err| {
-            self.logError(.assets, "Action system failure: {any}", .{err});
-        };
+        Systems.actionSystem(&self.world, &self.action_system, context) catch {};
         Systems.cameraTrackingSystem(&self.world, dt);
         Systems.lifetimeSystem(&self.world, dt);
         Systems.renderSystem(
@@ -331,18 +323,14 @@ pub const Engine = struct {
         _ = platform.pollEvent();
         self.input.keyboard = platform.getKeyboard();
         self.input.mouse = platform.getMouse();
-        self.renderer.beginFrame() catch |err| {
-            self.logError(.renderer, "Failure in beginFrame(): {any}", .{err});
-        };
+        self.renderer.beginFrame() catch {};
     }
     pub fn endFrame(self: *Engine) void {
         if (build_options.backend == .cpu) {
             const offset = self.renderer.getDisplayBufferOffset() orelse 0;
             self.window.swapBuffers(offset);
         }
-        self.renderer.endFrame() catch |err| {
-            self.logError(.renderer, "Failure in endFrame(): {any}", .{err});
-        };
+        self.renderer.endFrame() catch {};
     }
     pub fn clear(self: *Engine, color: Color) void {
         self.renderer.setClearColor(color);
@@ -433,12 +421,5 @@ pub const Engine = struct {
     pub const reloadActiveScene = @import("EngineScene.zig").reloadActiveScene;
 
     // MARK: Logging methods
-    pub const logDebug = @import("EngineLogging.zig").logDebug;
-    pub const logInfo = @import("EngineLogging.zig").logInfo;
-    pub const logWarning = @import("EngineLogging.zig").logWarning;
-    pub const logError = @import("EngineLogging.zig").logError;
-    pub const logFatal = @import("EngineLogging.zig").logFatal;
-    pub const getErrors = @import("EngineLogging.zig").getErrors;
-    pub const hasErrors = @import("EngineLogging.zig").hasErrors;
-    pub const clearErrors = @import("EngineLogging.zig").clearErrors;
+
 };

@@ -22,9 +22,7 @@ pub const World = ecs.World;
 const Engine = @import("../engine.zig").Engine;
 
 pub fn createEntity(self: *Engine) Entity {
-    return self.world.createEntity() catch |err| {
-        self.logError(.ecs, "Unable to add to create Entity: {any}", .{err});
-    };
+    return self.world.createEntity() catch {};
 }
 
 pub fn destroyEntity(self: *Engine, entity: Entity) void {
@@ -37,13 +35,7 @@ pub fn addComponent(
     comptime T: type,
     value: T,
 ) void {
-    self.world.addComponent(entity, T, value) catch |err| {
-        self.logError(
-            .ecs,
-            "Unable to add component to Entity: {d} {any}",
-            .{ entity.id, err },
-        );
-    };
+    self.world.addComponent(entity, T, value) catch {};
 }
 
 pub fn findEntityByTag(self: *Engine, tag: []const u8) ?Entity {

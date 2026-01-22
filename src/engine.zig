@@ -84,7 +84,3 @@ pub const TemplateManager = scene.TemplateManager;
 const debug = @import("debug");
 pub const DebugCategory = debug.DebugCategory;
 pub const Debugger = debug.DebugManager;
-pub const ErrorEntry = debug.ErrorEntry;
-pub const ErrorLogger = debug.ErrorLogger;
-pub const Severity = debug.Severity;
-pub const Subsystem = debug.SubSystem;
