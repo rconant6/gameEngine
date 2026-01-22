@@ -82,21 +82,25 @@ pub fn Rectangle(comptime PointType: type) type {
         }
 
         pub fn getCorners(self: *const @This()) [4]PointType {
+            const XType = @TypeOf(self.center.x);
+            const hw = if (XType == i32) @as(i32, @intFromFloat(self.half_width)) else self.half_width;
+            const hh = if (XType == i32) @as(i32, @intFromFloat(self.half_height)) else self.half_height;
+
             const top_left: PointType = .{
-                .x = self.center.x - self.half_width,
-                .y = self.center.y + self.half_height,
+                .x = self.center.x - hw,
+                .y = self.center.y + hh,
             };
             const top_right: PointType = .{
-                .x = self.center.x + self.half_width,
-                .y = self.center.y + self.half_height,
+                .x = self.center.x + hw,
+                .y = self.center.y + hh,
             };
             const bottom_right: PointType = .{
-                .x = self.center.x + self.half_width,
-                .y = self.center.y - self.half_height,
+                .x = self.center.x + hw,
+                .y = self.center.y - hh,
             };
             const bottom_left: PointType = .{
-                .x = self.center.x - self.half_width,
-                .y = self.center.y - self.half_height,
+                .x = self.center.x - hw,
+                .y = self.center.y - hh,
             };
             return .{ top_left, top_right, bottom_right, bottom_left };
         }

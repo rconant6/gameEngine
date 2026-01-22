@@ -6,6 +6,7 @@ const math = @import("math");
 const WorldPoint = math.WorldPoint;
 const ScreenPoint = math.ScreenPoint;
 
+pub const CoordinateSpace = enum { WorldSpace, ScreenSpace };
 pub const point_types = .{ WorldPoint, ScreenPoint };
 pub const point_type_names = .{ "World", "Screen" };
 
@@ -81,15 +82,26 @@ pub const ShapeRegistry = struct {
         break :blk names;
     };
 
-    pub fn getShapeIndex(name: []const u8) ?usize {
-        inline for (shape_names, 0..) |shape_name, i| {
-            if (std.ascii.eqlIgnoreCase(shape_name, name)) {
-                return i;
-            }
-        }
+    pub fn getShapeIndex(name: []const u8, coord_space: CoordinateSpace) ?usize {
+        return switch (coord_space) {
+            .WorldSpace => getWorldShapeIndex(name),
+            .ScreenSpace => getScreenShapeIndex(name),
+        };
+    }
+    fn getWorldShapeIndex(name: []const u8) ?usize {
         inline for (shape_names, 0..) |shape_name, i| {
             if (std.ascii.startsWithIgnoreCase(shape_name, name) and
                 std.mem.endsWith(u8, shape_name, "World"))
+            {
+                return i;
+            }
+        }
+        return null;
+    }
+    fn getScreenShapeIndex(name: []const u8) ?usize {
+        inline for (shape_names, 0..) |shape_name, i| {
+            if (std.ascii.startsWithIgnoreCase(shape_name, name) and
+                std.mem.endsWith(u8, shape_name, "Screen"))
             {
                 return i;
             }

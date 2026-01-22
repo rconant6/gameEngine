@@ -37,7 +37,11 @@ pub fn main() !void {
     try game.loadScene("camera", "camera_test.scene");
     try game.setActiveScene("camera");
 
-    // NOTE loading all 3 andd setting to active to see where/when something breaks
+    // UI test scene - tests screen-space HUD elements
+    try game.loadScene("ui", "ui_test.scene");
+    try game.setActiveScene("ui");
+
+    // NOTE loading all scenes and setting to active to see where/when something breaks
     try game.instantiateActiveScene();
 
     try game.loadTemplates("assets/templates/");
@@ -65,14 +69,50 @@ pub fn main() !void {
     }
     // ===== END CAMERA TRACKING SETUP =====
 
-    // ===== CAMERA TEST SCENE NOTES =====
-    // This scene tests camera controls and coordinate systems:
+    // ===== MANUAL UI ELEMENT TEST =====
+    // Create a hardcoded UIElement to test if the rendering pipeline works
+    {
+        const RectScreen = engine.Rectangle(engine.ScreenPoint);
+        const test_ui = game.createEntity();
+        game.addComponent(test_ui, engine.UIElement, .{
+            .anchor = .TopRight,
+            .offset = .{ .x = -100, .y = 100 },
+        });
+        game.addComponent(test_ui, engine.Sprite, .{
+            .geometry = engine.ShapeRegistry.createShapeUnion(
+                RectScreen,
+                RectScreen{
+                    .center = .{ .x = 0, .y = 0 }, // Centered at anchor + offset
+                    .half_width = 50,
+                    .half_height = 50,
+                },
+            ),
+            .fill_color = Colors.NEON_MAGENTA,
+            .stroke_color = Colors.WHITE,
+            .stroke_width = 3.0,
+            .visible = true,
+        });
+        game.addComponent(test_ui, engine.Tag, .{ .tags = "test-ui" });
+    }
+    // ===== END MANUAL UI ELEMENT TEST =====
+
+    // ===== UI TEST SCENE NOTES =====
+    // This scene tests screen-space UI elements (HUD) vs world-space rendering:
+    //
+    // WORLD-SPACE ELEMENTS (move with camera):
     // - Pink circle at origin (0, 0) - world center reference
     // - Red rectangles at N/S (±20 Y) - vertical extent markers
     // - Blue rectangles at E/W (±30 X) - horizontal extent markers
     // - Yellow circles at corners - world bounds visualization
-    // - Green circle (player) - WASD to move, demonstrates object movement vs camera
-    // - Gray dots - grid pattern to show culling when camera moves
+    // - Green circle (player) - WASD to move, camera follows
+    // - Gray dots - grid pattern to show culling
+    //
+    // SCREEN-SPACE ELEMENTS (stay fixed on screen):
+    // - Health bar (top-left) - green bar with background
+    // - Score display (top-right) - blue background panel
+    // - Crosshair (screen center) - red circle
+    // - Mini-map (top-right corner) - teal bordered square with player dot
+    // - Bottom UI panel - gray panel at bottom of screen
     //
     // CONTROLS:
     //   WASD: Move green player - camera follows with spring-damper smoothing
@@ -84,12 +124,10 @@ pub fn main() !void {
     //   ]: Tight camera follow (responsive, snappy)
     //
     // WHAT TO TEST:
-    //   1. WASD moves player - camera smoothly follows with spring physics
-    //   2. T toggles tracking - switch between manual and automatic camera
-    //   3. [ and ] adjust follow feel - test different tracking personalities
-    //   4. Arrow keys pan when tracking off - manual camera control
-    //   5. Q/E zoom - see more or less of the world
-    //   6. R resets camera - return to default view
+    //   1. Move camera - HUD elements should STAY FIXED on screen
+    //   2. World elements should move when camera pans/zooms
+    //   3. UI elements should ignore camera transform completely
+    //   4. Test that screen-space coordinates are in pixel units
     // =======================================
 
     // Debug text for font testing (comment out if not needed)

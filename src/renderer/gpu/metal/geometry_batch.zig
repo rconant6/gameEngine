@@ -90,7 +90,7 @@ pub const GeometryBatch = struct {
                     const tag_str = tag_name;
                     if (std.mem.endsWith(u8, tag_str, "World")) {
                         break :blk tag_str[0 .. tag_str.len - 5];
-                    } else if (std.mem.endsWith(u8, tag_str, "Scene")) {
+                    } else if (std.mem.endsWith(u8, tag_str, "Screen")) {
                         break :blk tag_str[0 .. tag_str.len - 6];
                     }
                     break :blk tag_str;
@@ -122,10 +122,20 @@ pub const GeometryBatch = struct {
     }
     inline fn makeScreenVertex(
         point: ScreenPoint,
+        xform: ?Transform,
         ctx: RenderContext,
         color: [4]f32,
     ) Vertex {
-        const clip_pos = utils.screenToClipSpace(point, ctx);
+        // Apply transform offset to screen-space point
+        const transformed = if (xform) |t| blk: {
+            const offset_x: i32 = if (t.offset) |off| @intFromFloat(off.x) else 0;
+            const offset_y: i32 = if (t.offset) |off| @intFromFloat(off.y) else 0;
+            break :blk ScreenPoint{
+                .x = point.x + offset_x,
+                .y = point.y + offset_y,
+            };
+        } else point;
+        const clip_pos = utils.screenToClipSpace(transformed, ctx);
         return .{ .position = clip_pos, .color = color };
     }
 
@@ -151,7 +161,7 @@ pub const GeometryBatch = struct {
             makeVertex(line.start, transform, ctx, color);
 
         const end_vert = if (PointType == ScreenPoint)
-            makeScreenVertex(line.end, ctx, color)
+            makeScreenVertex(line.end, transform, ctx, color)
         else
             makeVertex(line.end, transform, ctx, color);
         const vertices = [_]Vertex{ start_vert, end_vert };
@@ -203,15 +213,15 @@ pub const GeometryBatch = struct {
         var batch_offset: u32 = @intCast(self.vertices.items.len);
         if (has_fill) {
             const v0 = if (PointType == ScreenPoint)
-                makeScreenVertex(tri.v0, ctx, fc)
+                makeScreenVertex(tri.v0, transform, ctx, fc)
             else
                 makeVertex(tri.v0, transform, ctx, fc);
             const v1 = if (PointType == ScreenPoint)
-                makeScreenVertex(tri.v1, ctx, fc)
+                makeScreenVertex(tri.v1, transform, ctx, fc)
             else
                 makeVertex(tri.v1, transform, ctx, fc);
             const v2 = if (PointType == ScreenPoint)
-                makeScreenVertex(tri.v2, ctx, fc)
+                makeScreenVertex(tri.v2, transform, ctx, fc)
             else
                 makeVertex(tri.v2, transform, ctx, fc);
             const vertices = [_]Vertex{ v0, v1, v2 };
@@ -226,15 +236,15 @@ pub const GeometryBatch = struct {
 
         if (has_outline) {
             const v0 = if (PointType == ScreenPoint)
-                makeScreenVertex(tri.v0, ctx, sc)
+                makeScreenVertex(tri.v0, transform, ctx, sc)
             else
                 makeVertex(tri.v0, transform, ctx, sc);
             const v1 = if (PointType == ScreenPoint)
-                makeScreenVertex(tri.v1, ctx, sc)
+                makeScreenVertex(tri.v1, transform, ctx, sc)
             else
                 makeVertex(tri.v1, transform, ctx, sc);
             const v2 = if (PointType == ScreenPoint)
-                makeScreenVertex(tri.v2, ctx, sc)
+                makeScreenVertex(tri.v2, transform, ctx, sc)
             else
                 makeVertex(tri.v2, transform, ctx, sc);
             self.vertices.appendSliceAssumeCapacity(&.{ v0, v1, v1, v2, v2, v0 });
@@ -259,6 +269,8 @@ pub const GeometryBatch = struct {
         const has_outline = stroke_color != null;
         if (!has_fill and !has_outline) return;
 
+        const PointType: type = @TypeOf(rect.center);
+
         const vertex_count: u32 = blk: {
             var count: u32 = 0;
             if (has_fill) count += 6;
@@ -279,23 +291,22 @@ pub const GeometryBatch = struct {
         const sc = if (has_outline) utils.colorToFloat(stroke_color.?) else undefined;
 
         const corners = rect.getCorners();
-        const PointType: type = @TypeOf(rect.center);
         var batch_offset: u32 = @intCast(self.vertices.items.len);
         if (has_fill) {
             const v0 = if (PointType == ScreenPoint)
-                makeScreenVertex(corners[0], ctx, fc)
+                makeScreenVertex(corners[0], transform, ctx, fc)
             else
                 makeVertex(corners[0], transform, ctx, fc);
             const v1 = if (PointType == ScreenPoint)
-                makeScreenVertex(corners[1], ctx, fc)
+                makeScreenVertex(corners[1], transform, ctx, fc)
             else
                 makeVertex(corners[1], transform, ctx, fc);
             const v2 = if (PointType == ScreenPoint)
-                makeScreenVertex(corners[2], ctx, fc)
+                makeScreenVertex(corners[2], transform, ctx, fc)
             else
                 makeVertex(corners[2], transform, ctx, fc);
             const v3 = if (PointType == ScreenPoint)
-                makeScreenVertex(corners[3], ctx, fc)
+                makeScreenVertex(corners[3], transform, ctx, fc)
             else
                 makeVertex(corners[3], transform, ctx, fc);
             self.vertices.appendSliceAssumeCapacity(&.{
@@ -310,19 +321,19 @@ pub const GeometryBatch = struct {
         }
         if (has_outline) {
             const v0 = if (PointType == ScreenPoint)
-                makeScreenVertex(corners[0], ctx, sc)
+                makeScreenVertex(corners[0], transform, ctx, sc)
             else
                 makeVertex(corners[0], transform, ctx, sc);
             const v1 = if (PointType == ScreenPoint)
-                makeScreenVertex(corners[1], ctx, sc)
+                makeScreenVertex(corners[1], transform, ctx, sc)
             else
                 makeVertex(corners[1], transform, ctx, sc);
             const v2 = if (PointType == ScreenPoint)
-                makeScreenVertex(corners[2], ctx, sc)
+                makeScreenVertex(corners[2], transform, ctx, sc)
             else
                 makeVertex(corners[2], transform, ctx, sc);
             const v3 = if (PointType == ScreenPoint)
-                makeScreenVertex(corners[3], ctx, sc)
+                makeScreenVertex(corners[3], transform, ctx, sc)
             else
                 makeVertex(corners[3], transform, ctx, sc);
             self.vertices.appendSliceAssumeCapacity(&.{
@@ -367,15 +378,15 @@ pub const GeometryBatch = struct {
         if (has_fill) {
             for (cache) |tris| {
                 const v0 = if (PointType == ScreenPoint)
-                    makeScreenVertex(tris[0], ctx, fc)
+                    makeScreenVertex(tris[0], transform, ctx, fc)
                 else
                     makeVertex(tris[0], transform, ctx, fc);
                 const v1 = if (PointType == ScreenPoint)
-                    makeScreenVertex(tris[1], ctx, fc)
+                    makeScreenVertex(tris[1], transform, ctx, fc)
                 else
                     makeVertex(tris[1], transform, ctx, fc);
                 const v2 = if (PointType == ScreenPoint)
-                    makeScreenVertex(tris[2], ctx, fc)
+                    makeScreenVertex(tris[2], transform, ctx, fc)
                 else
                     makeVertex(tris[2], transform, ctx, fc);
                 self.vertices.appendSliceAssumeCapacity(&.{ v0, v1, v2 });
@@ -392,12 +403,12 @@ pub const GeometryBatch = struct {
             for (poly.points, 0..) |point, i| {
                 const edge_start = self.vertices.items.len;
                 const v1 = if (PointType == ScreenPoint)
-                    makeScreenVertex(point, ctx, sc)
+                    makeScreenVertex(point, transform, ctx, sc)
                 else
                     makeVertex(point, transform, ctx, sc);
                 const v2_idx: usize = (i + 1) % poly.points.len;
                 const v2 = if (PointType == ScreenPoint)
-                    makeScreenVertex(poly.points[v2_idx], ctx, sc)
+                    makeScreenVertex(poly.points[v2_idx], transform, ctx, sc)
                 else
                     makeVertex(poly.points[v2_idx], transform, ctx, sc);
                 self.vertices.appendSliceAssumeCapacity(&.{ v1, v2 });
@@ -447,7 +458,7 @@ pub const GeometryBatch = struct {
 
         const PointType: type = @TypeOf(circle.origin);
         const origin_vertex = if (PointType == ScreenPoint)
-            makeScreenVertex(circle.origin, ctx, fc)
+            makeScreenVertex(circle.origin, transform, ctx, fc)
         else
             makeVertex(circle.origin, transform, ctx, fc);
         for (0..segments) |i| {
@@ -455,22 +466,29 @@ pub const GeometryBatch = struct {
             const angle1 = i_f * angle_step;
             const angle2 = (i_f + 1.0) * angle_step;
 
-            const p1 = PointType{
+            const XType = @TypeOf(circle.origin.x);
+            const p1 = if (XType == i32) PointType{
+                .x = circle.origin.x + @as(i32, @intFromFloat(circle.radius * @cos(angle1))),
+                .y = circle.origin.y + @as(i32, @intFromFloat(circle.radius * @sin(angle1))),
+            } else PointType{
                 .x = circle.origin.x + circle.radius * @cos(angle1),
                 .y = circle.origin.y + circle.radius * @sin(angle1),
             };
-            const p2 = PointType{
+            const p2 = if (XType == i32) PointType{
+                .x = circle.origin.x + @as(i32, @intFromFloat(circle.radius * @cos(angle2))),
+                .y = circle.origin.y + @as(i32, @intFromFloat(circle.radius * @sin(angle2))),
+            } else PointType{
                 .x = circle.origin.x + circle.radius * @cos(angle2),
                 .y = circle.origin.y + circle.radius * @sin(angle2),
             };
 
             if (has_fill) {
                 const v1 = if (PointType == ScreenPoint)
-                    makeScreenVertex(p1, ctx, fc)
+                    makeScreenVertex(p1, transform, ctx, fc)
                 else
                     makeVertex(p1, transform, ctx, fc);
                 const v2 = if (PointType == ScreenPoint)
-                    makeScreenVertex(p2, ctx, fc)
+                    makeScreenVertex(p2, transform, ctx, fc)
                 else
                     makeVertex(p2, transform, ctx, fc);
                 const current_offset: u32 = @intCast(self.vertices.items.len);
@@ -485,11 +503,11 @@ pub const GeometryBatch = struct {
             if (has_outline) {
                 const current_offset: u32 = @intCast(self.vertices.items.len);
                 const v1 = if (PointType == ScreenPoint)
-                    makeScreenVertex(p1, ctx, sc)
+                    makeScreenVertex(p1, transform, ctx, sc)
                 else
                     makeVertex(p1, transform, ctx, sc);
                 const v2 = if (PointType == ScreenPoint)
-                    makeScreenVertex(p2, ctx, sc)
+                    makeScreenVertex(p2, transform, ctx, sc)
                 else
                     makeVertex(p2, transform, ctx, sc);
                 self.vertices.appendSliceAssumeCapacity(&.{ v1, v2 });

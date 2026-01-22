@@ -9,6 +9,7 @@ pub const Shapes = shapes_module;
 const registry = @import("registry");
 pub const ShapeRegistry = registry.ShapeRegistry;
 pub const ShapeData = registry.ShapeData;
+pub const CoordinateSpace = registry.CoordinateSpace;
 pub const triangulation = @import("triangulation.zig");
 const build_options = @import("build_options");
 const col = @import("color.zig");

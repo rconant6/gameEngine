@@ -19,16 +19,17 @@ pub const V2 = math.V2;
 pub const V2I = math.V2I;
 pub const V2U = math.V2U;
 pub const WorldPoint = V2;
+pub const ScreenPoint = V2I;
 
 // MARK: Renderer Types
 const renderer = @import("renderer");
 pub const Color = renderer.Color;
 pub const Colors = renderer.Colors;
-pub const Circle = renderer.Circle;
-pub const Rectangle = renderer.Rectangle;
-pub const Triangle = renderer.Triangle;
-pub const Polygon = renderer.Polygon;
-pub const Line = renderer.Line;
+pub const Circle = renderer.Shapes.Circle;
+pub const Rectangle = renderer.Shapes.Rectangle;
+pub const Triangle = renderer.Shapes.Triangle;
+pub const Polygon = renderer.Shapes.Polygon;
+pub const Line = renderer.Shapes.Line;
 pub const RenderContext = renderer.RenderContext;
 pub const RenderTransform = renderer.Transform;
 pub const ShapeRegistry = renderer.ShapeRegistry;
@@ -60,6 +61,7 @@ pub const Tag = ecs.Tag;
 pub const Text = ecs.Text;
 pub const TrackingMode = ecs.TrackingMode;
 pub const Transform = ecs.Transform;
+pub const UIElement = ecs.UIElement;
 pub const Velocity = ecs.Velocity;
 pub const World = ecs.World;
 

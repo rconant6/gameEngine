@@ -89,6 +89,11 @@ pub const Engine = struct {
 
     active_camera_entity: Entity,
 
+    // Logical window dimensions (for UIElement / ScreenPoint Rendering
+    // BUG: This logic needs to be set correctly from data from the platform
+    window_width: u32,
+    window_height: u32,
+
     pub fn init(
         allocator: Allocator,
         title: []const u8,
@@ -101,6 +106,8 @@ pub const Engine = struct {
             had_error = true;
         };
 
+        // NOTE: need to make sure what we are storing is correct and scaled
+        // for display info and window size to get 1:1 pixels in the window
         const window = platform.createWindow(.{
             .title = title,
             .width = width,
@@ -115,6 +122,7 @@ pub const Engine = struct {
 
         const f_width: f32 = @floatFromInt(width);
         const f_height: f32 = @floatFromInt(height);
+        const aspect_ratio = f_width / f_height;
 
         const scaled_width: u32 = @intFromFloat(f_width * scale_factor);
         const scaled_height: u32 = @intFromFloat(f_height * scale_factor);
@@ -158,12 +166,13 @@ pub const Engine = struct {
         };
         try world.addComponent(camera, ActiveCamera, ActiveCamera{});
         try world.addComponent(camera, Transform, Transform{});
+
         try world.addComponent(camera, Camera, Camera{
             .ortho_size = 25.0,
             .viewport = .{
                 .center = V2.ZERO,
-                .half_width = @floatFromInt(scaled_width / 2),
-                .half_height = @floatFromInt(scaled_height / 2),
+                .half_width = aspect_ratio, // Store aspect ratio, not pixel dimensions
+                .half_height = 1.0,
             },
             .priority = 1,
         });
@@ -204,6 +213,8 @@ pub const Engine = struct {
             .template_manager = undefined,
             .debugger = undefined,
             .active_camera_entity = camera,
+            .window_width = width,
+            .window_height = height,
         };
 
         engine.instantiator = .init(allocator, &engine.world, &engine.assets);
@@ -294,6 +305,8 @@ pub const Engine = struct {
             self.active_camera_entity,
             dt,
             &self.debugger,
+            self.window_width,
+            self.window_height,
         );
         if (debug_enabled) {
             Systems.debugEntityInfoSystem(&self.world, &self.debugger);

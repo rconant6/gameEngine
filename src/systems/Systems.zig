@@ -10,6 +10,7 @@ const Destroy = ecs.Destroy;
 const Lifetime = ecs.Lifetime;
 const Sprite = ecs.Sprite;
 const Transform = ecs.Transform;
+const UIElement = ecs.UIElement;
 const Velocity = ecs.Velocity;
 const World = ecs.World;
 const rend = @import("renderer");
@@ -56,6 +57,10 @@ pub fn debugEntityInfoSystem(world: *World, debugger: *DebugManager) void {
         }
         if (world.hasComponent(entry.entity, ActiveCamera)) {
             indicators[idx] = 'A';
+            idx += 1;
+        }
+        if (world.hasComponent(entry.entity, UIElement)) {
+            indicators[idx] = 'U';
             idx += 1;
         }
         if (world.hasComponent(entry.entity, ecs.Tag)) {

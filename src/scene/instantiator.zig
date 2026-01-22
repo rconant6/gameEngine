@@ -36,6 +36,8 @@ const AssetManager = asset.AssetManager;
 const rend = @import("renderer");
 const Color = rend.Color;
 const Colors = rend.Colors;
+const CoordinateSpace = rend.CoordinateSpace;
+const ScreenAnchor = rend.ScreenAnchor;
 
 const acts = @import("action");
 const Action = acts.Action;
@@ -50,11 +52,28 @@ pub const InstantiatorError = error{
     MissingAssetPath,
     MissingRequiredField,
     NotOptionalValue,
-    TypeMismatch,
     UnableToFindFont,
     UnableToLoadFont,
     UnknownComponent,
     UnknownProperty,
+
+    ActionTargetTypeMismatch,
+    ArrayTypeMismatch,
+    BoolTypeMismatch,
+    ColorTypeMismatch,
+    EnumTypeMismatch,
+    FloatTypeMismatch,
+    FontHandleTypeMismatch,
+    IntTypeMismatch,
+    KeyCodeTypeMismatch,
+    MouseButtonTypeMismatch,
+    OptionalTypeMismatch,
+    PointerTypeMismatch,
+    ScreenAnchorMismatch,
+    StringTypeMismatch,
+    TypeMismatch,
+    V2ITypeMismatch,
+    V2TypeMismatch,
 
     Unimplemented,
     UnimplementedAction,
@@ -66,6 +85,7 @@ pub const Instantiator = struct {
     last_instantiated_entities: std.ArrayList(Entity),
     world: *World,
     assets: *AssetManager,
+    in_screen_space: bool = false,
 
     pub fn init(allocator: Allocator, world: *World, assets: *AssetManager) Instantiator {
         return .{
@@ -139,6 +159,17 @@ pub const Instantiator = struct {
         const entity = try self.world.createEntity();
         try self.last_instantiated_entities.append(self.allocator, entity);
         std.log.debug("EntityName: {s} Id: {d}", .{ entity_decl.name, entity.id });
+
+        for (entity_decl.components) |comp_decl| {
+            switch (comp_decl) {
+                inline else => |comp| {
+                    if (std.mem.eql(u8, comp.name, "UIElement")) {
+                        self.in_screen_space = true;
+                        break;
+                    }
+                },
+            }
+        }
         for (entity_decl.components) |*comp_decl| {
             try self.addComponent(entity, comp_decl);
         }
@@ -246,7 +277,9 @@ pub const Instantiator = struct {
                 }
             },
             .sprite => |s| {
-                const shape_index = ShapeRegistry.getShapeIndex(s.shape_type) orelse
+                defer self.in_screen_space = false;
+                const coord_space: CoordinateSpace = if (self.in_screen_space) .ScreenSpace else .WorldSpace;
+                const shape_index = ShapeRegistry.getShapeIndex(s.shape_type, coord_space) orelse
                     return InstantiatorError.UnknownComponent;
                 inline for (ShapeRegistry.shape_names, 0..) |_, i| {
                     if (shape_index == i) {
@@ -325,6 +358,11 @@ pub const Instantiator = struct {
 
         var component = std.mem.zeroInit(Components.Sprite, .{});
         var shape = std.mem.zeroInit(ShapeType, .{});
+
+        // For screen space shapes, geometry should be centered at (0,0)
+        // and positioning comes from the entity's UIElement component
+        const is_screen_space = self.in_screen_space;
+
         if (sprite.properties) |props| {
             for (props) |prop| {
                 var field_found = false;
@@ -347,6 +385,16 @@ pub const Instantiator = struct {
                 if (!field_found) {
                     inline for (std.meta.fields(ShapeType)) |shape_field| {
                         if (std.mem.eql(u8, shape_field.name, prop.name)) {
+                            // Skip setting center/origin for screen space shapes
+                            // These should always be (0,0) for screen space
+                            if (is_screen_space and
+                                (std.mem.eql(u8, shape_field.name, "center") or
+                                    std.mem.eql(u8, shape_field.name, "origin")))
+                            {
+                                field_found = true;
+                                break;
+                            }
+
                             field_found = true;
                             const field_value = try self.extractValueForType(
                                 shape_field.type,
@@ -596,20 +644,20 @@ pub const Instantiator = struct {
                 // T is f32 or f64
                 return switch (value) {
                     .number => |n| @floatCast(n),
-                    else => InstantiatorError.TypeMismatch,
+                    else => InstantiatorError.FloatTypeMismatch,
                 };
             },
             .int => {
                 // T is i32, u8, u32...
                 return switch (value) {
                     .number => |n| @intFromFloat(n),
-                    else => InstantiatorError.TypeMismatch,
+                    else => InstantiatorError.IntTypeMismatch,
                 };
             },
             .bool => {
                 return switch (value) {
                     .boolean => |b| b,
-                    else => InstantiatorError.TypeMismatch,
+                    else => InstantiatorError.BoolTypeMismatch,
                 };
             },
             .pointer => |ptr_info| {
@@ -617,7 +665,7 @@ pub const Instantiator = struct {
                 if (ptr_info.size == .slice and ptr_info.child == u8) {
                     return switch (value) {
                         .string => |s| s,
-                        else => InstantiatorError.TypeMismatch,
+                        else => InstantiatorError.StringTypeMismatch,
                     };
                 }
                 // For []const V2 (point arrays for polygons)
@@ -635,38 +683,47 @@ pub const Instantiator = struct {
                                     },
                                     else => {
                                         self.allocator.free(points);
-                                        return InstantiatorError.TypeMismatch;
+                                        return InstantiatorError.ArrayTypeMismatch;
                                     },
                                 }
                             }
                             break :blk points;
                         },
-                        else => InstantiatorError.TypeMismatch,
+                        else => InstantiatorError.ArrayTypeMismatch,
                     };
                 }
-                return InstantiatorError.TypeMismatch;
+                return InstantiatorError.PointerTypeMismatch;
             },
             .@"struct" => {
-                // For V2, Color, FontHandle...
+                // For V2, V2I, Color, FontHandle...
                 if (T == V2) {
                     return switch (value) {
                         .vector => |v| V2{
                             .x = @floatCast(v[0]),
                             .y = @floatCast(v[1]),
                         },
-                        else => InstantiatorError.TypeMismatch,
+                        else => InstantiatorError.V2TypeMismatch,
+                    };
+                }
+                if (T == math.V2I) {
+                    return switch (value) {
+                        .vector => |v| math.V2I{
+                            .x = @intFromFloat(v[0]),
+                            .y = @intFromFloat(v[1]),
+                        },
+                        else => InstantiatorError.V2ITypeMismatch,
                     };
                 }
                 if (T == Color) {
                     return switch (value) {
                         .color => |c| Color.initFromU32Hex(c),
-                        else => InstantiatorError.TypeMismatch,
+                        else => InstantiatorError.ColorTypeMismatch,
                     };
                 }
                 if (T == FontHandle) {
                     return switch (value) {
                         .assetRef => |a| try self.assets.getFontAssetHandle(a),
-                        else => InstantiatorError.TypeMismatch,
+                        else => InstantiatorError.FontHandleTypeMismatch,
                     };
                 }
                 return InstantiatorError.TypeMismatch;
@@ -682,26 +739,30 @@ pub const Instantiator = struct {
                     // TODO buildShape
                     return InstantiatorError.ShapeBuilding;
                 }
-                return InstantiatorError.TypeMismatch;
+                return InstantiatorError.OptionalTypeMismatch;
             },
             .@"enum" => {
                 if (T == ActionTarget)
                     return getActionTarget(value.string) orelse
-                        return InstantiatorError.TypeMismatch;
+                        return InstantiatorError.ActionTargetTypeMismatch;
                 if (T == KeyCode) {
                     return getKeyCode(value.string) orelse
-                        return InstantiatorError.TypeMismatch;
+                        return InstantiatorError.KeyCodeTypeMismatch;
                 }
                 if (T == MouseButton) {
                     return getMouseButton(value.string) orelse
-                        return InstantiatorError.TypeMismatch;
+                        return InstantiatorError.MouseButtonTypeMismatch;
                 }
-                return InstantiatorError.TypeMismatch;
+                if (T == ScreenAnchor) {
+                    return getScreenAnchor(value.string) orelse
+                        return InstantiatorError.ScreenAnchorMismatch;
+                }
+                return InstantiatorError.EnumTypeMismatch;
             },
             .@"union" => {
                 return InstantiatorError.TypeMismatch;
             },
-            else => return InstantiatorError.TypeMismatch,
+            else => return InstantiatorError.UnionTypeMismatch,
         }
         return InstantiatorError.TypeMismatch;
     }
@@ -770,40 +831,6 @@ fn getActionTarget(target: []const u8) ?ActionTarget {
 fn getActionType(action: []const u8) ?ActionType {
     return std.meta.stringToEnum(ActionType, action);
 }
-
-// For []const []const u8 (string arrays for Tag names)
-// if (ptr_info.size == .slice) {
-//     if (@typeInfo(ptr_info.child) == .pointer) {
-//         const child_ptr = @typeInfo(ptr_info.child).pointer;
-//         if (child_ptr.size == .slice and child_ptr.child == u8) {
-//             return switch (value) {
-//                 .array => |arr| blk: {
-//                     const strings = try self.allocator.alloc(
-//                         []const u8,
-//                         arr.len,
-//                     );
-//                     errdefer {
-//                         for (strings, 0..) |s, idx| {
-//                             if (idx < arr.len) self.allocator.free(s);
-//                         }
-//                         self.allocator.free(strings);
-//                     }
-//                     for (arr, 0..) |val, i| {
-//                         switch (val) {
-//                             .string => |s| strings[i] = s,
-//                             else => {
-//                                 for (strings[0..i]) |owned_s| {
-//                                     self.allocator.free(owned_s);
-//                                 }
-//                                 self.allocator.free(strings);
-//                                 return InstantiatorError.TypeMismatch;
-//                             },
-//                         }
-//                     }
-//                     break :blk strings;
-//                 },
-//                 else => InstantiatorError.TypeMismatch,
-//             };
-//         }
-//     }
-// }
+fn getScreenAnchor(anchor: []const u8) ?ScreenAnchor {
+    return std.meta.stringToEnum(ScreenAnchor, anchor);
+}

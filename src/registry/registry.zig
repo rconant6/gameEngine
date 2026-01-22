@@ -13,3 +13,4 @@ pub const ColliderShape = collider_shape_registry.ColliderShape;
 const shape_registry = @import("shape_registry.zig");
 pub const ShapeRegistry = shape_registry.ShapeRegistry;
 pub const ShapeData = shape_registry.ShapeData;
+pub const CoordinateSpace = shape_registry.CoordinateSpace;

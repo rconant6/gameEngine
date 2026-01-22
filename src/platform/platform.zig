@@ -58,7 +58,6 @@ pub fn clearInputStates() void {
     PlatformImpl.clearInputFrameStates();
 }
 
-// TODO: This needs to be evicted
 pub const Event = union(enum) {
     NullEvent,
     WindowClose,
