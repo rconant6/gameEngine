@@ -27,10 +27,9 @@ const Instantiator = scene.Instantiator;
 const SceneManager = scene.SceneManager;
 const TemplateManager = scene.TemplateManager;
 const debug = @import("debug");
+const debug_enabled = debug.debug_enabled;
 const DebugCategory = debug.DebugCategory;
 const Debugger = debug.DebugManager;
-const builtin = @import("builtin");
-const debug_enabled = builtin.mode == .Debug;
 const Systems = @import("systems");
 
 const PerformanceMetrics = struct {
@@ -96,27 +95,18 @@ pub const Engine = struct {
         title: []const u8,
         width: u32,
         height: u32,
-    ) !*Engine {
-        var had_error = false;
-        platform.init() catch |err| {
-            std.log.err("[PLATFORM] Unable to platform layer: {any}", .{err});
-            had_error = true;
-        };
+    ) *Engine {
+        Logger.init(allocator) catch |err| fatal("Logger", err);
 
-        // NOTE: need to make sure what we are storing is correct and scaled
-        // for display info and window size to get 1:1 pixels in the window
+        platform.init() catch |err| fatal("Platform Layer", err);
+
         const window = platform.createWindow(.{
             .title = title,
             .width = width,
             .height = height,
-        }) catch |err| blk: {
-            std.log.err("[PLATFORM] Unable to native window: {any}", .{err});
-            had_error = true;
-            break :blk undefined;
-        };
+        }) catch |err| fatal("Window Creation", err);
 
         const scale_factor = platform.getWindowScaleFactor(window);
-
         const f_width: f32 = @floatFromInt(width);
         const f_height: f32 = @floatFromInt(height);
         const aspect_ratio = f_width / f_height;
@@ -131,72 +121,31 @@ pub const Engine = struct {
                 .height = scaled_height,
                 .native_handle = window.handle,
             },
-        ) catch |err| blk: {
-            std.log.err("[RENDERER] Unable to create rendering backend: {any}", .{err});
-            had_error = true;
-            break :blk undefined;
-        };
+        ) catch |err| fatal("Renderer", err);
 
-        if (build_options.backend == .cpu) {
-            if (rend.getPixelBufferPtr()) |pixels| {
-                const total_bytes: usize = scaled_width * scaled_height * 4 * 3;
-                platform.setPixelBuffer(
-                    window,
-                    pixels[0..total_bytes],
-                    scaled_width,
-                    scaled_height,
-                );
-            }
-        }
+        var world = World.init(allocator) catch |err| fatal("ECS World", err);
 
-        var world = World.init(allocator) catch |err| blk: {
-            std.log.err("[ECS] Unable to create a world entity manager: {any}", .{err});
-            had_error = true;
-            break :blk undefined;
-        };
-
-        // Create main default camera
-        const camera = world.createEntity() catch |err| blk: {
-            std.log.err("[ECS] Unable to create main_default_camera: {any}", .{err});
-            had_error = true;
-            break :blk undefined;
-        };
-        try world.addComponent(camera, ActiveCamera, ActiveCamera{});
-        try world.addComponent(camera, Transform, Transform{});
-
-        try world.addComponent(camera, Camera, Camera{
+        const camera = world.createEntity() catch |err| fatal("Main Camera Entity", err);
+        world.addComponent(camera, ActiveCamera, .{}) catch |err| fatal("ActiveCamera Component", err);
+        world.addComponent(camera, Transform, .{}) catch |err| fatal("Transform Component", err);
+        world.addComponent(camera, Camera, .{
             .ortho_size = 25.0,
             .viewport = .{
                 .center = V2.ZERO,
-                .half_width = aspect_ratio, // Store aspect ratio, not pixel dimensions
+                .half_width = aspect_ratio,
                 .half_height = 1.0,
             },
             .priority = 1,
-        });
+        }) catch |err| fatal("Camera Component", err);
 
-        const asset_manager = AssetManager.init(allocator) catch |err| blk: {
-            std.log.err("[ASSETS] Unable to create an asset manager: {any}", .{err});
-            had_error = true;
-            break :blk undefined;
-        };
-        const input: Input = .init();
-        const action_system = ActionSystem.init(allocator) catch |err| blk: {
-            std.log.err("[ACTIONS] Unable to create the action system manager: {any}", .{err});
-            had_error = true;
-            break :blk undefined;
-        };
+        const asset_manager = AssetManager.init(allocator) catch |err| fatal("Asset Manager", err);
+        const action_system = ActionSystem.init(allocator) catch |err| fatal("Action System", err);
 
-        if (had_error) {
-            std.debug.print("FATAL: [ENGINE]Failed to initialize engine!! (see console)\n", .{});
-            @panic("Engine Broke");
-        }
-
-        const engine = try allocator.create(Engine);
-        errdefer allocator.destroy(engine);
+        const engine = allocator.create(Engine) catch |err| fatal("Engine Memory Allocation", err);
 
         engine.* = Engine{
             .allocator = allocator,
-            .input = input,
+            .input = .init(),
             .assets = asset_manager,
             .renderer = rend,
             .window = window.*,
@@ -217,11 +166,15 @@ pub const Engine = struct {
         engine.template_manager = .init(allocator, &engine.instantiator);
         engine.world.template_manager = &engine.template_manager;
 
-        // Get the default font for debug rendering
-        const default_font = try engine.assets.getFontByName("__default__");
+        const default_font = engine.assets.getFontByName("__default__") catch |err| fatal("Default Font Loading", err);
         engine.debugger = .init(allocator, &engine.renderer, default_font);
 
         return engine;
+    }
+    fn fatal(subsystem: []const u8, err: anyerror) noreturn {
+        @branchHint(.cold);
+        std.debug.print("\n[FATAL] Engine initialization failed in: {s}\nReason: {s}\n", .{ subsystem, @errorName(err) });
+        @panic("Engine Initialization Failure");
     }
 
     pub fn deinit(self: *Engine) void {
@@ -237,6 +190,7 @@ pub const Engine = struct {
         self.template_manager.deinit();
         self.debugger.deinit();
 
+        Logger.deinit();
         allocator.destroy(self);
     }
 
@@ -421,5 +375,6 @@ pub const Engine = struct {
     pub const reloadActiveScene = @import("EngineScene.zig").reloadActiveScene;
 
     // MARK: Logging methods
-
+    pub const log = @import("debug");
+    pub const Logger = log.Logger;
 };

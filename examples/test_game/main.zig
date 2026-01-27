@@ -3,18 +3,19 @@ const engine = @import("engine");
 const KeyCode = engine.KeyCode;
 const debug = engine.debug;
 const DebugCategory = debug.DebugCategory;
+const log = engine.log;
 
 const Colors = engine.Colors;
 
-const logical_width = 800 * 2;
-const logical_height = 600 * 2;
+const logical_width = 1920;
+const logical_height = 1080;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const game = try engine.Engine.init(
+    const game = engine.Engine.init(
         allocator,
         "ECS Demo",
         logical_width,
@@ -24,21 +25,27 @@ pub fn main() !void {
 
     // leave to make sure it's ok if there are collisions or reimports
     // TODO: these all need to handle errors better or catch at engine level or be fatal
+    log.setMinLogLevel(.warn);
+    log.setCategoryLevel(.scene, .trace);
     try game.loadScene("master", "master");
+    log.trace(.scene, "Loading {s}.scene", .{"master"});
     try game.setActiveScene("master");
-
+    log.debug(.scene, "Loading {s}.scene", .{"collision_test"});
     try game.loadScene("collision", "collision_test");
     try game.setActiveScene("collision");
 
     try game.loadScene("action", "action_test.scene");
+    log.info(.scene, "Loading {s}.scene", .{"action_test"});
     try game.setActiveScene("action");
 
     // Camera test scene - simple scene to test camera controls
     try game.loadScene("camera", "camera_test.scene");
+    log.warn(.scene, "Loading {s}.scene", .{"camera_test"});
     try game.setActiveScene("camera");
 
     // UI test scene - tests screen-space HUD elements
     try game.loadScene("ui", "ui_test.scene");
+    log.err(.scene, "Loading {s}.scene", .{"ui_test"});
     try game.setActiveScene("ui");
 
     // NOTE loading all scenes and setting to active to see where/when something breaks
@@ -56,8 +63,8 @@ pub fn main() !void {
         // Spring-damper settings for smooth, natural camera follow
         // Higher stiffness = stronger pull toward target
         // Higher damping = less overshoot/bounce
-        game.setActiveCameraFollowStiffness(20.0, 20.0);
-        game.setActiveCameraFollowDamping(10.0, 10.0);
+        game.setActiveCameraFollowStiffness(30.0, 30.0);
+        game.setActiveCameraFollowDamping(15.0, 15.0);
     }
     // ===== END CAMERA TRACKING SETUP =====
 
