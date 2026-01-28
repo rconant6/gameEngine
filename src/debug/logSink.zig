@@ -170,21 +170,15 @@ pub const FileSink = struct {
                 entry.message,
                 time_str,
             },
-        ) catch {
-            std.debug.print("print failed\n", .{});
-        };
+        ) catch {};
 
         self.entry_count += 1;
     }
     pub fn flush(self: *Self) void {
         if (!self.enabled) return;
 
-        self.writer.flush() catch |err| {
-            std.debug.print("FileSink unable to write to file: game.log {any}\n", .{err});
-        };
-        self.log_file.sync() catch |err| {
-            std.debug.print("FileSink unable to sync() file: game.log {any}\n", .{err});
-        };
+        self.writer.flush() catch {};
+        self.log_file.sync() catch {};
 
         self.entry_count = 0;
     }

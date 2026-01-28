@@ -119,6 +119,7 @@ pub const LogEntry = struct {
 
 pub const Logger = struct {
     allocator: Allocator,
+    buf: [4096]u8 = undefined,
     sinks: []Sink,
     min_level: LogLevel,
     category_filters: EnumMap(LogCategory, ?LogLevel),
@@ -203,8 +204,7 @@ fn internalLog(
 ) void {
     if (!shouldLog(category, level) or
         !Logger.initialized) return;
-    const msg = std.fmt.allocPrint(Logger.global_logger.allocator, fmt, args) catch return;
-    defer Logger.global_logger.allocator.free(msg);
+    const msg = std.fmt.bufPrint(&Logger.global_logger.buf, fmt, args) catch return;
     const entry: LogEntry = .{
         .category = category,
         .level = level,
