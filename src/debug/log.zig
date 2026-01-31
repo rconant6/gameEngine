@@ -204,8 +204,10 @@ fn internalLog(
 ) void {
     if (!shouldLog(category, level) or
         !Logger.initialized) return;
-    const msg = std.fmt.allocPrint(Logger.global_logger.allocator, fmt, args) catch return;
-    defer Logger.global_logger.allocator.free(msg);
+    var msg_buf: [4096]u8 = undefined;
+    const msg = std.fmt.bufPrint(&msg_buf, fmt, args) catch
+        "[UNLOGGED] Logger  Log message to long and truncated: {any}\n";
+
     const entry: LogEntry = .{
         .category = category,
         .level = level,

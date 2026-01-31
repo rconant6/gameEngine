@@ -169,12 +169,12 @@ pub const FileSink = struct {
                 time_str,
             },
         ) catch |err| {
+            self.enabled = false;
             log.err(
                 .debug,
                 "FileLogger failed to write to buffer: {any}",
                 .{err},
             );
-            self.enabled = false;
         };
 
         self.entry_count += 1;
@@ -184,20 +184,20 @@ pub const FileSink = struct {
 
         var w = &self.log_writer.interface;
         w.flush() catch |err| {
+            self.enabled = false;
             log.err(
                 .debug,
                 "FileLogger failed to flush and is now disabled: {any}",
                 .{err},
             );
-            self.enabled = false;
         };
         self.log_file.sync() catch |err| {
+            self.enabled = false;
             log.err(
                 .debug,
                 "FileLogger failed to sync and is now disabled: {any}",
                 .{err},
             );
-            self.enabled = false;
         };
 
         self.entry_count = 0;
