@@ -2,7 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const RendererBackend = enum { metal, vulkan, opengl, cpu };
-const MinLogLevel = enum { debug, info, warn, err, fatal };
+const MinLogLevel = enum { trace, debug, info, warn, err, fatal };
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -164,6 +164,13 @@ pub fn build(b: *std.Build) void {
     debug_module.addImport("math", math_module);
     debug_module.addImport("renderer", renderer_module);
     debug_module.addImport("assets", assets_module);
+
+    action_module.addImport("debug", debug_module);
+    assets_module.addImport("debug", debug_module);
+    ecs_module.addImport("debug", debug_module);
+    renderer_module.addImport("debug", debug_module);
+    scene_format_module.addImport("debug", debug_module);
+    scene_module.addImport("debug", debug_module);
 
     const systems_module = b.addModule("systems", .{
         .root_source_file = b.path("src/systems/Systems.zig"),

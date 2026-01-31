@@ -44,9 +44,15 @@ pub const SceneManager = struct {
         name: []const u8,
         file_path: []const u8,
     ) !void {
-        if (self.scenes.contains(name)) return SceneManagerError.SceneAlreadyLoaded;
+        if (self.scenes.contains(name)) {
+            log.warn(.scene, "Scene {s} is already loaded", .{name});
+            return SceneManagerError.SceneAlreadyLoaded;
+        }
 
-        const scene = try load.loadSceneFile(self.allocator, file_path);
+        const scene = load.loadSceneFile(self.allocator, file_path) catch |err| {
+            log.err(.scene, "Unable to load {s}: {any}", .{ name, err });
+            return err;
+        };
 
         const owned_scene = try self.allocator.create(SceneFile);
         errdefer self.allocator.destroy(owned_scene);
@@ -63,11 +69,15 @@ pub const SceneManager = struct {
     }
     pub fn unloadScene(self: *SceneManager, name: []const u8) !void {
         if (self.active_scene_name) |as|
-            if (std.mem.eql(u8, as, name))
+            if (std.mem.eql(u8, as, name)) {
+                log.warn(.scene, "{s} is the active scene", .{name});
                 return SceneManagerError.CannotUnloadActiveScene;
+            };
 
-        const scene_entry = self.scenes.fetchRemove(name) orelse
+        const scene_entry = self.scenes.fetchRemove(name) orelse {
+            log.warn(.scene, "{s} cannot be unloaded", .{name});
             return SceneManagerError.SceneNotFound;
+        };
         const path_entry = self.scene_file_paths.fetchRemove(name);
 
         scene_entry.value.deinit(self.allocator);

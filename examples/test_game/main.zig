@@ -25,12 +25,10 @@ pub fn main() !void {
 
     // leave to make sure it's ok if there are collisions or reimports
     // TODO: these all need to handle errors better or catch at engine level or be fatal
-    log.setMinLogLevel(.warn);
-    log.setCategoryLevel(.scene, .trace);
     try game.loadScene("master", "master");
-    log.trace(.scene, "Loading {s}.scene", .{"master"});
+    log.info(.scene, "Loading {s}.scene", .{"master"});
     try game.setActiveScene("master");
-    log.debug(.scene, "Loading {s}.scene", .{"collision_test"});
+    log.info(.scene, "Loading {s}.scene", .{"collision_test"});
     try game.loadScene("collision", "collision_test");
     try game.setActiveScene("collision");
 
@@ -40,16 +38,17 @@ pub fn main() !void {
 
     // Camera test scene - simple scene to test camera controls
     try game.loadScene("camera", "camera_test.scene");
-    log.warn(.scene, "Loading {s}.scene", .{"camera_test"});
+    log.info(.scene, "Loading {s}.scene", .{"camera_test"});
     try game.setActiveScene("camera");
 
     // UI test scene - tests screen-space HUD elements
     try game.loadScene("ui", "ui_test.scene");
-    log.err(.scene, "Loading {s}.scene", .{"ui_test"});
+    log.info(.scene, "Loading {s}.scene", .{"ui_test"});
     try game.setActiveScene("ui");
 
     // NOTE loading all scenes and setting to active to see where/when something breaks
     try game.instantiateActiveScene();
+    log.info(.scene, "Instantiated ui_test-scene as the active scene", .{});
 
     try game.loadTemplates("assets/templates/");
 
