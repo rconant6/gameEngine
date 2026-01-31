@@ -157,6 +157,7 @@ pub fn clear(self: Self) void {
 pub fn setClearColor(self: *Self, color: Color) void {
     self.clear_color = color;
 }
+
 pub fn drawShape(
     self: *Self,
     shape: ShapeData,
@@ -187,7 +188,6 @@ pub fn drawShape(
 }
 fn flushBatch(self: *Self) !void {
     const vertices = self.batch.vertices.items;
-    if (vertices.len == 0) return;
 
     const buffer_ptr = try MetalBridge.getBufferContents(self.vertex_buffer);
     const vertex_size = @sizeOf(Vertex);

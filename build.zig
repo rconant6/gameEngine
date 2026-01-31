@@ -18,11 +18,6 @@ pub fn build(b: *std.Build) void {
         "validation",
         "Enable validation layers (default: debug builds)",
     ) orelse (optimize == .Debug);
-    // const enable_debug_tools = b.option(
-    //     bool,
-    //     "debug-tools",
-    //     "Enable debug overlay and tools",
-    // ) orelse (optimize == .Debug);
 
     const selected_renderer = renderer_backend orelse defaultRendererForTarget(target.result.os.tag);
 
@@ -217,6 +212,40 @@ pub fn build(b: *std.Build) void {
 
     // Install the engine library
     b.installArtifact(engine_lib);
+
+    // ========================================
+    // ZixelArt Executable
+    // ========================================
+    const app_module = b.createModule(.{
+        .root_source_file = b.path("src/tools/app.zig"),
+    });
+    app_module.addImport("platform", platform_module);
+    app_module.addImport("renderer", renderer_module);
+    app_module.addImport("math", math_module);
+    app_module.addImport("debug", debug_module);
+
+    const zixelart_module = b.addModule("zixelart", .{
+        .root_source_file = b.path("src/tools/zixelart/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    zixelart_module.addImport("app", app_module);
+    zixelart_module.addImport("platform", platform_module);
+    zixelart_module.addImport("renderer", renderer_module);
+    zixelart_module.addImport("math", math_module);
+    zixelart_module.addImport("debug", debug_module);
+
+    const zixelart_exe = b.addExecutable(.{
+        .name = "zixelart",
+        .root_module = zixelart_module,
+    });
+    configurePlatform(b, zixelart_exe, zixelart_module, target, optimize, selected_renderer);
+    b.installArtifact(zixelart_exe);
+    const run_zixelart = b.addRunArtifact(zixelart_exe);
+    run_zixelart.step.dependOn(b.getInstallStep());
+    run_zixelart.setCwd(b.path("zig-out/bin"));
+    const run_zixelart_step = b.step("zixelart", "Run the Pixel Art Editor");
+    run_zixelart_step.dependOn(&run_zixelart.step);
 
     // ========================================
     // Test Game Executable

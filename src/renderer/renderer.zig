@@ -89,14 +89,10 @@ pub const Renderer = struct {
     }
 
     pub fn beginFrame(self: *Renderer) !void {
-        self.backend.beginFrame() catch |err| {
-            log.err(.renderer, "BeginFrame failed: {any}", .{err});
-        };
+        try self.backend.beginFrame();
     }
     pub fn endFrame(self: *Renderer) !void {
-        self.backend.endFrame() catch |err| {
-            log.err(.renderer, "EndFrame failed: {any}", .{err});
-        };
+        try self.backend.endFrame();
     }
 
     pub fn clear(self: *Renderer) void {

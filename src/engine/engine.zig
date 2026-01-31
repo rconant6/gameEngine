@@ -307,8 +307,8 @@ pub const Engine = struct {
         _ = platform.pollEvent();
         self.input.keyboard = platform.getKeyboard();
         self.input.mouse = platform.getMouse();
-        self.renderer.beginFrame() catch {
-            
+        self.renderer.beginFrame() catch |err| {
+            log.err(.renderer, "BeginFrame failed: {any}", .{err});
         };
     }
     pub fn endFrame(self: *Engine) void {
@@ -316,7 +316,9 @@ pub const Engine = struct {
             const offset = self.renderer.getDisplayBufferOffset() orelse 0;
             self.window.swapBuffers(offset);
         }
-        self.renderer.endFrame() catch {};
+        self.renderer.endFrame() catch |err| {
+            log.err(.renderer, "EndFrame failed: {any}", .{err});
+        };
     }
     pub fn clear(self: *Engine, color: Color) void {
         self.renderer.setClearColor(color);
