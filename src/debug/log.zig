@@ -52,6 +52,7 @@ pub const LogLevel = enum(u8) {
 
 pub const LogCategory = enum {
     action,
+    application,
     assets,
     debug,
     ecs,
