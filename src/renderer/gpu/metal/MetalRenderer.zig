@@ -4,7 +4,8 @@ const bridge = @import("metal_bridge.zig");
 const BridgeError = bridge.BridgeError;
 const MetalBridge = bridge.MetalBridge;
 const GeometryBatch = @import("geometry_batch.zig").GeometryBatch;
-
+const debug = @import("debug");
+const log = debug.log;
 const MTLDevice = metal.MTLDevice;
 const MTLCommandQueue = metal.MTLCommandQueue;
 const MTLCommandBuffer = metal.MTLCommandBuffer;
@@ -106,8 +107,6 @@ fn createPipelineState(allocator: std.mem.Allocator, device: *MTLDevice) !*MTLRe
     const vertex_fn = try MetalBridge.createFunction(library, "vertex_main");
     const fragment_fn = try MetalBridge.createFunction(library, "fragment_main");
 
-    // const pixel_format = @intFromEnum(MTLPixelFormat.bgra8Unorm);
-
     return try MetalBridge.createRenderPipelineState(
         device,
         vertex_fn,
@@ -151,7 +150,7 @@ pub fn resize(self: *Self, width: u32, height: u32) !void {
 }
 
 pub fn clear(self: Self) void {
-    // Nothing needs to happen, render pass does it
+    // NOTE: nothing needs to happen, render pass does it
     _ = self;
 }
 
@@ -167,12 +166,11 @@ pub fn drawShape(
     stroke_width: f32,
     ctx: RenderContext,
 ) void {
-    // Check if batch is getting too full, flush early to prevent overflow
-    const estimated_vertices_per_shape = 64;
+    // NOTE: Check if batch is getting too full, flush early to prevent overflow of 12MB
+    const estimated_vertices_per_shape = 96;
     if (self.batch.vertices.items.len + estimated_vertices_per_shape > MAX_VERT_SIZE) {
         self.flushBatch() catch {
-            // NOTE: Still trying to draw
-            std.debug.print("Warning: Failed to flush batch before adding shape\n", .{});
+            log.warn(.renderer, "Warning: Failed to flush batch before adding shape", .{});
         };
     }
 
@@ -184,7 +182,7 @@ pub fn drawShape(
         stroke_width,
         ctx,
     ) catch {
-        // Silently skip shapes that fail to batch
+        log.err(.renderer, "Failed to batch shape {any}", .{@TypeOf(shape)});
     };
 }
 fn flushBatch(self: *Self) !void {
@@ -196,9 +194,15 @@ fn flushBatch(self: *Self) !void {
     const bytes_to_copy = vertices.len * vertex_size;
 
     if (bytes_to_copy > self.vertex_buffer_size) {
-        std.log.err(
+        log.err(
+            .renderer,
             "Vertex buffer overflow: trying to copy {d} bytes but buffer size is {d} bytes ({d} vertices vs {d} max)",
-            .{ bytes_to_copy, self.vertex_buffer_size, vertices.len, self.vertex_buffer_size / vertex_size },
+            .{
+                bytes_to_copy,
+                self.vertex_buffer_size,
+                vertices.len,
+                self.vertex_buffer_size / vertex_size,
+            },
         );
         // NOTE: Clamp to buffer size to prevent crash, will produce artifacts on screen
         const clamped_bytes = self.vertex_buffer_size;
@@ -207,7 +211,7 @@ fn flushBatch(self: *Self) !void {
             @as([*]u8, @ptrCast(buffer_ptr))[0..clamped_bytes],
             @as([*]const u8, @ptrCast(vertices.ptr))[0..clamped_bytes],
         );
-        std.log.warn("Rendering truncated to {d} vertices", .{clamped_vertices});
+        log.warn(.renderer, "Rendering truncated to {d} vertices", .{clamped_vertices});
     } else {
         @memcpy(
             @as([*]u8, @ptrCast(buffer_ptr))[0..bytes_to_copy],

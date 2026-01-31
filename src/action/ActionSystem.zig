@@ -10,6 +10,8 @@ const TriggerContext = triggers.TriggerContext;
 const InputTrigger = triggers.InputTrigger;
 const CollisionTrigger = triggers.CollisionTrigger;
 const ActionExecutor = @import("ActionExecutor.zig");
+const debug = @import("debug");
+const log = debug.log;
 
 allocator: Allocator,
 action_queue: ActionQueue,
@@ -53,6 +55,7 @@ pub fn init(allocator: Allocator) !Self {
     return action_system;
 }
 pub fn deinit(self: *Self) void {
+    log.info(.action, "Action System shutting down...", .{});
     self.trigger_systems.deinit(self.allocator);
     self.action_queue.deinit();
 }

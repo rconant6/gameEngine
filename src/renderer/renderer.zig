@@ -3,7 +3,6 @@ const math = @import("math");
 pub const V2 = math.V2;
 pub const WorldPoint = math.WorldPoint;
 pub const ScreenPoint = math.ScreenPoint;
-// Shapes
 const shapes_module = @import("shapes.zig");
 pub const Shapes = shapes_module;
 const registry = @import("registry");
@@ -29,6 +28,8 @@ pub const getAnchorPos = utils.getAnchorPosition;
 pub const RenderContext = @import("RenderContext.zig");
 const text_module = @import("text.zig");
 const Font = text_module.Font;
+const debug = @import("debug");
+const log = debug.log;
 
 // CPU renderer is currently disabled - code kept for reference
 // const CpuRenderer = if (build_options.backend == .cpu)
@@ -77,6 +78,7 @@ pub const Renderer = struct {
         };
     }
     pub fn deinit(self: *Renderer) void {
+        log.info(.renderer, "Renderer shutting down...", .{});
         self.backend.deinit();
     }
 
@@ -87,10 +89,14 @@ pub const Renderer = struct {
     }
 
     pub fn beginFrame(self: *Renderer) !void {
-        try self.backend.beginFrame();
+        self.backend.beginFrame() catch |err| {
+            log.err(.renderer, "BeginFrame failed: {any}", .{err});
+        };
     }
     pub fn endFrame(self: *Renderer) !void {
-        try self.backend.endFrame();
+        self.backend.endFrame() catch |err| {
+            log.err(.renderer, "EndFrame failed: {any}", .{err});
+        };
     }
 
     pub fn clear(self: *Renderer) void {

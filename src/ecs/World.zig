@@ -12,6 +12,8 @@ const scene = @import("scene");
 const TemplateManager = scene.TemplateManager;
 const comps = @import("Components.zig");
 const Tag = comps.Tag;
+const debug = @import("debug");
+const log = debug.log;
 
 allocator: std.mem.Allocator,
 next_entity_id: usize,
@@ -27,6 +29,7 @@ pub fn init(alloc: Allocator) !Self {
 }
 
 pub fn deinit(self: *Self) void {
+    log.info(.ecs, "ECS(world) shutting down...", .{});
     for (0..self.next_entity_id) |entity_id| {
         self.destroyEntity(Entity{ .id = entity_id });
     }

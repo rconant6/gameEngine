@@ -3,6 +3,8 @@ const Allocator = std.mem.Allocator;
 const scene_format = @import("scene-format");
 const SceneFile = scene_format.SceneFile;
 const load = @import("loader.zig");
+const debug = @import("debug");
+const log = debug.log;
 
 pub const SceneManager = struct {
     allocator: Allocator,
@@ -19,6 +21,7 @@ pub const SceneManager = struct {
         };
     }
     pub fn deinit(self: *SceneManager) void {
+        log.info(.scene, "Scene Manager shutting down...", .{});
         var path_iter = self.scene_file_paths.iterator();
         while (path_iter.next()) |entry| {
             self.allocator.free(entry.value_ptr.*);

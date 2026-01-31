@@ -1,5 +1,6 @@
 const std = @import("std");
-
+const debug = @import("debug");
+const log = debug.log;
 const font_mgr = @import("font/font_manager.zig");
 const FontHandle = font_mgr.FontHandle;
 const FontManager = font_mgr.FontManager;
@@ -32,6 +33,7 @@ pub fn init(alloc: std.mem.Allocator) !Self {
 }
 
 pub fn deinit(self: *Self) void {
+    log.info(.assets, "Asset Manager shutting down...", .{});
     var iter = self.name_to_font.keyIterator();
     while (iter.next()) |key| {
         self.allocator.free(key.*);

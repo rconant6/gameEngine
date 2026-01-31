@@ -158,7 +158,6 @@ pub const Instantiator = struct {
     ) !void {
         const entity = try self.world.createEntity();
         try self.last_instantiated_entities.append(self.allocator, entity);
-        std.log.debug("EntityName: {s} Id: {d}", .{ entity_decl.name, entity.id });
 
         for (entity_decl.components) |comp_decl| {
             switch (comp_decl) {

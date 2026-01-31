@@ -114,11 +114,8 @@ pub const FontManager = struct {
     ) ![]const u8 {
         const joined = try std.fs.path.join(alloc, &[_][]const u8{ base_path, name });
         defer alloc.free(joined);
-        // std.log.debug("Joined path: {s}", .{joined});
 
-        // Caller owns this memory
         const absolute = try std.fs.cwd().realpathAlloc(alloc, joined);
-        // std.log.debug("Absolute path: {s}", .{absolute});
 
         return absolute;
     }

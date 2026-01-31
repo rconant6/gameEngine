@@ -86,7 +86,7 @@ pub const Engine = struct {
 
     active_camera_entity: Entity,
 
-    // Logical window dimensions (for UIElement / ScreenPoint Rendering
+    // Logical window dimensions (for UIElement / ScreenPoint Rendering)
     window_width: u32,
     window_height: u32,
 
@@ -99,12 +99,18 @@ pub const Engine = struct {
         Logger.init(allocator) catch |err| fatal("Logger", err);
 
         platform.init() catch |err| fatal("Platform Layer", err);
+        log.info(.engine, "Platform layer initialized", .{});
 
         const window = platform.createWindow(.{
             .title = title,
             .width = width,
             .height = height,
         }) catch |err| fatal("Window Creation", err);
+        log.info(
+            .engine,
+            "Main window initialized {{width: {d}, height: {d}}}",
+            .{ width, height },
+        );
 
         const scale_factor = platform.getWindowScaleFactor(window);
         const f_width: f32 = @floatFromInt(width);
@@ -122,8 +128,14 @@ pub const Engine = struct {
                 .native_handle = window.handle,
             },
         ) catch |err| fatal("Renderer", err);
+        log.info(
+            .engine,
+            "Renderer initialized: {{scaled width: {d}, scaled height: {d}}}",
+            .{ scaled_width, scaled_height },
+        );
 
         var world = World.init(allocator) catch |err| fatal("ECS World", err);
+        log.info(.engine, "ECS(world) initialized", .{});
 
         const camera = world.createEntity() catch |err| fatal("Main Camera Entity", err);
         world.addComponent(camera, ActiveCamera, .{}) catch |err| fatal("ActiveCamera Component", err);
@@ -139,7 +151,9 @@ pub const Engine = struct {
         }) catch |err| fatal("Camera Component", err);
 
         const asset_manager = AssetManager.init(allocator) catch |err| fatal("Asset Manager", err);
+        log.info(.engine, "ASSET MANAGER initialized", .{});
         const action_system = ActionSystem.init(allocator) catch |err| fatal("Action System", err);
+        log.info(.engine, "ACTIONS SYSTEM initialized", .{});
 
         const engine = allocator.create(Engine) catch |err| fatal("Engine Memory Allocation", err);
 
@@ -169,11 +183,21 @@ pub const Engine = struct {
         const default_font = engine.assets.getFontByName("__default__") catch |err| fatal("Default Font Loading", err);
         engine.debugger = .init(allocator, &engine.renderer, default_font);
 
+        log.info(.engine, "Engine successfully started", .{});
         return engine;
     }
-    fn fatal(subsystem: []const u8, err: anyerror) noreturn {
+
+    pub fn fatal(subsystem: []const u8, err: anyerror) noreturn {
         @branchHint(.cold);
-        std.debug.print("\n[FATAL] Engine initialization failed in: {s}\nReason: {s}\n", .{ subsystem, @errorName(err) });
+        log.fatal(
+            .engine,
+            "\n[FATAL] Engine initialization failed in: {s}\nReason: {s}\n",
+            .{ subsystem, @errorName(err) },
+        );
+        std.debug.print(
+            "\n[FATAL] Engine initialization failed in: {s}\nReason: {s}\n",
+            .{ subsystem, @errorName(err) },
+        );
         @panic("Engine Initialization Failure");
     }
 
@@ -189,7 +213,7 @@ pub const Engine = struct {
         self.instantiator.deinit();
         self.template_manager.deinit();
         self.debugger.deinit();
-
+        log.info(.engine, "All systems shutdown", .{});
         Logger.deinit();
         allocator.destroy(self);
     }
@@ -204,21 +228,27 @@ pub const Engine = struct {
         }
         if (self.input.isPressed(KeyCode.F1)) {
             self.debugger.draw.toggleCategory(.collision);
+            log.info(.debug, "{s} info toggled", .{@tagName(.collision)});
         }
         if (self.input.isPressed(KeyCode.F2)) {
             self.debugger.draw.toggleCategory(.velocity);
+            log.info(.debug, "{s} info toggled", .{@tagName(.velocity)});
         }
         if (self.input.isPressed(KeyCode.F3)) {
             self.debugger.draw.toggleCategory(.entity_info);
+            log.info(.debug, "{s} info toggled", .{@tagName(.entity_info)});
         }
         if (self.input.isPressed(KeyCode.F4)) {
-            self.debugger.draw.toggleCategory(.grid);
+            self.debugger.draw.toggleCategory(.fps);
+            log.info(.debug, "{s} info toggled", .{@tagName(.fps)});
         }
         if (self.input.isPressed(KeyCode.F5)) {
-            self.debugger.draw.toggleCategory(.fps);
+            self.debugger.draw.toggleCategory(.grid);
+            log.info(.debug, "{s} info toggled", .{@tagName(.grid)});
         }
         if (self.input.isPressed(KeyCode.F6)) {
             self.debugger.draw.toggleCategory(.custom);
+            log.info(.debug, "{s} info toggled", .{@tagName(.custom)});
         }
     }
 
@@ -277,7 +307,9 @@ pub const Engine = struct {
         _ = platform.pollEvent();
         self.input.keyboard = platform.getKeyboard();
         self.input.mouse = platform.getMouse();
-        self.renderer.beginFrame() catch {};
+        self.renderer.beginFrame() catch {
+            
+        };
     }
     pub fn endFrame(self: *Engine) void {
         if (build_options.backend == .cpu) {
@@ -292,14 +324,14 @@ pub const Engine = struct {
     }
 
     // Creating shapes by hand
-    pub fn create(self: *Engine, comptime Data: type, args: anytype) Data {
-        return @call(.auto, Data.init, .{self.allocator} ++ args) catch |err| {
-            std.debug.panic(
-                "Engine.create({s}) failed: {}\n memory leaking or to large",
-                .{ @typeName(Data), err },
-            );
-        };
-    }
+    // pub fn create(self: *Engine, comptime Data: type, args: anytype) Data {
+    //     return @call(.auto, Data.init, .{self.allocator} ++ args) catch |err| {
+    //         std.debug.panic(
+    //             "Engine.create({s}) failed: {}\n memory leaking or to large",
+    //             .{ @typeName(Data), err },
+    //         );
+    //     };
+    // }
 
     // MARK: Camera methods
     pub const createCamera = @import("EngineCamera.zig").createCamera;
@@ -375,6 +407,7 @@ pub const Engine = struct {
     pub const reloadActiveScene = @import("EngineScene.zig").reloadActiveScene;
 
     // MARK: Logging methods
-    pub const log = @import("debug");
-    pub const Logger = log.Logger;
+    const logger = @import("debug");
+    const Logger = logger.Logger;
+    pub const log = logger.log;
 };

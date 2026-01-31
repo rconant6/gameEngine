@@ -11,6 +11,7 @@ const Declaration = ast.Declaration;
 const Property = ast.Property;
 const Value = ast.Value;
 const AssetType = ast.AssetType;
+const log = @import("debug").log;
 
 pub const ParseError = error{
     NoPreviousTokens,
@@ -39,10 +40,10 @@ pub const Parser = struct {
     pub fn init(allocator: Allocator, src: [:0]const u8, file_name: []const u8) !Parser {
         var lexer = Lexer.init(src);
         const first = lexer.next() catch |err| {
-            std.log.err("Lexer returned error on initialization {}", .{err});
+            log.err(.sceneFormat, "Lexer returned error on initialization {}", .{err});
             return err;
         } orelse {
-            std.log.err("Lexer did not produce a token", .{});
+            log.err(.sceneFormat, "Lexer did not produce a token", .{});
             return ParseError.NoTokenReturned;
         };
         return Parser{
@@ -73,7 +74,11 @@ pub const Parser = struct {
     fn consume(self: *Parser, token_type: TokenTag) !Token {
         if (self.current_tok.tag != token_type) {
             const curr = lexeme(self.lexer.src, self.current_tok);
-            std.log.debug("CONSUME: {} {s}, FOUND: {} at {f}", .{ token_type, curr, self.current_tok.tag, self.current_tok.src_loc });
+            log.err(
+                .sceneFormat,
+                "CONSUME: {} {s}, FOUND: {} at {f}",
+                .{ token_type, curr, self.current_tok.tag, self.current_tok.src_loc },
+            );
             return ParseError.UnexpectedToken;
         }
 
