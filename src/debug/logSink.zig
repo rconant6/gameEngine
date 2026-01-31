@@ -108,29 +108,26 @@ pub const FileSink = struct {
 
     log_dir: std.fs.Dir,
     log_file: std.fs.File,
-    log_buffer: [65336]u8,
-    writer: std.Io.Writer,
+    log_writer: std.fs.File.Writer,
+    log_buffer: [65336]u8 = undefined,
     entry_count: usize = 0,
     enabled: bool = false,
 
-    pub fn init() !Self {
+    pub fn init(self: *FileSink) !void {
         var log_dir = getLogDir() catch |err| {
             std.debug.print("Unable to get logs directory: {any}\n", .{err});
             return error.FailedToCreateFileLogger;
         };
         try rotateLogs(log_dir);
 
-        var self = Self{
+        self.* = .{
             .log_dir = try getLogDir(),
             .log_file = try log_dir.createFile(log_files[0], .{}),
-            .log_buffer = undefined,
-            .writer = undefined,
             .enabled = true,
+            .log_writer = self.log_file.writer(&self.log_buffer),
         };
-        self.writer = self.log_file.writer(&self.log_buffer).interface;
-
-        return self;
     }
+
     pub fn sink(self: *Self) Sink {
         return .{
             .ptr = self,
@@ -162,7 +159,8 @@ pub const FileSink = struct {
         const time_str = entry.time.formatISO08601(&time_buf) catch "0000-00-00T00:00:00Z";
 
         // Layout: LEVEL category message time\n
-        self.writer.print(
+        var w = &self.log_writer.interface;
+        w.print(
             "{s:<5}  {s:<10}  {s}  {s:>20}\n",
             .{
                 entry.level.getLevelName(),
@@ -170,15 +168,37 @@ pub const FileSink = struct {
                 entry.message,
                 time_str,
             },
-        ) catch {};
+        ) catch |err| {
+            log.err(
+                .debug,
+                "FileLogger failed to write to buffer: {any}",
+                .{err},
+            );
+            self.enabled = false;
+        };
 
         self.entry_count += 1;
     }
     pub fn flush(self: *Self) void {
         if (!self.enabled) return;
 
-        self.writer.flush() catch {};
-        self.log_file.sync() catch {};
+        var w = &self.log_writer.interface;
+        w.flush() catch |err| {
+            log.err(
+                .debug,
+                "FileLogger failed to flush and is now disabled: {any}",
+                .{err},
+            );
+            self.enabled = false;
+        };
+        self.log_file.sync() catch |err| {
+            log.err(
+                .debug,
+                "FileLogger failed to sync and is now disabled: {any}",
+                .{err},
+            );
+            self.enabled = false;
+        };
 
         self.entry_count = 0;
     }

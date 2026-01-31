@@ -38,6 +38,7 @@ pub const LogLevel = enum(u8) {
         };
     }
 
+    // TODO: why not add a pretty icon
     // pub fn getIcon(self: LogLevel) []const u8 {
     //     return switch (self) {
     //         .error => "✘",
@@ -119,7 +120,6 @@ pub const LogEntry = struct {
 
 pub const Logger = struct {
     allocator: Allocator,
-    buf: [4096]u8 = undefined,
     sinks: []Sink,
     min_level: LogLevel,
     category_filters: EnumMap(LogCategory, ?LogLevel),
@@ -141,9 +141,9 @@ pub const Logger = struct {
             console_sink.* = ConsoleSink.init();
             sinks[0] = console_sink.sink();
 
-            const file_sink = try allocator.create(FileSink);
+            var file_sink = try allocator.create(FileSink);
             errdefer allocator.destroy(file_sink);
-            file_sink.* = try FileSink.init();
+            try FileSink.init(file_sink);
             sinks[1] = file_sink.sink();
 
             const min_level = if (builtin.mode == .Debug) .trace else .warn;
@@ -204,7 +204,8 @@ fn internalLog(
 ) void {
     if (!shouldLog(category, level) or
         !Logger.initialized) return;
-    const msg = std.fmt.bufPrint(&Logger.global_logger.buf, fmt, args) catch return;
+    const msg = std.fmt.allocPrint(Logger.global_logger.allocator, fmt, args) catch return;
+    defer Logger.global_logger.allocator.free(msg);
     const entry: LogEntry = .{
         .category = category,
         .level = level,
