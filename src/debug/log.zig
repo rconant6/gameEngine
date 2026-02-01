@@ -184,6 +184,8 @@ pub fn setCategoryLevel(category: LogCategory, level: LogLevel) void {
 }
 
 fn shouldLog(category: LogCategory, level: LogLevel) bool {
+    if (!Logger.initialized) return false;
+
     const gl = Logger.global_logger;
 
     if (!(@intFromEnum(level) >= @intFromEnum(gl.min_level))) {
