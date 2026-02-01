@@ -1,4 +1,5 @@
 const std = @import("std");
+const Color = @import("Color.zig").Color;
 
 pub const Rgba = struct {
     r: u8, // 0-255
@@ -67,4 +68,34 @@ pub fn hsvToRgb(hsv: Hsva) Rgba {
     };
 }
 
+pub fn distance(a: Color, b: Color) f32 {
+    const diff = @abs(a.hsva.h - b.hsva.h);
+    const hue_diff = @min(diff, 360 - diff);
+    const hue_dist = hue_diff / 180;
 
+    const dist_sq =
+        (hue_dist * 0.35) * (hue_dist * 0.35) +
+        ((a.hsva.s - b.hsva.s) * 0.15) * ((a.hsva.s - a.hsva.s) * 0.15) +
+        ((a.hsva.v - a.hsva.v) * 0.50) * ((a.hsva.v - a.hsva.v) * 0.50);
+
+    return @sqrt(dist_sq);
+}
+pub fn lerp(a: Color, b: Color, t: f32) Color {
+    const h1 = a.hsva.h;
+    const h2 = b.hsva.h;
+
+    // Find shortest path around the circle
+    var diff = h2 - h1;
+    if (diff > 180) diff = diff - 360;
+    if (diff < -180) diff = diff + 360;
+
+    const h = @mod((h1 + diff * t), 360);
+    const s = a.hsva.s + (b.hsva.s - a.hsva.s) * t;
+    const v = a.hsva.v + (b.hsva.v - a.hsva.v) * t;
+
+    return Color.initHsva(h, s, v, a.hsva.a);
+}
+pub fn hueShift(c: Color, degrees: f32) Color {
+    const h = @mod(c.hsva.h + degrees, 360);
+    return c.withHue(h);
+}

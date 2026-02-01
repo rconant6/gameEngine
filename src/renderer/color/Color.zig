@@ -1,7 +1,13 @@
+// TODO: we can make this Big C color now
 const std = @import("std");
 const math = @import("math.zig");
 const Rgba = math.Rgba;
 const Hsva = math.Hsva;
+const types = @import("types.zig");
+const Hue = types.Hue;
+const Tone = types.Tone;
+const Saturation = types.Saturation;
+const Temperature = types.Temperature;
 
 /// Color with synchronized RGBA and HSVA representations.
 /// Both are always in sync - READ from either freely.
@@ -113,6 +119,21 @@ pub const Color = struct {
     pub fn withOpacity(c: Color, a: f32) Color {
         return Color.initHsva(c.hsva.h, c.hsva.s, c.hsva.v, a);
     }
+
+    pub fn hue(c: Color) Hue {
+        return Hue.from(c);
+    }
+    pub fn tone(c: Color) Tone {
+        return Tone.from(c);
+    }
+    pub fn saturation(c: Color) Saturation {
+        return Saturation.from(c);
+    }
+    pub fn temperature(c: Color) Temperature {
+        return Temperature.from(c);
+    }
+
+    // TODO: format function
 
     fn hexCharToInt(comptime c: u8) u8 {
         return switch (c) {
