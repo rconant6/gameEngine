@@ -1,7 +1,15 @@
 const std = @import("std");
 const testing = std.testing;
-const Color = @import("color").Color;
-const Colors = @import("color").Colors;
+const color_mod = @import("color");
+const Color = color_mod.Color;
+const Colors = color_mod.Colors;
+const types = color_mod.types;
+const Hue = types.Hue;
+const Tone = types.Tone;
+const Saturation = types.Saturation;
+const Temperature = types.Temperature;
+const TaggedColor = types.TaggedColor;
+const math = color_mod.math;
 
 test "Color: init with RGBA values" {
     const color = Color.initRgba(255, 128, 64, 200);
@@ -384,4 +392,264 @@ test "Color: RGB -> HSV -> RGB round trip" {
     try testing.expectEqual(original.rgba.r, roundtrip.rgba.r);
     try testing.expectEqual(original.rgba.g, roundtrip.rgba.g);
     try testing.expectEqual(original.rgba.b, roundtrip.rgba.b);
+}
+
+// =============================================================================
+// Hue Classification Tests
+// =============================================================================
+
+test "Hue: pure red classifies as red" {
+    const red = Color.initRgba(255, 0, 0, 255);
+    try testing.expectEqual(Hue.red, red.hue());
+}
+
+test "Hue: pure green classifies as green" {
+    const green = Color.initRgba(0, 255, 0, 255);
+    try testing.expectEqual(Hue.green, green.hue());
+}
+
+test "Hue: pure blue classifies as blue" {
+    const blue = Color.initRgba(0, 0, 255, 255);
+    try testing.expectEqual(Hue.blue, blue.hue());
+}
+
+test "Hue: cyan classifies as cyan" {
+    const cyan = Color.initRgba(0, 255, 255, 255);
+    try testing.expectEqual(Hue.cyan, cyan.hue());
+}
+
+test "Hue: yellow classifies as yellow" {
+    const yellow = Color.initRgba(255, 255, 0, 255);
+    try testing.expectEqual(Hue.yellow, yellow.hue());
+}
+
+test "Hue: magenta classifies as magenta" {
+    const magenta = Color.initRgba(255, 0, 255, 255);
+    try testing.expectEqual(Hue.magenta, magenta.hue());
+}
+
+test "Hue: gray classifies as neutral" {
+    const gray = Color.initRgba(128, 128, 128, 255);
+    try testing.expectEqual(Hue.neutral, gray.hue());
+}
+
+test "Hue: white classifies as neutral" {
+    const white = Color.initRgba(255, 255, 255, 255);
+    try testing.expectEqual(Hue.neutral, white.hue());
+}
+
+test "Hue: black classifies as neutral" {
+    const black = Color.initRgba(0, 0, 0, 255);
+    try testing.expectEqual(Hue.neutral, black.hue());
+}
+
+test "Hue: brown detection" {
+    // A typical brown: low value, moderate saturation, orange-ish hue
+    const brown = Color.initHsva(30.0, 0.6, 0.4, 1.0);
+    try testing.expectEqual(Hue.brown, brown.hue());
+}
+
+// =============================================================================
+// Tone Classification Tests
+// =============================================================================
+
+test "Tone: very dark colors are deep" {
+    const dark = Color.initHsva(0.0, 1.0, 0.1, 1.0);
+    try testing.expectEqual(Tone.deep, dark.tone());
+}
+
+test "Tone: dark colors are dark" {
+    const dark = Color.initHsva(0.0, 1.0, 0.3, 1.0);
+    try testing.expectEqual(Tone.dark, dark.tone());
+}
+
+test "Tone: mid brightness is mid" {
+    const mid = Color.initHsva(0.0, 1.0, 0.5, 1.0);
+    try testing.expectEqual(Tone.mid, mid.tone());
+}
+
+test "Tone: light colors are light" {
+    const light = Color.initHsva(0.0, 1.0, 0.7, 1.0);
+    try testing.expectEqual(Tone.light, light.tone());
+}
+
+test "Tone: very bright colors are high" {
+    const bright = Color.initHsva(0.0, 1.0, 0.9, 1.0);
+    try testing.expectEqual(Tone.high, bright.tone());
+}
+
+// =============================================================================
+// Saturation Classification Tests
+// =============================================================================
+
+test "Saturation: zero saturation is gray" {
+    const gray = Color.initHsva(0.0, 0.0, 0.5, 1.0);
+    try testing.expectEqual(Saturation.gray, gray.saturation());
+}
+
+test "Saturation: low saturation is muted" {
+    const muted = Color.initHsva(0.0, 0.2, 0.5, 1.0);
+    try testing.expectEqual(Saturation.muted, muted.saturation());
+}
+
+test "Saturation: medium saturation is moderate" {
+    const moderate = Color.initHsva(0.0, 0.5, 0.5, 1.0);
+    try testing.expectEqual(Saturation.moderate, moderate.saturation());
+}
+
+test "Saturation: high saturation is vivid" {
+    const vivid = Color.initHsva(0.0, 0.9, 0.5, 1.0);
+    try testing.expectEqual(Saturation.vivid, vivid.saturation());
+}
+
+// =============================================================================
+// Temperature Classification Tests
+// =============================================================================
+
+test "Temperature: red is warm" {
+    const red = Color.initRgba(255, 0, 0, 255);
+    try testing.expectEqual(Temperature.warm, red.temperature());
+}
+
+test "Temperature: orange is warm" {
+    const orange = Color.initHsva(30.0, 1.0, 1.0, 1.0);
+    try testing.expectEqual(Temperature.warm, orange.temperature());
+}
+
+test "Temperature: blue is cool" {
+    const blue = Color.initRgba(0, 0, 255, 255);
+    try testing.expectEqual(Temperature.cool, blue.temperature());
+}
+
+test "Temperature: cyan is cool" {
+    const cyan = Color.initRgba(0, 255, 255, 255);
+    try testing.expectEqual(Temperature.cool, cyan.temperature());
+}
+
+test "Temperature: gray is neutral" {
+    const gray = Color.initRgba(128, 128, 128, 255);
+    try testing.expectEqual(Temperature.neutral, gray.temperature());
+}
+
+test "Temperature: green is neutral" {
+    const green = Color.initHsva(120.0, 1.0, 1.0, 1.0);
+    try testing.expectEqual(Temperature.neutral, green.temperature());
+}
+
+// =============================================================================
+// TaggedColor Tests
+// =============================================================================
+
+test "TaggedColor: from creates correct tags" {
+    const red = Color.initRgba(255, 0, 0, 255);
+    const tagged = TaggedColor.from(red);
+
+    try testing.expectEqual(Hue.red, tagged.hue);
+    try testing.expectEqual(Tone.high, tagged.tone);
+    try testing.expectEqual(Saturation.vivid, tagged.saturation);
+    try testing.expectEqual(Temperature.warm, tagged.temp);
+    try testing.expectEqual(types.Family.unassigned, tagged.family);
+}
+
+test "TaggedColor: preserves original color" {
+    const original = Color.initRgba(100, 150, 200, 255);
+    const tagged = TaggedColor.from(original);
+
+    try testing.expectEqual(original.rgba.r, tagged.color.rgba.r);
+    try testing.expectEqual(original.rgba.g, tagged.color.rgba.g);
+    try testing.expectEqual(original.rgba.b, tagged.color.rgba.b);
+}
+
+// =============================================================================
+// Math: Distance Tests
+// =============================================================================
+
+test "math.distance: identical colors have zero distance" {
+    const red = Color.initRgba(255, 0, 0, 255);
+    try testing.expectApproxEqAbs(@as(f32, 0.0), math.distance(red, red), 0.001);
+}
+
+test "math.distance: similar colors have small distance" {
+    const red1 = Color.initRgba(255, 0, 0, 255);
+    const red2 = Color.initRgba(250, 10, 5, 255);
+    const dist = math.distance(red1, red2);
+    try testing.expect(dist < 0.1);
+}
+
+test "math.distance: different hues have larger distance" {
+    const red = Color.initRgba(255, 0, 0, 255);
+    const blue = Color.initRgba(0, 0, 255, 255);
+    const dist = math.distance(red, blue);
+    try testing.expect(dist > 0.2);
+}
+
+// =============================================================================
+// Math: Lerp Tests
+// =============================================================================
+
+test "math.lerp: t=0 returns first color" {
+    const red = Color.initRgba(255, 0, 0, 255);
+    const blue = Color.initRgba(0, 0, 255, 255);
+    const result = math.lerp(red, blue, 0.0);
+
+    try testing.expectApproxEqAbs(red.hsva.h, result.hsva.h, 0.01);
+}
+
+test "math.lerp: t=1 returns second color" {
+    const red = Color.initRgba(255, 0, 0, 255);
+    const blue = Color.initRgba(0, 0, 255, 255);
+    const result = math.lerp(red, blue, 1.0);
+
+    try testing.expectApproxEqAbs(blue.hsva.h, result.hsva.h, 0.01);
+}
+
+test "math.lerp: t=0.5 is midpoint" {
+    const black = Color.initHsva(0.0, 0.0, 0.0, 1.0);
+    const white = Color.initHsva(0.0, 0.0, 1.0, 1.0);
+    const result = math.lerp(black, white, 0.5);
+
+    try testing.expectApproxEqAbs(@as(f32, 0.5), result.hsva.v, 0.01);
+}
+
+test "math.lerp: takes shortest path around hue circle" {
+    const red = Color.initHsva(10.0, 1.0, 1.0, 1.0);
+    const rose = Color.initHsva(350.0, 1.0, 1.0, 1.0);
+    const result = math.lerp(red, rose, 0.5);
+
+    // Midpoint should be at 0/360, not at 180
+    const h = result.hsva.h;
+    try testing.expect(h < 20.0 or h > 340.0);
+}
+
+// =============================================================================
+// Math: Hue Shift Tests
+// =============================================================================
+
+test "math.hueShift: shifts hue by degrees" {
+    const red = Color.initHsva(0.0, 1.0, 1.0, 1.0);
+    const shifted = math.hueShift(red, 120.0);
+
+    try testing.expectApproxEqAbs(@as(f32, 120.0), shifted.hsva.h, 0.01);
+}
+
+test "math.hueShift: wraps around 360" {
+    const rose = Color.initHsva(350.0, 1.0, 1.0, 1.0);
+    const shifted = math.hueShift(rose, 30.0);
+
+    try testing.expectApproxEqAbs(@as(f32, 20.0), shifted.hsva.h, 0.01);
+}
+
+test "math.hueShift: negative shift works" {
+    const green = Color.initHsva(120.0, 1.0, 1.0, 1.0);
+    const shifted = math.hueShift(green, -60.0);
+
+    try testing.expectApproxEqAbs(@as(f32, 60.0), shifted.hsva.h, 0.01);
+}
+
+test "math.hueShift: preserves saturation and value" {
+    const original = Color.initHsva(0.0, 0.7, 0.8, 1.0);
+    const shifted = math.hueShift(original, 90.0);
+
+    try testing.expectApproxEqAbs(original.hsva.s, shifted.hsva.s, 0.01);
+    try testing.expectApproxEqAbs(original.hsva.v, shifted.hsva.v, 0.01);
 }
