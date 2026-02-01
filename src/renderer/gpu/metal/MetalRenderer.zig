@@ -79,7 +79,7 @@ pub fn init(allocator: std.mem.Allocator, config: RenderConfig) (MTLError || std
         .width = config.width,
         .height = config.height,
         .scale_factor = 1.0, // TODO: get from platform
-        .clear_color = Color.init(0, 0, 255, 255), // black for now
+        .clear_color = Color.initRgba(0, 0, 255, 255), // black for now
         .frame_number = 0,
         .start_time = 0.0, // TODO: get time from platform
         .last_frame_time = 0.0,

@@ -1,6 +1,6 @@
 const std = @import("std");
 const core = @import("math");
-const Color = @import("../renderer/color.zig").Color;
+const Color = @import("color.zig").Color;
 const WorldPoint = core.WorldPoint;
 const ScreenPoint = core.ScreenPoint;
 const WorldBounds = core.WorldBounds;
@@ -146,10 +146,10 @@ pub fn worldToClipSpace(point: WorldPoint, ctx: RenderContext) [2]f32 {
 }
 
 pub fn colorToFloat(color: Color) [4]f32 {
-    const r: f32 = @floatFromInt(color.r);
-    const g: f32 = @floatFromInt(color.g);
-    const b: f32 = @floatFromInt(color.b);
-    const a: f32 = @floatFromInt(color.a);
+    const r: f32 = @floatFromInt(color.rgba.r);
+    const g: f32 = @floatFromInt(color.rgba.g);
+    const b: f32 = @floatFromInt(color.rgba.b);
+    const a: f32 = @floatFromInt(color.rgba.a);
 
     return .{ r / 255.0, g / 255.0, b / 255.0, a / 255.0 };
 }

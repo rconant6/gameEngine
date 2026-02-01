@@ -115,10 +115,10 @@ pub const ClearColor = struct {
     a: f64,
 
     pub fn fromColor(c: Color) ClearColor {
-        const rf: f64 = @floatFromInt(c.r);
-        const gf: f64 = @floatFromInt(c.g);
-        const bf: f64 = @floatFromInt(c.b);
-        const af: f64 = @floatFromInt(c.a);
+        const rf: f64 = @floatFromInt(c.rgba.r);
+        const gf: f64 = @floatFromInt(c.rgba.g);
+        const bf: f64 = @floatFromInt(c.rgba.b);
+        const af: f64 = @floatFromInt(c.rgba.a);
 
         return .{
             .r = rf / 255.0,
