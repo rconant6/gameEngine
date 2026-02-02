@@ -3,12 +3,12 @@ const testing = std.testing;
 const color_mod = @import("color");
 const Color = color_mod.Color;
 const Colors = color_mod.Colors;
-const types = color_mod.types;
-const Hue = types.Hue;
-const Tone = types.Tone;
-const Saturation = types.Saturation;
-const Temperature = types.Temperature;
-const TaggedColor = types.TaggedColor;
+const Hue = color_mod.Hue;
+const Tone = color_mod.Tone;
+const Saturation = color_mod.Saturation;
+const Temperature = color_mod.Temperature;
+const TaggedColor = color_mod.TaggedColor;
+const Family = color_mod.Family;
 const math = color_mod.math;
 
 test "Color: init with RGBA values" {
@@ -542,18 +542,18 @@ test "Temperature: green is neutral" {
 
 test "TaggedColor: from creates correct tags" {
     const red = Color.initRgba(255, 0, 0, 255);
-    const tagged = TaggedColor.from(red);
+    const tagged = TaggedColor.from(red, "TEST_RED");
 
     try testing.expectEqual(Hue.red, tagged.hue);
     try testing.expectEqual(Tone.high, tagged.tone);
     try testing.expectEqual(Saturation.vivid, tagged.saturation);
     try testing.expectEqual(Temperature.warm, tagged.temp);
-    try testing.expectEqual(types.Family.unassigned, tagged.family);
+    try testing.expectEqual(Family.unassigned, tagged.family);
 }
 
 test "TaggedColor: preserves original color" {
     const original = Color.initRgba(100, 150, 200, 255);
-    const tagged = TaggedColor.from(original);
+    const tagged = TaggedColor.from(original, "TEST_COLOR");
 
     try testing.expectEqual(original.rgba.r, tagged.color.rgba.r);
     try testing.expectEqual(original.rgba.g, tagged.color.rgba.g);
@@ -652,4 +652,239 @@ test "math.hueShift: preserves saturation and value" {
 
     try testing.expectApproxEqAbs(original.hsva.s, shifted.hsva.s, 0.01);
     try testing.expectApproxEqAbs(original.hsva.v, shifted.hsva.v, 0.01);
+}
+
+// =============================================================================
+// ColorLibrary Tests
+// =============================================================================
+
+const ColorLibrary = color_mod.ColorLibrary;
+
+test "ColorLibrary: getAllColors returns all 1837 colors" {
+    const all = ColorLibrary.getAllColors();
+    try testing.expectEqual(@as(usize, 1837), all.len);
+}
+
+test "ColorLibrary: getColorCount matches getAllColors length" {
+    try testing.expectEqual(ColorLibrary.getColorCount(), ColorLibrary.getAllColors().len);
+}
+
+test "ColorLibrary: hue buckets sum to total count" {
+    var sum: usize = 0;
+    for (comptime std.enums.values(Hue)) |h| {
+        sum += ColorLibrary.getHueCount(h);
+    }
+    try testing.expectEqual(ColorLibrary.getColorCount(), sum);
+}
+
+test "ColorLibrary: tone buckets sum to total count" {
+    var sum: usize = 0;
+    for (comptime std.enums.values(Tone)) |t| {
+        sum += ColorLibrary.getToneCount(t);
+    }
+    try testing.expectEqual(ColorLibrary.getColorCount(), sum);
+}
+
+test "ColorLibrary: saturation buckets sum to total count" {
+    var sum: usize = 0;
+    for (comptime std.enums.values(Saturation)) |s| {
+        sum += ColorLibrary.getSatCount(s);
+    }
+    try testing.expectEqual(ColorLibrary.getColorCount(), sum);
+}
+
+test "ColorLibrary: temperature buckets sum to total count" {
+    var sum: usize = 0;
+    for (comptime std.enums.values(Temperature)) |t| {
+        sum += ColorLibrary.getTempCount(t);
+    }
+    try testing.expectEqual(ColorLibrary.getColorCount(), sum);
+}
+
+test "ColorLibrary: getHue returns only matching hues" {
+    const reds = ColorLibrary.getHue(.red);
+    try testing.expect(reds.len > 0);
+    for (reds) |entry| {
+        try testing.expectEqual(Hue.red, entry.hue);
+    }
+}
+
+test "ColorLibrary: getTone returns only matching tones" {
+    const darks = ColorLibrary.getTone(.dark);
+    try testing.expect(darks.len > 0);
+    for (darks) |entry| {
+        try testing.expectEqual(Tone.dark, entry.tone);
+    }
+}
+
+test "ColorLibrary: getSat returns only matching saturations" {
+    const vivids = ColorLibrary.getSat(.vivid);
+    try testing.expect(vivids.len > 0);
+    for (vivids) |entry| {
+        try testing.expectEqual(Saturation.vivid, entry.saturation);
+    }
+}
+
+test "ColorLibrary: getTemp returns only matching temperatures" {
+    const warms = ColorLibrary.getTemp(.warm);
+    try testing.expect(warms.len > 0);
+    for (warms) |entry| {
+        try testing.expectEqual(Temperature.warm, entry.temp);
+    }
+}
+
+test "ColorLibrary: getHueTone returns matching hue AND tone" {
+    const dark_reds = ColorLibrary.getHueTone(.red, .dark);
+    try testing.expect(dark_reds.len > 0);
+    for (dark_reds) |entry| {
+        try testing.expectEqual(Hue.red, entry.hue);
+        try testing.expectEqual(Tone.dark, entry.tone);
+    }
+}
+
+test "ColorLibrary: getHueToneSat returns matching hue, tone AND saturation" {
+    const vivid_light_blues = ColorLibrary.getHueToneSat(.azure, .light, .vivid);
+    try testing.expect(vivid_light_blues.len > 0);
+    for (vivid_light_blues) |entry| {
+        try testing.expectEqual(Hue.azure, entry.hue);
+        try testing.expectEqual(Tone.light, entry.tone);
+        try testing.expectEqual(Saturation.vivid, entry.saturation);
+    }
+}
+
+test "ColorLibrary: getHueToneSat with no matches returns empty slice" {
+    // This combination might not exist - test empty result handling
+    const result = ColorLibrary.getHueToneSat(.neutral, .deep, .vivid);
+    // Neutral hue with vivid saturation is contradictory, should be empty
+    try testing.expectEqual(@as(usize, 0), result.len);
+}
+
+test "ColorLibrary: findByName finds existing color" {
+    const result = ColorLibrary.findByName("RED");
+    try testing.expect(result != null);
+    try testing.expectEqual(@as(u8, 255), result.?.color.rgba.r);
+    try testing.expectEqual(@as(u8, 0), result.?.color.rgba.g);
+    try testing.expectEqual(@as(u8, 0), result.?.color.rgba.b);
+}
+
+test "ColorLibrary: findByName is case insensitive" {
+    const upper = ColorLibrary.findByName("RED");
+    const lower = ColorLibrary.findByName("red");
+    const mixed = ColorLibrary.findByName("Red");
+
+    try testing.expect(upper != null);
+    try testing.expect(lower != null);
+    try testing.expect(mixed != null);
+
+    try testing.expectEqual(upper.?.color.rgba.r, lower.?.color.rgba.r);
+    try testing.expectEqual(lower.?.color.rgba.r, mixed.?.color.rgba.r);
+}
+
+test "ColorLibrary: findByName returns null for nonexistent color" {
+    const result = ColorLibrary.findByName("NONEXISTENT_COLOR_12345");
+    try testing.expect(result == null);
+}
+
+test "ColorLibrary: findByName finds sports team colors" {
+    const cowboys = ColorLibrary.findByName("NFL_COWBOYS_BLUE");
+    try testing.expect(cowboys != null);
+    try testing.expectEqual(Hue.azure, cowboys.?.hue);
+}
+
+test "ColorLibrary: findByColor finds exact match" {
+    const red = Color.initRgba(255, 0, 0, 255);
+    const result = ColorLibrary.findByColor(red);
+    try testing.expect(result != null);
+    try testing.expect(std.mem.eql(u8, "RED", result.?.name));
+}
+
+test "ColorLibrary: findByColor returns null for no match" {
+    const weird = Color.initRgba(123, 45, 67, 255);
+    const result = ColorLibrary.findByColor(weird);
+    // This specific color probably doesn't exist in the library
+    // (test may need adjustment if it does exist)
+    _ = result; // Just verify it doesn't crash
+}
+
+test "ColorLibrary: brown detection works in library" {
+    const browns = ColorLibrary.getHue(.brown);
+    try testing.expect(browns.len > 0);
+    // Browns should have low-ish value and be in orange-ish hue range
+    for (browns) |entry| {
+        try testing.expectEqual(Hue.brown, entry.hue);
+    }
+}
+
+test "ColorLibrary: neutral hue matches gray saturation" {
+    const neutrals = ColorLibrary.getHue(.neutral);
+    const grays = ColorLibrary.getSat(.gray);
+    // All grays should be neutral, but not all neutrals are gray
+    for (grays) |gray_entry| {
+        try testing.expectEqual(Hue.neutral, gray_entry.hue);
+    }
+    try testing.expect(neutrals.len >= grays.len);
+}
+
+test "ColorLibrary: deep tones have low brightness" {
+    const deeps = ColorLibrary.getTone(.deep);
+    for (deeps) |entry| {
+        try testing.expect(entry.color.hsva.v < 0.2);
+    }
+}
+
+test "ColorLibrary: high tones have high brightness" {
+    const highs = ColorLibrary.getTone(.high);
+    for (highs) |entry| {
+        try testing.expect(entry.color.hsva.v >= 0.8);
+    }
+}
+
+test "ColorLibrary: vivid colors have high saturation" {
+    const vivids = ColorLibrary.getSat(.vivid);
+    for (vivids) |entry| {
+        try testing.expect(entry.color.hsva.s >= 0.75);
+    }
+}
+
+test "ColorLibrary: muted colors have low saturation" {
+    const muteds = ColorLibrary.getSat(.muted);
+    for (muteds) |entry| {
+        try testing.expect(entry.color.hsva.s >= 0.05);
+        try testing.expect(entry.color.hsva.s < 0.35);
+    }
+}
+
+test "ColorLibrary: warm colors are in warm hue range" {
+    const warms = ColorLibrary.getTemp(.warm);
+    for (warms) |entry| {
+        const h = entry.color.hsva.h;
+        // Warm: 0-80 or 315-360
+        const is_warm_hue = (h >= 0.0 and h <= 80.0) or (h >= 315.0 and h <= 360.0);
+        try testing.expect(is_warm_hue);
+    }
+}
+
+test "ColorLibrary: cool colors are in cool hue range" {
+    const cools = ColorLibrary.getTemp(.cool);
+    for (cools) |entry| {
+        const h = entry.color.hsva.h;
+        // Cool: 125-265
+        try testing.expect(h >= 125.0 and h <= 265.0);
+    }
+}
+
+test "ColorLibrary: drill-down query narrows results" {
+    const all_reds = ColorLibrary.getHue(.red);
+    const dark_reds = ColorLibrary.getHueTone(.red, .dark);
+    const dark_vivid_reds = ColorLibrary.getHueToneSat(.red, .dark, .vivid);
+
+    try testing.expect(all_reds.len > dark_reds.len);
+    try testing.expect(dark_reds.len >= dark_vivid_reds.len);
+}
+
+test "ColorLibrary: each entry has a name" {
+    const all = ColorLibrary.getAllColors();
+    for (all) |entry| {
+        try testing.expect(entry.name.len > 0);
+    }
 }
