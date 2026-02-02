@@ -109,8 +109,9 @@ pub const TaggedColor = struct {
     saturation: Saturation,
     temp: Temperature,
     family: Family,
+    name: []const u8,
 
-    pub fn from(c: Color) TaggedColor {
+    pub fn from(c: Color, name: []const u8) TaggedColor {
         return .{
             .color = c,
             .hue = Hue.from(c),
@@ -118,6 +119,7 @@ pub const TaggedColor = struct {
             .saturation = Saturation.from(c),
             .temp = Temperature.from(c),
             .family = .unassigned,
+            .name = name,
         };
     }
 };

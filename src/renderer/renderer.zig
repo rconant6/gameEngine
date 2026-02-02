@@ -14,6 +14,14 @@ const build_options = @import("build_options");
 const col = @import("color.zig");
 pub const Color = col.Color;
 pub const Colors = col.Colors;
+pub const ColorLibrary = col.ColorLibrary;
+pub const Hue = col.Hue;
+pub const Temperature = col.Temperature;
+pub const Saturation = col.Saturation;
+pub const Tone = col.Tone;
+pub const Family = col.Family;
+pub const TaggedColor = col.TaggedColor;
+
 const utils = @import("geometry_utils.zig");
 pub const Transform = utils.Transform;
 pub const ScreenAnchor = utils.ScreenAnchor;
