@@ -20,4 +20,4 @@ pub const TaggedColor = types.TaggedColor;
 
 // Future exports (as they are implemented):
 // pub const palette = @import("color/palette.zig");
-// pub const generators = @import("color/generators.zig");
+pub const generators = @import("color/generators.zig");

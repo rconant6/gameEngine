@@ -101,11 +101,6 @@ pub const ColorLibrary = struct {
         return temp_buckets[@intFromEnum(t)].len;
     }
 
-    // pub const closest(c: Color) {}// - Returns TaggedColor. The "Fuzzy" matcher for your generator; snaps any color to the nearest library entry.
-    // pub const getShade(c: Color) {}// - Finds the color one Tone lower in the same Hue.
-    // pub const getTint(c: Color) {}// - Finds the color one Tone higher in the same Hue.
-    // pub const getComplement(c: Color) {}// - Finds the nearest color on the opposite side of the wheel.
-
     const count = blk: {
         @setEvalBranchQuota(2000);
         var c = 0;
