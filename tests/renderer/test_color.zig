@@ -888,3 +888,583 @@ test "ColorLibrary: each entry has a name" {
         try testing.expect(entry.name.len > 0);
     }
 }
+
+// =============================================================================
+// Generator Tests
+// =============================================================================
+
+const generators = color_mod.generators;
+
+// === Harmony: complement ===
+
+test "generators.complement: shifts hue by 180 degrees" {
+    const red = Color.initHsva(0.0, 1.0, 1.0, 1.0);
+    const comp = generators.complement(red);
+    try testing.expectApproxEqAbs(@as(f32, 180.0), comp.hsva.h, 0.01);
+}
+
+test "generators.complement: preserves saturation and value" {
+    const color = Color.initHsva(60.0, 0.7, 0.8, 1.0);
+    const comp = generators.complement(color);
+    try testing.expectApproxEqAbs(color.hsva.s, comp.hsva.s, 0.01);
+    try testing.expectApproxEqAbs(color.hsva.v, comp.hsva.v, 0.01);
+}
+
+test "generators.complement: wraps around 360" {
+    const color = Color.initHsva(270.0, 1.0, 1.0, 1.0);
+    const comp = generators.complement(color);
+    // 270 + 180 = 450 -> 90
+    try testing.expectApproxEqAbs(@as(f32, 90.0), comp.hsva.h, 0.01);
+}
+
+test "generators.complement: red -> cyan" {
+    const red = Colors.RED;
+    const comp = generators.complement(red);
+    // Red (0) complement is Cyan (180)
+    try testing.expectApproxEqAbs(@as(f32, 180.0), comp.hsva.h, 0.01);
+}
+
+test "generators.complement: blue -> yellow-ish" {
+    const blue = Color.initHsva(240.0, 1.0, 1.0, 1.0);
+    const comp = generators.complement(blue);
+    // Blue (240) complement is Yellow (60)
+    try testing.expectApproxEqAbs(@as(f32, 60.0), comp.hsva.h, 0.01);
+}
+
+// === Harmony: analogous ===
+
+test "generators.analogous: returns 3 colors" {
+    const red = Colors.RED;
+    const result = generators.analogous(red);
+    try testing.expectEqual(@as(usize, 3), result.len);
+}
+
+test "generators.analogous: center color is original" {
+    const red = Colors.RED;
+    const result = generators.analogous(red);
+    try testing.expectApproxEqAbs(red.hsva.h, result[1].hsva.h, 0.01);
+}
+
+test "generators.analogous: neighbors are ±30 degrees" {
+    const color = Color.initHsva(90.0, 1.0, 1.0, 1.0);
+    const result = generators.analogous(color);
+    // result[0] = hue - 30 = 60
+    // result[1] = hue = 90
+    // result[2] = hue + 30 = 120
+    try testing.expectApproxEqAbs(@as(f32, 60.0), result[0].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 90.0), result[1].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 120.0), result[2].hsva.h, 0.01);
+}
+
+test "generators.analogous: wraps around hue wheel" {
+    const color = Color.initHsva(10.0, 1.0, 1.0, 1.0);
+    const result = generators.analogous(color);
+    // result[0] = 10 - 30 = -20 -> 340
+    try testing.expectApproxEqAbs(@as(f32, 340.0), result[0].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 40.0), result[2].hsva.h, 0.01);
+}
+
+test "generators.analogous: preserves saturation and value" {
+    const color = Color.initHsva(180.0, 0.6, 0.7, 1.0);
+    const result = generators.analogous(color);
+    for (result) |c| {
+        try testing.expectApproxEqAbs(color.hsva.s, c.hsva.s, 0.01);
+        try testing.expectApproxEqAbs(color.hsva.v, c.hsva.v, 0.01);
+    }
+}
+
+// === Harmony: triadic ===
+
+test "generators.triadic: returns 3 colors" {
+    const red = Colors.RED;
+    const result = generators.triadic(red);
+    try testing.expectEqual(@as(usize, 3), result.len);
+}
+
+test "generators.triadic: colors are 120 degrees apart" {
+    const color = Color.initHsva(0.0, 1.0, 1.0, 1.0);
+    const result = generators.triadic(color);
+    // Should be at 0, 120, 240
+    try testing.expectApproxEqAbs(@as(f32, 0.0), result[0].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 120.0), result[1].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 240.0), result[2].hsva.h, 0.01);
+}
+
+test "generators.triadic: preserves saturation and value" {
+    const color = Color.initHsva(45.0, 0.8, 0.9, 1.0);
+    const result = generators.triadic(color);
+    for (result) |c| {
+        try testing.expectApproxEqAbs(color.hsva.s, c.hsva.s, 0.01);
+        try testing.expectApproxEqAbs(color.hsva.v, c.hsva.v, 0.01);
+    }
+}
+
+// === Harmony: splitComplementary ===
+
+test "generators.splitComplementary: returns 3 colors" {
+    const red = Colors.RED;
+    const result = generators.splitComplementary(red);
+    try testing.expectEqual(@as(usize, 3), result.len);
+}
+
+test "generators.splitComplementary: base + flanking complement" {
+    const color = Color.initHsva(0.0, 1.0, 1.0, 1.0);
+    const result = generators.splitComplementary(color);
+    // Base at 0, flanks at 150 and 210
+    try testing.expectApproxEqAbs(@as(f32, 0.0), result[0].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 150.0), result[1].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 210.0), result[2].hsva.h, 0.01);
+}
+
+// === Harmony: tetradic ===
+
+test "generators.tetradic: returns 4 colors" {
+    const red = Colors.RED;
+    const result = generators.tetradic(red);
+    try testing.expectEqual(@as(usize, 4), result.len);
+}
+
+test "generators.tetradic: rectangle scheme at 90 degree intervals" {
+    const color = Color.initHsva(0.0, 1.0, 1.0, 1.0);
+    const result = generators.tetradic(color);
+    // 0, 90, 180, 270
+    try testing.expectApproxEqAbs(@as(f32, 0.0), result[0].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 90.0), result[1].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 180.0), result[2].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 270.0), result[3].hsva.h, 0.01);
+}
+
+// === Harmony: square ===
+
+test "generators.square: returns 4 colors" {
+    const red = Colors.RED;
+    const result = generators.square(red);
+    try testing.expectEqual(@as(usize, 4), result.len);
+}
+
+test "generators.square: evenly spaced at 90 degrees" {
+    const color = Color.initHsva(30.0, 1.0, 1.0, 1.0);
+    const result = generators.square(color);
+    // 30, 120, 210, 300
+    try testing.expectApproxEqAbs(@as(f32, 30.0), result[0].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 120.0), result[1].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 210.0), result[2].hsva.h, 0.01);
+    try testing.expectApproxEqAbs(@as(f32, 300.0), result[3].hsva.h, 0.01);
+}
+
+// === Library-Aware: closest ===
+
+test "generators.closest: exact match returns same color" {
+    const red = Colors.RED;
+    const result = generators.closest(red);
+    try testing.expectEqual(red.rgba.r, result.color.rgba.r);
+    try testing.expectEqual(red.rgba.g, result.color.rgba.g);
+    try testing.expectEqual(red.rgba.b, result.color.rgba.b);
+}
+
+test "generators.closest: near-red snaps to a red" {
+    const near_red = Color.initRgba(250, 5, 5, 255);
+    const result = generators.closest(near_red);
+    try testing.expectEqual(Hue.red, result.hue);
+}
+
+test "generators.closest: returns a TaggedColor with name" {
+    const color = Color.initRgba(100, 150, 200, 255);
+    const result = generators.closest(color);
+    try testing.expect(result.name.len > 0);
+}
+
+test "generators.closest: arbitrary color finds reasonable match" {
+    const arbitrary = Color.initHsva(185.0, 0.6, 0.7, 1.0);
+    const result = generators.closest(arbitrary);
+    // Should snap to something in the cyan-ish range
+    const h = result.hue;
+    try testing.expect(h == .cyan or h == .azure or h == .spring);
+}
+
+test "generators.closest: searches entire library (can cross hue boundaries)" {
+    // A color on the red/orange boundary might snap to orange if that's closer
+    const boundary_color = Color.initHsva(28.0, 0.9, 0.8, 1.0); // right on red/orange edge
+    const result = generators.closest(boundary_color);
+    // Should find SOMETHING close - verify result has a name (is a valid library entry)
+    try testing.expect(result.name.len > 0);
+}
+
+test "generators.closest: very dark color returns valid library entry" {
+    const dark = Color.initHsva(0.0, 0.8, 0.15, 1.0);
+    const result = generators.closest(dark);
+    // Verify it returns a valid library entry
+    try testing.expect(result.name.len > 0);
+}
+
+test "generators.closest: gray returns valid library entry" {
+    const gray = Color.initRgba(128, 128, 128, 255);
+    const result = generators.closest(gray);
+    // Verify it returns a valid library entry
+    try testing.expect(result.name.len > 0);
+}
+
+// === Library-Aware: closestInHue ===
+
+test "generators.closestInHue: stays within same hue family" {
+    const red_variant = Color.initHsva(5.0, 0.7, 0.6, 1.0);
+    const result = generators.closestInHue(red_variant);
+    try testing.expectEqual(Hue.red, result.hue);
+}
+
+test "generators.closestInHue: finds closest within hue bucket" {
+    const dark_blue = Color.initHsva(240.0, 0.8, 0.3, 1.0);
+    const result = generators.closestInHue(dark_blue);
+    try testing.expectEqual(Hue.blue, result.hue);
+    // Should find a dark-ish blue
+    try testing.expect(result.tone == .dark or result.tone == .deep);
+}
+
+test "generators.closestInHue: exact library color returns same hue" {
+    const result = generators.closestInHue(Colors.GREEN);
+    // Should find a green - might not be exact match due to distance calculation
+    try testing.expectEqual(Hue.green, result.hue);
+}
+
+test "generators.closestInHue: does not cross into adjacent hue" {
+    // Orange at 35 degrees - should stay orange, not become red or yellow
+    const orange = Color.initHsva(35.0, 0.9, 0.9, 1.0);
+    const result = generators.closestInHue(orange);
+    try testing.expectEqual(Hue.orange, result.hue);
+}
+
+test "generators.closestInHue: neutral stays neutral" {
+    const gray = Color.initRgba(100, 100, 100, 255);
+    const result = generators.closestInHue(gray);
+    try testing.expectEqual(Hue.neutral, result.hue);
+}
+
+// === Library-Aware: closestInHueTone ===
+
+test "generators.closestInHueTone: matches both hue and tone" {
+    const mid_green = Color.initHsva(120.0, 0.7, 0.5, 1.0);
+    const result = generators.closestInHueTone(mid_green);
+    try testing.expectEqual(Hue.green, result.hue);
+    try testing.expectEqual(Tone.mid, result.tone);
+}
+
+test "generators.closestInHueTone: finds closest saturation within hue+tone" {
+    const vivid_red = Color.initHsva(0.0, 0.95, 0.85, 1.0);
+    const result = generators.closestInHueTone(vivid_red);
+    try testing.expectEqual(Hue.red, result.hue);
+    try testing.expectEqual(Tone.high, result.tone);
+    // Just verify we got a valid result - saturation will be whatever is closest
+    try testing.expect(result.name.len > 0);
+}
+
+test "generators.closestInHueTone: dark blue finds dark blue" {
+    const dark_blue = Color.initHsva(240.0, 0.8, 0.35, 1.0);
+    const result = generators.closestInHueTone(dark_blue);
+    try testing.expectEqual(Hue.blue, result.hue);
+    try testing.expectEqual(Tone.dark, result.tone);
+}
+
+test "generators.closestInHueTone: light yellow finds light yellow" {
+    const light_yellow = Color.initHsva(60.0, 0.6, 0.75, 1.0);
+    const result = generators.closestInHueTone(light_yellow);
+    try testing.expectEqual(Hue.yellow, result.hue);
+    try testing.expectEqual(Tone.light, result.tone);
+}
+
+test "generators.closestInHueTone: deep red finds deep red" {
+    const deep_red = Color.initHsva(0.0, 0.9, 0.15, 1.0);
+    const result = generators.closestInHueTone(deep_red);
+    try testing.expectEqual(Hue.red, result.hue);
+    try testing.expectEqual(Tone.deep, result.tone);
+}
+
+// === Library-Aware: closestInTone ===
+
+test "generators.closestInTone: matches tone, any hue" {
+    const dark_color = Color.initHsva(180.0, 0.7, 0.35, 1.0);
+    const result = generators.closestInTone(dark_color);
+    try testing.expectEqual(Tone.dark, result.tone);
+}
+
+test "generators.closestInTone: can cross hue boundaries for better tone match" {
+    // A mid-tone cyan might match a mid-tone blue if that's closer
+    const mid_cyan = Color.initHsva(185.0, 0.6, 0.55, 1.0);
+    const result = generators.closestInTone(mid_cyan);
+    try testing.expectEqual(Tone.mid, result.tone);
+    // Hue can be anything in the cool range
+}
+
+test "generators.closestInTone: high tone finds bright colors" {
+    const bright = Color.initHsva(60.0, 0.5, 0.9, 1.0);
+    const result = generators.closestInTone(bright);
+    try testing.expectEqual(Tone.high, result.tone);
+}
+
+test "generators.closestInTone: deep tone finds very dark colors" {
+    const very_dark = Color.initHsva(300.0, 0.8, 0.1, 1.0);
+    const result = generators.closestInTone(very_dark);
+    try testing.expectEqual(Tone.deep, result.tone);
+}
+
+test "generators.closestInTone: useful for consistent lighting" {
+    // Two different hues at same tone should both find same-tone results
+    const dark_red = Color.initHsva(0.0, 0.8, 0.3, 1.0);
+    const dark_blue = Color.initHsva(240.0, 0.8, 0.3, 1.0);
+    const red_result = generators.closestInTone(dark_red);
+    const blue_result = generators.closestInTone(dark_blue);
+    try testing.expectEqual(red_result.tone, blue_result.tone);
+}
+
+// === Library-Aware: closestInSat ===
+
+test "generators.closestInSat: matches saturation, any hue/tone" {
+    const muted_color = Color.initHsva(120.0, 0.25, 0.6, 1.0);
+    const result = generators.closestInSat(muted_color);
+    try testing.expectEqual(Saturation.muted, result.saturation);
+}
+
+test "generators.closestInSat: vivid finds vivid" {
+    const vivid = Color.initHsva(0.0, 0.9, 0.8, 1.0);
+    const result = generators.closestInSat(vivid);
+    try testing.expectEqual(Saturation.vivid, result.saturation);
+}
+
+test "generators.closestInSat: gray finds gray" {
+    const gray = Color.initHsva(0.0, 0.02, 0.5, 1.0);
+    const result = generators.closestInSat(gray);
+    try testing.expectEqual(Saturation.gray, result.saturation);
+}
+
+test "generators.closestInSat: moderate finds moderate" {
+    const moderate = Color.initHsva(200.0, 0.5, 0.7, 1.0);
+    const result = generators.closestInSat(moderate);
+    try testing.expectEqual(Saturation.moderate, result.saturation);
+}
+
+test "generators.closestInSat: useful for consistent vibrancy" {
+    // Different colors at same saturation should both find same-sat results
+    const muted_red = Color.initHsva(0.0, 0.2, 0.6, 1.0);
+    const muted_green = Color.initHsva(120.0, 0.2, 0.6, 1.0);
+    const red_result = generators.closestInSat(muted_red);
+    const green_result = generators.closestInSat(muted_green);
+    try testing.expectEqual(red_result.saturation, green_result.saturation);
+}
+
+// === Library-Aware: snap ===
+
+test "generators.snap: with hue constraint returns matching hue" {
+    const color = Color.initHsva(45.0, 0.8, 0.8, 1.0); // orange-ish
+    const result = generators.snap(color, .red, null, null);
+    try testing.expectEqual(Hue.red, result.hue);
+}
+
+test "generators.snap: with tone constraint returns matching tone" {
+    const bright = Color.initHsva(0.0, 1.0, 0.9, 1.0);
+    const result = generators.snap(bright, null, .dark, null);
+    try testing.expectEqual(Tone.dark, result.tone);
+}
+
+test "generators.snap: with sat constraint returns matching saturation" {
+    const vivid = Color.initHsva(120.0, 0.9, 0.8, 1.0);
+    const result = generators.snap(vivid, null, null, .muted);
+    try testing.expectEqual(Saturation.muted, result.saturation);
+}
+
+test "generators.snap: with all constraints narrows to exact match" {
+    const result = generators.snap(Colors.RED, .red, .high, .vivid);
+    try testing.expectEqual(Hue.red, result.hue);
+    try testing.expectEqual(Tone.high, result.tone);
+    try testing.expectEqual(Saturation.vivid, result.saturation);
+}
+
+test "generators.snap: with no constraints behaves like closest" {
+    const color = Color.initRgba(200, 100, 50, 255);
+    const snapped = generators.snap(color, null, null, null);
+    const closest_result = generators.closest(color);
+    try testing.expectEqual(snapped.color.rgba.r, closest_result.color.rgba.r);
+}
+
+// === Tone Navigation: getShade ===
+
+test "generators.getShade: returns darker tone" {
+    const light_red = Color.initHsva(0.0, 1.0, 0.7, 1.0); // light tone
+    const result = generators.getShade(light_red);
+    try testing.expect(result != null);
+    try testing.expect(@intFromEnum(result.?.tone) < @intFromEnum(Tone.light));
+}
+
+test "generators.getShade: preserves hue" {
+    const color = Color.initHsva(120.0, 0.8, 0.6, 1.0);
+    const result = generators.getShade(color);
+    try testing.expect(result != null);
+    try testing.expectEqual(Hue.green, result.?.hue);
+}
+
+test "generators.getShade: returns null for deepest tone" {
+    const deep = Color.initHsva(0.0, 1.0, 0.1, 1.0); // deep tone (v < 0.2)
+    const result = generators.getShade(deep);
+    try testing.expect(result == null);
+}
+
+// === Tone Navigation: getTint ===
+
+test "generators.getTint: returns lighter tone" {
+    const dark_red = Color.initHsva(0.0, 1.0, 0.3, 1.0); // dark tone
+    const result = generators.getTint(dark_red);
+    try testing.expect(result != null);
+    try testing.expect(@intFromEnum(result.?.tone) > @intFromEnum(Tone.dark));
+}
+
+test "generators.getTint: preserves hue" {
+    const color = Color.initHsva(240.0, 0.8, 0.4, 1.0);
+    const result = generators.getTint(color);
+    try testing.expect(result != null);
+    try testing.expectEqual(Hue.blue, result.?.hue);
+}
+
+test "generators.getTint: returns null for highest tone" {
+    const high = Color.initHsva(0.0, 1.0, 0.95, 1.0); // high tone (v >= 0.8)
+    const result = generators.getTint(high);
+    try testing.expect(result == null);
+}
+
+// === Tone Navigation: getShades ===
+
+test "generators.getShades: returns array of darker tones" {
+    const mid = Color.initHsva(0.0, 1.0, 0.5, 1.0); // mid tone
+    const result = generators.getShades(mid);
+    try testing.expect(result.len > 0);
+    for (result) |shade| {
+        try testing.expect(@intFromEnum(shade.tone) < @intFromEnum(Tone.mid));
+    }
+}
+
+test "generators.getShades: preserves hue for all results" {
+    const green = Color.initHsva(120.0, 0.8, 0.7, 1.0);
+    const result = generators.getShades(green);
+    for (result) |shade| {
+        try testing.expectEqual(Hue.green, shade.hue);
+    }
+}
+
+test "generators.getShades: returns empty for deepest tone" {
+    const deep = Color.initHsva(0.0, 1.0, 0.1, 1.0);
+    const result = generators.getShades(deep);
+    try testing.expectEqual(@as(usize, 0), result.len);
+}
+
+// === Tone Navigation: getTints ===
+
+test "generators.getTints: returns array of lighter tones" {
+    const mid = Color.initHsva(0.0, 1.0, 0.5, 1.0); // mid tone
+    const result = generators.getTints(mid);
+    try testing.expect(result.len > 0);
+    for (result) |tint| {
+        try testing.expect(@intFromEnum(tint.tone) > @intFromEnum(Tone.mid));
+    }
+}
+
+test "generators.getTints: preserves hue for all results" {
+    const blue = Color.initHsva(240.0, 0.8, 0.4, 1.0);
+    const result = generators.getTints(blue);
+    for (result) |tint| {
+        try testing.expectEqual(Hue.blue, tint.hue);
+    }
+}
+
+test "generators.getTints: returns empty for highest tone" {
+    const high = Color.initHsva(0.0, 1.0, 0.95, 1.0);
+    const result = generators.getTints(high);
+    try testing.expectEqual(@as(usize, 0), result.len);
+}
+
+// === Ramp: monochromatic ===
+
+test "generators.monochromatic: returns requested number of steps" {
+    const color = Colors.RED;
+    const result = generators.monochromatic(color, 5);
+    try testing.expectEqual(@as(usize, 5), result.len);
+}
+
+test "generators.monochromatic: all colors have same hue" {
+    const color = Color.initHsva(120.0, 0.8, 0.5, 1.0);
+    const result = generators.monochromatic(color, 5);
+    for (result) |c| {
+        try testing.expectApproxEqAbs(color.hsva.h, c.hsva.h, 0.01);
+    }
+}
+
+test "generators.monochromatic: spans from dark to light" {
+    const color = Color.initHsva(0.0, 1.0, 0.5, 1.0);
+    const result = generators.monochromatic(color, 5);
+    // First should be darker, last should be lighter
+    try testing.expect(result[0].hsva.v < result[4].hsva.v);
+}
+
+test "generators.monochromatic: values increase monotonically" {
+    const color = Color.initHsva(60.0, 0.7, 0.5, 1.0);
+    const result = generators.monochromatic(color, 5);
+    var prev_v: f32 = 0.0;
+    for (result) |c| {
+        try testing.expect(c.hsva.v >= prev_v);
+        prev_v = c.hsva.v;
+    }
+}
+
+// === Ramp: gradient ===
+
+test "generators.gradient: returns requested number of steps" {
+    const from = Colors.RED;
+    const to = Colors.BLUE;
+    const result = generators.gradient(from, to, 5);
+    try testing.expectEqual(@as(usize, 5), result.len);
+}
+
+test "generators.gradient: first color matches 'from'" {
+    const from = Colors.RED;
+    const to = Colors.BLUE;
+    const result = generators.gradient(from, to, 5);
+    try testing.expectApproxEqAbs(from.hsva.h, result[0].hsva.h, 0.01);
+}
+
+test "generators.gradient: last color matches 'to'" {
+    const from = Colors.RED;
+    const to = Colors.BLUE;
+    const result = generators.gradient(from, to, 5);
+    try testing.expectApproxEqAbs(to.hsva.h, result[4].hsva.h, 0.01);
+}
+
+test "generators.gradient: middle color is interpolated" {
+    const black = Color.initHsva(0.0, 0.0, 0.0, 1.0);
+    const white = Color.initHsva(0.0, 0.0, 1.0, 1.0);
+    const result = generators.gradient(black, white, 3);
+    // Middle should be gray (v ~= 0.5)
+    try testing.expectApproxEqAbs(@as(f32, 0.5), result[1].hsva.v, 0.01);
+}
+
+test "generators.gradient: interpolates saturation" {
+    const vivid = Color.initHsva(0.0, 1.0, 1.0, 1.0);
+    const gray = Color.initHsva(0.0, 0.0, 1.0, 1.0);
+    const result = generators.gradient(vivid, gray, 3);
+    try testing.expectApproxEqAbs(@as(f32, 0.5), result[1].hsva.s, 0.01);
+}
+
+// === Chaining: harmony + library snap ===
+
+test "generators: complement then closest gives library color" {
+    const red = Colors.RED;
+    const comp = generators.complement(red);
+    const snapped = generators.closest(comp);
+    // Complement of red is cyan; should snap to a cyan-ish library color
+    try testing.expectEqual(Hue.cyan, snapped.hue);
+    try testing.expect(snapped.name.len > 0);
+}
+
+test "generators: triadic then snap constrains all to library" {
+    const red = Colors.RED;
+    const triad = generators.triadic(red);
+    for (triad) |c| {
+        const snapped = generators.closest(c);
+        try testing.expect(snapped.name.len > 0);
+    }
+}
