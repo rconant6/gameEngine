@@ -151,7 +151,7 @@ pub const Renderer = struct {
         color: Color,
         ctx: RenderContext,
     ) void {
-        text_module.drawText(self, font, text, position, scale, color, ctx);
+        text_module.drawTextScreen(self, font, text, position, scale, color, ctx);
     }
 
     // TODO: All of these need to return errors/nil if called for the wrong backend

@@ -30,7 +30,6 @@ pub fn drawText(
         const glyph_index = font.char_to_glyph.get(ascii_val) orelse continue;
         if (f.glyph_shapes.get(glyph_index)) |glyph| {
             drawGlyph(
-                WorldPoint,
                 renderer,
                 f,
                 glyph_index,
@@ -60,19 +59,20 @@ pub fn drawTextScreen(
     ctx: RenderContext,
 ) void {
     const f = @constCast(font);
-    var x_pos = position.x;
+    var x_pos: f32 = @floatFromInt(position.x);
+    const y_pos: f32 = @floatFromInt(position.y);
     for (text) |char| {
         const ascii_val: u32 = @intCast(char);
         const glyph_index = font.char_to_glyph.get(ascii_val) orelse continue;
         if (f.glyph_shapes.get(glyph_index)) |glyph| {
-            drawGlyph(
-                ScreenPoint,
+            drawGlyphScreen(
                 renderer,
                 f,
                 glyph_index,
                 &glyph,
                 scale,
-                .{ .x = x_pos, .y = position.y },
+                x_pos,
+                y_pos,
                 color,
                 ctx,
             ) catch {
@@ -88,13 +88,12 @@ pub fn drawTextScreen(
 }
 
 fn drawGlyph(
-    comptime PointType: type,
     renderer: *Renderer,
     font: *Font,
     glyph_index: u16,
     glyph: *const FilteredGlyph,
     scale: f32,
-    pos: V2,
+    pos: WorldPoint,
     color: Color,
     ctx: RenderContext,
 ) !void {
@@ -111,13 +110,53 @@ fn drawGlyph(
         const p1 = glyph.points[tri[1]];
         const p2 = glyph.points[tri[2]];
 
-        const t0 = V2{ .x = p0.x * scale + pos.x, .y = p0.y * scale + pos.y };
-        const t1 = V2{ .x = p1.x * scale + pos.x, .y = p1.y * scale + pos.y };
-        const t2 = V2{ .x = p2.x * scale + pos.x, .y = p2.y * scale + pos.y };
+        const t0 = WorldPoint{ .x = p0.x * scale + pos.x, .y = p0.y * scale + pos.y };
+        const t1 = WorldPoint{ .x = p1.x * scale + pos.x, .y = p1.y * scale + pos.y };
+        const t2 = WorldPoint{ .x = p2.x * scale + pos.x, .y = p2.y * scale + pos.y };
 
-        const triangle: Shapes.Triangle(PointType) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
+        const triangle: Shapes.Triangle(WorldPoint) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
         renderer.drawGeometry(
-            ShapeRegistry.createShapeUnion(Shapes.Triangle(PointType), triangle),
+            ShapeRegistry.createShapeUnion(Shapes.Triangle(WorldPoint), triangle),
+            .{},
+            color,
+            null,
+            1.0,
+            ctx,
+        );
+    }
+}
+
+fn drawGlyphScreen(
+    renderer: *Renderer,
+    font: *Font,
+    glyph_index: u16,
+    glyph: *const FilteredGlyph,
+    scale: f32,
+    x_pos: f32,
+    y_pos: f32,
+    color: Color,
+    ctx: RenderContext,
+) !void {
+    const triangles = if (font.glyph_triangles.get(glyph_index)) |cached|
+        cached
+    else blk: {
+        const tris = try glyph_builder.buildTriangles(font.alloc, glyph);
+        try font.glyph_triangles.put(glyph_index, tris);
+        break :blk tris;
+    };
+
+    for (triangles) |tri| {
+        const p0 = glyph.points[tri[0]];
+        const p1 = glyph.points[tri[1]];
+        const p2 = glyph.points[tri[2]];
+
+        const t0 = ScreenPoint{ .x = @intFromFloat(p0.x * scale + x_pos), .y = @intFromFloat(-p0.y * scale + y_pos) };
+        const t1 = ScreenPoint{ .x = @intFromFloat(p1.x * scale + x_pos), .y = @intFromFloat(-p1.y * scale + y_pos) };
+        const t2 = ScreenPoint{ .x = @intFromFloat(p2.x * scale + x_pos), .y = @intFromFloat(-p2.y * scale + y_pos) };
+
+        const triangle: Shapes.Triangle(ScreenPoint) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
+        renderer.drawGeometry(
+            ShapeRegistry.createShapeUnion(Shapes.Triangle(ScreenPoint), triangle),
             .{},
             color,
             null,
