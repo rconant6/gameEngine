@@ -313,6 +313,16 @@ pub fn main() !void {
 
         game.update(dt);
 
+        // Test screen-space text rendering
+        const font = game.getFont("__default__") catch unreachable;
+        const ctx: engine.RenderContext = .{
+            .camera_loc = .{ .x = 0, .y = 0 },
+            .height = logical_height,
+            .width = logical_width,
+            .ortho_size = logical_height / 2,
+        };
+        game.renderer.drawTextScreen(font, "test screen", .{ .x = 100, .y = 100 }, 30.0, engine.Colors.WHITE, ctx);
+
         game.endFrame();
 
         // if (game.hasErrors()) {
