@@ -21,6 +21,7 @@ pub const Saturation = col.Saturation;
 pub const Tone = col.Tone;
 pub const Family = col.Family;
 pub const TaggedColor = col.TaggedColor;
+pub const Generator = col.generators;
 
 const utils = @import("geometry_utils.zig");
 pub const Transform = utils.Transform;
@@ -134,6 +135,18 @@ pub const Renderer = struct {
         font: *const Font,
         text: []const u8,
         position: WorldPoint,
+        scale: f32,
+        color: Color,
+        ctx: RenderContext,
+    ) void {
+        text_module.drawText(self, font, text, position, scale, color, ctx);
+    }
+
+    pub fn drawTextScreen(
+        self: *Renderer,
+        font: *const Font,
+        text: []const u8,
+        position: ScreenPoint,
         scale: f32,
         color: Color,
         ctx: RenderContext,

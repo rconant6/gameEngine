@@ -7,6 +7,7 @@ const rend = @import("renderer.zig");
 const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
 const WorldPoint = rend.WorldPoint;
+const ScreenPoint = rend.ScreenPoint;
 const Color = rend.Color;
 const ShapeRegistry = rend.ShapeRegistry;
 const Shapes = rend.Shapes;
@@ -29,6 +30,43 @@ pub fn drawText(
         const glyph_index = font.char_to_glyph.get(ascii_val) orelse continue;
         if (f.glyph_shapes.get(glyph_index)) |glyph| {
             drawGlyph(
+                WorldPoint,
+                renderer,
+                f,
+                glyph_index,
+                &glyph,
+                scale,
+                .{ .x = x_pos, .y = position.y },
+                color,
+                ctx,
+            ) catch {
+                // Skip glyphs that fail to render
+                continue;
+            };
+        }
+
+        const advance_f: f32 = @floatFromInt(f.glyph_advance_width.items[glyph_index].advance_width);
+        const em_f: f32 = @floatFromInt(f.units_per_em);
+        x_pos += (advance_f / em_f) * scale;
+    }
+}
+pub fn drawTextScreen(
+    renderer: *Renderer,
+    font: *const Font,
+    text: []const u8,
+    position: ScreenPoint,
+    scale: f32,
+    color: Color,
+    ctx: RenderContext,
+) void {
+    const f = @constCast(font);
+    var x_pos = position.x;
+    for (text) |char| {
+        const ascii_val: u32 = @intCast(char);
+        const glyph_index = font.char_to_glyph.get(ascii_val) orelse continue;
+        if (f.glyph_shapes.get(glyph_index)) |glyph| {
+            drawGlyph(
+                ScreenPoint,
                 renderer,
                 f,
                 glyph_index,
@@ -50,6 +88,7 @@ pub fn drawText(
 }
 
 fn drawGlyph(
+    comptime PointType: type,
     renderer: *Renderer,
     font: *Font,
     glyph_index: u16,
@@ -76,9 +115,9 @@ fn drawGlyph(
         const t1 = V2{ .x = p1.x * scale + pos.x, .y = p1.y * scale + pos.y };
         const t2 = V2{ .x = p2.x * scale + pos.x, .y = p2.y * scale + pos.y };
 
-        const triangle: Shapes.Triangle(WorldPoint) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
+        const triangle: Shapes.Triangle(PointType) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
         renderer.drawGeometry(
-            ShapeRegistry.createShapeUnion(Shapes.Triangle(WorldPoint), triangle),
+            ShapeRegistry.createShapeUnion(Shapes.Triangle(PointType), triangle),
             .{},
             color,
             null,
