@@ -73,6 +73,19 @@ pub const ColorLibrary = struct {
         }
         return null;
     }
+    pub fn findByNameClass(name: []const u8) [64]TaggedColor {
+        @setEvalBranchQuota(10000);
+        var res: [64]TaggedColor = undefined;
+        var idx: usize = 0;
+        for (entries) |entry| {
+            if (std.ascii.startsWithIgnoreCase(name, entry.name)) {
+                res[idx] = entry;
+                idx += 1;
+            }
+        }
+        return res;
+    }
+
     pub fn findByColor(c: Color) ?TaggedColor {
         for (entries) |entry| {
             const entry_rgba = entry.color.rgba;

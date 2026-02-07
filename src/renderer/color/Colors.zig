@@ -2233,3 +2233,104 @@ pub const FOOD_BEER = Color.initRgba(220, 180, 80, 200);
 pub const FOOD_BEER_DARK = Color.initRgba(80, 50, 30, 255);
 pub const FOOD_SODA_COLA = Color.initRgba(60, 30, 20, 255);
 pub const FOOD_SODA_LEMON = Color.initRgba(255, 255, 200, 200);
+
+// ============================================================================
+// PALETTE GAP FILLERS
+// Colors specifically designed to fill gaps in hue/tone/saturation space
+// ============================================================================
+
+// Deep Vivid Colors (v < 0.2, s >= 0.75)
+pub const BLOOD_RED = Color.initRgba(50, 0, 0, 255); // red.deep.vivid
+pub const DEEP_YELLOW = Color.initRgba(50, 50, 0, 255); // yellow.deep.vivid
+pub const DEEP_MAGENTA = Color.initRgba(50, 0, 50, 255); // magenta.deep.vivid
+
+// Deep Muted Colors (v < 0.2, s in [0.05, 0.35))
+pub const BURNT_UMBER = Color.initRgba(36, 27, 24, 255); // orange.deep.muted
+pub const DARK_OLIVE = Color.initRgba(36, 35, 24, 255); // yellow.deep.muted
+pub const SWAMP_GREEN = Color.initRgba(24, 36, 24, 255); // green.deep.muted
+pub const DEEP_TEAL = Color.initRgba(24, 36, 36, 255); // cyan.deep.muted
+
+// Dark Muted Colors (v in [0.2, 0.4), s in [0.05, 0.35))
+pub const MUTED_COFFEE = Color.initRgba(77, 58, 51, 255); // orange.dark.muted
+
+// Mid Muted Colors (v in [0.4, 0.6), s in [0.05, 0.35))
+pub const CLAY = Color.initRgba(128, 95, 84, 255); // orange.mid.muted
+pub const DUSTY_ROSE = Color.initRgba(128, 85, 128, 255); // magenta.mid.muted
+
+// CRAYOLA 64 BOX (Classic crayon colors)
+// ============================================================================
+// 8-Count (Core)
+pub const CRAYOLA_BLUE = Color.initFromU32Hex(0x1F75FE);
+pub const CRAYOLA_BLACK = Color.initFromU32Hex(0x232323);
+pub const CRAYOLA_BROWN = Color.initFromU32Hex(0xB5674D);
+pub const CRAYOLA_GREEN = Color.initFromU32Hex(0x1CAC78);
+pub const CRAYOLA_ORANGE = Color.initFromU32Hex(0xFF7538);
+pub const CRAYOLA_RED = Color.initFromU32Hex(0xEE204D);
+pub const CRAYOLA_VIOLET = Color.initFromU32Hex(0x926EAE);
+pub const CRAYOLA_YELLOW = Color.initFromU32Hex(0xFCE883);
+
+// 16-Count Additions
+pub const CRAYOLA_CARNATION_PINK = Color.initFromU32Hex(0xFFAACC);
+pub const CRAYOLA_BLUE_GREEN = Color.initFromU32Hex(0x199EBD);
+pub const CRAYOLA_BLUE_VIOLET = Color.initFromU32Hex(0x2E5090);
+pub const CRAYOLA_RED_ORANGE = Color.initFromU32Hex(0xFF5349);
+pub const CRAYOLA_RED_VIOLET = Color.initFromU32Hex(0xC0448F);
+pub const CRAYOLA_WHITE = Color.initFromU32Hex(0xEDEDED);
+pub const CRAYOLA_YELLOW_GREEN = Color.initFromU32Hex(0xC5E384);
+pub const CRAYOLA_YELLOW_ORANGE = Color.initFromU32Hex(0xFFB653);
+
+// 24-Count Additions
+pub const CRAYOLA_APRICOT = Color.initFromU32Hex(0xFDD9B5);
+pub const CRAYOLA_BLUETIFUL = Color.initFromU32Hex(0x7366BD);
+pub const CRAYOLA_CERULEAN = Color.initFromU32Hex(0x1DACD6);
+pub const CRAYOLA_GRAY = Color.initFromU32Hex(0x95918C);
+pub const CRAYOLA_GREEN_YELLOW = Color.initFromU32Hex(0xF0E891);
+pub const CRAYOLA_INDIGO = Color.initFromU32Hex(0x5D76CB);
+pub const CRAYOLA_SCARLET = Color.initFromU32Hex(0xFC2847);
+pub const CRAYOLA_VIOLET_RED = Color.initFromU32Hex(0xF75394);
+
+// 32-Count Additions
+pub const CRAYOLA_CADET_BLUE = Color.initFromU32Hex(0xB0B7C6);
+pub const CRAYOLA_CHESTNUT = Color.initFromU32Hex(0xBC5D58);
+pub const CRAYOLA_MELON = Color.initFromU32Hex(0xFDBCB4);
+pub const CRAYOLA_PEACH = Color.initFromU32Hex(0xFFCFAB);
+pub const CRAYOLA_SKY_BLUE = Color.initFromU32Hex(0x80DAEB);
+pub const CRAYOLA_TAN = Color.initFromU32Hex(0xFAA76C);
+pub const CRAYOLA_TIMBERWOLF = Color.initFromU32Hex(0xDBD7D2);
+pub const CRAYOLA_WISTERIA = Color.initFromU32Hex(0xCDA4DE);
+
+// 48-Count Additions
+pub const CRAYOLA_BURNT_SIENNA = Color.initFromU32Hex(0xEA7E5D);
+pub const CRAYOLA_CORNFLOWER = Color.initFromU32Hex(0x9ACEEB);
+pub const CRAYOLA_GOLDENROD = Color.initFromU32Hex(0xFCD975);
+pub const CRAYOLA_GRANNY_SMITH_APPLE = Color.initFromU32Hex(0xA8E4A0);
+pub const CRAYOLA_LAVENDER = Color.initFromU32Hex(0xFCB4D5);
+pub const CRAYOLA_MACARONI_AND_CHEESE = Color.initFromU32Hex(0xFFBD88);
+pub const CRAYOLA_MAHOGANY = Color.initFromU32Hex(0xCD4A4A);
+pub const CRAYOLA_MAUVELOUS = Color.initFromU32Hex(0xEF98AA);
+pub const CRAYOLA_OLIVE_GREEN = Color.initFromU32Hex(0xBAB86C);
+pub const CRAYOLA_PURPLE_MOUNTAINS_MAJESTY = Color.initFromU32Hex(0x9D81BA);
+pub const CRAYOLA_RAW_SIENNA = Color.initFromU32Hex(0xD68A59);
+pub const CRAYOLA_SALMON = Color.initFromU32Hex(0xFF9BAA);
+pub const CRAYOLA_SEA_GREEN = Color.initFromU32Hex(0x9FE2BF);
+pub const CRAYOLA_SEPIA = Color.initFromU32Hex(0xA5694F);
+pub const CRAYOLA_SPRING_GREEN = Color.initFromU32Hex(0xECEABE);
+pub const CRAYOLA_TUMBLEWEED = Color.initFromU32Hex(0xDEAA88);
+
+// 64-Count Additions
+pub const CRAYOLA_ASPARAGUS = Color.initFromU32Hex(0x87A96B);
+pub const CRAYOLA_BITTERSWEET = Color.initFromU32Hex(0xFD7C6E);
+pub const CRAYOLA_BRICK_RED = Color.initFromU32Hex(0xCB4154);
+pub const CRAYOLA_BURNT_ORANGE = Color.initFromU32Hex(0xFF7F49);
+pub const CRAYOLA_FOREST_GREEN = Color.initFromU32Hex(0x6DAE81);
+pub const CRAYOLA_GOLD = Color.initFromU32Hex(0xE7C697);
+pub const CRAYOLA_MAGENTA = Color.initFromU32Hex(0xF67EBF);
+pub const CRAYOLA_PERIWINKLE = Color.initFromU32Hex(0xC5D0E6);
+pub const CRAYOLA_ORCHID = Color.initFromU32Hex(0xE6A8D7);
+pub const CRAYOLA_PACIFIC_BLUE = Color.initFromU32Hex(0x1CA9C9);
+pub const CRAYOLA_PLUM = Color.initFromU32Hex(0x8E4584);
+pub const CRAYOLA_ROBINS_EGG_BLUE = Color.initFromU32Hex(0x1FCECB);
+pub const CRAYOLA_SILVER = Color.initFromU32Hex(0xCDC5C2);
+pub const CRAYOLA_TICKLE_ME_PINK = Color.initFromU32Hex(0xFC89AC);
+pub const CRAYOLA_TURQUOISE_BLUE = Color.initFromU32Hex(0x77DDE7);
+pub const CRAYOLA_WILD_STRAWBERRY = Color.initFromU32Hex(0xF664AF);
