@@ -32,7 +32,7 @@ pub fn update(self: *Self, data: MouseData) void {
     self.updateAnalogState(data.loc, data.scroll_data);
 }
 
-fn updateAnalogState(self: *Self, location: V2, scroll_delta: V2) void {
+pub fn updateAnalogState(self: *Self, location: V2, scroll_delta: V2) void {
     self.location_delta = location.sub(self.position);
     self.position = location;
     self.scroll_delta = self.scroll_delta.add(scroll_delta);

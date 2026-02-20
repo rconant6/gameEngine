@@ -54,7 +54,8 @@ class EventHandler {
     case .leftMouseDown, .leftMouseUp,
       .rightMouseDown, .rightMouseUp,
       .otherMouseDown, .otherMouseUp,
-      .scrollWheel:
+      .scrollWheel,
+      .mouseMoved, .leftMouseDragged, .rightMouseDragged:
       handleMouseEvent(event)
     default: break  // stuff not needed/supported (yet)
     }

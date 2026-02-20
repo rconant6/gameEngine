@@ -9,6 +9,8 @@ pub const Mouse = id.Mouse;
 pub const MouseButton = id.MouseButton;
 pub const MouseData = id.MouseData;
 pub const Window = PlatformImpl.Window;
+const math = @import("math");
+const V2I = math.V2I;
 // Internal use only - used by platform implementations
 pub const mapToGameKeyCode = id.mapToGameKeyCode;
 pub const mapToGameMouseButton = id.mapToGameMouseButton;
@@ -135,7 +137,7 @@ pub fn isKeyDown(window: *Window, key: KeyCode) bool {
     return PlatformImpl.isKeyDown(window, key);
 }
 
-pub fn getMousePosition(window: *Window) struct { x: i32, y: i32 } {
+pub fn getMousePosition(window: *Window) V2I {
     return PlatformImpl.getMousePosition(window);
 }
 

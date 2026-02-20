@@ -18,6 +18,7 @@ const MouseData = plat.MouseData;
 const PlatformImpl = plat.PlatformImpl;
 const WindowConfig = plat.WindowConfig;
 const V2 = @import("math").V2;
+const V2I = @import("math").V2I;
 
 var keyboard_state: Keyboard = .{};
 var mouse_state: Mouse = .{
@@ -99,6 +100,10 @@ pub fn pollEvent() ?Event {
     while (poll_mouse_event(&x, &y, &scroll_x, &scroll_y, &button, &is_down)) {
         const b = plat.mapToGameMouseButton(button);
         if (b == .Unused) {
+            mouse_state.updateAnalogState(
+                .{ .x = x, .y = y },
+                .{ .x = scroll_x, .y = scroll_y },
+            );
             continue;
         }
         mouse_state.update(MouseData{
@@ -143,6 +148,13 @@ pub fn getKeyboard() *const Keyboard {
 }
 pub fn getMouse() *const Mouse {
     return &mouse_state;
+}
+pub fn getMousePosition(window: *Window) V2I {
+    _ = window;
+    return .{
+        .x = @intFromFloat(mouse_state.position.x),
+        .y = @intFromFloat(mouse_state.position.y),
+    };
 }
 
 pub fn clearInputFrameStates() void {
