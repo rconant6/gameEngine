@@ -19,7 +19,7 @@ pub const V2 = math.V2;
 pub const V2I = math.V2I;
 pub const V2U = math.V2U;
 pub const WorldPoint = V2;
-pub const ScreenPoint = V2I;
+pub const ScreenPoint = math.ScreenPoint;
 
 // MARK: Renderer Types
 const renderer = @import("renderer");
