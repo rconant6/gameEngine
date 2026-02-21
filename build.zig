@@ -234,6 +234,7 @@ pub fn build(b: *std.Build) void {
     zixelart_module.addImport("renderer", renderer_module);
     zixelart_module.addImport("math", math_module);
     zixelart_module.addImport("debug", debug_module);
+    zixelart_module.addImport("assets", assets_module);
 
     const zixelart_exe = b.addExecutable(.{
         .name = "zixelart",
