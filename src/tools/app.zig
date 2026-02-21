@@ -19,6 +19,8 @@ pub const AppConfig = struct {
 pub const App = struct {
     allocator: std.mem.Allocator,
     window: *plat.Window,
+    kb: *const plat.Keyboard,
+    mouse: *const plat.Mouse,
     renderer: rend.Renderer,
     logical_width: u32,
     logical_height: u32,
@@ -69,6 +71,8 @@ pub const App = struct {
         return App{
             .allocator = allocator,
             .window = window,
+            .kb = plat.getKeyboard(),
+            .mouse = plat.getMouse(),
             .renderer = renderer,
             .logical_width = config.width,
             .logical_height = config.height,
@@ -88,8 +92,10 @@ pub const App = struct {
 
     pub fn beginFrame(self: *App) !void {
         plat.clearInputStates();
-        while (plat.pollEvent()) |_| {}
-        try self.renderer.beginFrame();
+        _ = plat.pollEvent();
+        self.renderer.beginFrame() catch |err| {
+            log.err(.renderer, "BeginFrame failed: {any}", .{err});
+        };
     }
 
     pub fn endFrame(self: *App) !void {

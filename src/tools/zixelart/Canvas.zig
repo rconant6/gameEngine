@@ -6,6 +6,9 @@ const Colors = rend.Colors;
 const Self = @This();
 const debug = @import("debug");
 const log = debug.log;
+const ZixelState = @import("ZixelState.zig");
+const layout = @import("Layout.zig");
+const Region = layout.Region;
 
 pub const PixelCell = struct {
     shape: ShapeData,
@@ -21,13 +24,13 @@ height: usize,
 pixel_count: usize,
 pixel_size: usize,
 x_offset: usize,
+y_offset: usize,
 
 pixels: []PixelCell = undefined,
 
 pub fn init(
     child_alloc: std.mem.Allocator,
-    width: usize,
-    height: usize,
+    region: Region,
     pixel_count: usize,
 ) !*Self {
     const self = try child_alloc.create(Self);
@@ -36,11 +39,12 @@ pub fn init(
     self.arena = std.heap.ArenaAllocator.init(child_alloc);
     self.allocator = self.arena.allocator();
 
-    self.width = width;
-    self.height = height;
+    self.width = @intFromFloat(region.width);
+    self.height = @intFromFloat(region.height);
     self.pixel_count = pixel_count;
-    self.pixel_size = height / pixel_count;
-    self.x_offset = (width - height) / 2;
+    self.pixel_size = @intFromFloat(region.height / @as(f32, @floatFromInt(pixel_count)));
+    self.x_offset = @intFromFloat(region.x);
+    self.y_offset = @intFromFloat(region.y);
 
     self.pixels = try self.allocator.alloc(PixelCell, pixel_count * pixel_count);
 
@@ -53,12 +57,12 @@ pub fn init(
     while (i < pixel_count) : (i += 1) {
         while (j < pixel_count) : (j += 1) {
             const loc_x = i * self.pixel_size + self.x_offset + self.pixel_size / 2;
-            const loc_y = j * self.pixel_size + self.pixel_size / 2;
+            const loc_y = j * self.pixel_size + self.y_offset + self.pixel_size / 2;
             self.pixels[j * pixel_count + i] = .{
                 .shape = rend.ShapeRegistry.createShapeUnion(
                     ScreenRect,
                     ScreenRect.initSquare(
-                        .{ .x = @intCast(loc_x), .y = @intCast(loc_y) },
+                        .{ .x = @floatFromInt(loc_x), .y = @floatFromInt(loc_y) },
                         @floatFromInt(self.pixel_size),
                     ),
                 ),
@@ -74,8 +78,11 @@ pub fn deinit(self: *Self) void {
     self.arena.deinit();
     self.child_allocator.destroy(self);
 }
-pub fn setPixel(self: *Self, x: usize, y: usize, color: Color) void {
-    self.pixels[y * self.pixel_count + x].color = color;
+pub fn setPixel(self: *Self, state: *const ZixelState) void {
+    self.pixels[state.cursor_y.? * self.pixel_count + state.cursor_x.?].color = state.active_color;
+}
+pub fn clearPixel(self: *Self, state: *const ZixelState) void {
+    self.pixels[state.cursor_y.? * self.pixel_count + state.cursor_x.?].color = state.bg_color;
 }
 pub fn clear(self: *Self) void {
     for (self.pixels) |*pixel| {
