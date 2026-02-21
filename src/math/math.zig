@@ -29,22 +29,21 @@ pub const V2U = @import("V2U.zig");
 ///    Camera positioning
 pub const WorldPoint = V2;
 
-/// ----  SCRENE SPACE ----
-/// Screen Point: alias for V2I(.x: i32, .y: i32)
-///     Origin is {0, 0} is top left of the screen
+/// ----  SCREEN SPACE ----
+/// Screen Point: alias for V2(.x: f32, .y: f32)
+///     Origin is {0, 0} is bottom-left of the screen
 ///     X increases to the right
-///     Y increases downward
+///     Y increases upward
 /// Limited by Window bounds (0..width, 0..height)
 /// Use Cases:
 ///     UI elements, debug info, input coords
 ///     Fixed screen overlays, debug grids
-///     Pixel Perfect Layout
-pub const ScreenPoint = V2I;
+/// Note: Uses f32 for math consistency. Rasterization converts to int.
+pub const ScreenPoint = V2;
 
 /// ----   CLIP SPACE  ----
 /// used for internal render pipeline by gpu
 /// [2]f32
 ///     Origin is {0, 0} at the center
 ///     Bounds (-1..1) in both X and Y
-
 pub const utils = @import("utils.zig");
