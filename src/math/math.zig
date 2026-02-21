@@ -39,7 +39,7 @@ pub const WorldPoint = V2;
 ///     UI elements, debug info, input coords
 ///     Fixed screen overlays, debug grids
 /// Note: Uses f32 for math consistency. Rasterization converts to int.
-pub const ScreenPoint = V2;
+pub const ScreenPoint = @import("ScreenPoint.zig");
 
 /// ----   CLIP SPACE  ----
 /// used for internal render pipeline by gpu
