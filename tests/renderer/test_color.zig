@@ -660,9 +660,9 @@ test "math.hueShift: preserves saturation and value" {
 
 const ColorLibrary = color_mod.ColorLibrary;
 
-test "ColorLibrary: getAllColors returns all 1911 colors" {
+test "ColorLibrary: getAllColors returns all 2187 colors" {
     const all = ColorLibrary.getAllColors();
-    try testing.expectEqual(@as(usize, 1911), all.len);
+    try testing.expectEqual(@as(usize, 2187), all.len);
 }
 
 test "ColorLibrary: getColorCount matches getAllColors length" {
