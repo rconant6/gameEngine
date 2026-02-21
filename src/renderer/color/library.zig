@@ -115,7 +115,7 @@ pub const ColorLibrary = struct {
     }
 
     const count = blk: {
-        @setEvalBranchQuota(2000);
+        @setEvalBranchQuota(3000);
         var c = 0;
         for (@typeInfo(Colors).@"struct".decls) |decl| {
             if (@TypeOf(@field(Colors, decl.name)) == Color) c += 1;

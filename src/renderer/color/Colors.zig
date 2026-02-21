@@ -2334,3 +2334,311 @@ pub const CRAYOLA_SILVER = Color.initFromU32Hex(0xCDC5C2);
 pub const CRAYOLA_TICKLE_ME_PINK = Color.initFromU32Hex(0xFC89AC);
 pub const CRAYOLA_TURQUOISE_BLUE = Color.initFromU32Hex(0x77DDE7);
 pub const CRAYOLA_WILD_STRAWBERRY = Color.initFromU32Hex(0xF664AF);
+
+// ============================================================================
+// PIXEL ART PALETTES - Popular community palettes from Lospec
+// ============================================================================
+
+// OIL-6 (6 colors) - Minimalist palette by GrafxKid
+pub const OIL6_CREAM = Color.initFromU32Hex(0xFBF5EF);
+pub const OIL6_BEIGE = Color.initFromU32Hex(0xF2D3AB);
+pub const OIL6_MAUVE = Color.initFromU32Hex(0xC69FA5);
+pub const OIL6_PURPLE = Color.initFromU32Hex(0x8B6D9C);
+pub const OIL6_INDIGO = Color.initFromU32Hex(0x494D7E);
+pub const OIL6_DARK = Color.initFromU32Hex(0x272744);
+
+// SLSO8 (8 colors) - Warm sunset palette
+pub const SLSO8_DARK_BLUE = Color.initFromU32Hex(0x0D2B45);
+pub const SLSO8_NAVY = Color.initFromU32Hex(0x203C56);
+pub const SLSO8_PURPLE = Color.initFromU32Hex(0x544E68);
+pub const SLSO8_MAUVE = Color.initFromU32Hex(0x8D697A);
+pub const SLSO8_RUST = Color.initFromU32Hex(0xD08159);
+pub const SLSO8_ORANGE = Color.initFromU32Hex(0xFFAA5E);
+pub const SLSO8_PEACH = Color.initFromU32Hex(0xFFD4A3);
+pub const SLSO8_CREAM = Color.initFromU32Hex(0xFFECD6);
+
+// NYX8 (8 colors) - Dark atmospheric palette
+pub const NYX8_VOID = Color.initFromU32Hex(0x08141E);
+pub const NYX8_DARK_BLUE = Color.initFromU32Hex(0x0F2A3F);
+pub const NYX8_BLUE = Color.initFromU32Hex(0x20394F);
+pub const NYX8_CREAM = Color.initFromU32Hex(0xF6D6BD);
+pub const NYX8_TAN = Color.initFromU32Hex(0xC3A38A);
+pub const NYX8_MAUVE = Color.initFromU32Hex(0x997577);
+pub const NYX8_ROSE = Color.initFromU32Hex(0x816271);
+pub const NYX8_PURPLE_GRAY = Color.initFromU32Hex(0x4E495F);
+
+// FUNKYFUTURE-8 (8 colors) - Retrowave/synthwave
+pub const FUNKYFUTURE_DEEP_PURPLE = Color.initFromU32Hex(0x2B0F54);
+pub const FUNKYFUTURE_MAGENTA = Color.initFromU32Hex(0xAB1F65);
+pub const FUNKYFUTURE_HOT_PINK = Color.initFromU32Hex(0xFF4F69);
+pub const FUNKYFUTURE_WHITE = Color.initFromU32Hex(0xFFF7F8);
+pub const FUNKYFUTURE_ORANGE = Color.initFromU32Hex(0xFF8142);
+pub const FUNKYFUTURE_YELLOW = Color.initFromU32Hex(0xFFDA45);
+pub const FUNKYFUTURE_BLUE = Color.initFromU32Hex(0x3368DC);
+pub const FUNKYFUTURE_CYAN = Color.initFromU32Hex(0x49E7EC);
+
+// BERRY-NEBULA (8 colors) - Space/underground scenes
+pub const BERRY_NEBULA_NEON = Color.initFromU32Hex(0x6CEDED);
+pub const BERRY_NEBULA_CYAN = Color.initFromU32Hex(0x6CB9C9);
+pub const BERRY_NEBULA_MUTED = Color.initFromU32Hex(0x6D85A5);
+pub const BERRY_NEBULA_VIOLET = Color.initFromU32Hex(0x6E5181);
+pub const BERRY_NEBULA_RED_VIOLET = Color.initFromU32Hex(0x6F1D5C);
+pub const BERRY_NEBULA_DEEP = Color.initFromU32Hex(0x4F1446);
+pub const BERRY_NEBULA_DARK = Color.initFromU32Hex(0x2E0A30);
+pub const BERRY_NEBULA_VOID = Color.initFromU32Hex(0x0D001A);
+
+// 1BIT-MONITOR-GLOW (2 colors) - High contrast 1-bit
+pub const MONITOR_GLOW_BLACK = Color.initFromU32Hex(0x222323);
+pub const MONITOR_GLOW_WHITE = Color.initFromU32Hex(0xF0F6F0);
+
+// NA16 (16 colors) - Versatile general-purpose palette
+pub const NA16_LAVENDER = Color.initFromU32Hex(0x8C8FAE);
+pub const NA16_DARK_PURPLE = Color.initFromU32Hex(0x584563);
+pub const NA16_DEEP_PURPLE = Color.initFromU32Hex(0x3E2137);
+pub const NA16_RUST = Color.initFromU32Hex(0x9A6348);
+pub const NA16_TAN = Color.initFromU32Hex(0xD79B7D);
+pub const NA16_CREAM = Color.initFromU32Hex(0xF5EDBA);
+pub const NA16_LIME = Color.initFromU32Hex(0xC0C741);
+pub const NA16_OLIVE = Color.initFromU32Hex(0x647D34);
+pub const NA16_ORANGE = Color.initFromU32Hex(0xE4943A);
+pub const NA16_CRIMSON = Color.initFromU32Hex(0x9D303B);
+pub const NA16_ROSE = Color.initFromU32Hex(0xD26471);
+pub const NA16_PURPLE = Color.initFromU32Hex(0x70377F);
+pub const NA16_AQUA = Color.initFromU32Hex(0x7EC4C1);
+pub const NA16_TEAL = Color.initFromU32Hex(0x34859D);
+pub const NA16_DARK_TEAL = Color.initFromU32Hex(0x17434B);
+pub const NA16_BLACK = Color.initFromU32Hex(0x1F0E1C);
+
+// ISLAND-JOY-16 (16 colors) - Tropical vibrant palette
+pub const ISLAND_JOY_WHITE = Color.initFromU32Hex(0xFFFFFF);
+pub const ISLAND_JOY_MINT = Color.initFromU32Hex(0x6DF7C1);
+pub const ISLAND_JOY_CYAN = Color.initFromU32Hex(0x11ADC1);
+pub const ISLAND_JOY_GRAY = Color.initFromU32Hex(0x606C81);
+pub const ISLAND_JOY_DARK = Color.initFromU32Hex(0x393457);
+pub const ISLAND_JOY_TEAL = Color.initFromU32Hex(0x1E8875);
+pub const ISLAND_JOY_GREEN = Color.initFromU32Hex(0x5BB361);
+pub const ISLAND_JOY_LIME = Color.initFromU32Hex(0xA1E55A);
+pub const ISLAND_JOY_YELLOW = Color.initFromU32Hex(0xF7E476);
+pub const ISLAND_JOY_ORANGE = Color.initFromU32Hex(0xF99252);
+pub const ISLAND_JOY_CORAL = Color.initFromU32Hex(0xCB4D68);
+pub const ISLAND_JOY_PURPLE = Color.initFromU32Hex(0x6A3771);
+pub const ISLAND_JOY_MAGENTA = Color.initFromU32Hex(0xC92464);
+pub const ISLAND_JOY_PINK = Color.initFromU32Hex(0xF48CB6);
+pub const ISLAND_JOY_SALMON = Color.initFromU32Hex(0xF7B69E);
+pub const ISLAND_JOY_OLIVE = Color.initFromU32Hex(0x9B9C82);
+
+// MULFOK32 (32 colors) - Soft pastel palette
+pub const MULFOK32_01 = Color.initFromU32Hex(0x5BA675);
+pub const MULFOK32_02 = Color.initFromU32Hex(0x6BC96C);
+pub const MULFOK32_03 = Color.initFromU32Hex(0xABDD64);
+pub const MULFOK32_04 = Color.initFromU32Hex(0xFCEF8D);
+pub const MULFOK32_05 = Color.initFromU32Hex(0xFFB879);
+pub const MULFOK32_06 = Color.initFromU32Hex(0xEA6262);
+pub const MULFOK32_07 = Color.initFromU32Hex(0xCC425E);
+pub const MULFOK32_08 = Color.initFromU32Hex(0xA32858);
+pub const MULFOK32_09 = Color.initFromU32Hex(0x751756);
+pub const MULFOK32_10 = Color.initFromU32Hex(0x390947);
+pub const MULFOK32_11 = Color.initFromU32Hex(0x611851);
+pub const MULFOK32_12 = Color.initFromU32Hex(0x873555);
+pub const MULFOK32_13 = Color.initFromU32Hex(0xA6555F);
+pub const MULFOK32_14 = Color.initFromU32Hex(0xC97373);
+pub const MULFOK32_15 = Color.initFromU32Hex(0xF2AE99);
+pub const MULFOK32_16 = Color.initFromU32Hex(0xFFC3F2);
+pub const MULFOK32_17 = Color.initFromU32Hex(0xEE8FCB);
+pub const MULFOK32_18 = Color.initFromU32Hex(0xD46EB3);
+pub const MULFOK32_19 = Color.initFromU32Hex(0x873E84);
+pub const MULFOK32_20 = Color.initFromU32Hex(0x1F102A);
+pub const MULFOK32_21 = Color.initFromU32Hex(0x4A3052);
+pub const MULFOK32_22 = Color.initFromU32Hex(0x7B5480);
+pub const MULFOK32_23 = Color.initFromU32Hex(0xA6859F);
+pub const MULFOK32_24 = Color.initFromU32Hex(0xD9BDC8);
+pub const MULFOK32_25 = Color.initFromU32Hex(0xFFFFFF);
+pub const MULFOK32_26 = Color.initFromU32Hex(0xAEE2FF);
+pub const MULFOK32_27 = Color.initFromU32Hex(0x8DB7FF);
+pub const MULFOK32_28 = Color.initFromU32Hex(0x6D80FA);
+pub const MULFOK32_29 = Color.initFromU32Hex(0x8465EC);
+pub const MULFOK32_30 = Color.initFromU32Hex(0x834DC4);
+pub const MULFOK32_31 = Color.initFromU32Hex(0x7D2DA0);
+pub const MULFOK32_32 = Color.initFromU32Hex(0x4E187C);
+
+// VINIK24 (24 colors) - Soft pastel connected ramps
+pub const VINIK24_01 = Color.initFromU32Hex(0x000000);
+pub const VINIK24_02 = Color.initFromU32Hex(0x6F6776);
+pub const VINIK24_03 = Color.initFromU32Hex(0x9A9A97);
+pub const VINIK24_04 = Color.initFromU32Hex(0xC5CCB8);
+pub const VINIK24_05 = Color.initFromU32Hex(0x8B5580);
+pub const VINIK24_06 = Color.initFromU32Hex(0xC38890);
+pub const VINIK24_07 = Color.initFromU32Hex(0xA593A5);
+pub const VINIK24_08 = Color.initFromU32Hex(0x666092);
+pub const VINIK24_09 = Color.initFromU32Hex(0x9A4F50);
+pub const VINIK24_10 = Color.initFromU32Hex(0xC28D75);
+pub const VINIK24_11 = Color.initFromU32Hex(0x7CA1C0);
+pub const VINIK24_12 = Color.initFromU32Hex(0x416AA3);
+pub const VINIK24_13 = Color.initFromU32Hex(0x8D6268);
+pub const VINIK24_14 = Color.initFromU32Hex(0xBE955C);
+pub const VINIK24_15 = Color.initFromU32Hex(0x68ACA9);
+pub const VINIK24_16 = Color.initFromU32Hex(0x387080);
+pub const VINIK24_17 = Color.initFromU32Hex(0x6E6962);
+pub const VINIK24_18 = Color.initFromU32Hex(0x93A167);
+pub const VINIK24_19 = Color.initFromU32Hex(0x6EAA78);
+pub const VINIK24_20 = Color.initFromU32Hex(0x557064);
+pub const VINIK24_21 = Color.initFromU32Hex(0x9D9F7F);
+pub const VINIK24_22 = Color.initFromU32Hex(0x7E9E99);
+pub const VINIK24_23 = Color.initFromU32Hex(0x5D6872);
+pub const VINIK24_24 = Color.initFromU32Hex(0x433455);
+
+// FANTASY-24 (24 colors) - Fantasy earth tones
+pub const FANTASY24_01 = Color.initFromU32Hex(0x1F240A);
+pub const FANTASY24_02 = Color.initFromU32Hex(0x39571C);
+pub const FANTASY24_03 = Color.initFromU32Hex(0xA58C27);
+pub const FANTASY24_04 = Color.initFromU32Hex(0xEFAC28);
+pub const FANTASY24_05 = Color.initFromU32Hex(0xEFD8A1);
+pub const FANTASY24_06 = Color.initFromU32Hex(0xAB5C1C);
+pub const FANTASY24_07 = Color.initFromU32Hex(0x183F39);
+pub const FANTASY24_08 = Color.initFromU32Hex(0xEF692F);
+pub const FANTASY24_09 = Color.initFromU32Hex(0xEFB775);
+pub const FANTASY24_10 = Color.initFromU32Hex(0xA56243);
+pub const FANTASY24_11 = Color.initFromU32Hex(0x773421);
+pub const FANTASY24_12 = Color.initFromU32Hex(0x724113);
+pub const FANTASY24_13 = Color.initFromU32Hex(0x2A1D0D);
+pub const FANTASY24_14 = Color.initFromU32Hex(0x392A1C);
+pub const FANTASY24_15 = Color.initFromU32Hex(0x684C3C);
+pub const FANTASY24_16 = Color.initFromU32Hex(0x927E6A);
+pub const FANTASY24_17 = Color.initFromU32Hex(0x276468);
+pub const FANTASY24_18 = Color.initFromU32Hex(0xEF3A0C);
+pub const FANTASY24_19 = Color.initFromU32Hex(0x45230D);
+pub const FANTASY24_20 = Color.initFromU32Hex(0x3C9F9C);
+pub const FANTASY24_21 = Color.initFromU32Hex(0x9B1A0A);
+pub const FANTASY24_22 = Color.initFromU32Hex(0x36170C);
+pub const FANTASY24_23 = Color.initFromU32Hex(0x550F0A);
+pub const FANTASY24_24 = Color.initFromU32Hex(0x300F0A);
+
+// PEAR36 (36 colors) - Warm vibrant palette
+pub const PEAR36_01 = Color.initFromU32Hex(0x5E315B);
+pub const PEAR36_02 = Color.initFromU32Hex(0x8C3F5D);
+pub const PEAR36_03 = Color.initFromU32Hex(0xBA6156);
+pub const PEAR36_04 = Color.initFromU32Hex(0xF2A65E);
+pub const PEAR36_05 = Color.initFromU32Hex(0xFFE478);
+pub const PEAR36_06 = Color.initFromU32Hex(0xCFFF70);
+pub const PEAR36_07 = Color.initFromU32Hex(0x8FDE5D);
+pub const PEAR36_08 = Color.initFromU32Hex(0x3CA370);
+pub const PEAR36_09 = Color.initFromU32Hex(0x3D6E70);
+pub const PEAR36_10 = Color.initFromU32Hex(0x323E4F);
+pub const PEAR36_11 = Color.initFromU32Hex(0x322947);
+pub const PEAR36_12 = Color.initFromU32Hex(0x473B78);
+pub const PEAR36_13 = Color.initFromU32Hex(0x4B5BAB);
+pub const PEAR36_14 = Color.initFromU32Hex(0x4DA6FF);
+pub const PEAR36_15 = Color.initFromU32Hex(0x66FFE3);
+pub const PEAR36_16 = Color.initFromU32Hex(0xFFFFEB);
+pub const PEAR36_17 = Color.initFromU32Hex(0xC2C2D1);
+pub const PEAR36_18 = Color.initFromU32Hex(0x7E7E8F);
+pub const PEAR36_19 = Color.initFromU32Hex(0x606070);
+pub const PEAR36_20 = Color.initFromU32Hex(0x43434F);
+pub const PEAR36_21 = Color.initFromU32Hex(0x272736);
+pub const PEAR36_22 = Color.initFromU32Hex(0x3E2347);
+pub const PEAR36_23 = Color.initFromU32Hex(0x57294B);
+pub const PEAR36_24 = Color.initFromU32Hex(0x964253);
+pub const PEAR36_25 = Color.initFromU32Hex(0xE36956);
+pub const PEAR36_26 = Color.initFromU32Hex(0xFFB570);
+pub const PEAR36_27 = Color.initFromU32Hex(0xFF9166);
+pub const PEAR36_28 = Color.initFromU32Hex(0xEB564B);
+pub const PEAR36_29 = Color.initFromU32Hex(0xB0305C);
+pub const PEAR36_30 = Color.initFromU32Hex(0x73275C);
+pub const PEAR36_31 = Color.initFromU32Hex(0x422445);
+pub const PEAR36_32 = Color.initFromU32Hex(0x5A265E);
+pub const PEAR36_33 = Color.initFromU32Hex(0x80366B);
+pub const PEAR36_34 = Color.initFromU32Hex(0xBD4882);
+pub const PEAR36_35 = Color.initFromU32Hex(0xFF6B97);
+pub const PEAR36_36 = Color.initFromU32Hex(0xFFB5B5);
+
+// ROSY-42 (42 colors) - Warm rosy tones
+pub const ROSY42_01 = Color.initFromU32Hex(0x21181B);
+pub const ROSY42_02 = Color.initFromU32Hex(0x3B2027);
+pub const ROSY42_03 = Color.initFromU32Hex(0x7D3833);
+pub const ROSY42_04 = Color.initFromU32Hex(0xAB5130);
+pub const ROSY42_05 = Color.initFromU32Hex(0xCF752B);
+pub const ROSY42_06 = Color.initFromU32Hex(0xF0B541);
+pub const ROSY42_07 = Color.initFromU32Hex(0xFFEE83);
+pub const ROSY42_08 = Color.initFromU32Hex(0xC8D45D);
+pub const ROSY42_09 = Color.initFromU32Hex(0x63AB3F);
+pub const ROSY42_10 = Color.initFromU32Hex(0x3B7D4F);
+pub const ROSY42_11 = Color.initFromU32Hex(0x2F5753);
+pub const ROSY42_12 = Color.initFromU32Hex(0x283540);
+pub const ROSY42_13 = Color.initFromU32Hex(0x1B1F21);
+pub const ROSY42_14 = Color.initFromU32Hex(0x2B2B45);
+pub const ROSY42_15 = Color.initFromU32Hex(0x3A3F5E);
+pub const ROSY42_16 = Color.initFromU32Hex(0x4C6885);
+pub const ROSY42_17 = Color.initFromU32Hex(0x4FA4B8);
+pub const ROSY42_18 = Color.initFromU32Hex(0x92E8C0);
+pub const ROSY42_19 = Color.initFromU32Hex(0xF5FFE8);
+pub const ROSY42_20 = Color.initFromU32Hex(0xDFE0E8);
+pub const ROSY42_21 = Color.initFromU32Hex(0xA3A7C2);
+pub const ROSY42_22 = Color.initFromU32Hex(0x686F99);
+pub const ROSY42_23 = Color.initFromU32Hex(0x404973);
+pub const ROSY42_24 = Color.initFromU32Hex(0x2C354D);
+pub const ROSY42_25 = Color.initFromU32Hex(0x14182E);
+pub const ROSY42_26 = Color.initFromU32Hex(0x4B1D52);
+pub const ROSY42_27 = Color.initFromU32Hex(0x692464);
+pub const ROSY42_28 = Color.initFromU32Hex(0x9C2A70);
+pub const ROSY42_29 = Color.initFromU32Hex(0xCC2F7B);
+pub const ROSY42_30 = Color.initFromU32Hex(0xFF5277);
+pub const ROSY42_31 = Color.initFromU32Hex(0xFFC2A1);
+pub const ROSY42_32 = Color.initFromU32Hex(0xFF8933);
+pub const ROSY42_33 = Color.initFromU32Hex(0xE64539);
+pub const ROSY42_34 = Color.initFromU32Hex(0xAD2F45);
+pub const ROSY42_35 = Color.initFromU32Hex(0x781D4F);
+pub const ROSY42_36 = Color.initFromU32Hex(0x4F1D4C);
+pub const ROSY42_37 = Color.initFromU32Hex(0x291D2B);
+pub const ROSY42_38 = Color.initFromU32Hex(0x3D2936);
+pub const ROSY42_39 = Color.initFromU32Hex(0x52333F);
+pub const ROSY42_40 = Color.initFromU32Hex(0x8F4D57);
+pub const ROSY42_41 = Color.initFromU32Hex(0xBD6A62);
+pub const ROSY42_42 = Color.initFromU32Hex(0xFFAE70);
+
+// APOLLO (46 colors) - Comprehensive organized palette
+pub const APOLLO_01 = Color.initFromU32Hex(0x172038);
+pub const APOLLO_02 = Color.initFromU32Hex(0x253A5E);
+pub const APOLLO_03 = Color.initFromU32Hex(0x3C5E8B);
+pub const APOLLO_04 = Color.initFromU32Hex(0x4F8FBA);
+pub const APOLLO_05 = Color.initFromU32Hex(0x73BED3);
+pub const APOLLO_06 = Color.initFromU32Hex(0xA4DDDB);
+pub const APOLLO_07 = Color.initFromU32Hex(0x19332D);
+pub const APOLLO_08 = Color.initFromU32Hex(0x25562E);
+pub const APOLLO_09 = Color.initFromU32Hex(0x468232);
+pub const APOLLO_10 = Color.initFromU32Hex(0x75A743);
+pub const APOLLO_11 = Color.initFromU32Hex(0xA8CA58);
+pub const APOLLO_12 = Color.initFromU32Hex(0xD0DA91);
+pub const APOLLO_13 = Color.initFromU32Hex(0x4D2B32);
+pub const APOLLO_14 = Color.initFromU32Hex(0x7A4841);
+pub const APOLLO_15 = Color.initFromU32Hex(0xAD7757);
+pub const APOLLO_16 = Color.initFromU32Hex(0xC09473);
+pub const APOLLO_17 = Color.initFromU32Hex(0xD7B594);
+pub const APOLLO_18 = Color.initFromU32Hex(0xE7D5B3);
+pub const APOLLO_19 = Color.initFromU32Hex(0x341C27);
+pub const APOLLO_20 = Color.initFromU32Hex(0x602C2C);
+pub const APOLLO_21 = Color.initFromU32Hex(0x884B2B);
+pub const APOLLO_22 = Color.initFromU32Hex(0xBE772B);
+pub const APOLLO_23 = Color.initFromU32Hex(0xDE9E41);
+pub const APOLLO_24 = Color.initFromU32Hex(0xE8C170);
+pub const APOLLO_25 = Color.initFromU32Hex(0x241527);
+pub const APOLLO_26 = Color.initFromU32Hex(0x411D31);
+pub const APOLLO_27 = Color.initFromU32Hex(0x752438);
+pub const APOLLO_28 = Color.initFromU32Hex(0xA53030);
+pub const APOLLO_29 = Color.initFromU32Hex(0xCF573C);
+pub const APOLLO_30 = Color.initFromU32Hex(0xDA863E);
+pub const APOLLO_31 = Color.initFromU32Hex(0x1E1D39);
+pub const APOLLO_32 = Color.initFromU32Hex(0x402751);
+pub const APOLLO_33 = Color.initFromU32Hex(0x7A367B);
+pub const APOLLO_34 = Color.initFromU32Hex(0xA23E8C);
+pub const APOLLO_35 = Color.initFromU32Hex(0xC65197);
+pub const APOLLO_36 = Color.initFromU32Hex(0xDF84A5);
+pub const APOLLO_37 = Color.initFromU32Hex(0x090A14);
+pub const APOLLO_38 = Color.initFromU32Hex(0x10141F);
+pub const APOLLO_39 = Color.initFromU32Hex(0x151D28);
+pub const APOLLO_40 = Color.initFromU32Hex(0x202E37);
+pub const APOLLO_41 = Color.initFromU32Hex(0x394A50);
+pub const APOLLO_42 = Color.initFromU32Hex(0x577277);
+pub const APOLLO_43 = Color.initFromU32Hex(0x819796);
+pub const APOLLO_44 = Color.initFromU32Hex(0xA8B5B2);
+pub const APOLLO_45 = Color.initFromU32Hex(0xC7CFCC);
+pub const APOLLO_46 = Color.initFromU32Hex(0xEBEDE9);
