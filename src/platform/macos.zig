@@ -24,6 +24,7 @@ var keyboard_state: Keyboard = .{};
 var mouse_state: Mouse = .{
     .buttons = InputDevice(MouseButton){},
 };
+var window_height: f32 = 0;
 
 pub const Window = struct {
     handle: c.WindowHandle,
@@ -61,6 +62,7 @@ pub fn createWindow(options: WindowConfig) !*Window {
 
     const window = try std.heap.c_allocator.create(Window);
     window.* = Window{ .handle = handle };
+    window_height = @floatFromInt(options.height);
 
     return window;
 }
@@ -98,16 +100,17 @@ pub fn pollEvent() ?Event {
     is_down = undefined;
 
     while (poll_mouse_event(&x, &y, &scroll_x, &scroll_y, &button, &is_down)) {
+        const flipped_y = window_height - y - 1;
         const b = plat.mapToGameMouseButton(button);
         if (b == .Unused) {
             mouse_state.updateAnalogState(
-                .{ .x = x, .y = y },
+                .{ .x = x, .y = flipped_y },
                 .{ .x = scroll_x, .y = scroll_y },
             );
             continue;
         }
         mouse_state.update(MouseData{
-            .loc = .{ .x = x, .y = y },
+            .loc = .{ .x = x, .y = flipped_y },
             .scroll_data = .{ .x = scroll_x, .y = scroll_y },
             .button = b,
             .is_down = if (is_down == 0) false else true,
