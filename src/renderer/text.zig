@@ -59,8 +59,8 @@ pub fn drawTextScreen(
     ctx: RenderContext,
 ) void {
     const f = @constCast(font);
-    var x_pos: f32 = @floatFromInt(position.x);
-    const y_pos: f32 = @floatFromInt(position.y);
+    var x_pos: f32 = position.x;
+    const y_pos: f32 = position.y;
     for (text) |char| {
         const ascii_val: u32 = @intCast(char);
         const glyph_index = font.char_to_glyph.get(ascii_val) orelse continue;
@@ -150,9 +150,9 @@ fn drawGlyphScreen(
         const p1 = glyph.points[tri[1]];
         const p2 = glyph.points[tri[2]];
 
-        const t0 = ScreenPoint{ .x = @intFromFloat(p0.x * scale + x_pos), .y = @intFromFloat(-p0.y * scale + y_pos) };
-        const t1 = ScreenPoint{ .x = @intFromFloat(p1.x * scale + x_pos), .y = @intFromFloat(-p1.y * scale + y_pos) };
-        const t2 = ScreenPoint{ .x = @intFromFloat(p2.x * scale + x_pos), .y = @intFromFloat(-p2.y * scale + y_pos) };
+        const t0 = ScreenPoint{ .x = p0.x * scale + x_pos, .y = -p0.y * scale + y_pos };
+        const t1 = ScreenPoint{ .x = p1.x * scale + x_pos, .y = -p1.y * scale + y_pos };
+        const t2 = ScreenPoint{ .x = p2.x * scale + x_pos, .y = -p2.y * scale + y_pos };
 
         const triangle: Shapes.Triangle(ScreenPoint) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
         renderer.drawGeometry(

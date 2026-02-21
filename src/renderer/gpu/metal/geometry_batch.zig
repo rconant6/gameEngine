@@ -128,8 +128,8 @@ pub const GeometryBatch = struct {
     ) Vertex {
         // Apply transform offset to screen-space point
         const transformed = if (xform) |t| blk: {
-            const offset_x: i32 = if (t.offset) |off| @intFromFloat(off.x) else 0;
-            const offset_y: i32 = if (t.offset) |off| @intFromFloat(off.y) else 0;
+            const offset_x: f32 = if (t.offset) |off| off.x else 0;
+            const offset_y: f32 = if (t.offset) |off| off.y else 0;
             break :blk ScreenPoint{
                 .x = point.x + offset_x,
                 .y = point.y + offset_y,
@@ -466,18 +466,11 @@ pub const GeometryBatch = struct {
             const angle1 = i_f * angle_step;
             const angle2 = (i_f + 1.0) * angle_step;
 
-            const XType = @TypeOf(circle.origin.x);
-            const p1 = if (XType == i32) PointType{
-                .x = circle.origin.x + @as(i32, @intFromFloat(circle.radius * @cos(angle1))),
-                .y = circle.origin.y + @as(i32, @intFromFloat(circle.radius * @sin(angle1))),
-            } else PointType{
+            const p1 = PointType{
                 .x = circle.origin.x + circle.radius * @cos(angle1),
                 .y = circle.origin.y + circle.radius * @sin(angle1),
             };
-            const p2 = if (XType == i32) PointType{
-                .x = circle.origin.x + @as(i32, @intFromFloat(circle.radius * @cos(angle2))),
-                .y = circle.origin.y + @as(i32, @intFromFloat(circle.radius * @sin(angle2))),
-            } else PointType{
+            const p2 = PointType{
                 .x = circle.origin.x + circle.radius * @cos(angle2),
                 .y = circle.origin.y + circle.radius * @sin(angle2),
             };

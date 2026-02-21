@@ -90,11 +90,11 @@ pub fn worldToScreen(point: WorldPoint, ctx: RenderContext) V2 {
     return .{ .x = screen_x, .y = screen_y };
 }
 
-/// Converts a world position to screen pixel coordinates (i32).
-/// Integer wrapper around worldToScreen for convenience.
-pub fn worldToScreenInt(point: WorldPoint, ctx: RenderContext) ScreenPoint {
+/// Converts a world position to screen pixel coordinates.
+/// Returns ScreenPoint (f32) for math consistency.
+pub fn worldToScreenPoint(point: WorldPoint, ctx: RenderContext) ScreenPoint {
     const f = worldToScreen(point, ctx);
-    return .{ .x = @intFromFloat(f.x), .y = @intFromFloat(f.y) };
+    return .{ .x = f.x, .y = f.y };
 }
 
 /// Converts screen pixel coordinates to world position.
@@ -103,12 +103,10 @@ pub fn worldToScreenInt(point: WorldPoint, ctx: RenderContext) ScreenPoint {
 pub fn screenToWorld(screen: ScreenPoint, ctx: RenderContext) WorldPoint {
     const fw: f32 = @floatFromInt(ctx.width);
     const fh: f32 = @floatFromInt(ctx.height);
-    const fx: f32 = @floatFromInt(screen.x);
-    const fy: f32 = @floatFromInt(screen.y);
     const aspect = fw / fh;
 
-    const clip_x = (fx / fw) * 2.0 - 1.0;
-    const clip_y = 1.0 - (fy / fh) * 2.0;
+    const clip_x = (screen.x / fw) * 2.0 - 1.0;
+    const clip_y = 1.0 - (screen.y / fh) * 2.0;
 
     const relative_x = clip_x * (ctx.ortho_size * aspect);
     const relative_y = clip_y * ctx.ortho_size;
@@ -124,11 +122,9 @@ pub fn screenToWorld(screen: ScreenPoint, ctx: RenderContext) WorldPoint {
 pub fn screenToClipSpace(screen: ScreenPoint, ctx: RenderContext) [2]f32 {
     const fw: f32 = @floatFromInt(ctx.width);
     const fh: f32 = @floatFromInt(ctx.height);
-    const fx: f32 = @floatFromInt(screen.x);
-    const fy: f32 = @floatFromInt(screen.y);
 
-    const clip_x = (fx / fw) * 2.0 - 1.0;
-    const clip_y = 1.0 - (fy / fh) * 2.0;
+    const clip_x = (screen.x / fw) * 2.0 - 1.0;
+    const clip_y = 1.0 - (screen.y / fh) * 2.0;
 
     return .{ clip_x, clip_y };
 }
