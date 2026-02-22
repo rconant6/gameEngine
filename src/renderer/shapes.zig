@@ -68,8 +68,8 @@ pub fn Rectangle(comptime PointType: type) type {
                     .x = top_left.x + width * 0.5,
                     .y = top_left.y + height * 0.5,
                 },
-                .half_width = width,
-                .half_height = height,
+                .half_width = width / 2,
+                .half_height = height / 2,
             };
         }
 
