@@ -140,6 +140,7 @@ pub const DUST_DARK = Color.initRgba(66, 40, 31, 255);
 pub const DUST_MID = Color.initRgba(163, 103, 75, 255);
 pub const DUST_LIGHT = Color.initRgba(224, 170, 117, 255);
 pub const DUST_GOLD = Color.initRgba(245, 203, 92, 255);
+pub const PENCIL_YELLOW = Color.initRgba(249, 194, 46, 255); // Ticonderoga #2 shaft yellow
 
 // 3. THE "CYBER" FAMILY (High-Saturation/Neon)
 // Use these for "Selection" states or FX
