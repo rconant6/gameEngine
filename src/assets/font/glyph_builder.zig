@@ -14,7 +14,6 @@ pub fn buildTriangles(
         return &[_][3]usize{};
     }
 
-
     const contours = try allocator.alloc([]usize, glyph.contour_ends.len);
     defer {
         for (contours) |contour| {
@@ -25,8 +24,8 @@ pub fn buildTriangles(
 
     var start_idx: usize = 0;
     for (glyph.contour_ends, 0..) |contour_end, contour_num| {
-        const end_idx = contour_end;
-        const contour_size = end_idx - start_idx + 1;
+        // contour_end is the inclusive last index of this contour
+        const end_idx = contour_end + 1; // +1 to make it exclusive (one past the end)
 
         // Filter out duplicate consecutive vertices
         var filtered: ArrayList(usize) = .empty;
@@ -35,12 +34,11 @@ pub fn buildTriangles(
         const epsilon = 0.00001; // Smaller epsilon to be more conservative
 
         // Build initial list, treating it as a circular buffer
-        for (0..contour_size) |i| {
-            const idx = start_idx + i;
+        for (start_idx..end_idx) |idx| {
             const pt = glyph.points[idx];
 
             // Check against previous point (wrapping around to last point if we're at index 0)
-            const prev_idx = if (i > 0) start_idx + i - 1 else start_idx + contour_size - 1;
+            const prev_idx = if (idx > start_idx) idx - 1 else end_idx - 1;
             const prev_pt = glyph.points[prev_idx];
 
             const dx = pt.x - prev_pt.x;
@@ -50,9 +48,8 @@ pub fn buildTriangles(
             try filtered.append(allocator, idx);
         }
 
-
         contours[contour_num] = try filtered.toOwnedSlice(allocator);
-        start_idx = end_idx + 1;
+        start_idx = end_idx; // Next contour starts where this one ended
     }
 
     var clipper = EarClipper.init(allocator, glyph.points);

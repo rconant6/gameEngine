@@ -264,8 +264,8 @@ pub const EarClipper = struct {
         const u = (d11 * d20 - d01 * d21) * inv_denom;
         const v = (d00 * d21 - d01 * d20) * inv_denom;
 
-        // Strict interior test with small epsilon to avoid edge cases
-        const eps = 0.0001;
+        // Strict interior test - relaxed epsilon for font glyphs with thin features
+        const eps = 0.00001;
         return (u > eps) and (v > eps) and (u + v < 1.0 - eps);
     }
     fn signedArea(vertices: []const Point, contour: Contour) f32 {
