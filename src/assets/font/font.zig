@@ -385,7 +385,6 @@ pub const Font = struct {
         raw_data: []const u8,
         table_directory: *std.AutoArrayHashMap(u32, TableEntry),
     ) !Font {
-
         var reader = FontReader{ .data = raw_data };
 
         const font_dir_header = try parseFontDir(&reader);
@@ -469,6 +468,28 @@ pub const Font = struct {
             self.alloc.free(entry.value_ptr.*);
         }
         self.glyph_triangles.deinit();
+    }
+
+    pub fn measureText(
+        self: *const Font,
+        text: []const u8,
+        scale: f32,
+    ) struct { width: f32, height: f32 } {
+        var width: f32 = 0.0;
+        const em_f: f32 = @floatFromInt(self.units_per_em);
+
+        for (text) |char| {
+            const ascii_val: u32 = @intCast(char);
+            const glyph_index = self.char_to_glyph.get(ascii_val) orelse continue;
+            const advance_f: f32 = @floatFromInt(self.glyph_advance_width.items[glyph_index].advance_width);
+            width += (advance_f / em_f) * scale;
+        }
+
+        const height: f32 = @as(f32, @floatFromInt(
+            self.ascender - self.descender + self.line_gap,
+        )) / em_f * scale;
+
+        return .{ .width = width, .height = height };
     }
 };
 
