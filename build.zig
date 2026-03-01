@@ -620,7 +620,42 @@ pub fn build(b: *std.Build) void {
     const run_template_instantiation_tests = b.addRunArtifact(template_instantiation_tests);
 
     // ========================================
-    // Layer 4B: Renderer Tests
+    // Layer 4B: UI Tests
+    // ========================================
+    const ui_module = b.addModule("ui", .{
+        .root_source_file = b.path("src/ui/ui.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    ui_module.addImport("math", math_module);
+
+    const ui_test_module = b.addModule("ui_tests", .{
+        .root_source_file = b.path("tests/ui/test_layout.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    ui_test_module.addImport("math", math_module);
+    ui_test_module.addAnonymousImport("Rect", .{
+        .root_source_file = b.path("src/ui/Rect.zig"),
+        .imports = &.{.{ .name = "math", .module = math_module }},
+    });
+    ui_test_module.addAnonymousImport("Layout", .{
+        .root_source_file = b.path("src/ui/Layout.zig"),
+        .imports = &.{.{ .name = "math", .module = math_module }},
+    });
+    ui_test_module.addAnonymousImport("Alignment", .{
+        .root_source_file = b.path("src/ui/alignment.zig"),
+        .imports = &.{.{ .name = "math", .module = math_module }},
+    });
+
+    const ui_tests = b.addTest(.{
+        .name = "ui-tests",
+        .root_module = ui_test_module,
+    });
+    const run_ui_tests = b.addRunArtifact(ui_tests);
+
+    // ========================================
+    // Layer 4C: Renderer Tests
     // ========================================
     const color_test_module = b.addModule("color_tests", .{
         .root_source_file = b.path("tests/renderer/test_color.zig"),
@@ -675,6 +710,7 @@ pub fn build(b: *std.Build) void {
     // Register all test suites
     // ========================================
     test_step.dependOn(&run_v2_tests.step);
+    test_step.dependOn(&run_ui_tests.step);
     test_step.dependOn(&run_color_tests.step);
     test_step.dependOn(&run_scene_lexer_tests.step);
     test_step.dependOn(&run_scene_parser_tests.step);
