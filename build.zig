@@ -167,6 +167,15 @@ pub fn build(b: *std.Build) void {
     scene_format_module.addImport("debug", debug_module);
     scene_module.addImport("debug", debug_module);
 
+    const ui_module = b.addModule("ui", .{
+        .root_source_file = b.path("src/ui/ui.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    ui_module.addImport("math", math_module);
+    ui_module.addImport("renderer", renderer_module);
+    ui_module.addImport("assets", assets_module);
+
     const systems_module = b.addModule("systems", .{
         .root_source_file = b.path("src/systems/Systems.zig"),
         .target = target,
@@ -247,6 +256,35 @@ pub fn build(b: *std.Build) void {
     run_zixelart.setCwd(b.path("zig-out/bin"));
     const run_zixelart_step = b.step("zixelart", "Run the Pixel Art Editor");
     run_zixelart_step.dependOn(&run_zixelart.step);
+
+    // ========================================
+    // UI Playground Executable
+    // ========================================
+    const ui_playground_module = b.addModule("ui_playground", .{
+        .root_source_file = b.path("src/tools/ui_playground/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    ui_playground_module.addImport("app", app_module);
+    ui_playground_module.addImport("platform", platform_module);
+    ui_playground_module.addImport("renderer", renderer_module);
+    ui_playground_module.addImport("math", math_module);
+    ui_playground_module.addImport("debug", debug_module);
+    ui_playground_module.addImport("assets", assets_module);
+    ui_playground_module.addImport("ui", ui_module);
+
+    const ui_playground_exe = b.addExecutable(.{
+        .name = "ui-playground",
+        .root_module = ui_playground_module,
+    });
+    configurePlatform(b, ui_playground_exe, ui_playground_module, target, optimize, selected_renderer);
+    // Not added to default install — only built when `zig build ui` is run explicitly
+    const install_ui_playground = b.addInstallArtifact(ui_playground_exe, .{});
+    const run_ui_playground = b.addRunArtifact(ui_playground_exe);
+    run_ui_playground.step.dependOn(&install_ui_playground.step);
+    run_ui_playground.setCwd(b.path("zig-out/bin"));
+    const run_ui_playground_step = b.step("ui", "Run the UI Playground");
+    run_ui_playground_step.dependOn(&run_ui_playground.step);
 
     // ========================================
     // Test Game Executable
@@ -622,13 +660,6 @@ pub fn build(b: *std.Build) void {
     // ========================================
     // Layer 4B: UI Tests
     // ========================================
-    const ui_module = b.addModule("ui", .{
-        .root_source_file = b.path("src/ui/ui.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    ui_module.addImport("math", math_module);
-
     const ui_test_module = b.addModule("ui_tests", .{
         .root_source_file = b.path("tests/ui/test_layout.zig"),
         .target = target,
