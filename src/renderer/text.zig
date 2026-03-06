@@ -13,6 +13,7 @@ const ShapeRegistry = rend.ShapeRegistry;
 const Shapes = rend.Shapes;
 const ShapeData = rend.ShapeData;
 const V2 = rend.V2;
+const log = @import("debug").log;
 
 pub fn drawText(
     renderer: *Renderer,
@@ -27,7 +28,10 @@ pub fn drawText(
     var x_pos = position.x;
     for (text) |char| {
         const ascii_val: u32 = @intCast(char);
-        const glyph_index = font.char_to_glyph.get(ascii_val) orelse continue;
+        const glyph_index = font.char_to_glyph.get(ascii_val) orelse {
+            log.err(.assets, "ASCII val: {d} not found", .{ascii_val});
+            continue;
+        };
         if (f.glyph_shapes.get(glyph_index)) |glyph| {
             drawGlyph(
                 renderer,
@@ -38,8 +42,8 @@ pub fn drawText(
                 .{ .x = x_pos, .y = position.y },
                 color,
                 ctx,
-            ) catch {
-                // Skip glyphs that fail to render
+            ) catch |err| {
+                log.err(.assets, "{c} failed to render {any}", .{ char, err });
                 continue;
             };
         }
@@ -63,7 +67,10 @@ pub fn drawTextScreen(
     const y_pos: f32 = position.y;
     for (text) |char| {
         const ascii_val: u32 = @intCast(char);
-        const glyph_index = font.char_to_glyph.get(ascii_val) orelse continue;
+        const glyph_index = font.char_to_glyph.get(ascii_val) orelse {
+            log.err(.assets, "ASCII val: {d} not found (screen)", .{ascii_val});
+            continue;
+        };
         if (f.glyph_shapes.get(glyph_index)) |glyph| {
             drawGlyphScreen(
                 renderer,
@@ -75,8 +82,8 @@ pub fn drawTextScreen(
                 y_pos,
                 color,
                 ctx,
-            ) catch {
-                // Skip glyphs that fail to render
+            ) catch |err| {
+                log.err(.assets, "{c} failed to render (screen) {any}", .{ char, err });
                 continue;
             };
         }

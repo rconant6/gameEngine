@@ -48,6 +48,49 @@ pub fn buildTriangles(
             try filtered.append(allocator, idx);
         }
 
+        // Remove collinear points - intermediate points on straight edges
+        // that produce degenerate zero-area triangles and break ear clipping.
+        // Use normalized cross product (sin of angle) so short edges at real
+        // corners aren't falsely removed.
+        const collinear_sin_eps = 0.01; // ~0.6 degrees
+        var changed = true;
+        while (changed) {
+            changed = false;
+            var i: usize = 0;
+            while (i < filtered.items.len) {
+                if (filtered.items.len < 3) break;
+
+                const len = filtered.items.len;
+                const prev = glyph.points[filtered.items[(i + len - 1) % len]];
+                const curr = glyph.points[filtered.items[i]];
+                const next = glyph.points[filtered.items[(i + 1) % len]];
+
+                const e1x = curr.x - prev.x;
+                const e1y = curr.y - prev.y;
+                const e2x = next.x - curr.x;
+                const e2y = next.y - curr.y;
+                const cross = e1x * e2y - e1y * e2x;
+
+                const len1_sq = e1x * e1x + e1y * e1y;
+                const len2_sq = e2x * e2x + e2y * e2y;
+                const len_product_sq = len1_sq * len2_sq;
+
+                // If either edge has zero length, point is a duplicate — remove
+                // Otherwise normalize: |sin(angle)| = |cross| / (|e1| * |e2|)
+                const is_collinear = if (len_product_sq < 1e-12)
+                    true
+                else
+                    (cross * cross) / len_product_sq < (collinear_sin_eps * collinear_sin_eps);
+
+                if (is_collinear) {
+                    _ = filtered.orderedRemove(i);
+                    changed = true;
+                } else {
+                    i += 1;
+                }
+            }
+        }
+
         contours[contour_num] = try filtered.toOwnedSlice(allocator);
         start_idx = end_idx; // Next contour starts where this one ended
     }
