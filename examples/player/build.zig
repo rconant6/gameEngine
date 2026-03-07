@@ -13,20 +13,20 @@ pub fn build(b: *std.Build) void {
     // Get the engine library artifact
     const engine_lib = engine_dep.artifact("game-engine");
 
-    // Create the test game module
-    const test_game_module = b.addModule("test_game", .{
+    // Create the player module
+    const player_module = b.addModule("player", .{
         .root_source_file = b.path("main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
     // Import the engine module
-    test_game_module.addImport("engine", engine_dep.module("engine"));
+    player_module.addImport("engine", engine_dep.module("engine"));
 
     // Create the executable
     const exe = b.addExecutable(.{
-        .name = "test-game",
-        .root_module = test_game_module,
+        .name = "player",
+        .root_module = player_module,
     });
 
     // Link the engine library (this brings in all dependencies and linking)
@@ -62,6 +62,6 @@ pub fn build(b: *std.Build) void {
         run_cmd.addArgs(args);
     }
 
-    const run_step = b.step("run", "Run the test game");
+    const run_step = b.step("run", "Run the player");
     run_step.dependOn(&run_cmd.step);
 }

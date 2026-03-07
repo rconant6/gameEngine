@@ -1,8 +1,174 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const macos = @import("build/macos.zig");
+const linux = @import("build/linux.zig");
+const windows = @import("build/windows.zig");
+const tests = @import("build/tests.zig");
 
-const RendererBackend = enum { metal, vulkan, opengl, cpu };
-const MinLogLevel = enum { trace, debug, info, warn, err, fatal };
+pub const RendererBackend = enum { metal, vulkan, opengl, cpu };
+
+/// Tool modules, used as indices into the modules array.
+pub const M = enum(u8) {
+    math,
+    debug,
+    scene_format,
+    renderer,
+    assets,
+    platform,
+    ecs,
+    action,
+    component_registry,
+    shape_registry,
+    collider_shape_registry,
+    registry,
+    scene,
+    ui,
+    systems,
+    engine,
+    build_options,
+};
+
+/// Module definition: source file path + dependencies (by enum).
+const ModuleDef = struct {
+    name: []const u8,
+    path: ?[]const u8, // null for generated modules (build_options)
+    deps: []const DepEntry,
+};
+
+const DepEntry = struct { []const u8, M };
+
+/// Module graph. Debug is auto-injected into every source module.
+const module_defs = [_]ModuleDef{
+    // Foundation
+    .{ .name = "math", .path = "src/math/math.zig", .deps = &.{} },
+    .{
+        .name = "debug",
+        .path = "src/debug/debug.zig",
+        .deps = &.{
+            .{ "renderer", .renderer }, .{ "math", .math }, .{ "assets", .assets },
+        },
+    },
+    .{ .name = "scene-format", .path = "src/scene-format/lib.zig", .deps = &.{} },
+    // Rendering
+    .{
+        .name = "renderer",
+        .path = "src/renderer/renderer.zig",
+        .deps = &.{
+            .{ "math", .math },                   .{ "registry", .registry },
+            .{ "build_options", .build_options }, .{ "assets", .assets },
+        },
+    },
+    .{
+        .name = "assets",
+        .path = "src/assets/assets.zig",
+        .deps = &.{
+            .{ "math", .math }, .{ "renderer", .renderer },
+        },
+    },
+    // Platform
+    .{
+        .name = "platform",
+        .path = "src/platform/platform.zig",
+        .deps = &.{
+            .{ "math", .math },
+        },
+    },
+    // ECS
+    .{
+        .name = "ecs",
+        .path = "src/ecs/ecs.zig",
+        .deps = &.{
+            .{ "math", .math },         .{ "renderer", .renderer },
+            .{ "assets", .assets },     .{ "action", .action },
+            .{ "registry", .registry }, .{ "scene", .scene },
+        },
+    },
+    .{ .name = "action", .path = "src/action/Action.zig", .deps = &.{
+        .{ "math", .math },   .{ "platform", .platform }, .{ "ecs", .ecs },
+        .{ "scene", .scene },
+    } },
+    // Registry
+    .{
+        .name = "component_registry",
+        .path = "src/registry/component_registry.zig",
+        .deps = &.{
+            .{ "scene-format", .scene_format }, .{ "ecs", .ecs },
+        },
+    },
+    .{
+        .name = "shape_registry",
+        .path = "src/registry/shape_registry.zig",
+        .deps = &.{
+            .{ "scene-format", .scene_format }, .{ "renderer", .renderer },
+            .{ "math", .math },
+        },
+    },
+    .{
+        .name = "collider_shape_registry",
+        .path = "src/registry/collider_shape_registry.zig",
+        .deps = &.{
+            .{ "ecs", .ecs },
+        },
+    },
+    .{
+        .name = "registry",
+        .path = "src/registry/registry.zig",
+        .deps = &.{
+            .{ "math", .math },         .{ "component_registry", .component_registry },
+            .{ "ecs", .ecs },           .{ "collider_shape_registry", .collider_shape_registry },
+            .{ "renderer", .renderer }, .{ "shape_registry", .shape_registry },
+        },
+    },
+    // Scene
+    .{
+        .name = "scene",
+        .path = "src/scene/scene.zig",
+        .deps = &.{
+            .{ "scene-format", .scene_format }, .{ "math", .math },
+            .{ "ecs", .ecs },                   .{ "assets", .assets },
+            .{ "renderer", .renderer },         .{ "build_options", .build_options },
+            .{ "registry", .registry },         .{ "platform", .platform },
+            .{ "action", .action },             .{ "engine", .engine },
+        },
+    },
+    // UI
+    .{
+        .name = "ui",
+        .path = "src/ui/ui.zig",
+        .deps = &.{
+            .{ "math", .math }, .{ "renderer", .renderer }, .{ "assets", .assets },
+        },
+    },
+    // Systems
+    .{
+        .name = "systems",
+        .path = "src/systems/Systems.zig",
+        .deps = &.{
+            .{ "math", .math },         .{ "ecs", .ecs },
+            .{ "renderer", .renderer }, .{ "assets", .assets },
+            .{ "action", .action },
+        },
+    },
+    // Engine (top-level)
+    .{
+        .name = "engine",
+        .path = "src/Engine.zig",
+        .deps = &.{
+            .{ "math", .math },                 .{ "platform", .platform },
+            .{ "renderer", .renderer },         .{ "build_options", .build_options },
+            .{ "assets", .assets },             .{ "ecs", .ecs },
+            .{ "scene-format", .scene_format }, .{ "action", .action },
+            .{ "scene", .scene },               .{ "registry", .registry },
+            .{ "systems", .systems },
+        },
+    },
+
+    // Generated (no source file)
+    .{ .name = "build_options", .path = null, .deps = &.{} },
+};
+
+/// Resolved module pointers, indexed by M enum.
+pub const Modules = [std.enums.directEnumArrayLen(M, 0)]*std.Build.Module;
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -21,244 +187,120 @@ pub fn build(b: *std.Build) void {
 
     const selected_renderer = renderer_backend orelse defaultRendererForTarget(target.result.os.tag);
 
-    // CPU renderer is currently not supported (commented out)
     if (selected_renderer == .cpu) {
         std.debug.print(
             \\ERROR: CPU renderer is not currently supported.
-            \\      The CPU renderer has been disabled to focus on GPU rendering.
-            \\     Use -Drenderer=metal for macOS or remove the -Drenderer flag.;
+            \\      Use -Drenderer=metal for macOS or remove the -Drenderer flag.;
         , .{});
         std.posix.exit(1);
     }
 
-    const math_module = b.addModule("math", .{
-        .root_source_file = b.path("src/math/math.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const scene_format_module = b.addModule("scene-format", .{
-        .root_source_file = b.path("src/scene-format/lib.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const renderer_module = b.addModule("renderer", .{
-        .root_source_file = b.path("src/renderer/renderer.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    renderer_module.addImport("math", math_module);
-
-    const assets_module = b.addModule("assets", .{
-        .root_source_file = b.path("src/assets/assets.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    assets_module.addImport("math", math_module);
-    assets_module.addImport("renderer", renderer_module);
-
+    // Build options (generated module)
     const renderer_options = b.addOptions();
     renderer_options.addOption(RendererBackend, "backend", selected_renderer);
     renderer_options.addOption(bool, "enable_validation", enable_validation);
-    renderer_module.addImport("assets", assets_module);
-
     const build_options_module = renderer_options.createModule();
-    renderer_module.addImport("build_options", build_options_module);
 
-    const platform_module = b.addModule("platform", .{
-        .root_source_file = b.path("src/platform/platform.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    platform_module.addIncludePath(b.path("src/platform/macos/swift/include"));
-    platform_module.addImport("build_options", build_options_module);
-    platform_module.addImport("math", math_module);
-    configurePlatformModule(b, platform_module, target, optimize, selected_renderer);
-    configurePlatformModule(b, renderer_module, target, optimize, selected_renderer);
+    // Platform-specific library (Swift on macOS, null elsewhere)
+    const swift_lib = macos.buildSwiftLibrary(b, target, optimize, selected_renderer);
 
-    const ecs_module = b.addModule("ecs", .{
-        .root_source_file = b.path("src/ecs/ecs.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    ecs_module.addImport("math", math_module);
-    ecs_module.addImport("renderer", renderer_module);
-    ecs_module.addImport("assets", assets_module);
+    // ========================================
+    // Create all modules + wire dependencies
+    // ========================================
+    var modules: Modules = undefined;
 
-    const action_module = b.addModule("action", .{
-        .root_source_file = b.path("src/action/Action.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    action_module.addImport("math", math_module);
-    action_module.addImport("platform", platform_module);
-    action_module.addImport("ecs", ecs_module);
+    // Create all modules from definitions
+    inline for (module_defs, 0..) |def, i| {
+        if (def.path) |path| {
+            modules[i] = b.addModule(def.name, .{
+                .root_source_file = b.path(path),
+                .target = target,
+                .optimize = optimize,
+            });
+        } else {
+            // Generated module (build_options)
+            modules[i] = build_options_module;
+        }
+    }
 
-    ecs_module.addImport("action", action_module);
+    // Wire dependencies (debug is auto-injected into every source module)
+    const debug_idx = @intFromEnum(M.debug);
+    const build_options_idx = @intFromEnum(M.build_options);
+    inline for (module_defs, 0..) |def, i| {
+        for (def.deps) |dep| {
+            modules[i].addImport(dep[0], modules[@intFromEnum(dep[1])]);
+        }
+        // Auto-inject debug into every source module (except debug itself and build_options)
+        if (i != debug_idx and i != build_options_idx and def.path != null) {
+            modules[i].addImport("debug", modules[debug_idx]);
+        }
+    }
 
-    const component_registry_module = b.addModule("component_registry", .{
-        .root_source_file = b.path("src/registry/component_registry.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    component_registry_module.addImport("scene-format", scene_format_module);
-    const shape_registry_module = b.addModule("shape_registry", .{
-        .root_source_file = b.path("src/registry/shape_registry.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    shape_registry_module.addImport("scene-format", scene_format_module);
-    const collider_shape_registry_module = b.addModule("collider_shape_registry", .{
-        .root_source_file = b.path("src/registry/collider_shape_registry.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
+    // Platform-specific: include path for Swift bridge header
+    modules[@intFromEnum(M.platform)].addIncludePath(b.path("src/platform/macos/swift/include"));
 
-    const registry_module = b.addModule("registry", .{
-        .root_source_file = b.path("src/registry/registry.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    registry_module.addImport("math", math_module);
-    registry_module.addImport("component_registry", component_registry_module);
-    registry_module.addImport("shape_registry", shape_registry_module);
-    registry_module.addImport("collider_shape_registry", collider_shape_registry_module);
-    registry_module.addImport("ecs", ecs_module);
-    registry_module.addImport("renderer", renderer_module);
+    // Platform linking on modules that need native frameworks
+    configurePlatformModule(b, modules[@intFromEnum(M.platform)], target, selected_renderer);
+    configurePlatformModule(b, modules[@intFromEnum(M.renderer)], target, selected_renderer);
 
-    component_registry_module.addImport("ecs", ecs_module);
-    collider_shape_registry_module.addImport("ecs", ecs_module);
-    shape_registry_module.addImport("renderer", renderer_module);
+    // Convenience aliases
+    const m = struct {
+        fn get(mods: *const Modules, id: M) *std.Build.Module {
+            return mods[@intFromEnum(id)];
+        }
+    };
 
-    ecs_module.addImport("registry", registry_module);
-    renderer_module.addImport("registry", registry_module);
-
-    const scene_module = b.addModule("scene", .{
-        .root_source_file = b.path("src/scene/scene.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    scene_module.addImport("scene-format", scene_format_module);
-    scene_module.addImport("math", math_module);
-    scene_module.addImport("ecs", ecs_module);
-    scene_module.addImport("assets", assets_module);
-    scene_module.addImport("renderer", renderer_module);
-    scene_module.addImport("build_options", build_options_module);
-    scene_module.addImport("registry", registry_module);
-    scene_module.addImport("platform", platform_module);
-    scene_module.addImport("action", action_module);
-
-    ecs_module.addImport("scene", scene_module);
-
-    const debug_module = b.addModule("debug", .{
-        .root_source_file = b.path("src/debug/debug.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    debug_module.addImport("math", math_module);
-    debug_module.addImport("renderer", renderer_module);
-    debug_module.addImport("assets", assets_module);
-
-    action_module.addImport("debug", debug_module);
-    assets_module.addImport("debug", debug_module);
-    ecs_module.addImport("debug", debug_module);
-    renderer_module.addImport("debug", debug_module);
-    scene_format_module.addImport("debug", debug_module);
-    scene_module.addImport("debug", debug_module);
-
-    const ui_module = b.addModule("ui", .{
-        .root_source_file = b.path("src/ui/ui.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    ui_module.addImport("math", math_module);
-    ui_module.addImport("renderer", renderer_module);
-    ui_module.addImport("assets", assets_module);
-
-    const systems_module = b.addModule("systems", .{
-        .root_source_file = b.path("src/systems/Systems.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    systems_module.addImport("math", math_module);
-    systems_module.addImport("ecs", ecs_module);
-    systems_module.addImport("debug", debug_module);
-    systems_module.addImport("renderer", renderer_module);
-    systems_module.addImport("assets", assets_module);
-    systems_module.addImport("action", action_module);
-
-    const engine_module = b.addModule("engine", .{
-        .root_source_file = b.path("src/Engine.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    engine_module.addImport("math", math_module);
-    engine_module.addImport("platform", platform_module);
-    engine_module.addImport("renderer", renderer_module);
-    engine_module.addImport("build_options", build_options_module);
-    engine_module.addImport("assets", assets_module);
-    engine_module.addImport("ecs", ecs_module);
-    engine_module.addImport("scene-format", scene_format_module);
-    engine_module.addImport("action", action_module);
-    engine_module.addImport("scene", scene_module);
-    engine_module.addImport("registry", registry_module);
-    engine_module.addImport("debug", debug_module);
-    engine_module.addImport("systems", systems_module);
-
-    scene_module.addImport("engine", engine_module);
-    ecs_module.addImport("scene", scene_module);
-
+    // ========================================
+    // Engine library
+    // ========================================
     const engine_lib = b.addLibrary(.{
         .name = "game-engine",
-        .root_module = engine_module,
+        .root_module = m.get(&modules, .engine),
     });
-
-    // Configure platform-specific linking and build steps for the engine library
-    configurePlatform(b, engine_lib, engine_module, target, optimize, selected_renderer);
-
-    // Install the engine library
     b.installArtifact(engine_lib);
 
     // ========================================
-    // ZixelArt Executable
+    // Tool shared app module
     // ========================================
     const app_module = b.createModule(.{
         .root_source_file = b.path("src/tools/app.zig"),
     });
-    app_module.addImport("platform", platform_module);
-    app_module.addImport("renderer", renderer_module);
-    app_module.addImport("math", math_module);
-    app_module.addImport("debug", debug_module);
+    const tool_deps = [_]M{ .platform, .renderer, .math, .debug, .ui };
+    for (tool_deps) |dep| {
+        const def = module_defs[@intFromEnum(dep)];
+        app_module.addImport(def.name, m.get(&modules, dep));
+    }
 
+    // Common tool imports (app + tool_deps + assets)
+    const tool_extra_deps = [_]M{ .platform, .renderer, .math, .debug, .assets, .ui };
+
+    // ========================================
+    // ZixelArt
+    // ========================================
     const zixelart_module = b.addModule("zixelart", .{
         .root_source_file = b.path("src/tools/zixelart/main.zig"),
         .target = target,
         .optimize = optimize,
     });
     zixelart_module.addImport("app", app_module);
-    zixelart_module.addImport("platform", platform_module);
-    zixelart_module.addImport("renderer", renderer_module);
-    zixelart_module.addImport("math", math_module);
-    zixelart_module.addImport("debug", debug_module);
-    zixelart_module.addImport("assets", assets_module);
+    for (tool_extra_deps) |dep| {
+        const def = module_defs[@intFromEnum(dep)];
+        zixelart_module.addImport(def.name, m.get(&modules, dep));
+    }
 
     const zixelart_exe = b.addExecutable(.{
         .name = "zixelart",
         .root_module = zixelart_module,
     });
-    configurePlatform(b, zixelart_exe, zixelart_module, target, optimize, selected_renderer);
     b.installArtifact(zixelart_exe);
+
     const run_zixelart = b.addRunArtifact(zixelart_exe);
     run_zixelart.step.dependOn(b.getInstallStep());
     run_zixelart.setCwd(b.path("zig-out/bin"));
-    const run_zixelart_step = b.step("zixelart", "Run the Pixel Art Editor");
-    run_zixelart_step.dependOn(&run_zixelart.step);
+    b.step("zixelart", "Run the Pixel Art Editor").dependOn(&run_zixelart.step);
 
     // ========================================
-    // UI Playground Executable
+    // UI Playground
     // ========================================
     const ui_playground_module = b.addModule("ui_playground", .{
         .root_source_file = b.path("src/tools/ui_playground/main.zig"),
@@ -266,618 +308,75 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     ui_playground_module.addImport("app", app_module);
-    ui_playground_module.addImport("platform", platform_module);
-    ui_playground_module.addImport("renderer", renderer_module);
-    ui_playground_module.addImport("math", math_module);
-    ui_playground_module.addImport("debug", debug_module);
-    ui_playground_module.addImport("assets", assets_module);
-    ui_playground_module.addImport("ui", ui_module);
+    for (tool_extra_deps) |dep| {
+        const def = module_defs[@intFromEnum(dep)];
+        ui_playground_module.addImport(def.name, m.get(&modules, dep));
+    }
 
     const ui_playground_exe = b.addExecutable(.{
         .name = "ui-playground",
         .root_module = ui_playground_module,
     });
-    configurePlatform(b, ui_playground_exe, ui_playground_module, target, optimize, selected_renderer);
-    // Not added to default install — only built when `zig build ui` is run explicitly
+
     const install_ui_playground = b.addInstallArtifact(ui_playground_exe, .{});
     const run_ui_playground = b.addRunArtifact(ui_playground_exe);
     run_ui_playground.step.dependOn(&install_ui_playground.step);
     run_ui_playground.setCwd(b.path("zig-out/bin"));
-    const run_ui_playground_step = b.step("ui", "Run the UI Playground");
-    run_ui_playground_step.dependOn(&run_ui_playground.step);
+    b.step("ui", "Run the UI Playground").dependOn(&run_ui_playground.step);
 
     // ========================================
-    // Test Game Executable
+    // Player (scene viewer / development runtime)
     // ========================================
-    const test_game_module = b.addModule("test_game", .{
-        .root_source_file = b.path("examples/test_game/main.zig"),
+    const player_module = b.addModule("player", .{
+        .root_source_file = b.path("examples/player/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    test_game_module.addImport("engine", engine_module);
+    player_module.addImport("engine", m.get(&modules, .engine));
 
-    const test_game_exe = b.addExecutable(.{
-        .name = "test-game",
-        .root_module = test_game_module,
+    const player_exe = b.addExecutable(.{
+        .name = "player",
+        .root_module = player_module,
     });
 
-    configurePlatform(b, test_game_exe, test_game_module, target, optimize, selected_renderer);
-
-    const install_test_game_assets = b.addInstallDirectory(.{
-        .source_dir = b.path("examples/test_game/assets"),
+    const install_player_assets = b.addInstallDirectory(.{
+        .source_dir = b.path("examples/player/assets"),
         .install_dir = .bin,
         .install_subdir = "assets",
     });
-    test_game_exe.step.dependOn(&install_test_game_assets.step);
+    player_exe.step.dependOn(&install_player_assets.step);
+    b.installArtifact(player_exe);
 
-    b.installArtifact(test_game_exe);
-
-    const run_test_game = b.addRunArtifact(test_game_exe);
-    run_test_game.step.dependOn(b.getInstallStep());
-    run_test_game.setCwd(b.path("zig-out/bin"));
-
-    const run_test_game_step = b.step("run-test-game", "Run the test game");
-    run_test_game_step.dependOn(&run_test_game.step);
-
-    // Clean step for Swift build artifacts
-    const clean_step = b.step("clean", "Remove all swift build artifacts");
-    const remove_swift = b.addRemoveDirTree(.{ .cwd_relative = "zig-out/swift-build" });
-    clean_step.dependOn(&remove_swift.step);
+    const run_player = b.addRunArtifact(player_exe);
+    run_player.step.dependOn(b.getInstallStep());
+    run_player.setCwd(b.path("zig-out/bin"));
+    b.step("play", "Run the player").dependOn(&run_player.step);
 
     // ========================================
-    // Test Frameworks
+    // Platform-specific linking (Swift runtime on macOS, no-op elsewhere)
+    // ========================================
+    linkPlatformLibraries(&.{ engine_lib, zixelart_exe, ui_playground_exe, player_exe }, swift_lib, target);
+
+    // ========================================
+    // Clean
+    // ========================================
+    const clean_step = b.step("clean", "Remove all build artifacts");
+    clean_step.dependOn(&b.addRemoveDirTree(.{ .cwd_relative = "zig-out" }).step);
+    clean_step.dependOn(&b.addRemoveDirTree(.{ .cwd_relative = ".zig-cache" }).step);
+
+    // ========================================
+    // Tests
     // ========================================
     const test_step = b.step("test", "Run all tests");
-
-    // ========================================
-    // Layer 1: Core V2 Tests
-    // ========================================
-    const v2_test_module = b.addModule("v2_tests", .{
-        .root_source_file = b.path("tests/core/test_v2.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    v2_test_module.addAnonymousImport("V2", .{
-        .root_source_file = b.path("src/math/V2.zig"),
-    });
-
-    const v2_tests = b.addTest(.{
-        .name = "v2-tests",
-        .root_module = v2_test_module,
-    });
-    const run_v2_tests = b.addRunArtifact(v2_tests);
-
-    // ========================================
-    // Layer 2: ECS Component Tests
-    // ========================================
-    // ECS Component Storage Tests
-    const ecs_test_module = b.addModule("ecs_tests", .{
-        .root_source_file = b.path("tests/ecs/test_component_storage.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    ecs_test_module.addImport("math", math_module);
-    ecs_test_module.addAnonymousImport("ComponentStorage", .{
-        .root_source_file = b.path("src/ecs/ComponentStorage.zig"),
-    });
-
-    const ecs_tests = b.addTest(.{
-        .name = "ecs-tests",
-        .root_module = ecs_test_module,
-    });
-    const run_ecs_tests = b.addRunArtifact(ecs_tests);
-
-    // Query Tests - use entity module which properly exports Query and ComponentStorage
-    const query_test_module = b.addModule("query_tests", .{
-        .root_source_file = b.path("tests/ecs/test_query.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    query_test_module.addImport("math", math_module);
-    query_test_module.addImport("ecs", ecs_module);
-
-    const query_tests = b.addTest(.{
-        .name = "query-tests",
-        .root_module = query_test_module,
-    });
-    query_tests.linkLibrary(engine_lib);
-    const run_query_tests = b.addRunArtifact(query_tests);
-
-    // World Tests
-    const world_test_module = b.addModule("world_tests", .{
-        .root_source_file = b.path("tests/ecs/test_world.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    world_test_module.addImport("math", math_module);
-    world_test_module.addImport("scene", scene_module);
-    world_test_module.addImport("ecs", ecs_module);
-    const world_tests = b.addTest(.{
-        .name = "world-tests",
-        .root_module = world_test_module,
-    });
-    world_tests.linkLibrary(engine_lib);
-    const run_world_tests = b.addRunArtifact(world_tests);
-
-    // World Query Tests
-    const world_query_test_module = b.addModule("world_query_tests", .{
-        .root_source_file = b.path("tests/ecs/test_world_queries.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    world_query_test_module.addImport("math", math_module);
-    world_query_test_module.addImport("scene", scene_module);
-    world_query_test_module.addImport("ecs", ecs_module);
-    const world_query_tests = b.addTest(.{
-        .name = "world-query-tests",
-        .root_module = world_query_test_module,
-    });
-    world_query_tests.linkLibrary(engine_lib);
-    const run_world_query_tests = b.addRunArtifact(world_query_tests);
-
-    // Collider Component Tests
-    const collider_test_module = b.addModule("collider_tests", .{
-        .root_source_file = b.path("tests/ecs/test_collider.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    collider_test_module.addImport("math", math_module);
-    collider_test_module.addImport("ecs", ecs_module);
-
-    const collider_tests = b.addTest(.{
-        .name = "collider-tests",
-        .root_module = collider_test_module,
-    });
-    collider_tests.linkLibrary(engine_lib);
-    const run_collider_tests = b.addRunArtifact(collider_tests);
-
-    // Tag Component Tests
-    const tag_test_module = b.addModule("tag_tests", .{
-        .root_source_file = b.path("tests/ecs/test_tag.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    tag_test_module.addAnonymousImport("Tag", .{
-        .root_source_file = b.path("src/ecs/Tag.zig"),
-    });
-
-    const tag_tests = b.addTest(.{
-        .name = "tag-tests",
-        .root_module = tag_test_module,
-    });
-    const run_tag_tests = b.addRunArtifact(tag_tests);
-
-    // Action Tests
-    const action_test_module = b.addModule("action_tests", .{
-        .root_source_file = b.path("tests/ecs/test_action.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    action_test_module.addImport("math", math_module);
-    action_test_module.addImport("Action", action_module);
-
-    const action_tests = b.addTest(.{
-        .name = "action-tests",
-        .root_module = action_test_module,
-    });
-    action_tests.linkLibrary(engine_lib);
-    const run_action_tests = b.addRunArtifact(action_tests);
-
-    // ActionBindings Tests
-    const triggers_module = b.addModule("triggers", .{
-        .root_source_file = b.path("src/action/Triggers.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    triggers_module.addImport("math", math_module);
-    triggers_module.addImport("action", action_module);
-    triggers_module.addImport("platform", platform_module);
-    triggers_module.addImport("ecs", ecs_module);
-
-    const action_bindings_module = b.addModule("ActionBindings", .{
-        .root_source_file = b.path("src/action/ActionBindings.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    action_bindings_module.addImport("math", math_module);
-    action_bindings_module.addImport("triggers", triggers_module);
-
-    const action_bindings_test_module = b.addModule("action_bindings_tests", .{
-        .root_source_file = b.path("tests/ecs/test_action_bindings.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    action_bindings_test_module.addImport("math", math_module);
-    action_bindings_test_module.addImport("Action", action_module);
-
-    const action_bindings_tests = b.addTest(.{
-        .name = "action-bindings-tests",
-        .root_module = action_bindings_test_module,
-    });
-    action_bindings_tests.linkLibrary(engine_lib);
-    const run_action_bindings_tests = b.addRunArtifact(action_bindings_tests);
-
-    // CollisionTrigger Tests
-    const collision_trigger_test_module = b.addModule("collision_trigger_tests", .{
-        .root_source_file = b.path("tests/ecs/test_collision_trigger.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    collision_trigger_test_module.addImport("math", math_module);
-    collision_trigger_test_module.addImport("Action", action_module);
-
-    const collision_trigger_tests = b.addTest(.{
-        .name = "collision-trigger-tests",
-        .root_module = collision_trigger_test_module,
-    });
-    collision_trigger_tests.linkLibrary(engine_lib);
-    const run_collision_trigger_tests = b.addRunArtifact(collision_trigger_tests);
-
-    // InputTrigger Tests
-    const input_trigger_test_module = b.addModule("input_trigger_tests", .{
-        .root_source_file = b.path("tests/ecs/test_input_trigger.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    input_trigger_test_module.addImport("math", math_module);
-    input_trigger_test_module.addImport("Action", action_module);
-    input_trigger_test_module.addImport("platform", platform_module);
-
-    const input_trigger_tests = b.addTest(.{
-        .name = "input-trigger-tests",
-        .root_module = input_trigger_test_module,
-    });
-    input_trigger_tests.linkLibrary(engine_lib);
-    const run_input_trigger_tests = b.addRunArtifact(input_trigger_tests);
-
-    // TimeTrigger Tests (Custom Trigger System)
-    const time_trigger_test_module = b.addModule("time_trigger_tests", .{
-        .root_source_file = b.path("tests/ecs/test_time_trigger.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    time_trigger_test_module.addImport("math", math_module);
-    time_trigger_test_module.addImport("Action", action_module);
-    time_trigger_test_module.addImport("ecs", ecs_module);
-
-    const time_trigger_tests = b.addTest(.{
-        .name = "time-trigger-tests",
-        .root_module = time_trigger_test_module,
-    });
-    time_trigger_tests.linkLibrary(engine_lib);
-    const run_time_trigger_tests = b.addRunArtifact(time_trigger_tests);
-
-    // ========================================
-    // Layer 3: Collision Detection Tests
-    // ========================================
-    const collision_test_module = b.addModule("collision_tests", .{
-        .root_source_file = b.path("tests/collision/test_collision_detection.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    collision_test_module.addImport("math", math_module);
-    collision_test_module.addImport("ecs", ecs_module);
-    collision_test_module.addImport("systems", systems_module);
-
-    const collision_tests = b.addTest(.{
-        .name = "collision-tests",
-        .root_module = collision_test_module,
-    });
-    collision_tests.linkLibrary(engine_lib);
-    const run_collision_tests = b.addRunArtifact(collision_tests);
-
-    // ========================================
-    // Layer 4: Scene Format Tests
-    // ========================================
-    // Scene Format Lexer Tests
-    const scene_lexer_test_module = b.addModule("scene_lexer_tests", .{
-        .root_source_file = b.path("tests/scene-format/lexer_test.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    scene_lexer_test_module.addImport("scene-format", scene_format_module);
-
-    const scene_lexer_tests = b.addTest(.{
-        .name = "scene-lexer-tests",
-        .root_module = scene_lexer_test_module,
-    });
-    const run_scene_lexer_tests = b.addRunArtifact(scene_lexer_tests);
-
-    // Scene Format Parser Tests
-    const scene_parser_test_module = b.addModule("scene_parser_tests", .{
-        .root_source_file = b.path("tests/scene-format/parser_test.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    scene_parser_test_module.addImport("scene-format", scene_format_module);
-
-    const scene_parser_tests = b.addTest(.{
-        .name = "scene-parser-tests",
-        .root_module = scene_parser_test_module,
-    });
-    const run_scene_parser_tests = b.addRunArtifact(scene_parser_tests);
-
-    // Template Parser Tests (will fail until template support is added)
-    const template_parser_test_module = b.addModule("template_parser_tests", .{
-        .root_source_file = b.path("tests/scene-format/template_parser_test.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    template_parser_test_module.addImport("scene-format", scene_format_module);
-
-    const template_parser_tests = b.addTest(.{
-        .name = "template-parser-tests",
-        .root_module = template_parser_test_module,
-    });
-    const run_template_parser_tests = b.addRunArtifact(template_parser_tests);
-
-    // Nested Block Parser Tests (will fail until nested block support is added)
-    const nested_block_parser_test_module = b.addModule("nested_block_parser_tests", .{
-        .root_source_file = b.path("tests/scene-format/parser_nested_blocks_test.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    nested_block_parser_test_module.addImport("scene-format", scene_format_module);
-
-    const nested_block_parser_tests = b.addTest(.{
-        .name = "nested-block-parser-tests",
-        .root_module = nested_block_parser_test_module,
-    });
-    const run_nested_block_parser_tests = b.addRunArtifact(nested_block_parser_tests);
-
-    // Scene Integration Tests
-    const scene_test_module = b.addModule("scene_tests", .{
-        .root_source_file = b.path("tests/scene/test_scene_integration.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    scene_test_module.addImport("scene-format", scene_format_module);
-
-    const scene_tests = b.addTest(.{
-        .name = "scene-tests",
-        .root_module = scene_test_module,
-    });
-    const run_scene_tests = b.addRunArtifact(scene_tests);
-
-    const template_instantiation_test_module = b.addModule("template_instantiation_tests", .{
-        .root_source_file = b.path("tests/scene/test_template_instantiation.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    template_instantiation_test_module.addImport("scene-format", scene_format_module);
-    template_instantiation_test_module.addImport("ecs", ecs_module);
-    template_instantiation_test_module.addImport("scene", scene_module);
-    template_instantiation_test_module.addImport("assets", assets_module);
-    template_instantiation_test_module.addImport("math", math_module);
-
-    const template_instantiation_tests = b.addTest(.{
-        .name = "template-instantiation-tests",
-        .root_module = template_instantiation_test_module,
-    });
-    template_instantiation_tests.linkLibrary(engine_lib);
-    const run_template_instantiation_tests = b.addRunArtifact(template_instantiation_tests);
-
-    // ========================================
-    // Layer 4B: UI Tests
-    // ========================================
-    const ui_test_module = b.addModule("ui_tests", .{
-        .root_source_file = b.path("tests/ui/test_layout.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    ui_test_module.addImport("math", math_module);
-    ui_test_module.addAnonymousImport("Rect", .{
-        .root_source_file = b.path("src/ui/Rect.zig"),
-        .imports = &.{.{ .name = "math", .module = math_module }},
-    });
-    ui_test_module.addAnonymousImport("Layout", .{
-        .root_source_file = b.path("src/ui/Layout.zig"),
-        .imports = &.{.{ .name = "math", .module = math_module }},
-    });
-    ui_test_module.addAnonymousImport("Alignment", .{
-        .root_source_file = b.path("src/ui/alignment.zig"),
-        .imports = &.{.{ .name = "math", .module = math_module }},
-    });
-
-    const ui_tests = b.addTest(.{
-        .name = "ui-tests",
-        .root_module = ui_test_module,
-    });
-    const run_ui_tests = b.addRunArtifact(ui_tests);
-
-    // ========================================
-    // Layer 4C: Renderer Tests
-    // ========================================
-    const color_test_module = b.addModule("color_tests", .{
-        .root_source_file = b.path("tests/renderer/test_color.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    color_test_module.addAnonymousImport("color", .{
-        .root_source_file = b.path("src/renderer/color.zig"),
-    });
-
-    const color_tests = b.addTest(.{
-        .name = "color-tests",
-        .root_module = color_test_module,
-    });
-    const run_color_tests = b.addRunArtifact(color_tests);
-
-    const shapes_test_module = b.addModule("shapes_tests", .{
-        .root_source_file = b.path("tests/renderer/test_shapes.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    shapes_test_module.addImport("math", math_module);
-    shapes_test_module.addImport("renderer", renderer_module);
-
-    const shapes_tests = b.addTest(.{
-        .name = "shapes-tests",
-        .root_module = shapes_test_module,
-    });
-    shapes_tests.linkLibrary(engine_lib);
-    const run_shapes_tests = b.addRunArtifact(shapes_tests);
-
-    // ========================================
-    // Layer 5: End-to-End Integration Tests
-    // ========================================
-    const integration_test_module = b.addModule("integration_tests", .{
-        .root_source_file = b.path("tests/integration/test_end_to_end.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    integration_test_module.addImport("math", math_module);
-    integration_test_module.addImport("ecs", ecs_module);
-    integration_test_module.addImport("systems", systems_module);
-
-    const integration_tests = b.addTest(.{
-        .name = "integration-tests",
-        .root_module = integration_test_module,
-    });
-    integration_tests.linkLibrary(engine_lib);
-    const run_integration_tests = b.addRunArtifact(integration_tests);
-
-    // ========================================
-    // Register all test suites
-    // ========================================
-    test_step.dependOn(&run_v2_tests.step);
-    test_step.dependOn(&run_ui_tests.step);
-    test_step.dependOn(&run_color_tests.step);
-    test_step.dependOn(&run_scene_lexer_tests.step);
-    test_step.dependOn(&run_scene_parser_tests.step);
-    test_step.dependOn(&run_template_parser_tests.step);
-    test_step.dependOn(&run_tag_tests.step);
-    test_step.dependOn(&run_ecs_tests.step);
-    test_step.dependOn(&run_query_tests.step);
-    test_step.dependOn(&run_world_tests.step);
-    test_step.dependOn(&run_world_query_tests.step);
-    test_step.dependOn(&run_collider_tests.step);
-    test_step.dependOn(&run_action_tests.step);
-    test_step.dependOn(&run_action_bindings_tests.step);
-    test_step.dependOn(&run_collision_trigger_tests.step);
-    test_step.dependOn(&run_input_trigger_tests.step);
-    test_step.dependOn(&run_time_trigger_tests.step);
-    test_step.dependOn(&run_collision_tests.step);
-    test_step.dependOn(&run_nested_block_parser_tests.step);
-    test_step.dependOn(&run_scene_tests.step);
-    test_step.dependOn(&run_shapes_tests.step);
-    test_step.dependOn(&run_integration_tests.step);
-    test_step.dependOn(&run_template_instantiation_tests.step);
+    const platform_step: ?*std.Build.Step = if (swift_lib) |sl| sl.swift_step else null;
+    tests.addAllTests(b, target, optimize, &modules, engine_lib, test_step, platform_step);
 }
 
-/// Configure a module with all platform-specific linking requirements
-/// This ensures any executable that imports this module gets all necessary frameworks and libraries
-pub fn configurePlatformModule(
-    b: *std.Build,
-    module: *std.Build.Module,
-    target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-    renderer: RendererBackend,
-) void {
-    _ = b; // May be used for custom build steps in the future
-    _ = optimize; // May be used in future platform-specific logic
+// ========================================
+// Platform helpers
+// ========================================
 
-    switch (target.result.os.tag) {
-        .macos => {
-            // Add all macOS frameworks to the module
-            module.linkFramework("Foundation", .{});
-            module.linkFramework("AppKit", .{});
-            module.linkFramework("QuartzCore", .{});
-            module.linkFramework("CoreGraphics", .{});
-
-            switch (renderer) {
-                .metal => {
-                    module.linkFramework("Metal", .{});
-                    module.linkFramework("MetalKit", .{});
-                },
-                .opengl => {
-                    module.linkFramework("OpenGL", .{});
-                },
-                .vulkan => {
-                    module.linkSystemLibrary("vulkan", .{});
-                    module.linkSystemLibrary("MoltenVK", .{});
-                },
-                .cpu => {
-                    // Link Metal frameworks weakly for Swift package dependencies
-                    module.linkFramework("Metal", .{ .weak = true });
-                    module.linkFramework("MetalKit", .{ .weak = true });
-                },
-            }
-
-            // Add Swift library paths
-            const sys_path = "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.sdk/usr/lib/swift/";
-            const other_sys_path = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx";
-            module.addLibraryPath(.{ .cwd_relative = sys_path });
-            module.addLibraryPath(.{ .cwd_relative = other_sys_path });
-
-            // Link all Swift runtime libraries
-            module.linkSystemLibrary("swiftObjectiveC", .{});
-            module.linkSystemLibrary("swiftCore", .{});
-            module.linkSystemLibrary("swiftAppKit", .{});
-            module.linkSystemLibrary("swiftCoreFoundation", .{});
-            module.linkSystemLibrary("swiftCompatibilityConcurrency", .{});
-            module.linkSystemLibrary("swiftCompatibility50", .{});
-            module.linkSystemLibrary("swiftCompatibility51", .{});
-            module.linkSystemLibrary("swiftCompatibility56", .{});
-            module.linkSystemLibrary("swiftCompatibilityDynamicReplacements", .{});
-            module.linkSystemLibrary("swift_Concurrency", .{});
-            module.linkSystemLibrary("swiftUniformTypeIdentifiers", .{});
-            module.linkSystemLibrary("swift_StringProcessing", .{});
-            module.linkSystemLibrary("swiftDispatch", .{});
-            module.linkSystemLibrary("swiftCoreGraphics", .{});
-
-            // Link Metal Swift libraries (weak for CPU renderer to resolve package dependencies)
-            if (renderer == .metal) {
-                module.linkSystemLibrary("swiftMetal", .{});
-                module.linkSystemLibrary("swiftMetalKit", .{});
-                module.linkSystemLibrary("swiftModelIO", .{});
-            } else {
-                // Weak link for Swift package auto-load symbols
-                module.linkSystemLibrary("swiftMetal", .{ .weak = true });
-                module.linkSystemLibrary("swiftMetalKit", .{ .weak = true });
-                module.linkSystemLibrary("swiftModelIO", .{ .weak = true });
-            }
-            module.linkSystemLibrary("swiftIOKit", .{});
-            module.linkSystemLibrary("swiftXPC", .{});
-            module.linkSystemLibrary("swiftDarwin", .{});
-            module.linkSystemLibrary("swiftCoreImage", .{});
-            module.linkSystemLibrary("swiftQuartzCore", .{});
-            module.linkSystemLibrary("swiftOSLog", .{});
-            module.linkSystemLibrary("swiftos", .{});
-            module.linkSystemLibrary("swiftsimd", .{});
-        },
-        .linux => {
-            module.link_libc = true;
-            module.linkSystemLibrary("X11", .{});
-            module.linkSystemLibrary("Xrandr", .{});
-            module.linkSystemLibrary("Xi", .{});
-            module.linkSystemLibrary("Xcursor", .{});
-
-            switch (renderer) {
-                .vulkan => module.linkSystemLibrary("vulkan", .{}),
-                .opengl => module.linkSystemLibrary("GL", .{}),
-                .metal => @panic("Metal is not available on Linux"),
-                .cpu => {},
-            }
-        },
-        .windows => {
-            module.linkSystemLibrary("user32", .{});
-            module.linkSystemLibrary("gdi32", .{});
-            module.linkSystemLibrary("shell32", .{});
-            module.linkSystemLibrary("kernel32", .{});
-
-            switch (renderer) {
-                .vulkan => module.linkSystemLibrary("vulkan-1", .{}),
-                .opengl => module.linkSystemLibrary("opengl32", .{}),
-                .metal => @panic("Metal is not available on Windows"),
-                .cpu => {},
-            }
-        },
-        else => @panic("Unsupported operating system"),
-    }
-}
-
-pub fn defaultRendererForTarget(os_tag: std.Target.Os.Tag) RendererBackend {
+fn defaultRendererForTarget(os_tag: std.Target.Os.Tag) RendererBackend {
     return switch (os_tag) {
         .macos => .metal,
         .windows => .vulkan,
@@ -886,102 +385,31 @@ pub fn defaultRendererForTarget(os_tag: std.Target.Os.Tag) RendererBackend {
     };
 }
 
-/// Configure an executable with platform-specific build steps (Swift builds, metal shaders, etc.)
-/// The module should already have configurePlatformModule called on it
-pub fn configurePlatform(
-    b: *std.Build,
-    exe: *std.Build.Step.Compile,
-    module: *std.Build.Module,
+/// Link platform libraries onto all executables (Swift runtime on macOS, no-op elsewhere).
+fn linkPlatformLibraries(
+    artifacts: []const *std.Build.Step.Compile,
+    swift_lib: ?macos.SwiftBuildResult,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
-    renderer: RendererBackend,
 ) void {
-    _ = module;
-
     switch (target.result.os.tag) {
-        .macos => configureMacOSExecutable(b, exe, target, optimize, renderer),
-        .linux => {}, // Linux doesn't need extra executable configuration
-        .windows => {}, // Windows doesn't need extra executable configuration
-        else => @panic("Unsupported operating system"),
+        .macos => for (artifacts) |artifact| {
+            macos.linkSwiftLibrary(artifact, swift_lib, target);
+        },
+        else => {},
     }
 }
 
-/// Configure macOS-specific executable build steps (Swift library, Metal shaders)
-fn configureMacOSExecutable(
+/// Link platform-specific native libraries onto a module.
+fn configurePlatformModule(
     b: *std.Build,
-    exe: *std.Build.Step.Compile,
+    module: *std.Build.Module,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
     renderer: RendererBackend,
 ) void {
-    const arch = switch (target.result.cpu.arch) {
-        .aarch64 => "arm64",
-        .x86_64 => "x86_64",
-        else => @panic("Unsupported architecture for macOS"),
-    };
-
-    const config = if (optimize == .Debug) "debug" else "release";
-
-    // Use absolute paths so this works when building as a dependency
-    const package_path = b.path("src/platform/macos").getPath(b);
-    const swift_scratch_rel = b.fmt("swift-build/{s}", .{config});
-    const swift_scratch = b.cache_root.join(b.allocator, &.{swift_scratch_rel}) catch @panic("OOM");
-    const shaders_air = b.cache_root.join(b.allocator, &.{"shaders.air"}) catch @panic("OOM");
-    const metallib_path = b.cache_root.join(b.allocator, &.{"default.metallib"}) catch @panic("OOM");
-    const shaders_metal = b.path("src/platform/macos/swift/shaders.metal").getPath(b);
-    const swift_build_dir = b.path("src/platform/macos/.build").getPath(b);
-
-    // Pass renderer type to Swift build via define
-    const renderer_define = switch (renderer) {
-        .metal => "-DUSE_METAL",
-        .cpu => "-DUSE_CPU",
-        else => "-DUSE_CPU",
-    };
-
-    const swift_build = b.addSystemCommand(&.{
-        "swift",          "build",
-        "--package-path", package_path,
-        "--scratch-path", swift_scratch,
-        "-c",             config,
-        "--arch",         arch,
-        "-Xswiftc",       renderer_define,
-    });
-
-    // Only compile Metal shaders when using Metal renderer
-    if (renderer == .metal) {
-        const metal_compile = b.addSystemCommand(&.{
-            "xcrun", "-sdk",        "macosx", "metal",
-            "-c",    shaders_metal, "-o",     shaders_air,
-        });
-        metal_compile.step.dependOn(&swift_build.step);
-
-        const metal_lib = b.addSystemCommand(&.{
-            "xcrun",     "-sdk", "macosx",      "metallib",
-            shaders_air, "-o",   metallib_path,
-        });
-        metal_lib.step.dependOn(&metal_compile.step);
-
-        const install_metallib = b.addInstallFile(.{ .cwd_relative = metallib_path }, "bin/default.metallib");
-        install_metallib.step.dependOn(&metal_lib.step);
-        exe.step.dependOn(&install_metallib.step);
+    switch (target.result.os.tag) {
+        .macos => macos.configureModule(b, module, target, renderer),
+        .linux => linux.configureModule(module, renderer),
+        .windows => windows.configureModule(module, renderer),
+        else => @panic("Unsupported operating system"),
     }
-
-    const swift_clean = b.addSystemCommand(&.{ "rm", "-rf", swift_build_dir });
-
-    const lib_src = b.fmt("{s}/arm64-apple-macosx/{s}/libMacPlatform.a", .{ swift_scratch, config });
-    const lib_dest = "lib/libMacPlatform.a";
-
-    const install_lib = b.addInstallFile(.{ .cwd_relative = lib_src }, lib_dest);
-    install_lib.step.dependOn(&swift_build.step);
-
-    // Link c++ for Swift interop
-    exe.linkSystemLibrary("c++");
-
-    // Link the Swift platform library
-    exe.addObjectFile(.{ .cwd_relative = lib_src });
-
-    // Make executable depend on these build steps
-    exe.step.dependOn(&swift_build.step);
-    exe.step.dependOn(&swift_clean.step);
-    exe.step.dependOn(&install_lib.step);
 }

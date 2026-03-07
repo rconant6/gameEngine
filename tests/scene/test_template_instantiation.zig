@@ -33,7 +33,7 @@ test "TemplateInstantiation: load single template from file" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplateFile("examples/test_game/assets/templates/projectiles.template");
+    try template_manager.loadTemplateFile("examples/player/assets/templates/projectiles.template");
 
     try testing.expect(template_manager.hasTemplate("Missile"));
     try testing.expect(template_manager.hasTemplate("Bullet"));
@@ -55,7 +55,7 @@ test "TemplateInstantiation: load all templates from directory" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplatesFromDirectory("examples/test_game/assets/templates/");
+    try template_manager.loadTemplatesFromDirectory("examples/player/assets/templates/");
 
     // Check all template files loaded
     try testing.expect(template_manager.hasTemplate("PlayerShip"));
@@ -83,7 +83,7 @@ test "TemplateInstantiation: get template by name" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplateFile("examples/test_game/assets/templates/projectiles.template");
+    try template_manager.loadTemplateFile("examples/player/assets/templates/projectiles.template");
 
     const missile_template = template_manager.getTemplate("Missile");
     try testing.expect(missile_template != null);
@@ -105,7 +105,7 @@ test "TemplateInstantiation: instantiate entity from template" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplateFile("examples/test_game/assets/templates/projectiles.template");
+    try template_manager.loadTemplateFile("examples/player/assets/templates/projectiles.template");
 
     // Instantiate missile at position (10, 20)
     const missile = try template_manager.instantiate("Missile", V2{ .x = 10.0, .y = 20.0 });
@@ -141,7 +141,7 @@ test "TemplateInstantiation: instantiate multiple entities from same template" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplateFile("examples/test_game/assets/templates/enemies.template");
+    try template_manager.loadTemplateFile("examples/player/assets/templates/enemies.template");
 
     // Spawn 3 enemies at different positions
     const enemy1 = try template_manager.instantiate("BasicEnemy", V2{ .x = 0.0, .y = 0.0 });
@@ -178,7 +178,7 @@ test "TemplateInstantiation: template with polygon sprite" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplateFile("examples/test_game/assets/templates/asteroids.template");
+    try template_manager.loadTemplateFile("examples/player/assets/templates/asteroids.template");
 
     const asteroid = try template_manager.instantiate("LargeAsteroid", V2{ .x = 0.0, .y = 0.0 });
 
@@ -211,7 +211,7 @@ test "TemplateInstantiation: template with tag component" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplateFile("examples/test_game/assets/templates/enemies.template");
+    try template_manager.loadTemplateFile("examples/player/assets/templates/enemies.template");
 
     const enemy = try template_manager.instantiate("BasicEnemy", V2{ .x = 0.0, .y = 0.0 });
 
@@ -237,7 +237,7 @@ test "TemplateInstantiation: template with lifetime component" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplateFile("examples/test_game/assets/templates/effects.template");
+    try template_manager.loadTemplateFile("examples/player/assets/templates/effects.template");
 
     const particle = try template_manager.instantiate("ExplosionParticle", V2{ .x = 0.0, .y = 0.0 });
 
@@ -261,7 +261,7 @@ test "TemplateInstantiation: template not found error" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplateFile("examples/test_game/assets/templates/projectiles.template");
+    try template_manager.loadTemplateFile("examples/player/assets/templates/projectiles.template");
 
     // Try to instantiate non-existent template
     const result = template_manager.instantiate("NonExistentTemplate", V2{ .x = 0.0, .y = 0.0 });
@@ -284,7 +284,7 @@ test "TemplateInstantiation: spawn with offset from action" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplateFile("examples/test_game/assets/templates/projectiles.template");
+    try template_manager.loadTemplateFile("examples/player/assets/templates/projectiles.template");
 
     // Simulate spawning from paddle at (0, 500) with offset (0, -30)
     const paddle_pos = V2{ .x = 0.0, .y = 500.0 };
@@ -312,7 +312,7 @@ test "TemplateInstantiation: asteroid break into smaller asteroids" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplateFile("examples/test_game/assets/templates/asteroids.template");
+    try template_manager.loadTemplateFile("examples/player/assets/templates/asteroids.template");
 
     // Large asteroid gets destroyed at position (100, 100)
     const large_pos = V2{ .x = 100.0, .y = 100.0 };
@@ -346,7 +346,7 @@ test "TemplateInstantiation: directory load includes all files" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplatesFromDirectory("examples/test_game/assets/templates/");
+    try template_manager.loadTemplatesFromDirectory("examples/player/assets/templates/");
 
     // Check templates from asteroids.template
     try testing.expect(template_manager.hasTemplate("LargeAsteroid"));
@@ -386,7 +386,7 @@ test "TemplateInstantiation: directory load then instantiate from different file
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplatesFromDirectory("examples/test_game/assets/templates/");
+    try template_manager.loadTemplatesFromDirectory("examples/player/assets/templates/");
 
     // Instantiate from projectiles.template
     const missile = try template_manager.instantiate("Missile", V2{ .x = 0.0, .y = 0.0 });
@@ -422,7 +422,7 @@ test "TemplateInstantiation: directory load empty directory does not error" {
     defer template_manager.deinit();
 
     // Loading empty directory should succeed but load nothing
-    try template_manager.loadTemplatesFromDirectory("examples/test_game/assets/scenes/");
+    try template_manager.loadTemplatesFromDirectory("examples/player/assets/scenes/");
 
     // Should not have any templates loaded
     try testing.expect(!template_manager.hasTemplate("Missile"));
@@ -444,7 +444,7 @@ test "TemplateInstantiation: directory load skips non-template files" {
     var template_manager = TemplateManager.init(allocator, &instantiator);
     defer template_manager.deinit();
 
-    try template_manager.loadTemplatesFromDirectory("examples/test_game/assets/templates/");
+    try template_manager.loadTemplatesFromDirectory("examples/player/assets/templates/");
 
     // Should have loaded .template files
     try testing.expect(template_manager.hasTemplate("Missile"));
