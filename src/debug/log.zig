@@ -65,6 +65,7 @@ pub const LogCategory = enum {
     scene,
     sceneFormat,
     systems,
+    ui,
 };
 
 const LogTime = struct {
