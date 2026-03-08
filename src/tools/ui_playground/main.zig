@@ -37,7 +37,7 @@ pub fn main() !void {
 
     var font = Font.initFromMemory(allocator, assets.embedded_default_font) catch |err| {
         log.err(.application, "Failed to load font: {any}", .{err});
-        @panic("Cannot load font");
+        @panic("Cannot load default engine font");
     };
     defer font.deinit();
 
@@ -57,6 +57,8 @@ pub fn main() !void {
     defer test3.deinit();
     var test4 = ui.UIManager.init(allocator);
     defer test4.deinit();
+    var test5 = ui.UIManager.init(allocator);
+    defer test5.deinit();
 
     while (app.isRunning()) {
         try app.beginFrame();
@@ -266,6 +268,88 @@ pub fn main() !void {
             test4.setRoot(bar);
             test4.layoutAt(0, screen_h - 40, screen_w, 40);
             test4.render(&app.renderer, &font, ctx);
+        }
+
+        // ────────────────────────────────────────
+        // Test 5: Buttons with hover/press states
+        // Expect: two buttons side-by-side in a panel,
+        //         hover changes color, click fires callback.
+        //         State managed by UIManager via string id.
+        // ────────────────────────────────────────
+        test5.rebuild();
+        {
+            const a = test5.allocator();
+            // const widgets = ui.Widgets;
+
+            var buttons = try a.alloc(ui.WidgetNode, 2);
+            buttons[0] = .{
+                .widget = .{ .Button = .{
+                    .id = "btn_save",
+                    .text = "Save",
+                    .font = &font,
+                    .font_scale = 24.0,
+                    .colors = .{
+                        .normal = Colors.UI_BUTTON_NORMAL,
+                        .hovered = Colors.UI_BUTTON_HOVER,
+                        .pressed = Colors.UI_BUTTON_PRESSED,
+                        .text = Colors.UI_BUTTON_TEXT,
+                    },
+                    .on_click = null,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            buttons[1] = .{
+                .widget = .{ .Button = .{
+                    .id = "btn_clear",
+                    .text = "Clear",
+                    .font = &font,
+                    .font_scale = 24.0,
+                    .colors = .{
+                        .normal = Colors.CHARCOAL,
+                        .hovered = Colors.BLUE,
+                        .pressed = Colors.RED,
+                        .text = Colors.WHITE,
+                    },
+                    .on_click = null,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            const hstack = try a.create(ui.WidgetNode);
+            hstack.* = .{
+                .widget = .{ .HStack = .{
+                    .children = buttons,
+                    .spacing = 12,
+                    .cross_axis = .center,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            const panel = try a.create(ui.WidgetNode);
+            panel.* = .{
+                .widget = .{ .Panel = .{
+                    .child = hstack,
+                    .background = Colors.DARK_GRAY,
+                    .border_color = Colors.WHITE,
+                    .border_width = 1,
+                    .padding = ui.EdgeInsets.all(10),
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            test5.setRoot(panel);
+            test5.layoutAt(20, 280, 400, 60);
+
+            // Process input — UIManager looks up ButtonState by id,
+            // updates hover/pressed, fires on_click on mouse_up
+            test5.processInput(
+                app.mouse.position.x,
+                app.mouse.position.y,
+                app.mouse.buttons.isPressed(.Left),
+                app.mouse.buttons.isReleased(.Left),
+            );
+
+            test5.render(&app.renderer, &font, ctx);
         }
 
         try app.endFrame();

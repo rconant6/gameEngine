@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
+const RenderContext = rend.RenderContext;
 pub const log = @import("log.zig");
 pub const LogLevel = log.LogLevel;
 pub const LogCategory = log.LogCategory;
@@ -26,9 +27,10 @@ const DebugManagerStub = struct {
         _ = self;
     }
 
-    pub fn run(self: *@This(), dt: f32) void {
+    pub fn run(self: *@This(), dt: f32, ctx: RenderContext) void {
         _ = self;
         _ = dt;
+        _ = ctx;
     }
 };
 

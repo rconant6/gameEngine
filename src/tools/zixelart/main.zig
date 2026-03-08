@@ -22,6 +22,9 @@ const Region = layout.Region;
 const InfoBar = @import("InfoBar.zig");
 const assets = @import("assets");
 const Font = assets.Font;
+const ui = @import("ui");
+const WidgetNode = ui.WidgetNode;
+const UIManager = ui.UIManager;
 
 const logical_width: i32 = 1920;
 const logical_height: i32 = 1088;
@@ -39,19 +42,23 @@ pub fn main() !void {
     defer app.deinit();
 
     // Load the embedded font
-    var font = Font.initFromMemory(allocator, assets.embedded_default_font) catch |err| {
+    var ui_font = Font.initFromMemory(allocator, assets.embedded_default_font) catch |err| {
         log.err(.application, "Failed to load font: {any}", .{err});
         @panic("Cannot load font");
     };
-    defer font.deinit();
+    defer ui_font.deinit();
 
-    // const kb = plat.getKeyboard();
-    // const mouse = plat.getMouse();
+    const size = ui_font.measureText("Hello World", 24.0);
+    log.info(.assets, "Font: width: {d}, height {d}", .{ size.width, size.height });
+
     log.debug(
         .application,
         "Number of Colors in library: {d}",
         .{ColorLibrary.getAllColors().len},
     );
+
+    // UI
+    var ui_manager: UIManager = .init(allocator);
 
     // Build canvas grid
     const canvas = Canvas.init(allocator, layout.canvas, 64) catch |err| {
@@ -65,13 +72,6 @@ pub fn main() !void {
     log.info(.application, "Created canvas of {d}x{d}", .{ 64, 64 });
     defer canvas.deinit();
 
-    // const palette = Palette.init();
-    // palette.print();
-
-    // const cs = ColorLibrary.getHueToneSat(.azure, .light, .vivid);
-    // for (cs) |c| {
-    //     log.debug(.application, "{s}", .{c.name});
-    // }
     const color_name = "food_peach";
     const active_color = ColorLibrary.findByName(color_name) orelse blk: {
         log.err(.application, "Active Color was not found: {s}", .{color_name});
@@ -79,16 +79,12 @@ pub fn main() !void {
     };
     log.debug(.application, "Default Color: {s}", .{active_color.name});
 
-    // const red = ColorLibrary.findByColor(Color.initRgba(255, 0, 0, 255));
-    // log.debug(.application, "{any}", .{red});
-
     var state: ZixelState = .{
         .canvas = canvas,
         .active_color = active_color.color,
         .active_color_name = active_color.name,
         .active_tool = .pencil,
     };
-    const info_bar: InfoBar = .init(&state);
 
     const ctx: rend.RenderContext = .{
         .camera_loc = .{ .x = 0, .y = 0 },
@@ -97,12 +93,14 @@ pub fn main() !void {
         .ortho_size = logical_height / 2,
     };
 
-    // TODO: These checking functions need to be moved elsewhere!
+    var str_buf: [256]u8 = undefined;
     while (app.isRunning()) {
         try app.beginFrame();
 
         app.renderer.setClearColor(Colors.DARK_GRAY);
         app.renderer.clear();
+
+        ui_manager.rebuild();
 
         if (app.kb.isPressed(.Esc)) break;
         if (app.kb.isPressed(.C)) canvas.clear();
@@ -110,7 +108,6 @@ pub fn main() !void {
         const screen_x: i32 = @intFromFloat(mouse_pos.x);
         const screen_y: i32 = @intFromFloat(mouse_pos.y);
         const pos = screenToCanvas(canvas, screen_x, screen_y);
-
         if (pos) |p| {
             state.cursor_x = p.x;
             state.cursor_y = p.y;
@@ -135,10 +132,25 @@ pub fn main() !void {
             );
         }
 
-        info_bar.render(&app.renderer, &font, &state, ctx);
+        const info_bar_root = try InfoBar.buildTree(
+            ui_manager.allocator(),
+            &ui_font,
+            &state,
+            &str_buf,
+        );
+        ui_manager.setRoot(info_bar_root);
 
+        ui_manager.layoutAt(
+            layout.info_bar.x,
+            layout.info_bar.y,
+            layout.info_bar.width,
+            layout.info_bar.height,
+        );
+
+        ui_manager.render(&app.renderer, &ui_font, ctx);
         try app.endFrame();
     }
+    ui_manager.deinit();
 }
 
 pub fn screenToCanvas(self: *const Canvas, screen_x: i32, screen_y: i32) ?struct { x: usize, y: usize } {

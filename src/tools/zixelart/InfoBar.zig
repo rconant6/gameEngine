@@ -1,126 +1,108 @@
 const std = @import("std");
-const Self = @This();
 const rend = @import("renderer");
 const Colors = rend.Colors;
 const Color = rend.Color;
 const Renderer = rend.Renderer;
 const RenderContext = rend.RenderContext;
-const ShapeData = rend.ShapeData;
-const ScreenPoint = rend.ScreenPoint;
 const assets = @import("assets");
 const Font = assets.Font;
-const layout = @import("Layout.zig");
-const Region = layout.Region;
 const ZixelState = @import("ZixelState.zig");
+const ui = @import("ui");
+const WidgetNode = ui.WidgetNode;
+const widgets = ui.Widgets;
+const Label = widgets.Label;
+const HStack = widgets.HStack;
+const Panel = widgets.Panel;
 
-region: Region,
-shape: ShapeData,
-state: *const ZixelState,
-
-pub fn init(zixel_state: *const ZixelState) Self {
-    const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse unreachable;
-    return .{
-        .state = zixel_state,
-        .region = layout.info_bar,
-        .shape = rend.ShapeRegistry.createShapeUnion(
-            ScreenRect,
-            ScreenRect.initFromTopLeft(
-                .{ .x = layout.info_bar.x, .y = layout.info_bar.y },
-                layout.info_bar.width,
-                layout.info_bar.height,
-            ),
-        ),
-    };
-}
-
-pub fn render(
-    self: *const Self,
-    renderer: *Renderer,
+pub fn buildTree(
+    arena: std.mem.Allocator,
     font: *const Font,
     state: *const ZixelState,
-    ctx: RenderContext,
-) void {
-    var buf: [256]u8 = undefined;
-    // Background bar
-    renderer.drawGeometry(
-        self.shape,
-        null,
-        Colors.CHARCOAL,
-        null,
-        1.0,
-        ctx,
-    );
-
-    const text_y = self.region.y + self.region.height / 2 - 2;
+    buf: *[256]u8,
+) !*WidgetNode {
     const text_scale: f32 = 24.0;
 
-    // Tool indicator (left side)
-    renderer.drawTextScreen(
-        font,
-        std.ascii.lowerString(&buf, @tagName(state.active_tool)),
-        .{ .x = 10, .y = text_y },
-        text_scale,
-        Colors.UI_BUTTON_TEXT,
-        ctx,
-    );
+    // Build label nodes: tool, color name, canvas size, zoom, cursor coords
+    var labels = try arena.alloc(WidgetNode, 5);
 
-    // Active color indicator (center-left) - show color name if available
-    renderer.drawTextScreen(
-        font,
-        std.ascii.lowerString(&buf, state.active_color_name),
-        .{ .x = 150, .y = text_y },
-        text_scale,
-        Colors.UI_BUTTON_TEXT,
-        ctx,
-    );
+    labels[0] = .{
+        .widget = .{ .Label = .{
+            .text = std.ascii.upperString(buf[0..64], @tagName(state.active_tool)),
+            .font = font,
+            .font_scale = text_scale,
+            .color = Colors.UI_BUTTON_TEXT,
+        } },
+        .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    };
 
-    // Draw a small color swatch
-    const swatch_size: f32 = 20;
-    const swatch_x: f32 = 280;
-    const swatch_y: f32 = self.region.y;
-    const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse unreachable;
-    const swatch = rend.ShapeRegistry.createShapeUnion(
-        ScreenRect,
-        ScreenRect.initFromTopLeft(
-            .{ .x = swatch_x, .y = swatch_y },
-            swatch_size,
-            swatch_size,
-        ),
-    );
-    renderer.drawGeometry(swatch, null, state.active_color, Colors.WHITE, 1.0, ctx);
+    labels[1] = .{
+        .widget = .{ .Label = .{
+            .text = std.ascii.lowerString(buf[64..128], state.active_color_name),
+            .font = font,
+            .font_scale = text_scale,
+            .color = Colors.UI_BUTTON_TEXT,
+        } },
+        .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    };
 
-    // Canvas size (center)
-    renderer.drawTextScreen(
-        font,
-        "64x64",
-        .{ .x = 400, .y = text_y },
-        text_scale,
-        Colors.UI_TEXT_INFO,
-        ctx,
-    );
+    labels[2] = .{
+        .widget = .{ .Label = .{
+            .text = "64x64",
+            .font = font,
+            .font_scale = text_scale,
+            .color = Colors.UI_TEXT_INFO,
+        } },
+        .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    };
 
-    // Zoom level (right side)
-    renderer.drawTextScreen(
-        font,
-        "100%",
-        .{ .x = 550, .y = text_y },
-        text_scale,
-        Colors.UI_BUTTON_NORMAL,
-        ctx,
-    );
+    labels[3] = .{
+        .widget = .{ .Label = .{
+            .text = "100%",
+            .font = font,
+            .font_scale = text_scale,
+            .color = Colors.UI_BUTTON_NORMAL,
+        } },
+        .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    };
 
-    // Coordinates (far right) - placeholder
-    const loc_text = std.fmt.bufPrint(
-        &buf,
+    const coord_text = std.fmt.bufPrint(
+        buf[128..192],
         "[{d:3}, {d:3}]",
         .{ state.cursor_x orelse 0, state.cursor_y orelse 0 },
     ) catch "";
-    renderer.drawTextScreen(
-        font,
-        loc_text,
-        .{ .x = 700, .y = text_y },
-        text_scale,
-        Colors.UI_BUTTON_NORMAL,
-        ctx,
-    );
+    labels[4] = .{
+        .widget = .{ .Label = .{
+            .text = coord_text,
+            .font = font,
+            .font_scale = text_scale,
+            .color = Colors.UI_BUTTON_TEXT,
+        } },
+        .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    };
+
+    // HStack: arrange labels horizontally
+    const hstack = try arena.create(WidgetNode);
+    hstack.* = .{
+        .widget = .{ .HStack = .{
+            .children = labels,
+            .spacing = 30,
+            .cross_axis = .center,
+        } },
+        .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    };
+
+    // Panel: charcoal background wrapping the hstack
+    const panel = try arena.create(WidgetNode);
+    panel.* = .{
+        .widget = .{ .Panel = .{
+            .child = hstack,
+            .background = Colors.CHARCOAL,
+            .border_color = null,
+            .border_width = 0,
+            .padding = ui.EdgeInsets.symmetric(10, 0),
+        } },
+        .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+    };
+
+    return panel;
 }
