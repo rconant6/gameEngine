@@ -15,9 +15,26 @@ const Event = evt.Event;
 const dbg = @import("debug");
 const log = dbg.log;
 
+/// Ergonomic wrapper around the raw u16 toggle bits owned by UIManager.
+/// Zero-cost at runtime — the compiler inlines everything.
 pub const ButtonState = struct {
-    hovered: bool = false,
-    pressed: bool = false,
+    const HOVERED: u16 = 0x1;
+    const PRESSED: u16 = 0x2;
+
+    bits: *u16,
+
+    pub fn isHovered(self: ButtonState) bool {
+        return self.bits.* & HOVERED != 0;
+    }
+    pub fn isPressed(self: ButtonState) bool {
+        return self.bits.* & PRESSED != 0;
+    }
+    pub fn setHovered(self: ButtonState, val: bool) void {
+        if (val) self.bits.* |= HOVERED else self.bits.* &= ~HOVERED;
+    }
+    pub fn setPressed(self: ButtonState, val: bool) void {
+        if (val) self.bits.* |= PRESSED else self.bits.* &= ~PRESSED;
+    }
 };
 
 pub const ButtonColors = struct {
@@ -35,7 +52,7 @@ text: []const u8,
 font: *const Font,
 font_scale: f32,
 colors: ButtonColors,
-state: ButtonState = .{},
+state: ?*u16 = null,
 on_click: ?*const fn () void = null,
 
 pub fn layout(
@@ -55,27 +72,26 @@ pub fn layout(
 }
 pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
     if (event.consumed) return;
+    const state = ButtonState{ .bits = self.state orelse return };
 
     const hit = bounds.contains(.{ .x = event.mouse_x, .y = event.mouse_y });
     switch (event.kind) {
         .mouse_move => {
-            self.state.hovered = hit;
+            state.setHovered(hit);
         },
         .mouse_down => {
             if (hit) {
-                self.state.pressed = true;
+                state.setPressed(true);
                 event.consume();
             }
         },
         .mouse_up => {
-            if (hit and self.state.pressed) {
+            if (hit and state.isPressed()) {
                 if (self.on_click) |cb| cb();
                 event.consume();
             }
-            if (hit) {
-                self.state.hovered = true;
-            }
-            self.state.pressed = false;
+            state.setHovered(hit);
+            state.setPressed(false);
         },
     }
 }
@@ -102,9 +118,13 @@ pub fn render(
             bounds.height,
         ),
     );
+    const state = ButtonState{ .bits = self.state orelse {
+        log.err(.ui, "Invalid Button State {s}", .{self.id});
+        return;
+    } };
     const bg_color = blk: {
-        if (self.state.pressed) break :blk self.colors.pressed;
-        if (self.state.hovered) break :blk self.colors.hovered;
+        if (state.isPressed()) break :blk self.colors.pressed;
+        if (state.isHovered()) break :blk self.colors.hovered;
         break :blk self.colors.normal;
     };
     // TODO: handle color of bg based on state
