@@ -59,8 +59,18 @@ pub const EarClipper = struct {
         if (outers.items.len == 0) return error.NoOuterContour;
 
         for (outers.items) |outer| {
-            const holes_for_outer = if (outers.items.len == 1) holes.items else &[_]Contour{};
-            const merged = try self.eliminateHoles(outer, holes_for_outer);
+            // Assign holes to this outer if they lie inside it
+            var matched_holes: ArrayList(Contour) = .empty;
+            defer matched_holes.deinit(self.allocator);
+
+            for (holes.items) |hole| {
+                // Test whether the hole's first vertex is inside this outer contour
+                if (hole.len > 0 and pointInContour(self.vertices, outer, self.vertices[hole[0]])) {
+                    try matched_holes.append(self.allocator, hole);
+                }
+            }
+
+            const merged = try self.eliminateHoles(outer, matched_holes.items);
             defer self.allocator.free(merged);
 
             self.polygon.clearRetainingCapacity();
@@ -183,6 +193,24 @@ pub const EarClipper = struct {
 
         const eps = -0.00001;
         return (u >= eps) and (v >= eps) and (u + v <= 1.0 - eps);
+    }
+
+    /// Ray-casting point-in-polygon test. Returns true if p is inside the contour.
+    fn pointInContour(vertices: []const Point, contour: Contour, p: Point) bool {
+        var inside = false;
+        const n = contour.len;
+        var j: usize = n - 1;
+        for (0..n) |i| {
+            const vi = vertices[contour[i]];
+            const vj = vertices[contour[j]];
+            if ((vi.y > p.y) != (vj.y > p.y) and
+                p.x < (vj.x - vi.x) * (p.y - vi.y) / (vj.y - vi.y) + vi.x)
+            {
+                inside = !inside;
+            }
+            j = i;
+        }
+        return inside;
     }
 
     fn signedArea(vertices: []const Point, contour: Contour) f32 {
