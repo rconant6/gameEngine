@@ -37,6 +37,7 @@ pub fn layout(
         const child_size = child.layout(child_constraints, cursor_x, origin_y);
         max_height = @max(max_height, child_size.height);
         cursor_x += child_size.width;
+        remaining_width -= child_size.width;
         if (i < self.children.len - 1) {
             cursor_x += self.spacing;
             remaining_width -= self.spacing;

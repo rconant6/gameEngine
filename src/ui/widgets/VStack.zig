@@ -31,12 +31,13 @@ pub fn layout(
 
     for (self.children, 0..) |*child, i| {
         const child_constraints = Constraints.loose(
+            constraints.max_width,
             remaining_height,
-            constraints.max_height,
         );
         const child_size = child.layout(child_constraints, origin_x, cursor_y);
         max_width = @max(max_width, child_size.width);
         cursor_y += child_size.height;
+        remaining_height -= child_size.height;
         if (i < self.children.len - 1) {
             cursor_y += self.spacing;
             remaining_height -= self.spacing;

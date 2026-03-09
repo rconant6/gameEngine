@@ -8,17 +8,20 @@ pub const Alignment = an.Alignment;
 pub const Horizontal = Alignment.Horizontal;
 pub const Vertical = Alignment.Vertical;
 pub const UIManager = @import("UIManager.zig");
-pub const Widgets = @import("widgets/widgets.zig");
+pub const WidgetState = UIManager.WidgetState;
 pub const WidgetNode = @import("widgets/WidgetNode.zig");
-pub const Label = Widgets.Label;
-pub const Panel = Widgets.Panel;
-pub const HStack = Widgets.HStack;
-pub const VStack = Widgets.VStack;
-pub const Button = Widgets.Button;
 const event = @import("event.zig");
 pub const UIEventKind = event.EventKind;
 pub const UIMouseButton = event.MouseButton;
 pub const UIEvent = event.Event;
+
+pub const Widgets = @import("widgets/widgets.zig");
+pub const Button = Widgets.Button;
+pub const HStack = Widgets.HStack;
+pub const Label = Widgets.Label;
+pub const Panel = Widgets.Panel;
+pub const Slider = Widgets.Slider;
+pub const VStack = Widgets.VStack;
 
 // TODO: [WIDGETS w/ FONTS] lets remove fonts from this call...
 // if you need a font store a pointer to it (so they can use different ones if needed)

@@ -16,14 +16,15 @@ const log = @import("debug").log;
 
 const Self = @This();
 
-/// Internal storage for states of widgets
-/// toggle: bit maskable for desired behaviours (hover, pressed, checked)
-/// value: continuous states (sliders, spinners, etc...)
-/// selection: indexes for dropdowns, tabs, radios, etc...
-const WidgetState = union(enum) {
-    toggle: u16,
-    value: f16,
-    selection: u16,
+/// Internal storage for states of widgets.
+/// Widgets declare `pub const state_kind = .flags` or `.value`
+/// to indicate which variant they need.
+///
+/// flags: bit-maskable boolean states (hovered, pressed, checked, disabled, etc.)
+/// value: continuous state (slider position, scroll offset) + flags for interaction
+pub const WidgetState = union(enum) {
+    flags: u16,
+    value: struct { val: f16, flags: u16 = 0 },
 };
 
 gpa: std.mem.Allocator,
@@ -55,6 +56,12 @@ pub fn getOrCreateState(
     };
     if (!state.found_existing) state.value_ptr.* = default;
     return state.value_ptr;
+}
+
+/// Read-only access to widget state by id.
+/// Use this from builder code to read values (e.g., slider positions for color preview).
+pub fn getState(self: *const Self, id: []const u8) ?*WidgetState {
+    return self.state_map.getPtr(id);
 }
 
 pub fn rebuild(self: *Self) void {
@@ -90,13 +97,27 @@ pub fn layoutAt(
     _ = root.layout(constraints, x, y);
 }
 
-pub fn render(self: *Self, renderer: *Renderer, font: *const Font, ctx: RenderContext) void {
+pub fn render(
+    self: *Self,
+    renderer: *Renderer,
+    font: *const Font,
+    ctx: RenderContext,
+) void {
     const root = self.root orelse return;
     root.render(renderer, font, ctx);
 }
 
-pub fn processInput(self: *Self, mouse_x: f32, mouse_y: f32, left_down: bool, left_up: bool) void {
+pub fn processInput(
+    self: *Self,
+    mouse_x: f32,
+    mouse_y: f32,
+    left_down: bool,
+    left_up: bool,
+) void {
     const root = self.root orelse return;
+
+    // Wire state pointers for ALL widgets first, independent of events.
+    wireState(self, root);
 
     if (left_down) {
         var event: Event = .{
@@ -105,16 +126,19 @@ pub fn processInput(self: *Self, mouse_x: f32, mouse_y: f32, left_down: bool, le
             .mouse_y = mouse_y,
             .button = .left,
         };
-        dispatchEvent(self, root, &event);
+        dispatchEvent(root, &event);
     }
     if (left_up) {
+        // Clear all dragging flags before dispatching mouse_up,
+        // so drag never sticks (even on same-frame press+release).
+        clearAllDragging(self);
         var event: Event = .{
             .kind = .mouse_up,
             .mouse_x = mouse_x,
             .mouse_y = mouse_y,
             .button = .left,
         };
-        dispatchEvent(self, root, &event);
+        dispatchEvent(root, &event);
     }
     var event: Event = .{
         .kind = .mouse_move,
@@ -122,32 +146,79 @@ pub fn processInput(self: *Self, mouse_x: f32, mouse_y: f32, left_down: bool, le
         .mouse_y = mouse_y,
         .button = null,
     };
-    dispatchEvent(self, root, &event);
+    dispatchEvent(root, &event);
 }
 
-fn dispatchEvent(self: *Self, node: *WidgetNode, event: *Event) void {
+/// Wire state pointers on every widget so rendering always works,
+/// regardless of whether events were consumed.
+fn wireState(self: *Self, node: *WidgetNode) void {
+    switch (node.widget) {
+        inline else => |*w| {
+            const W = @TypeOf(w.*);
+            if (@hasField(W, "id") and @hasDecl(W, "state_kind")) {
+                const kind = W.state_kind;
+                switch (kind) {
+                    .flags => {
+                        if (self.getOrCreateState(w.id, .{ .flags = 0 })) |ws| {
+                            w.state = &ws.flags;
+                        }
+                    },
+                    .value => {
+                        if (self.getOrCreateState(
+                            w.id,
+                            .{ .value = .{ .val = 0, .flags = 0 } },
+                        )) |ws| {
+                            w.state_value = &ws.value.val;
+                            w.state_flags = &ws.value.flags;
+                        }
+                    },
+                    else => {},
+                }
+            }
+        },
+    }
+
+    switch (node.widget) {
+        .Panel => |*p| wireState(self, p.child),
+        .HStack => |*h| {
+            for (h.children) |*c| wireState(self, c);
+        },
+        .VStack => |*v| {
+            for (v.children) |*c| wireState(self, c);
+        },
+        else => {},
+    }
+}
+
+/// Clear the DRAGGING flag on every value-state widget.
+fn clearAllDragging(self: *Self) void {
+    var it = self.state_map.iterator();
+    while (it.next()) |entry| {
+        switch (entry.value_ptr.*) {
+            .value => |*v| v.flags &= ~@as(u16, 0x4),
+            else => {},
+        }
+    }
+}
+
+fn dispatchEvent(node: *WidgetNode, event: *Event) void {
     if (event.consumed) return;
     switch (node.widget) {
         inline else => |*w| {
-            // Wire up state pointer for any widget with an id
-            // (needed by both handleEvent and render)
-            if (@hasField(@TypeOf(w.*), "id")) {
-                if (@hasField(@TypeOf(w.*), "state")) {
-                    if (self.getOrCreateState(w.id, .{ .toggle = 0 })) |ws| {
-                        w.state = &ws.toggle;
-                    }
-                }
-            }
-            if (@hasDecl(@TypeOf(w.*), "handleEvent")) {
+            const W = @TypeOf(w.*);
+            if (@hasDecl(W, "handleEvent")) {
                 w.handleEvent(event, node.bounds);
             }
         },
     }
 
     switch (node.widget) {
-        .Panel => |*p| dispatchEvent(self, p.child, event),
+        .Panel => |*p| dispatchEvent(p.child, event),
         .HStack => |*h| {
-            for (h.children) |*c| dispatchEvent(self, c, event);
+            for (h.children) |*c| dispatchEvent(c, event);
+        },
+        .VStack => |*v| {
+            for (v.children) |*c| dispatchEvent(c, event);
         },
         else => {},
     }

@@ -47,6 +47,8 @@ pub const ButtonColors = struct {
 
 const Self = @This();
 
+pub const state_kind = .flags;
+
 id: []const u8,
 text: []const u8,
 font: *const Font,
@@ -70,6 +72,7 @@ pub fn layout(
         .height = measured_text.height + 8,
     };
 }
+
 pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
     if (event.consumed) return;
     const state = ButtonState{ .bits = self.state orelse return };
@@ -127,7 +130,6 @@ pub fn render(
         if (state.isHovered()) break :blk self.colors.hovered;
         break :blk self.colors.normal;
     };
-    // TODO: handle color of bg based on state
     renderer.drawGeometry(
         bg_shape,
         null,

@@ -59,6 +59,8 @@ pub fn main() !void {
     defer test4.deinit();
     var test5 = ui.UIManager.init(allocator);
     defer test5.deinit();
+    var test6 = ui.UIManager.init(allocator);
+    defer test6.deinit();
 
     while (app.isRunning()) {
         try app.beginFrame();
@@ -350,6 +352,184 @@ pub fn main() !void {
             );
 
             test5.render(&app.renderer, &font, ctx);
+        }
+
+        // ────────────────────────────────────────
+        // Test 6: RGB Color Picker (3 sliders + swatch)
+        // Expect: three labeled sliders (R, G, B) stacked
+        //         vertically, with a color swatch panel
+        //         showing the composed color.
+        //         Slider state managed by UIManager via .value kind.
+        // ────────────────────────────────────────
+        test6.rebuild();
+        {
+            const a = test6.allocator();
+
+            // Read current slider values from state map (persists across frames)
+            const r_val: f32 = if (test6.getState("slider_r")) |s| @floatCast(s.value.val) else 0.5;
+            const g_val: f32 = if (test6.getState("slider_g")) |s| @floatCast(s.value.val) else 0.5;
+            const b_val: f32 = if (test6.getState("slider_b")) |s| @floatCast(s.value.val) else 0.5;
+
+            const swatch_color: Color = .initRgba(
+                @intFromFloat(r_val * 255.0),
+                @intFromFloat(g_val * 255.0),
+                @intFromFloat(b_val * 255.0),
+                255,
+            );
+
+            // Build 3 slider rows: each is an HStack of [Label, Slider]
+            var rows = try a.alloc(ui.WidgetNode, 4); // 3 slider rows + 1 swatch
+
+            // --- R slider row ---
+            var r_children = try a.alloc(ui.WidgetNode, 2);
+            r_children[0] = .{
+                .widget = .{ .Label = .{
+                    .text = "R",
+                    .font = &font,
+                    .font_scale = 20.0,
+                    .color = Colors.RED,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            r_children[1] = .{
+                .widget = .{ .Slider = .{
+                    .id = "slider_r",
+                    .min = 0.0,
+                    .max = 1.0,
+                    .track_color = Colors.CHARCOAL,
+                    .fill_color = Colors.RED,
+                    .thumb_color = Colors.WHITE,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            rows[0] = .{
+                .widget = .{ .HStack = .{
+                    .children = r_children,
+                    .spacing = 10,
+                    .cross_axis = .center,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            // --- G slider row ---
+            var g_children = try a.alloc(ui.WidgetNode, 2);
+            g_children[0] = .{
+                .widget = .{ .Label = .{
+                    .text = "G",
+                    .font = &font,
+                    .font_scale = 20.0,
+                    .color = Colors.GREEN,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            g_children[1] = .{
+                .widget = .{ .Slider = .{
+                    .id = "slider_g",
+                    .min = 0.0,
+                    .max = 1.0,
+                    .track_color = Colors.CHARCOAL,
+                    .fill_color = Colors.GREEN,
+                    .thumb_color = Colors.WHITE,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            rows[1] = .{
+                .widget = .{ .HStack = .{
+                    .children = g_children,
+                    .spacing = 10,
+                    .cross_axis = .center,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            // --- B slider row ---
+            var b_children = try a.alloc(ui.WidgetNode, 2);
+            b_children[0] = .{
+                .widget = .{ .Label = .{
+                    .text = "B",
+                    .font = &font,
+                    .font_scale = 20.0,
+                    .color = Colors.BLUE,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            b_children[1] = .{
+                .widget = .{ .Slider = .{
+                    .id = "slider_b",
+                    .min = 0.0,
+                    .max = 1.0,
+                    .track_color = Colors.CHARCOAL,
+                    .fill_color = Colors.BLUE,
+                    .thumb_color = Colors.WHITE,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            rows[2] = .{
+                .widget = .{ .HStack = .{
+                    .children = b_children,
+                    .spacing = 10,
+                    .cross_axis = .center,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            // --- Color swatch ---
+            const swatch_label = try a.create(ui.WidgetNode);
+            swatch_label.* = .{
+                .widget = .{ .Label = .{
+                    .text = "Preview",
+                    .font = &font,
+                    .font_scale = 18.0,
+                    .color = Colors.WHITE,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            rows[3] = .{
+                .widget = .{ .Panel = .{
+                    .child = swatch_label,
+                    .background = swatch_color,
+                    .border_color = Colors.WHITE,
+                    .border_width = 1,
+                    .padding = ui.EdgeInsets.symmetric(20, 8),
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            // Wrap all rows in a VStack
+            const vstack = try a.create(ui.WidgetNode);
+            vstack.* = .{
+                .widget = .{ .VStack = .{
+                    .children = rows,
+                    .spacing = 6,
+                    .cross_axis = .start,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            // Outer panel
+            const panel = try a.create(ui.WidgetNode);
+            panel.* = .{
+                .widget = .{ .Panel = .{
+                    .child = vstack,
+                    .background = Colors.LIGHT_GRAY,
+                    .border_color = Colors.WHITE,
+                    .border_width = 1,
+                    .padding = ui.EdgeInsets.all(12),
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            test6.setRoot(panel);
+            test6.layoutAt(20, 370, 300, 200);
+
+            test6.processInput(
+                app.mouse.position.x,
+                app.mouse.position.y,
+                app.mouse.buttons.isPressed(.Left),
+                app.mouse.buttons.isReleased(.Left),
+            );
+
+            test6.render(&app.renderer, &font, ctx);
         }
 
         try app.endFrame();
