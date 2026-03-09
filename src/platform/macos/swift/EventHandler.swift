@@ -72,7 +72,8 @@ class EventHandler {
     let mouseButton = event.buttonNumber
     let isDown: UInt8 =
       (event.type == .leftMouseDown || event.type == .rightMouseDown
-        || event.type == .otherMouseDown) ? 1 : 0
+        || event.type == .otherMouseDown
+        || event.type == .leftMouseDragged || event.type == .rightMouseDragged) ? 1 : 0
     let loc = event.locationInWindow
     let (scroll_x, scroll_y) =
       (event.type == .scrollWheel) ? (event.scrollingDeltaX, event.scrollingDeltaY) : (0, 0)
