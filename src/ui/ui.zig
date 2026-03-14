@@ -17,10 +17,12 @@ pub const UIEvent = event.Event;
 
 pub const Widgets = @import("widgets/widgets.zig");
 pub const Button = Widgets.Button;
+pub const Divider = Widgets.Divider;
 pub const HStack = Widgets.HStack;
 pub const Label = Widgets.Label;
 pub const Panel = Widgets.Panel;
 pub const Slider = Widgets.Slider;
+pub const Spacer = Widgets.Spacer;
 pub const VStack = Widgets.VStack;
 
 // TODO: [WIDGETS w/ FONTS] lets remove fonts from this call...

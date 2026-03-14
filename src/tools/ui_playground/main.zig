@@ -61,6 +61,10 @@ pub fn main() !void {
     defer test5.deinit();
     var test6 = ui.UIManager.init(allocator);
     defer test6.deinit();
+    var test7 = ui.UIManager.init(allocator);
+    defer test7.deinit();
+    var test8 = ui.UIManager.init(allocator);
+    defer test8.deinit();
 
     while (app.isRunning()) {
         try app.beginFrame();
@@ -530,6 +534,162 @@ pub fn main() !void {
             );
 
             test6.render(&app.renderer, &font, ctx);
+        }
+
+        // ────────────────────────────────────────
+        // Test 7: Spacer — flex spacers in an HStack
+        // Expect: "File" left, "Edit" centered, "View" right
+        //         with spacers absorbing remaining space equally
+        //         inside a 1500px-wide panel at (340, 280)
+        // ────────────────────────────────────────
+        test7.rebuild();
+        {
+            const a = test7.allocator();
+
+            var items = try a.alloc(ui.WidgetNode, 5); // label, spacer, label, spacer, label
+            items[0] = .{
+                .widget = .{ .Label = .{
+                    .text = "File",
+                    .font = &font,
+                    .font_scale = 22.0,
+                    .color = Colors.WHITE,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            items[1] = .{
+                .widget = .{ .Spacer = .{
+                    .min_size = 1,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            items[2] = .{
+                .widget = .{ .Label = .{
+                    .text = "Edit",
+                    .font = &font,
+                    .font_scale = 22.0,
+                    .color = Colors.WHITE,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            items[3] = .{
+                .widget = .{ .Spacer = .{
+                    .min_size = 1,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            items[4] = .{
+                .widget = .{ .Label = .{
+                    .text = "View",
+                    .font = &font,
+                    .font_scale = 22.0,
+                    .color = Colors.WHITE,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            const hstack = try a.create(ui.WidgetNode);
+            hstack.* = .{
+                .widget = .{ .HStack = .{
+                    .children = items,
+                    .spacing = 10,
+                    .cross_axis = .center,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            const panel = try a.create(ui.WidgetNode);
+            panel.* = .{
+                .widget = .{ .Panel = .{
+                    .child = hstack,
+                    .background = Colors.CHARCOAL,
+                    .border_color = Colors.WHITE,
+                    .border_width = 1,
+                    .padding = ui.EdgeInsets.symmetric(16, 8),
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            test7.setRoot(panel);
+            test7.layoutAt(340, 280, 500, 50);
+            test7.render(&app.renderer, &font, ctx);
+        }
+
+        // ────────────────────────────────────────
+        // Test 8: Spacer — flex spacers in a VStack
+        // Expect: "Top" at top, "Middle" centered, "Bottom" at bottom
+        //         with spacers absorbing remaining vertical space equally
+        //         inside a 300px-tall panel at (340, 350)
+        // ────────────────────────────────────────
+        test8.rebuild();
+        {
+            const a = test8.allocator();
+
+            var items = try a.alloc(ui.WidgetNode, 5);
+            items[0] = .{
+                .widget = .{ .Label = .{
+                    .text = "Top",
+                    .font = &font,
+                    .font_scale = 22.0,
+                    .color = Colors.WHITE,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            items[1] = .{
+                .widget = .{ .Spacer = .{
+                    .min_size = null,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            items[2] = .{
+                .widget = .{ .Label = .{
+                    .text = "Middle",
+                    .font = &font,
+                    .font_scale = 22.0,
+                    .color = Colors.WHITE,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            items[3] = .{
+                .widget = .{ .Spacer = .{
+                    .min_size = null,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+            items[4] = .{
+                .widget = .{ .Label = .{
+                    .text = "Bottom",
+                    .font = &font,
+                    .font_scale = 22.0,
+                    .color = Colors.WHITE,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            const vstack = try a.create(ui.WidgetNode);
+            vstack.* = .{
+                .widget = .{ .VStack = .{
+                    .children = items,
+                    .spacing = 4,
+                    .cross_axis = .start,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            const panel = try a.create(ui.WidgetNode);
+            panel.* = .{
+                .widget = .{ .Panel = .{
+                    .child = vstack,
+                    .background = Colors.CHARCOAL,
+                    .border_color = Colors.WHITE,
+                    .border_width = 1,
+                    .padding = ui.EdgeInsets.all(12),
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            test8.setRoot(panel);
+            test8.layoutAt(340, 350, 200, 300);
+            test8.render(&app.renderer, &font, ctx);
         }
 
         try app.endFrame();
