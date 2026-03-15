@@ -18,6 +18,7 @@ pub const UIEvent = event.Event;
 pub const Widgets = @import("widgets/widgets.zig");
 pub const Button = Widgets.Button;
 pub const Divider = Widgets.Divider;
+pub const Grid = Widgets.Grid;
 pub const HStack = Widgets.HStack;
 pub const Label = Widgets.Label;
 pub const Panel = Widgets.Panel;

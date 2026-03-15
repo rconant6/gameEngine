@@ -1,5 +1,6 @@
 pub const Button = @import("Button.zig");
 pub const Divider = @import("Divider.zig");
+pub const Grid = @import("Grid.zig");
 pub const HStack = @import("HStack.zig");
 pub const Label = @import("Label.zig");
 pub const Panel = @import("Panel.zig");

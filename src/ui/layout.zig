@@ -2,6 +2,8 @@ pub const Size = struct {
     width: f32,
     height: f32,
 
+    pub const zero = Size{ .width = 0, .height = 0 };
+
     pub fn constrain(self: Size, c: Constraints) Size {
         return .{
             .width = @max(c.min_width, @min(c.max_width, self.width)),

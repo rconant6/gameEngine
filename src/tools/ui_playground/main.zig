@@ -65,6 +65,8 @@ pub fn main() !void {
     defer test7.deinit();
     var test8 = ui.UIManager.init(allocator);
     defer test8.deinit();
+    var test9 = ui.UIManager.init(allocator);
+    defer test9.deinit();
 
     while (app.isRunning()) {
         try app.beginFrame();
@@ -690,6 +692,73 @@ pub fn main() !void {
             test8.setRoot(panel);
             test8.layoutAt(340, 350, 200, 300);
             test8.render(&app.renderer, &font, ctx);
+        }
+
+        // ────────────────────────────────────────
+        // Test 9: Grid — 12 colored panels in a 4-column grid
+        // Expect: 4 columns x 3 rows of colored squares with
+        //         spacing, inside a panel at (560, 350)
+        // ────────────────────────────────────────
+        test9.rebuild();
+        {
+            const a = test9.allocator();
+
+            const grid_colors = [12]Color{
+                Colors.RED,     Colors.ORANGE, Colors.YELLOW, Colors.LIME,
+                Colors.GREEN,   Colors.CYAN,   Colors.BLUE,   Colors.PURPLE,
+                Colors.MAGENTA, Colors.PINK,   Colors.BROWN,  Colors.DARK_GREEN,
+            };
+
+            var cells = try a.alloc(ui.WidgetNode, 12);
+            for (cells[0..], 0..) |*cell, i| {
+                const cell_panel = try a.create(ui.WidgetNode);
+                cell_panel.* = .{
+                    .widget = .{ .Label = .{
+                        .text = "",
+                        .font = &font,
+                        .font_scale = 1.0,
+                        .color = Colors.WHITE,
+                    } },
+                    .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+                };
+                cell.* = .{
+                    .widget = .{ .Panel = .{
+                        .child = cell_panel,
+                        .background = grid_colors[i],
+                        .border_color = Colors.WHITE,
+                        .border_width = 1,
+                        .padding = ui.EdgeInsets.all(16),
+                    } },
+                    .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+                };
+            }
+
+            const grid = try a.create(ui.WidgetNode);
+            grid.* = .{
+                .widget = .{ .Grid = .{
+                    .children = cells,
+                    .columns = 4,
+                    .h_spacing = 4,
+                    .v_spacing = 4,
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            const panel = try a.create(ui.WidgetNode);
+            panel.* = .{
+                .widget = .{ .Panel = .{
+                    .child = grid,
+                    .background = Colors.CHARCOAL,
+                    .border_color = Colors.WHITE,
+                    .border_width = 1,
+                    .padding = ui.EdgeInsets.all(8),
+                } },
+                .bounds = .{ .x = 0, .y = 0, .width = 0, .height = 0 },
+            };
+
+            test9.setRoot(panel);
+            test9.layoutAt(560, 350, 300, 300);
+            test9.render(&app.renderer, &font, ctx);
         }
 
         try app.endFrame();
