@@ -145,10 +145,7 @@ pub fn addAllTests(
     const ui_tests = [_]TestSpec{
         .{ .name = "ui-tests", .path = "tests/ui/test_layout.zig", .imports = &.{
             .{ "math", mod(modules, .math) },
-        }, .anon_imports = &.{
-            .{ "Rect", "src/ui/Rect.zig" },
-            .{ "Layout", "src/ui/Layout.zig" },
-            .{ "Alignment", "src/ui/alignment.zig" },
+            .{ "ui", mod(modules, .ui) },
         } },
     };
 
