@@ -1,3 +1,30 @@
+const assets = @import("assets");
+const Font = assets.Font;
+const rend = @import("renderer");
+const Color = rend.Color;
+const Colors = rend.Colors;
+const ColorLibrary = rend.ColorLibrary;
+const Renderer = rend.Renderer;
+const RenderContext = rend.RenderContext;
+const Rect = @import("Rect.zig");
+const V2 = @import("math").V2;
+
+/// Used to pass required info to widgets for layout purposes
+pub const LayoutInfo = struct {
+    // Required for widgets with text
+    font: *const Font,
+    // Required for all widgets
+    constraints: Constraints,
+    pos: V2,
+};
+/// Used to pass required info to widgets for rendering purposes
+pub const RenderInfo = struct {
+    renderer: *Renderer,
+    ctx: RenderContext,
+    font: *const Font,
+    bounds: Rect,
+};
+
 pub const Size = struct {
     width: f32,
     height: f32,

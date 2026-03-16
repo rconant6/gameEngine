@@ -2,6 +2,8 @@ const std = @import("std");
 const Rect = @import("Rect.zig");
 const l_out = @import("layout.zig");
 const Constraints = l_out.Constraints;
+const LayoutInfo = l_out.LayoutInfo;
+const RenderInfo = l_out.RenderInfo;
 const WidgetNode = @import("widgets/WidgetNode.zig");
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
@@ -31,6 +33,7 @@ gpa: std.mem.Allocator,
 arena: std.heap.ArenaAllocator,
 root: ?*WidgetNode,
 state_map: std.StringArrayHashMap(WidgetState),
+font: Font,
 
 pub fn init(backing_alloc: std.mem.Allocator) Self {
     return .{
@@ -38,9 +41,21 @@ pub fn init(backing_alloc: std.mem.Allocator) Self {
         .arena = std.heap.ArenaAllocator.init(backing_alloc),
         .root = null,
         .state_map = .init(backing_alloc),
+        .font = Font.initFromMemory(
+            backing_alloc,
+            assets.embedded_default_font,
+        ) catch |err| {
+            log.fatal(
+                .ui,
+                "UIManager unable to load default font as fallback font: {any}",
+                .{err},
+            );
+            @panic("UI System Failure");
+        },
     };
 }
 pub fn deinit(self: *Self) void {
+    self.font.deinit();
     self.arena.deinit();
     self.state_map.deinit();
 }
@@ -77,6 +92,11 @@ pub fn setRoot(self: *Self, node: *WidgetNode) void {
     self.root = node;
 }
 
+// TODO: update for more styling/defaults later on
+pub fn setFont(self: *Self, font: *const Font) void {
+    self.font = font;
+}
+
 pub fn layout(
     self: *Self,
     screen_width: f32,
@@ -94,17 +114,28 @@ pub fn layoutAt(
 ) void {
     const root = self.root orelse return;
     const constraints = Constraints.loose(width, height);
-    _ = root.layout(constraints, x, y);
+    const layout_info: LayoutInfo = .{
+        .constraints = constraints,
+        .font = &self.font,
+        .pos = .{ .x = x, .y = y },
+    };
+    _ = root.layout(layout_info);
 }
 
 pub fn render(
     self: *Self,
     renderer: *Renderer,
-    font: *const Font,
+    font: ?*const Font,
     ctx: RenderContext,
 ) void {
     const root = self.root orelse return;
-    root.render(renderer, font, ctx);
+    const render_info: RenderInfo = .{
+        .bounds = root.bounds,
+        .ctx = ctx,
+        .renderer = renderer,
+        .font = font orelse &self.font,
+    };
+    root.render(render_info);
 }
 
 pub fn processInput(

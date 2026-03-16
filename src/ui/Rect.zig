@@ -4,6 +4,8 @@ const V2 = math.V2;
 const ScreenPoint = math.ScreenPoint;
 const Self = @This();
 
+pub const zero: Self = .{ .x = 0, .y = 0, .width = 0, .height = 0 };
+
 x: f32,
 y: f32,
 width: f32,
