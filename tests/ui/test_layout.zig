@@ -2,12 +2,12 @@ const std = @import("std");
 const testing = std.testing;
 const math = @import("math");
 const V2 = math.V2;
-const Rect = @import("Rect");
-const layout = @import("Layout");
-const Size = layout.Size;
-const Constraints = layout.Constraints;
-const EdgeInsets = layout.EdgeInsets;
-const Alignment = @import("Alignment").Alignment;
+const ui = @import("ui");
+const Rect = ui.Rect;
+const Size = ui.Size;
+const Constraints = ui.Constraints;
+const EdgeInsets = ui.EdgeInsets;
+const Alignment = ui.Alignment;
 
 // ========================================
 // Rect Tests
