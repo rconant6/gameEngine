@@ -474,7 +474,7 @@ pub const Font = struct {
         self: *const Font,
         text: []const u8,
         scale: f32,
-    ) struct { width: f32, height: f32 } {
+    ) V2 {
         var width: f32 = 0.0;
         const em_f: f32 = @floatFromInt(self.units_per_em);
 
@@ -489,7 +489,7 @@ pub const Font = struct {
             self.ascender - self.descender + self.line_gap,
         )) / em_f * scale;
 
-        return .{ .width = width, .height = height };
+        return .{ .x = width, .y = height };
     }
 };
 
