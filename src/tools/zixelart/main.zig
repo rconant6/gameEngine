@@ -49,7 +49,7 @@ pub fn main() !void {
     defer ui_font.deinit();
 
     const size = ui_font.measureText("Hello World", 24.0);
-    log.info(.assets, "Font: width: {d}, height {d}", .{ size.width, size.height });
+    log.info(.assets, "Font: width: {d}, height {d}", .{ size.x, size.y });
 
     log.debug(
         .application,
@@ -132,9 +132,8 @@ pub fn main() !void {
             );
         }
 
-        const info_bar_root = try InfoBar.buildTree(
+        const info_bar_root = InfoBar.buildTree(
             ui_manager.allocator(),
-            &ui_font,
             &state,
             &str_buf,
         );
