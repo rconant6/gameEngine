@@ -9,9 +9,12 @@ const RenderContext = rend.RenderContext;
 const Size = l_out.Size;
 const l_out = @import("../layout.zig");
 const Constraints = l_out.Constraints;
+const LayoutInfo = l_out.LayoutInfo;
+const RenderInfo = l_out.RenderInfo;
 const Rect = @import("../Rect.zig");
 const evt = @import("../event.zig");
 const Event = evt.Event;
+const TextBlock = @import("../TextBlock.zig");
 const dbg = @import("debug");
 const log = dbg.log;
 
@@ -50,23 +53,13 @@ const Self = @This();
 pub const state_kind = .flags;
 
 id: []const u8,
-text: []const u8,
-font: *const Font,
-font_scale: f32,
+text_info: TextBlock,
 colors: ButtonColors,
 state: ?*u16 = null,
 on_click: ?*const fn () void = null,
 
-pub fn layout(
-    self: *Self,
-    constraints: Constraints,
-    origin_x: f32,
-    origin_y: f32,
-) Size {
-    _ = constraints;
-    _ = origin_x;
-    _ = origin_y;
-    const measured_text = self.font.measureText(self.text, self.font_scale);
+pub fn layout(self: *Self, li: LayoutInfo) Size {
+    const measured_text = self.text_info.getSize(li.font);
     return .{
         .width = measured_text.width + 16,
         .height = measured_text.height + 8,
@@ -99,18 +92,14 @@ pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
     }
 }
 
-pub fn render(
-    self: *const Self,
-    renderer: *Renderer,
-    font: *const Font,
-    bounds: Rect,
-    ctx: RenderContext,
-) void {
-    const ascender: f32 = @floatFromInt(self.font.ascender);
-    const per_em: f32 = @floatFromInt(self.font.units_per_em);
-    const measured = self.font.measureText(self.text, self.font_scale);
-    const ascent = (ascender / per_em) * self.font_scale;
-    const text_y = bounds.y + ascent + (bounds.height - measured.height) / 2;
+pub fn render(self: *Self, ri: RenderInfo) void {
+    const bounds = ri.bounds;
+    const font = ri.font;
+    const ascender: f32 = @floatFromInt(font.ascender);
+    const per_em: f32 = @floatFromInt(font.units_per_em);
+    const measured = ri.font.measureText(self.text_info.text, self.text_info.font_scale);
+    const ascent = (ascender / per_em) * self.text_info.font_scale;
+    const text_y = bounds.y + ascent + (bounds.height - measured.y) / 2;
     const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse
         return;
     const bg_shape = rend.ShapeRegistry.createShapeUnion(
@@ -130,21 +119,21 @@ pub fn render(
         if (state.isHovered()) break :blk self.colors.hovered;
         break :blk self.colors.normal;
     };
-    renderer.drawGeometry(
+    ri.renderer.drawGeometry(
         bg_shape,
         null,
         bg_color,
         null,
         1,
-        ctx,
+        ri.ctx,
     );
 
-    renderer.drawTextScreen(
+    ri.renderer.drawTextScreen(
         font,
-        self.text,
+        self.text_info.text,
         .{ .x = bounds.x, .y = text_y },
-        self.font_scale,
+        self.text_info.font_scale,
         self.colors.text,
-        ctx,
+        ri.ctx,
     );
 }

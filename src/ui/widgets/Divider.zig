@@ -7,6 +7,8 @@ const assets = @import("assets");
 const Font = assets.Font;
 const l_out = @import("../layout.zig");
 const Constraints = l_out.Constraints;
+const LayoutInfo = l_out.LayoutInfo;
+const RenderInfo = l_out.RenderInfo;
 const EdgeInsets = l_out.EdgeInsets;
 const Size = l_out.Size;
 const Rect = @import("../Rect.zig");
@@ -17,31 +19,17 @@ const Self = @This();
 size: f32 = 2,
 color: Color = Colors.RED,
 
-pub fn layout(
-    self: *Self,
-    constraints: Constraints,
-    origin_x: f32,
-    origin_y: f32,
-) Size {
-    _ = origin_x;
-    _ = origin_y;
-
+pub fn layout(self: *Self, li: LayoutInfo) Size {
     const size: Size = .{
         .width = self.size,
-        .height = constraints.max_height,
+        .height = li.constraints.max_height,
     };
 
-    return size.constrain(constraints);
+    return size.constrain(li.constraints);
 }
 
-pub fn render(
-    self: *const Self,
-    renderer: *Renderer,
-    font: *const Font,
-    bounds: Rect,
-    ctx: RenderContext,
-) void {
-    _ = font;
+pub fn render(self: *Self, ri: RenderInfo) void {
+    const bounds = ri.bounds;
     const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse
         return;
     const bg_shape = rend.ShapeRegistry.createShapeUnion(
@@ -52,12 +40,12 @@ pub fn render(
             2,
         ),
     );
-    renderer.drawGeometry(
+    ri.renderer.drawGeometry(
         bg_shape,
         null,
         self.color,
         null,
         1,
-        ctx,
+        ri.ctx,
     );
 }

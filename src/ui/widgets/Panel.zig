@@ -5,11 +5,14 @@ const Color = rend.Color;
 const assets = @import("assets");
 const Font = assets.Font;
 const l_out = @import("../layout.zig");
+const LayoutInfo = l_out.LayoutInfo;
+const RenderInfo = l_out.RenderInfo;
 const Constraints = l_out.Constraints;
 const EdgeInsets = l_out.EdgeInsets;
 const Size = l_out.Size;
 const Rect = @import("../Rect.zig");
 const WidgetNode = @import("WidgetNode.zig");
+const log = @import("debug").log;
 
 const Self = @This();
 
@@ -19,34 +22,28 @@ border_color: ?Color,
 border_width: f32,
 padding: EdgeInsets,
 
-pub fn layout(
-    self: *Self,
-    constraints: Constraints,
-    origin_x: f32,
-    origin_y: f32,
-) Size {
-    const child_constraints = constraints.deflate(self.padding);
-    const child_origin_x = origin_x + self.padding.left;
-    const child_origin_y = origin_y + self.padding.top;
-    const child_size = self.child.layout(child_constraints, child_origin_x, child_origin_y);
+pub fn layout(self: *Self, li: LayoutInfo) Size {
+    const child_constraints = li.constraints.deflate(self.padding);
+    const child_origin_x = li.pos.x + self.padding.left;
+    const child_origin_y = li.pos.y + self.padding.top;
+    const child_size = self.child.layout(.{
+        .constraints = child_constraints,
+        .pos = .{ .x = child_origin_x, .y = child_origin_y },
+        .font = li.font,
+    });
 
     const size: Size = .{
         .width = child_size.width + self.padding.horizontal(),
         .height = child_size.height + self.padding.vertical(),
     };
 
-    return size.constrain(constraints);
+    return size.constrain(li.constraints);
 }
 
-pub fn render(
-    self: *const Self,
-    renderer: *Renderer,
-    font: *const Font,
-    bounds: Rect,
-    ctx: RenderContext,
-) void {
+pub fn render(self: *Self, ri: RenderInfo) void {
     const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse
         return;
+    const bounds = ri.bounds;
     const bg_shape = rend.ShapeRegistry.createShapeUnion(
         ScreenRect,
         ScreenRect.initFromTopLeft(
@@ -55,14 +52,19 @@ pub fn render(
             bounds.height,
         ),
     );
-    renderer.drawGeometry(
+    ri.renderer.drawGeometry(
         bg_shape,
         null,
         self.background,
         self.border_color,
         self.border_width,
-        ctx,
+        ri.ctx,
     );
 
-    self.child.render(renderer, font, ctx);
+    self.child.render(.{
+        .renderer = ri.renderer,
+        .ctx = ri.ctx,
+        .font = ri.font,
+        .bounds = self.child.bounds,
+    });
 }

@@ -9,6 +9,8 @@ const RenderContext = rend.RenderContext;
 const Size = l_out.Size;
 const l_out = @import("../layout.zig");
 const Constraints = l_out.Constraints;
+const LayoutInfo = l_out.LayoutInfo;
+const RenderInfo = l_out.RenderInfo;
 const Rect = @import("../Rect.zig");
 const evt = @import("../event.zig");
 const Event = evt.Event;
@@ -52,17 +54,10 @@ pub const SliderState = struct {
     }
 };
 
-pub fn layout(
-    self: *Self,
-    constraints: Constraints,
-    origin_x: f32,
-    origin_y: f32,
-) Size {
+pub fn layout(self: *Self, li: LayoutInfo) Size {
     _ = self;
-    _ = origin_x;
-    _ = origin_y;
     return .{
-        .width = constraints.max_width,
+        .width = li.constraints.max_width,
         .height = 24,
     };
 }
@@ -109,14 +104,8 @@ pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
     }
 }
 
-pub fn render(
-    self: *const Self,
-    renderer: *Renderer,
-    font: *const Font,
-    bounds: Rect,
-    ctx: RenderContext,
-) void {
-    _ = font;
+pub fn render(self: *Self, ri: RenderInfo) void {
+    const bounds = ri.bounds;
     const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse
         return;
 
@@ -143,13 +132,13 @@ pub fn render(
             4,
         ),
     );
-    renderer.drawGeometry(
+    ri.renderer.drawGeometry(
         track_shape,
         null,
         self.track_color,
         null,
         1,
-        ctx,
+        ri.ctx,
     );
 
     // FILL (from left edge to thumb position)
@@ -162,13 +151,13 @@ pub fn render(
                 4,
             ),
         );
-        renderer.drawGeometry(
+        ri.renderer.drawGeometry(
             fill_shape,
             null,
             self.fill_color,
             null,
             1,
-            ctx,
+            ri.ctx,
         );
     }
 
@@ -181,12 +170,12 @@ pub fn render(
             bounds.height,
         ),
     );
-    renderer.drawGeometry(
+    ri.renderer.drawGeometry(
         thumb_shape,
         null,
         self.thumb_color,
         null,
         1,
-        ctx,
+        ri.ctx,
     );
 }

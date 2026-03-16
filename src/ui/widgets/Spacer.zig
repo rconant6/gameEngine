@@ -7,6 +7,8 @@ const assets = @import("assets");
 const Font = assets.Font;
 const l_out = @import("../layout.zig");
 const Constraints = l_out.Constraints;
+const LayoutInfo = l_out.LayoutInfo;
+const RenderInfo = l_out.RenderInfo;
 const EdgeInsets = l_out.EdgeInsets;
 const Size = l_out.Size;
 const Rect = @import("../Rect.zig");
@@ -18,30 +20,15 @@ min_size: ?f32,
 
 pub fn layout(
     self: *Self,
-    constraints: Constraints,
-    origin_x: f32,
-    origin_y: f32,
+    info: LayoutInfo,
 ) Size {
     _ = self;
-    _ = origin_x;
-    _ = origin_y;
-
     const size: Size = .{ .width = 0, .height = 0 };
-
-    return size.constrain(constraints);
+    return size.constrain(info.constraints);
 }
 
-pub fn render(
-    self: *const Self,
-    renderer: *Renderer,
-    font: *const Font,
-    bounds: Rect,
-    ctx: RenderContext,
-) void {
+pub fn render(self: *Self, ri: RenderInfo) void {
     _ = self;
-    _ = renderer;
-    _ = font;
-    _ = bounds;
-    _ = ctx;
+    _ = ri;
     return;
 }
