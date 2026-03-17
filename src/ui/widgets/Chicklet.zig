@@ -1,5 +1,4 @@
-const assets = @import("assets");
-const Font = assets.Font;
+const V2 = @import("math").V2;
 const rend = @import("renderer");
 const Color = rend.Color;
 const Colors = rend.Colors;
@@ -18,55 +17,53 @@ const TextBlock = @import("../TextBlock.zig");
 const WidgetState = @import("../widgetState.zig").WidgetState;
 const dbg = @import("debug");
 const log = dbg.log;
-
 /// Ergonomic wrapper around the raw u16 toggle bits owned by UIManager.
 /// Zero-cost at runtime — the compiler inlines everything.
-pub const ButtonState = struct {
+pub const ChickletState = struct {
     bits: *u16,
 
-    pub fn isHovered(self: ButtonState) bool {
+    pub fn isHovered(self: ChickletState) bool {
         return self.bits.* & WidgetState.hovered != 0;
     }
-    pub fn isPressed(self: ButtonState) bool {
-        return self.bits.* & WidgetState.pressed != 0;
-    }
-    pub fn setHovered(self: ButtonState, val: bool) void {
+    pub fn setHovered(self: ChickletState, val: bool) void {
         if (val) self.bits.* |= WidgetState.hovered else self.bits.* &= ~WidgetState.hovered;
     }
-    pub fn setPressed(self: ButtonState, val: bool) void {
+    pub fn isPressed(self: ChickletState) bool {
+        return self.bits.* & WidgetState.pressed != 0;
+    }
+    pub fn setPressed(self: ChickletState, val: bool) void {
         if (val) self.bits.* |= WidgetState.pressed else self.bits.* &= ~WidgetState.pressed;
     }
+    pub fn isSelected(self: ChickletState) bool {
+        return self.bits.* & WidgetState.selected != 0;
+    }
+    pub fn setSelected(self: ChickletState, val: bool) void {
+        if (val) self.bits.* |= WidgetState.selected else self.bits.* &= ~WidgetState.selected;
+    }
 };
-
-pub const ButtonColors = struct {
-    normal: Color,
-    hovered: Color,
-    pressed: Color,
-    text: Color,
-    background: Color = Colors.UI_BUTTON_NORMAL,
+pub const ChickletColors = struct {
+    not_selected: Color = Colors.UI_BUTTON_NORMAL,
+    selected: Color = Colors.UI_BUTTON_PRESSED,
 };
-
 const Self = @This();
 
 pub const state_kind = .flags;
 
 id: []const u8,
-text_info: TextBlock,
-colors: ButtonColors,
+colors: ChickletColors,
 state: ?*u16 = null,
+size: V2,
+selected: bool = false,
 on_click: ?*const fn () void = null,
 
 pub fn layout(self: *Self, li: LayoutInfo) Size {
-    const measured_text = self.text_info.getSize(li.font);
-    return .{
-        .width = measured_text.width + 16,
-        .height = measured_text.height + 8,
-    };
+    const desired = Size{ .width = self.size.x, .height = self.size.y };
+    return desired.constrain(li.constraints);
 }
 
 pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
     if (event.consumed) return;
-    const state = ButtonState{ .bits = self.state orelse return };
+    const state = ChickletState{ .bits = self.state orelse return };
 
     const hit = bounds.contains(.{ .x = event.mouse_x, .y = event.mouse_y });
     switch (event.kind) {
@@ -84,20 +81,13 @@ pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
                 if (self.on_click) |cb| cb();
                 event.consume();
             }
-            state.setHovered(hit);
             state.setPressed(false);
+            state.setHovered(hit);
         },
     }
 }
-
 pub fn render(self: *Self, ri: RenderInfo) void {
     const bounds = ri.bounds;
-    const font = ri.font;
-    const ascender: f32 = @floatFromInt(font.ascender);
-    const per_em: f32 = @floatFromInt(font.units_per_em);
-    const measured = ri.font.measureText(self.text_info.text, self.text_info.font_scale);
-    const ascent = (ascender / per_em) * self.text_info.font_scale;
-    const text_y = bounds.y + ascent + (bounds.height - measured.y) / 2;
     const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse
         return;
     const bg_shape = rend.ShapeRegistry.createShapeUnion(
@@ -108,30 +98,19 @@ pub fn render(self: *Self, ri: RenderInfo) void {
             bounds.height,
         ),
     );
-    const state = ButtonState{ .bits = self.state orelse {
+    const state = ChickletState{ .bits = self.state orelse {
         log.err(.ui, "Invalid Button State {s}", .{self.id});
         return;
     } };
-    const bg_color = blk: {
-        if (state.isPressed()) break :blk self.colors.pressed;
-        if (state.isHovered()) break :blk self.colors.hovered;
-        break :blk self.colors.normal;
-    };
+    const bg_color = if (self.selected) self.colors.selected
+        else self.colors.not_selected;
+
     ri.renderer.drawGeometry(
         bg_shape,
         null,
         bg_color,
-        null,
+        if (state.isHovered() or self.selected) Colors.WHITE else null,
         1,
-        ri.ctx,
-    );
-
-    ri.renderer.drawTextScreen(
-        font,
-        self.text_info.text,
-        .{ .x = bounds.x, .y = text_y },
-        self.text_info.font_scale,
-        self.colors.text,
         ri.ctx,
     );
 }

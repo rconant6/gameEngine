@@ -10,15 +10,16 @@ const log = @import("debug").log;
 const WidgetNode = @import("widgets/WidgetNode.zig");
 const Registry = @import("widgets/widget_registry.zig");
 const Rect = @import("Rect.zig");
-const Widgets = @import("widgets/widgets.zig");
-const Label = Widgets.Label;
-const Panel = Widgets.Panel;
-const HStack = Widgets.HStack;
-const VStack = Widgets.VStack;
-const Button = Widgets.Button;
-const Slider = Widgets.Slider;
-const Spacer = Widgets.Spacer;
-const Grid = Widgets.Grid;
+const widgets = @import("widgets/widgets.zig");
+const Button = widgets.Button;
+const Chicklet = widgets.Chicklet;
+const Grid = widgets.Grid;
+const HStack = widgets.HStack;
+const Label = widgets.Label;
+const Panel = widgets.Panel;
+const Slider = widgets.Slider;
+const Spacer = widgets.Spacer;
+const VStack = widgets.VStack;
 const TextBlock = @import("TextBlock.zig");
 const lo = @import("layout.zig");
 const Size = lo.Size;
@@ -114,6 +115,28 @@ pub fn vstack(a: Allocator, children: []const *WidgetNode, opts: VStackOpts) *Wi
     });
 }
 
+// ── Chicklet ──
+
+pub const ChickletOpts = struct {
+    colors: Chicklet.ChickletColors = .{
+        .not_selected = Colors.UI_BUTTON_NORMAL,
+        .selected = Colors.UI_BUTTON_PRESSED,
+    },
+    size: V2 = .{ .x = 24, .y = 24 },
+    is_selected: bool = false,
+    on_click: ?*const fn () void = null,
+};
+
+pub fn chicklet(a: Allocator, name: []const u8, opts: ChickletOpts) *WidgetNode {
+    return alloc(a, Chicklet{
+        .colors = opts.colors,
+        .id = name,
+        .selected = opts.is_selected,
+        .on_click = opts.on_click,
+        .size = opts.size,
+    });
+}
+
 // ── Button ──
 
 pub const ButtonOpts = struct {
@@ -127,7 +150,12 @@ pub const ButtonOpts = struct {
     on_click: ?*const fn () void = null,
 };
 
-pub fn button(a: Allocator, id: []const u8, text: []const u8, opts: ButtonOpts) *WidgetNode {
+pub fn button(
+    a: Allocator,
+    id: []const u8,
+    text: []const u8,
+    opts: ButtonOpts,
+) *WidgetNode {
     return alloc(a, Button{
         .id = id,
         .text_info = .{

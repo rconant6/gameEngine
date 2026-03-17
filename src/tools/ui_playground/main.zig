@@ -68,6 +68,8 @@ pub fn main() !void {
     defer test8.deinit();
     var test9 = ui.UIManager.init(allocator);
     defer test9.deinit();
+    var test10 = ui.UIManager.init(allocator);
+    defer test10.deinit();
 
     while (app.isRunning()) {
         try app.beginFrame();
@@ -323,6 +325,50 @@ pub fn main() !void {
             );
             test9.layoutAt(560, 350, 300, 300);
             test9.render(&app.renderer, &font, ctx);
+        }
+
+        // ────────────────────────────────────────
+        // Test 10: Chicklets — small icon-sized buttons
+        // Expect: row of colored chicklets with hover/press
+        //         states, inside a panel at (880, 280)
+        // ────────────────────────────────────────
+        test10.rebuild();
+        {
+            const a = test10.allocator();
+            test10.setRoot(
+                make.panel(a, make.hstack(a, &.{
+                    make.chicklet(a, "ck_red", .{
+                        .colors = .{
+                            .not_selected = Colors.PASTEL_PINK,
+                            .selected = Colors.TULIP_PINK,
+                        },
+                    }),
+                    make.chicklet(a, "ck_green", .{
+                        .colors = .{
+                            .selected = Colors.GREEN,
+                            .not_selected = Colors.LIME,
+                        },
+                    }),
+                    make.chicklet(a, "ck_blue", .{
+                        .colors = .{
+                            .selected = Colors.BLUE,
+                            .not_selected = Colors.CYAN,
+                        },
+                    }),
+                    make.chicklet(a, "ck_default", .{}),
+                }, .{ .spacing = 8 }), .{
+                    .background = Colors.DARK_GRAY,
+                    .padding = ui.EdgeInsets.all(10),
+                }),
+            );
+            test10.layoutAt(880, 280, 200, 60);
+            test10.processInput(
+                app.mouse.position.x,
+                app.mouse.position.y,
+                app.mouse.buttons.isPressed(.Left),
+                app.mouse.buttons.isReleased(.Left),
+            );
+            test10.render(&app.renderer, &font, ctx);
         }
 
         try app.endFrame();

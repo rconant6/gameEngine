@@ -5,6 +5,7 @@ const Constraints = l_out.Constraints;
 const LayoutInfo = l_out.LayoutInfo;
 const RenderInfo = l_out.RenderInfo;
 const WidgetNode = @import("widgets/WidgetNode.zig");
+pub const WidgetState = @import("widgetState.zig").WidgetState;
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
 const RenderContext = rend.RenderContext;
@@ -17,17 +18,6 @@ const MouseButton = evt.MouseButton;
 const log = @import("debug").log;
 
 const Self = @This();
-
-/// Internal storage for states of widgets.
-/// Widgets declare `pub const state_kind = .flags` or `.value`
-/// to indicate which variant they need.
-///
-/// flags: bit-maskable boolean states (hovered, pressed, checked, disabled, etc.)
-/// value: continuous state (slider position, scroll offset) + flags for interaction
-pub const WidgetState = union(enum) {
-    flags: u16,
-    value: struct { val: f16, flags: u16 = 0 },
-};
 
 gpa: std.mem.Allocator,
 arena: std.heap.ArenaAllocator,
