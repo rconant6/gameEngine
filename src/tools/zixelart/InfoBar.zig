@@ -29,9 +29,10 @@ pub fn buildTree(
             ),
             make.label(
                 arena,
-                std.ascii.lowerString(buf[64..128], state.active_color_name),
+                std.ascii.upperString(buf[64..128], state.active_color_name),
                 .{ .font_scale = text_scale, .color = Colors.UI_BUTTON_TEXT },
             ),
+            make.spacer(arena, null),
             make.label(
                 arena,
                 "64x64",
@@ -42,16 +43,17 @@ pub fn buildTree(
                 "100%",
                 .{ .font_scale = text_scale, .color = Colors.UI_BUTTON_NORMAL },
             ),
+            make.spacer(arena, null),
             make.label(
                 arena,
                 coord_text,
                 .{ .font_scale = text_scale, .color = Colors.UI_BUTTON_TEXT },
             ),
-        }, .{ .spacing = 30 }),
+        }, .{ .spacing = 40 }),
         .{
             .border_color = Colors.CHARCOAL,
             .border_width = 0,
-            .padding = ui.EdgeInsets.symmetric(10, 0),
+            .padding = ui.EdgeInsets.symmetric(10, 10),
         },
     );
 }

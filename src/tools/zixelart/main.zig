@@ -20,6 +20,7 @@ const Palette = @import("Palette.zig");
 const layout = @import("Layout.zig");
 const Region = layout.Region;
 const InfoBar = @import("InfoBar.zig");
+const ToolBar = @import("ToolBar.zig");
 const assets = @import("assets");
 const Font = assets.Font;
 const ui = @import("ui");
@@ -59,6 +60,7 @@ pub fn main() !void {
 
     // UI
     var ui_manager: UIManager = .init(allocator);
+    var toolbar_manager: UIManager = .init(allocator);
 
     // Build canvas grid
     const canvas = Canvas.init(allocator, layout.canvas, 64) catch |err| {
@@ -72,7 +74,7 @@ pub fn main() !void {
     log.info(.application, "Created canvas of {d}x{d}", .{ 64, 64 });
     defer canvas.deinit();
 
-    const color_name = "food_peach";
+    const color_name = "FOOD_PEACH";
     const active_color = ColorLibrary.findByName(color_name) orelse blk: {
         log.err(.application, "Active Color was not found: {s}", .{color_name});
         break :blk TaggedColor.from(Colors.MAGENTA, color_name);
@@ -101,6 +103,7 @@ pub fn main() !void {
         app.renderer.clear();
 
         ui_manager.rebuild();
+        toolbar_manager.rebuild();
 
         if (app.kb.isPressed(.Esc)) break;
         if (app.kb.isPressed(.C)) canvas.clear();
@@ -138,17 +141,55 @@ pub fn main() !void {
             &str_buf,
         );
         ui_manager.setRoot(info_bar_root);
-
         ui_manager.layoutAt(
             layout.info_bar.x,
             layout.info_bar.y,
             layout.info_bar.width,
             layout.info_bar.height,
         );
-
         ui_manager.render(&app.renderer, &ui_font, ctx);
+        const tool_bar_root = ToolBar.buildTree(toolbar_manager.allocator(), &state);
+        toolbar_manager.setRoot(tool_bar_root);
+        toolbar_manager.layoutAt(
+            layout.toolbar.x,
+            layout.toolbar.y,
+            layout.toolbar.width,
+            layout.toolbar.height,
+        );
+        toolbar_manager.processInput(
+            app.mouse.position.x,
+            app.mouse.position.y,
+            app.mouse.buttons.isPressed(.Left),
+            app.mouse.buttons.isReleased(.Left),
+        );
+
+        // Poll toolbar clicks and update active tool
+        const Tool = @import("tool.zig").Tool;
+        const tool_map = [_]struct { id: []const u8, tool: Tool }{
+            .{ .id = "ck_pencil", .tool = .pencil },
+            .{ .id = "ck_eraser", .tool = .erase },
+            .{ .id = "ck_fill", .tool = .fill },
+            .{ .id = "ck_line", .tool = .line },
+            .{ .id = "ck_picker", .tool = .picker },
+        };
+        for (&tool_map) |entry| {
+            if (toolbar_manager.getState(entry.id)) |ws| {
+                switch (ws.*) {
+                    .flags => |*bits| {
+                        if (bits.* & ui.WidgetState.pressed != 0) {
+                            state.active_tool = entry.tool;
+                            bits.* &= ~ui.WidgetState.pressed;
+                        }
+                    },
+                    else => {},
+                }
+            }
+        }
+
+        toolbar_manager.render(&app.renderer, &ui_font, ctx);
         try app.endFrame();
     }
+    toolbar_manager.deinit();
     ui_manager.deinit();
 }
 

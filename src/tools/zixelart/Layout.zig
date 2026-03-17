@@ -3,8 +3,8 @@
 const screen_width: f32 = 1920;
 const screen_height: f32 = 1088;
 const info_bar_height: f32 = 40;
-const toolbar_width: f32 = 80;
 const right_panel_width: f32 = 300;
+const toolbar_width: f32 = 240;
 
 const content_top: f32 = 0; // Top of content area (below nothing, starts at top)
 const content_height = screen_height - info_bar_height;
