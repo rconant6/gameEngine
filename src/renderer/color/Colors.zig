@@ -2643,3 +2643,89 @@ pub const APOLLO_43 = Color.initFromU32Hex(0x819796);
 pub const APOLLO_44 = Color.initFromU32Hex(0xA8B5B2);
 pub const APOLLO_45 = Color.initFromU32Hex(0xC7CFCC);
 pub const APOLLO_46 = Color.initFromU32Hex(0xEBEDE9);
+
+// ============================================================================
+// BASE PALETTE - Default 64-color palette for ZixelArt (8 hues × 8 shades)
+// Columns: Red(0°), Orange(30°), Yellow(55°), Green(120°), Cyan(180°), Blue(225°), Purple(280°), Neutral
+// Rows: Brightest (top) to Darkest (bottom)
+// ============================================================================
+
+// Red column (hue 0°)
+pub const BASE_RED_1 = Color.initHsva(0, 1.0, 1.0, 1.0);
+pub const BASE_RED_2 = Color.initHsva(0, 1.0, 0.85, 1.0);
+pub const BASE_RED_3 = Color.initHsva(0, 1.0, 0.70, 1.0);
+pub const BASE_RED_4 = Color.initHsva(0, 1.0, 0.55, 1.0);
+pub const BASE_RED_5 = Color.initHsva(0, 1.0, 0.40, 1.0);
+pub const BASE_RED_6 = Color.initHsva(0, 1.0, 0.28, 1.0);
+pub const BASE_RED_7 = Color.initHsva(0, 1.0, 0.17, 1.0);
+pub const BASE_RED_8 = Color.initHsva(0, 1.0, 0.08, 1.0);
+
+// Orange column (hue 30°)
+pub const BASE_ORANGE_1 = Color.initHsva(30, 1.0, 1.0, 1.0);
+pub const BASE_ORANGE_2 = Color.initHsva(30, 1.0, 0.85, 1.0);
+pub const BASE_ORANGE_3 = Color.initHsva(30, 1.0, 0.70, 1.0);
+pub const BASE_ORANGE_4 = Color.initHsva(30, 1.0, 0.55, 1.0);
+pub const BASE_ORANGE_5 = Color.initHsva(30, 1.0, 0.40, 1.0);
+pub const BASE_ORANGE_6 = Color.initHsva(30, 1.0, 0.28, 1.0);
+pub const BASE_ORANGE_7 = Color.initHsva(30, 1.0, 0.17, 1.0);
+pub const BASE_ORANGE_8 = Color.initHsva(30, 1.0, 0.08, 1.0);
+
+// Yellow column (hue 55°)
+pub const BASE_YELLOW_1 = Color.initHsva(55, 1.0, 1.0, 1.0);
+pub const BASE_YELLOW_2 = Color.initHsva(55, 1.0, 0.85, 1.0);
+pub const BASE_YELLOW_3 = Color.initHsva(55, 1.0, 0.70, 1.0);
+pub const BASE_YELLOW_4 = Color.initHsva(55, 1.0, 0.55, 1.0);
+pub const BASE_YELLOW_5 = Color.initHsva(55, 1.0, 0.40, 1.0);
+pub const BASE_YELLOW_6 = Color.initHsva(55, 1.0, 0.28, 1.0);
+pub const BASE_YELLOW_7 = Color.initHsva(55, 1.0, 0.17, 1.0);
+pub const BASE_YELLOW_8 = Color.initHsva(55, 1.0, 0.08, 1.0);
+
+// Green column (hue 120°)
+pub const BASE_GREEN_1 = Color.initHsva(120, 1.0, 1.0, 1.0);
+pub const BASE_GREEN_2 = Color.initHsva(120, 1.0, 0.85, 1.0);
+pub const BASE_GREEN_3 = Color.initHsva(120, 1.0, 0.70, 1.0);
+pub const BASE_GREEN_4 = Color.initHsva(120, 1.0, 0.55, 1.0);
+pub const BASE_GREEN_5 = Color.initHsva(120, 1.0, 0.40, 1.0);
+pub const BASE_GREEN_6 = Color.initHsva(120, 1.0, 0.28, 1.0);
+pub const BASE_GREEN_7 = Color.initHsva(120, 1.0, 0.17, 1.0);
+pub const BASE_GREEN_8 = Color.initHsva(120, 1.0, 0.08, 1.0);
+
+// Cyan column (hue 180°)
+pub const BASE_CYAN_1 = Color.initHsva(180, 1.0, 1.0, 1.0);
+pub const BASE_CYAN_2 = Color.initHsva(180, 1.0, 0.85, 1.0);
+pub const BASE_CYAN_3 = Color.initHsva(180, 1.0, 0.70, 1.0);
+pub const BASE_CYAN_4 = Color.initHsva(180, 1.0, 0.55, 1.0);
+pub const BASE_CYAN_5 = Color.initHsva(180, 1.0, 0.40, 1.0);
+pub const BASE_CYAN_6 = Color.initHsva(180, 1.0, 0.28, 1.0);
+pub const BASE_CYAN_7 = Color.initHsva(180, 1.0, 0.17, 1.0);
+pub const BASE_CYAN_8 = Color.initHsva(180, 1.0, 0.08, 1.0);
+
+// Blue column (hue 225°)
+pub const BASE_BLUE_1 = Color.initHsva(225, 1.0, 1.0, 1.0);
+pub const BASE_BLUE_2 = Color.initHsva(225, 1.0, 0.85, 1.0);
+pub const BASE_BLUE_3 = Color.initHsva(225, 1.0, 0.70, 1.0);
+pub const BASE_BLUE_4 = Color.initHsva(225, 1.0, 0.55, 1.0);
+pub const BASE_BLUE_5 = Color.initHsva(225, 1.0, 0.40, 1.0);
+pub const BASE_BLUE_6 = Color.initHsva(225, 1.0, 0.28, 1.0);
+pub const BASE_BLUE_7 = Color.initHsva(225, 1.0, 0.17, 1.0);
+pub const BASE_BLUE_8 = Color.initHsva(225, 1.0, 0.08, 1.0);
+
+// Purple column (hue 280°)
+pub const BASE_PURPLE_1 = Color.initHsva(280, 1.0, 1.0, 1.0);
+pub const BASE_PURPLE_2 = Color.initHsva(280, 1.0, 0.85, 1.0);
+pub const BASE_PURPLE_3 = Color.initHsva(280, 1.0, 0.70, 1.0);
+pub const BASE_PURPLE_4 = Color.initHsva(280, 1.0, 0.55, 1.0);
+pub const BASE_PURPLE_5 = Color.initHsva(280, 1.0, 0.40, 1.0);
+pub const BASE_PURPLE_6 = Color.initHsva(280, 1.0, 0.28, 1.0);
+pub const BASE_PURPLE_7 = Color.initHsva(280, 1.0, 0.17, 1.0);
+pub const BASE_PURPLE_8 = Color.initHsva(280, 1.0, 0.08, 1.0);
+
+// Neutral column (grayscale)
+pub const BASE_GRAY_1 = Color.initHsva(0, 0.0, 1.0, 1.0);
+pub const BASE_GRAY_2 = Color.initHsva(0, 0.0, 0.85, 1.0);
+pub const BASE_GRAY_3 = Color.initHsva(0, 0.0, 0.70, 1.0);
+pub const BASE_GRAY_4 = Color.initHsva(0, 0.0, 0.55, 1.0);
+pub const BASE_GRAY_5 = Color.initHsva(0, 0.0, 0.40, 1.0);
+pub const BASE_GRAY_6 = Color.initHsva(0, 0.0, 0.28, 1.0);
+pub const BASE_GRAY_7 = Color.initHsva(0, 0.0, 0.17, 1.0);
+pub const BASE_GRAY_8 = Color.initHsva(0, 0.0, 0.08, 1.0);

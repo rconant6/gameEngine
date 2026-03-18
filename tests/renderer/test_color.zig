@@ -660,9 +660,9 @@ test "math.hueShift: preserves saturation and value" {
 
 const ColorLibrary = color_mod.ColorLibrary;
 
-test "ColorLibrary: getAllColors returns all 2188 colors" {
+test "ColorLibrary: getAllColors returns all 2252 colors" {
     const all = ColorLibrary.getAllColors();
-    try testing.expectEqual(@as(usize, 2188), all.len);
+    try testing.expectEqual(@as(usize, 2252), all.len);
 }
 
 test "Colors: PENCIL_YELLOW matches Ticonderoga #2 shaft" {
