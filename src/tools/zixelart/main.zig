@@ -61,6 +61,7 @@ pub fn main() !void {
     // UI
     var ui_manager: UIManager = .init(allocator);
     var toolbar_manager: UIManager = .init(allocator);
+    var palette_manager: UIManager = .init(allocator);
 
     // Build canvas grid
     const canvas = Canvas.init(allocator, layout.canvas, 64) catch |err| {
@@ -104,6 +105,7 @@ pub fn main() !void {
 
         ui_manager.rebuild();
         toolbar_manager.rebuild();
+        palette_manager.rebuild();
 
         if (app.kb.isPressed(.Esc)) break;
         if (app.kb.isPressed(.C)) canvas.clear();
@@ -162,6 +164,39 @@ pub fn main() !void {
             app.mouse.buttons.isPressed(.Left),
             app.mouse.buttons.isReleased(.Left),
         );
+        const palette_root = Palette.buildTree(palette_manager.allocator(), &state);
+        palette_manager.setRoot(palette_root);
+        palette_manager.layoutAt(
+            layout.palette.x,
+            layout.palette.y,
+            layout.palette.width,
+            layout.palette.height,
+        );
+        palette_manager.processInput(
+            app.mouse.position.x,
+            app.mouse.position.y,
+            app.mouse.buttons.isPressed(.Left),
+            app.mouse.buttons.isReleased(.Left),
+        );
+
+        // Poll palette clicks and update active color
+        for (0..Palette.palette_size) |i| {
+            if (palette_manager.getState(Palette.color_ids[i])) |ws| {
+                switch (ws.*) {
+                    .flags => |*bits| {
+                        if (bits.* & ui.WidgetState.pressed != 0) {
+                            state.active_color = Palette.colors[i];
+                            state.active_color_name = if (ColorLibrary.findByColor(Palette.colors[i])) |tc|
+                                tc.name
+                            else
+                                "custom";
+                            bits.* &= ~ui.WidgetState.pressed;
+                        }
+                    },
+                    else => {},
+                }
+            }
+        }
 
         // Poll toolbar clicks and update active tool
         const Tool = @import("tool.zig").Tool;
@@ -187,8 +222,10 @@ pub fn main() !void {
         }
 
         toolbar_manager.render(&app.renderer, &ui_font, ctx);
+        palette_manager.render(&app.renderer, &ui_font, ctx);
         try app.endFrame();
     }
+    palette_manager.deinit();
     toolbar_manager.deinit();
     ui_manager.deinit();
 }

@@ -207,6 +207,9 @@ fn wireState(self: *Self, node: *WidgetNode) void {
         .VStack => |*v| {
             for (v.children) |*c| wireState(self, c);
         },
+        .Grid => |*g| {
+            for (g.children) |*c| wireState(self, c);
+        },
         else => {},
     }
 }
@@ -240,6 +243,9 @@ fn dispatchEvent(node: *WidgetNode, event: *Event) void {
         },
         .VStack => |*v| {
             for (v.children) |*c| dispatchEvent(c, event);
+        },
+        .Grid => |*g| {
+            for (g.children) |*c| dispatchEvent(c, event);
         },
         else => {},
     }
