@@ -13,6 +13,8 @@ const Rect = @import("Rect.zig");
 const widgets = @import("widgets/widgets.zig");
 const Button = widgets.Button;
 const Chicklet = widgets.Chicklet;
+const ColorRect = widgets.ColorRect;
+const Divider = widgets.Divider;
 const Grid = widgets.Grid;
 const HStack = widgets.HStack;
 const Label = widgets.Label;
@@ -115,6 +117,21 @@ pub fn vstack(a: Allocator, children: []const *WidgetNode, opts: VStackOpts) *Wi
     });
 }
 
+// ── ColorRect ──
+
+pub const ColorRectOpts = struct {
+    border_color: ?Color = null,
+    border_width: f32 = 0,
+};
+
+pub fn colorRect(a: Allocator, color: Color, opts: ColorRectOpts) *WidgetNode {
+    return alloc(a, ColorRect{
+        .color = color,
+        .border_color = opts.border_color,
+        .border_width = opts.border_width,
+    });
+}
+
 // ── Chicklet ──
 
 pub const ChickletOpts = struct {
@@ -185,6 +202,20 @@ pub fn slider(a: Allocator, id: []const u8, opts: SliderOpts) *WidgetNode {
         .track_color = opts.track_color,
         .fill_color = opts.fill_color,
         .thumb_color = opts.thumb_color,
+    });
+}
+
+// ── Divider ──
+
+pub const DividerOpts = struct {
+    size: f32 = 2,
+    color: Color = Colors.CHARCOAL,
+};
+
+pub fn divider(a: Allocator, opts: DividerOpts) *WidgetNode {
+    return alloc(a, Divider{
+        .size = opts.size,
+        .color = opts.color,
     });
 }
 

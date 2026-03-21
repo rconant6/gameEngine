@@ -11,6 +11,7 @@ const l_out = @import("../layout.zig");
 const Constraints = l_out.Constraints;
 const LayoutInfo = l_out.LayoutInfo;
 const RenderInfo = l_out.RenderInfo;
+const WidgetState = @import("../widgetState.zig").WidgetState;
 const Rect = @import("../Rect.zig");
 const evt = @import("../event.zig");
 const Event = evt.Event;
@@ -35,8 +36,6 @@ const std = @import("std");
 /// Ergonomic wrapper around the raw f16 value + u16 flags owned by UIManager.
 /// Zero-cost at runtime — the compiler inlines everything.
 pub const SliderState = struct {
-    const DRAGGING: u16 = 0x4;
-
     val: *f16,
     flags: *u16,
 
@@ -47,10 +46,10 @@ pub const SliderState = struct {
         self.val.* = @floatCast(std.math.clamp(v, min, max));
     }
     pub fn isDragging(self: SliderState) bool {
-        return self.flags.* & DRAGGING != 0;
+        return self.flags.* & WidgetState.dragging != 0;
     }
     pub fn setDragging(self: SliderState, val: bool) void {
-        if (val) self.flags.* |= DRAGGING else self.flags.* &= ~DRAGGING;
+        if (val) self.flags.* |= WidgetState.dragging else self.flags.* &= ~WidgetState.dragging;
     }
 };
 

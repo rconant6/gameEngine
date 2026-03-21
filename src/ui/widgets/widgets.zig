@@ -1,5 +1,6 @@
 pub const Button = @import("Button.zig");
 pub const Chicklet = @import("Chicklet.zig");
+pub const ColorRect = @import("ColorRect.zig");
 pub const Divider = @import("Divider.zig");
 pub const Grid = @import("Grid.zig");
 pub const HStack = @import("HStack.zig");
