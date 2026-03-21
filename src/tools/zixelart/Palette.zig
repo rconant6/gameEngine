@@ -57,9 +57,9 @@ const swatch_size = 32;
 
 pub fn buildTree(
     arena: std.mem.Allocator,
-    state: *const ZixelState,
+    raw_state: ?*const anyopaque,
 ) *WidgetNode {
-    _ = state;
+    _ = raw_state;
     const chicklets = arena.alloc(*WidgetNode, palette_size) catch |err| {
         log.fatal(
             .application,

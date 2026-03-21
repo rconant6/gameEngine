@@ -18,3 +18,5 @@ active_tool: Tool,
 
 cursor_x: ?usize = null,
 cursor_y: ?usize = null,
+
+buf: *[256]u8, // scratch buffer for naming things

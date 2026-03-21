@@ -9,8 +9,9 @@ const make = ui.make;
 
 pub fn buildTree(
     arena: std.mem.Allocator,
-    state: *const ZixelState,
+    raw_state: ?*const anyopaque,
 ) *WidgetNode {
+    const state: *const ZixelState = @ptrCast(@alignCast(raw_state.?)); // TODO: smarter handling
     const tool = state.active_tool;
     return make.panel(
         arena,

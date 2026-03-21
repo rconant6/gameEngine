@@ -16,16 +16,19 @@ const Hue = rend.Hue;
 const Tone = rend.Tone;
 const Saturation = rend.Saturation;
 const Temperature = rend.Temperature;
+const ColorSlider = @import("ColorSlider.zig");
+const ColorPanel = @import("ColorPanel.zig");
 const Palette = @import("Palette.zig");
-const layout = @import("Layout.zig");
-const Region = layout.Region;
 const InfoBar = @import("InfoBar.zig");
 const ToolBar = @import("ToolBar.zig");
+const layout = @import("Layout.zig");
+const Region = layout.Region;
 const assets = @import("assets");
 const Font = assets.Font;
 const ui = @import("ui");
 const WidgetNode = ui.WidgetNode;
 const UIManager = ui.UIManager;
+const UILayer = ui.UILayer;
 
 const logical_width: i32 = 1920;
 const logical_height: i32 = 1088;
@@ -59,9 +62,37 @@ pub fn main() !void {
     );
 
     // UI
-    var ui_manager: UIManager = .init(allocator);
-    var toolbar_manager: UIManager = .init(allocator);
-    var palette_manager: UIManager = .init(allocator);
+    var ui_layer = UILayer.init(allocator);
+    ui_layer.addView(
+        "toolbar",
+        .{ .x = 20, .y = 20, .width = 240, .height = 1048 },
+        ToolBar.buildTree,
+        .{},
+    );
+    ui_layer.addView(
+        "palette",
+        .{ .x = 1448, .y = 20, .width = 300, .height = 300 },
+        Palette.buildTree,
+        .{},
+    );
+    ui_layer.addView(
+        "color_panel",
+        .{ .x = 1448, .y = 320, .width = 300, .height = 300 },
+        ColorPanel.buildTree,
+        .{ .interactive = false },
+    );
+    ui_layer.addView(
+        "color_slider",
+        .{ .x = 1448, .y = 740, .width = 300, .height = 300 },
+        ColorSlider.buildTree,
+        .{},
+    );
+    ui_layer.addView(
+        "info_bar",
+        .{ .x = 0, .y = 1048, .width = 1920, .height = 40 },
+        InfoBar.buildTree,
+        .{ .interactive = false },
+    );
 
     // Build canvas grid
     const canvas = Canvas.init(allocator, layout.canvas, 64) catch |err| {
@@ -75,18 +106,20 @@ pub fn main() !void {
     log.info(.application, "Created canvas of {d}x{d}", .{ 64, 64 });
     defer canvas.deinit();
 
-    const color_name = "FOOD_PEACH";
+    const color_name = "RED";
     const active_color = ColorLibrary.findByName(color_name) orelse blk: {
         log.err(.application, "Active Color was not found: {s}", .{color_name});
         break :blk TaggedColor.from(Colors.MAGENTA, color_name);
     };
     log.debug(.application, "Default Color: {s}", .{active_color.name});
 
+    var state_buf: [256]u8 = undefined;
     var state: ZixelState = .{
         .canvas = canvas,
         .active_color = active_color.color,
         .active_color_name = active_color.name,
         .active_tool = .pencil,
+        .buf = &state_buf,
     };
 
     const ctx: rend.RenderContext = .{
@@ -96,16 +129,11 @@ pub fn main() !void {
         .ortho_size = logical_height / 2,
     };
 
-    var str_buf: [256]u8 = undefined;
     while (app.isRunning()) {
         try app.beginFrame();
 
         app.renderer.setClearColor(Colors.DARK_GRAY);
         app.renderer.clear();
-
-        ui_manager.rebuild();
-        toolbar_manager.rebuild();
-        palette_manager.rebuild();
 
         if (app.kb.isPressed(.Esc)) break;
         if (app.kb.isPressed(.C)) canvas.clear();
@@ -136,69 +164,15 @@ pub fn main() !void {
                 ctx,
             );
         }
-
-        const info_bar_root = InfoBar.buildTree(
-            ui_manager.allocator(),
+        ui_layer.update(
             &state,
-            &str_buf,
-        );
-        ui_manager.setRoot(info_bar_root);
-        ui_manager.layoutAt(
-            layout.info_bar.x,
-            layout.info_bar.y,
-            layout.info_bar.width,
-            layout.info_bar.height,
-        );
-        ui_manager.render(&app.renderer, &ui_font, ctx);
-        const tool_bar_root = ToolBar.buildTree(toolbar_manager.allocator(), &state);
-        toolbar_manager.setRoot(tool_bar_root);
-        toolbar_manager.layoutAt(
-            layout.toolbar.x,
-            layout.toolbar.y,
-            layout.toolbar.width,
-            layout.toolbar.height,
-        );
-        toolbar_manager.processInput(
-            app.mouse.position.x,
-            app.mouse.position.y,
-            app.mouse.buttons.isPressed(.Left),
-            app.mouse.buttons.isReleased(.Left),
-        );
-        const palette_root = Palette.buildTree(palette_manager.allocator(), &state);
-        palette_manager.setRoot(palette_root);
-        palette_manager.layoutAt(
-            layout.palette.x,
-            layout.palette.y,
-            layout.palette.width,
-            layout.palette.height,
-        );
-        palette_manager.processInput(
-            app.mouse.position.x,
-            app.mouse.position.y,
+            mouse_pos.x,
+            mouse_pos.y,
             app.mouse.buttons.isPressed(.Left),
             app.mouse.buttons.isReleased(.Left),
         );
 
-        // Poll palette clicks and update active color
-        for (0..Palette.palette_size) |i| {
-            if (palette_manager.getState(Palette.color_ids[i])) |ws| {
-                switch (ws.*) {
-                    .flags => |*bits| {
-                        if (bits.* & ui.WidgetState.pressed != 0) {
-                            state.active_color = Palette.colors[i];
-                            state.active_color_name = if (ColorLibrary.findByColor(Palette.colors[i])) |tc|
-                                tc.name
-                            else
-                                "custom";
-                            bits.* &= ~ui.WidgetState.pressed;
-                        }
-                    },
-                    else => {},
-                }
-            }
-        }
-
-        // Poll toolbar clicks and update active tool
+        // Poll toolbar clicks
         const Tool = @import("tool.zig").Tool;
         const tool_map = [_]struct { id: []const u8, tool: Tool }{
             .{ .id = "ck_pencil", .tool = .pencil },
@@ -208,7 +182,7 @@ pub fn main() !void {
             .{ .id = "ck_picker", .tool = .picker },
         };
         for (&tool_map) |entry| {
-            if (toolbar_manager.getState(entry.id)) |ws| {
+            if (ui_layer.getState("toolbar", entry.id)) |ws| {
                 switch (ws.*) {
                     .flags => |*bits| {
                         if (bits.* & ui.WidgetState.pressed != 0) {
@@ -221,16 +195,157 @@ pub fn main() !void {
             }
         }
 
-        toolbar_manager.render(&app.renderer, &ui_font, ctx);
-        palette_manager.render(&app.renderer, &ui_font, ctx);
+        // Poll palette clicks
+        for (0..Palette.palette_size) |i| {
+            if (ui_layer.getState("palette", Palette.color_ids[i])) |ws| {
+                switch (ws.*) {
+                    .flags => |*bits| {
+                        if (bits.* & ui.WidgetState.pressed != 0) {
+                            const tagged_color = ColorLibrary.findByColor(
+                                Palette.colors[i],
+                            );
+                            state.active_color = Palette.colors[i];
+                            state.active_color_name =
+                                if (tagged_color) |tc| tc.name else "CUSTOM";
+                            bits.* &= ~ui.WidgetState.pressed;
+
+                            // Sync sliders to new palette color
+                            syncSlidersToColor(&ui_layer, state.active_color);
+                        }
+                    },
+                    else => {},
+                }
+            }
+        }
+
+        // Poll RGB sliders
+        {
+            const r_ws = ui_layer.getState("color_slider", "slider_r");
+            const g_ws = ui_layer.getState("color_slider", "slider_g");
+            const b_ws = ui_layer.getState("color_slider", "slider_b");
+
+            const r_active = if (r_ws) |ws| switch (ws.*) {
+                .value => |v| v.flags & ui.WidgetState.dragging != 0,
+                else => false,
+            } else false;
+            const g_active = if (g_ws) |ws| switch (ws.*) {
+                .value => |v| v.flags & ui.WidgetState.dragging != 0,
+                else => false,
+            } else false;
+            const b_active = if (b_ws) |ws| switch (ws.*) {
+                .value => |v| v.flags & ui.WidgetState.dragging != 0,
+                else => false,
+            } else false;
+
+            if (r_active or g_active or b_active) {
+                const r_val: f32 = if (r_ws) |ws| switch (ws.*) {
+                    .value => |v| @as(f32, @floatCast(v.val)),
+                    else => 0,
+                } else 0;
+                const g_val: f32 = if (g_ws) |ws| switch (ws.*) {
+                    .value => |v| @as(f32, @floatCast(v.val)),
+                    else => 0,
+                } else 0;
+                const b_val: f32 = if (b_ws) |ws| switch (ws.*) {
+                    .value => |v| @as(f32, @floatCast(v.val)),
+                    else => 0,
+                } else 0;
+
+                state.active_color = Color.initRgba(
+                    @intFromFloat(r_val * 255.0),
+                    @intFromFloat(g_val * 255.0),
+                    @intFromFloat(b_val * 255.0),
+                    255,
+                );
+                state.active_color_name = "CUSTOM";
+
+                // Sync HSV sliders to match
+                syncHsvSliders(&ui_layer, state.active_color);
+            }
+        }
+
+        // Poll HSV sliders
+        {
+            const h_ws = ui_layer.getState("color_slider", "slider_h");
+            const s_ws = ui_layer.getState("color_slider", "slider_s");
+            const v_ws = ui_layer.getState("color_slider", "slider_v");
+
+            const h_active = if (h_ws) |ws| switch (ws.*) {
+                .value => |v| v.flags & ui.WidgetState.dragging != 0,
+                else => false,
+            } else false;
+            const s_active = if (s_ws) |ws| switch (ws.*) {
+                .value => |v| v.flags & ui.WidgetState.dragging != 0,
+                else => false,
+            } else false;
+            const v_active = if (v_ws) |ws| switch (ws.*) {
+                .value => |v| v.flags & ui.WidgetState.dragging != 0,
+                else => false,
+            } else false;
+
+            if (h_active or s_active or v_active) {
+                const h_val: f32 = if (h_ws) |ws| switch (ws.*) {
+                    .value => |v| @as(f32, @floatCast(v.val)),
+                    else => 0,
+                } else 0;
+                const s_val: f32 = if (s_ws) |ws| switch (ws.*) {
+                    .value => |v| @as(f32, @floatCast(v.val)),
+                    else => 0,
+                } else 0;
+                const v_val: f32 = if (v_ws) |ws| switch (ws.*) {
+                    .value => |v| @as(f32, @floatCast(v.val)),
+                    else => 0,
+                } else 0;
+
+                state.active_color = Color.initHsva(
+                    h_val * 360.0,
+                    s_val,
+                    v_val,
+                    1.0,
+                );
+                state.active_color_name = "CUSTOM";
+
+                // Sync RGB sliders to match
+                syncRgbSliders(&ui_layer, state.active_color);
+            }
+        }
+
+        ui_layer.render(&app.renderer, &ui_font, ctx);
+
         try app.endFrame();
     }
-    palette_manager.deinit();
-    toolbar_manager.deinit();
-    ui_manager.deinit();
+
+    ui_layer.deinit();
 }
 
-pub fn screenToCanvas(self: *const Canvas, screen_x: i32, screen_y: i32) ?struct { x: usize, y: usize } {
+fn setSliderVal(layer: *UILayer, view: []const u8, id: []const u8, val: f16) void {
+    if (layer.getState(view, id)) |ws| {
+        ws.* = .{ .value = .{ .val = val } };
+    }
+}
+
+fn syncRgbSliders(layer: *UILayer, color: Color) void {
+    setSliderVal(layer, "color_slider", "slider_r", @as(f16, @floatFromInt(color.rgba.r)) / 255.0);
+    setSliderVal(layer, "color_slider", "slider_g", @as(f16, @floatFromInt(color.rgba.g)) / 255.0);
+    setSliderVal(layer, "color_slider", "slider_b", @as(f16, @floatFromInt(color.rgba.b)) / 255.0);
+}
+
+fn syncHsvSliders(layer: *UILayer, color: Color) void {
+    setSliderVal(layer, "color_slider", "slider_h", @as(f16, @floatCast(color.hsva.h / 360.0)));
+    setSliderVal(layer, "color_slider", "slider_s", @as(f16, @floatCast(color.hsva.s)));
+    setSliderVal(layer, "color_slider", "slider_v", @as(f16, @floatCast(color.hsva.v)));
+}
+
+fn syncSlidersToColor(layer: *UILayer, color: Color) void {
+    syncRgbSliders(layer, color);
+    syncHsvSliders(layer, color);
+}
+
+pub fn screenToCanvas(
+    self: *const Canvas,
+    screen_x: i32,
+    screen_y: i32,
+) ?struct { x: usize, y: usize } {
     if (screen_x < 0 or screen_y < 0) return null;
 
     const ux: usize = @intCast(screen_x);

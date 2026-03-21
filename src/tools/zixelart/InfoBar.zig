@@ -8,13 +8,13 @@ const make = ui.make;
 
 pub fn buildTree(
     arena: std.mem.Allocator,
-    state: *const ZixelState,
-    buf: *[256]u8,
+    raw_state: ?*const anyopaque,
 ) *WidgetNode {
+    const state: *const ZixelState = @ptrCast(@alignCast(raw_state.?)); // TODO: smarter handling
     const text_scale: f32 = 24.0;
 
     const coord_text = std.fmt.bufPrint(
-        buf[128..192],
+        state.buf[128..192],
         "[{d:3}, {d:3}]",
         .{ state.cursor_x orelse 0, state.cursor_y orelse 0 },
     ) catch "";
@@ -24,13 +24,13 @@ pub fn buildTree(
         make.hstack(arena, &.{
             make.label(
                 arena,
-                std.ascii.upperString(buf[0..64], @tagName(state.active_tool)),
+                std.ascii.upperString(state.buf[0..64], @tagName(state.active_tool)),
                 .{ .font_scale = text_scale, .color = Colors.UI_BUTTON_TEXT },
             ),
             make.label(
                 arena,
-                std.ascii.upperString(buf[64..128], state.active_color_name),
-                .{ .font_scale = text_scale, .color = Colors.UI_BUTTON_TEXT },
+                std.ascii.upperString(state.buf[64..128], state.active_color_name),
+                .{ .font_scale = text_scale, .color = state.active_color },
             ),
             make.spacer(arena, null),
             make.label(
