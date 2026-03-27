@@ -45,7 +45,7 @@ pub fn configureModule(
         "swiftDispatch",        "swiftCoreGraphics",             "swiftIOKit",
         "swiftXPC",             "swiftDarwin",                   "swiftCoreImage",
         "swiftQuartzCore",      "swiftOSLog",                    "swiftos",
-        "swiftsimd",
+        "swiftsimd",            "swiftSpatial",
     };
     for (swift_libs) |lib| module.linkSystemLibrary(lib, .{});
 
