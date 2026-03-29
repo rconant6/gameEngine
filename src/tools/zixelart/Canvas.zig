@@ -4,11 +4,16 @@ const ShapeData = rend.ShapeData;
 const Color = rend.Color;
 const Colors = rend.Colors;
 const Self = @This();
-const debug = @import("debug");
-const log = debug.log;
+const log = @import("debug").log;
 const ZixelState = @import("ZixelState.zig");
 const layout = @import("Layout.zig");
 const Region = layout.Region;
+const cmds = @import("commands.zig");
+const PixelChange = cmds.PixelChange;
+const ToolCommand = cmds.ToolCommand;
+const CommandHistory = @import("CommandHistory.zig").CommandHistory;
+const ToolDispatcher = @import("ToolFns.zig").ToolDispatcher;
+const Tool = @import("tool.zig").Tool;
 
 pub const PixelCell = struct {
     shape: ShapeData,
@@ -25,8 +30,13 @@ pixel_count: usize,
 pixel_size: usize,
 x_offset: usize,
 y_offset: usize,
+blank_color: Color = Colors.CLEAR,
 
 pixels: []PixelCell = undefined,
+
+changes: std.ArrayList(PixelChange),
+history: CommandHistory(ToolCommand),
+dispatcher: ToolDispatcher,
 
 pub fn init(
     child_alloc: std.mem.Allocator,
@@ -39,12 +49,17 @@ pub fn init(
     self.arena = std.heap.ArenaAllocator.init(child_alloc);
     self.allocator = self.arena.allocator();
 
+    self.changes = try .initCapacity(self.allocator, 48);
+    self.history = .init(self.allocator);
+    self.dispatcher = .init();
+
     self.width = @intFromFloat(region.width);
     self.height = @intFromFloat(region.height);
     self.pixel_count = pixel_count;
     self.pixel_size = @intFromFloat(region.height / @as(f32, @floatFromInt(pixel_count)));
     self.x_offset = @intFromFloat(region.x);
     self.y_offset = @intFromFloat(region.y);
+    self.blank_color = Colors.LIGHT_GRAY;
 
     self.pixels = try self.allocator.alloc(PixelCell, pixel_count * pixel_count);
 
@@ -79,13 +94,40 @@ pub fn deinit(self: *Self) void {
     self.child_allocator.destroy(self);
 }
 pub fn setPixel(self: *Self, state: *const ZixelState) void {
-    self.pixels[state.cursor_y.? * self.pixel_count + state.cursor_x.?].color = state.active_color;
+    self.pixels[
+        state.cursor_y.? * self.pixel_count + state.cursor_x.?
+    ].color = state.active_color;
 }
 pub fn clearPixel(self: *Self, state: *const ZixelState) void {
-    self.pixels[state.cursor_y.? * self.pixel_count + state.cursor_x.?].color = state.bg_color;
+    self.pixels[
+        state.cursor_y.? * self.pixel_count + state.cursor_x.?
+    ].color = self.blank_color;
 }
 pub fn clear(self: *Self) void {
     for (self.pixels) |*pixel| {
-        pixel.color = Colors.LIGHT_GRAY;
+        pixel.color = self.blank_color;
     }
+}
+
+// MARK: Tool related stuff
+pub fn cancel(self: *Self) void {
+    for (self.changes.items) |change| {
+        const idx = change.y * self.pixel_count + change.x;
+        self.pixels[idx].color = change.old_color orelse self.blank_color;
+    }
+}
+
+pub fn onMouseDown(self: *Self, tool: Tool, x: usize, y: usize, color: Color) void {
+    self.dispatcher.begin(tool, self, x, y, color);
+}
+pub fn onMouseUp(self: *Self, tool: Tool) void {
+    if (self.dispatcher.commit(tool, self)) |cmd| {
+        self.history.push(cmd);
+    }
+}
+pub fn onCancel(self: *Self, tool: Tool) void {
+    self.dispatcher.cancel(tool, self);
+}
+pub fn onMouseDrag(self: *Self, tool: Tool, x: usize, y: usize, color: Color) void {
+    self.dispatcher.update(tool, self, x, y, color);
 }

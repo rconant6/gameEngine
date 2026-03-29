@@ -119,6 +119,7 @@ pub fn main() !void {
         .active_color = active_color.color,
         .active_color_name = active_color.name,
         .active_tool = .pencil,
+        .bg_color = Colors.LIGHT_GRAY,
         .buf = &state_buf,
     };
 
@@ -129,6 +130,8 @@ pub fn main() !void {
         .ortho_size = logical_height / 2,
     };
 
+    var is_drawing = false;
+
     while (app.isRunning()) {
         try app.beginFrame();
 
@@ -137,6 +140,18 @@ pub fn main() !void {
 
         if (app.kb.isPressed(.Esc)) break;
         if (app.kb.isPressed(.C)) canvas.clear();
+
+        // Undo / Redo (Cmd+Z / Cmd+Shift+Z)
+        if (app.kb.isDown(.LeftCmd) or app.kb.isDown(.RightCmd)) {
+            if (app.kb.isPressed(.Z)) {
+                if (app.kb.isDown(.LeftShift) or app.kb.isDown(.RightShift)) {
+                    if (canvas.history.redo()) |cmd| cmd.redo(canvas);
+                } else {
+                    if (canvas.history.undo()) |cmd| cmd.undo(canvas);
+                }
+            }
+        }
+
         const mouse_pos = app.mouse.position;
         const screen_x: i32 = @intFromFloat(mouse_pos.x);
         const screen_y: i32 = @intFromFloat(mouse_pos.y);
@@ -145,11 +160,23 @@ pub fn main() !void {
             state.cursor_x = p.x;
             state.cursor_y = p.y;
 
-            if (app.mouse.buttons.isPressed(.Left))
-                canvas.setPixel(&state);
-            if (app.mouse.buttons.isPressed(.Right))
-                canvas.clearPixel(&state);
+            if (app.mouse.buttons.isPressed(.Left)) {
+                is_drawing = true;
+                canvas.onMouseDown(state.active_tool, p.x, p.y, state.active_color);
+            } else if (is_drawing and app.mouse.buttons.isDown(.Left)) {
+                canvas.onMouseDrag(state.active_tool, p.x, p.y, state.active_color);
+            }
+
+            if (app.mouse.buttons.isReleased(.Left) and is_drawing) {
+                canvas.onMouseUp(state.active_tool);
+                is_drawing = false;
+            }
         } else {
+            // Cursor left canvas — commit if mid-stroke
+            if (is_drawing and app.mouse.buttons.isReleased(.Left)) {
+                canvas.onMouseUp(state.active_tool);
+                is_drawing = false;
+            }
             state.cursor_x = null;
             state.cursor_y = null;
         }

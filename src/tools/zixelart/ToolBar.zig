@@ -21,41 +21,46 @@ pub fn buildTree(
                     .not_selected = color_gen.darken(Colors.PENCIL_YELLOW, 0.25),
                     .selected = Colors.PENCIL_YELLOW,
                 },
-                .size = .{ .x = 150, .y = 150 },
+                .size = .{ .x = 75, .y = 75 },
                 .is_selected = tool == .pencil,
             }),
+            make.label(arena, "Pencil", .{ .color = Colors.UI_BUTTON_TEXT }),
             make.chicklet(arena, "ck_eraser", .{
                 .colors = .{
                     .not_selected = color_gen.darken(Colors.PASTEL_PINK, 0.25),
                     .selected = Colors.TULIP_PINK,
                 },
-                .size = .{ .x = 150, .y = 150 },
+                .size = .{ .x = 75, .y = 75 },
                 .is_selected = tool == .erase,
             }),
+            make.label(arena, "Eraser", .{ .color = Colors.UI_BUTTON_TEXT }),
             make.chicklet(arena, "ck_fill", .{
                 .colors = .{
                     .not_selected = color_gen.darken(Colors.OCEAN_SHALLOW, 0.25),
                     .selected = Colors.OCEAN_SHALLOW,
                 },
-                .size = .{ .x = 150, .y = 150 },
+                .size = .{ .x = 75, .y = 75 },
                 .is_selected = tool == .fill,
             }),
+            make.label(arena, "Fill", .{ .color = Colors.UI_BUTTON_TEXT }),
             make.chicklet(arena, "ck_line", .{
                 .colors = .{
                     .not_selected = color_gen.darken(Colors.EMERALD, 0.25),
                     .selected = Colors.EMERALD,
                 },
-                .size = .{ .x = 150, .y = 150 },
+                .size = .{ .x = 75, .y = 75 },
                 .is_selected = tool == .line,
             }),
+            make.label(arena, "Line", .{ .color = Colors.UI_BUTTON_TEXT }),
             make.chicklet(arena, "ck_picker", .{
                 .colors = .{
                     .not_selected = color_gen.darken(Colors.LAVENDER_FLOWER, 0.25),
                     .selected = Colors.LAVENDER_FLOWER,
                 },
-                .size = .{ .x = 150, .y = 150 },
+                .size = .{ .x = 75, .y = 75 },
                 .is_selected = tool == .picker,
             }),
+            make.label(arena, "Picker", .{ .color = Colors.UI_BUTTON_TEXT }),
             make.spacer(arena, null),
         }, .{ .spacing = 30 }),
         .{

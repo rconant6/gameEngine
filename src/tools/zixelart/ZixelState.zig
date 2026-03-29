@@ -9,7 +9,7 @@ const Canvas = @import("Canvas.zig");
 const Tool = @import("tool.zig").Tool;
 
 canvas: *Canvas,
-bg_color: Color = Colors.LIGHT_GRAY,
+bg_color: Color,
 
 active_color: Color = Colors.MAGENTA,
 active_color_name: []const u8,
