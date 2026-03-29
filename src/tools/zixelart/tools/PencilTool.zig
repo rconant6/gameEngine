@@ -42,7 +42,10 @@ fn update(canvas: *Canvas, x: usize, y: usize, color: Color) void {
 fn commit(canvas: *Canvas) ?ToolCommand {
     if (canvas.changes.items.len == 0) return null;
 
-    const pixels = canvas.allocator.dupe(PixelChange, canvas.changes.items) catch return null;
+    const pixels = canvas.allocator.dupe(
+        PixelChange,
+        canvas.changes.items,
+    ) catch return null;
     canvas.changes.clearRetainingCapacity();
 
     return ToolCommand{
