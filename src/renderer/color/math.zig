@@ -1,7 +1,7 @@
 const std = @import("std");
 const Color = @import("Color.zig").Color;
 
-pub const Rgba = struct {
+pub const Rgba = packed struct {
     r: u8, // 0-255
     g: u8, // 0-255
     b: u8, // 0-255

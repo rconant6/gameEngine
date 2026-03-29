@@ -36,7 +36,9 @@ const Temperature = types.Temperature;
 ///
 /// ⚠️ Don't mutate fields directly - use with* methods to keep sync.
 pub const Color = struct {
+    // Canonical
     rgba: Rgba,
+    // Derived
     hsva: Hsva,
 
     pub fn initRgba(r: u8, g: u8, b: u8, a: u8) Color {
@@ -133,6 +135,9 @@ pub const Color = struct {
         return Temperature.from(c);
     }
 
+    pub fn eql(a: Color, b: Color) bool {
+        return @as(u32, @bitCast(a.rgba)) == @as(u32, @bitCast(b.rgba));
+    }
     // TODO: format function
 
     fn hexCharToInt(comptime c: u8) u8 {
