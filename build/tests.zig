@@ -35,7 +35,9 @@ pub fn addAllTests(
         .{ .name = "v2-tests", .path = "tests/core/test_v2.zig", .anon_imports = &.{
             .{ "V2", "src/math/V2.zig" },
         } },
-        .{ .name = "color-tests", .path = "tests/renderer/test_color.zig", .anon_imports = &.{
+        .{ .name = "color-tests", .path = "tests/renderer/test_color.zig", .imports = &.{
+            .{ "math", mod(modules, .math) },
+        }, .anon_imports = &.{
             .{ "color", "src/renderer/color.zig" },
         } },
     };
@@ -160,6 +162,20 @@ pub fn addAllTests(
     };
 
     // ========================================
+    // Layer 4D: ZXL
+    // ========================================
+    const zxl_tests = [_]TestSpec{
+        .{ .name = "zxl-image-tests", .path = "tests/zxl/test_zxl_image.zig", .imports = &.{
+            .{ "zxl", mod(modules, .zxl) },
+            .{ "math", mod(modules, .math) },
+        } },
+        .{ .name = "zxl-reader-tests", .path = "tests/zxl/test_zxl_reader.zig", .imports = &.{
+            .{ "zxl", mod(modules, .zxl) },
+            .{ "math", mod(modules, .math) },
+        } },
+    };
+
+    // ========================================
     // Layer 5: Integration
     // ========================================
     const integration_tests = [_]TestSpec{
@@ -179,6 +195,7 @@ pub fn addAllTests(
         &scene_tests,
         &ui_tests,
         &renderer_tests,
+        &zxl_tests,
         &integration_tests,
     };
 

@@ -25,6 +25,7 @@ pub const M = enum(u8) {
     ui,
     systems,
     engine,
+    zxl,
     build_options,
 };
 
@@ -162,7 +163,14 @@ const module_defs = [_]ModuleDef{
             .{ "systems", .systems },
         },
     },
-
+    // ZXL
+    .{
+        .name = "zxl",
+        .path = "src/zxl/zxl.zig",
+        .deps = &.{
+            .{ "math", .math },
+        },
+    },
     // Generated (no source file)
     .{ .name = "build_options", .path = null, .deps = &.{} },
 };
@@ -272,7 +280,7 @@ pub fn build(b: *std.Build) void {
     }
 
     // Common tool imports (app + tool_deps + assets)
-    const tool_extra_deps = [_]M{ .platform, .renderer, .math, .debug, .assets, .ui };
+    const tool_extra_deps = [_]M{ .platform, .renderer, .math, .debug, .assets, .ui, .zxl };
 
     // ========================================
     // ZixelArt
