@@ -1,18 +1,9 @@
 const std = @import("std");
 const Color = @import("Color.zig").Color;
+const m = @import("math");
 
-pub const Rgba = packed struct {
-    r: u8, // 0-255
-    g: u8, // 0-255
-    b: u8, // 0-255
-    a: u8, // 0-255
-};
-pub const Hsva = struct {
-    h: f32, // 0-360
-    s: f32, // 0-1
-    v: f32, // 0-1
-    a: f32, // 0-1
-};
+pub const Rgba = m.Rgba;
+pub const Hsva = m.Hsva;
 
 pub fn rgbToHsv(rgba: Rgba) Hsva {
     const r = @as(f32, @floatFromInt(rgba.r)) / 255.0;
