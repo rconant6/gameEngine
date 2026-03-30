@@ -71,6 +71,7 @@ fn begin(canvas: *Canvas, x: usize, y: usize, color: Color) void {
 }
 
 fn update(canvas: *Canvas, x: usize, y: usize, color: Color) void {
+    // NOOP since canvas is updated on drag
     _ = canvas;
     _ = x;
     _ = y;

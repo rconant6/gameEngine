@@ -24,6 +24,8 @@ const ToolBar = @import("ToolBar.zig");
 const layout = @import("Layout.zig");
 const Region = layout.Region;
 const assets = @import("assets");
+const zxl = @import("zxl");
+const ZxlReader = zxl.ZxlReader;
 const Font = assets.Font;
 const ui = @import("ui");
 const WidgetNode = ui.WidgetNode;
@@ -105,6 +107,36 @@ pub fn main() !void {
     };
     log.info(.application, "Created canvas of {d}x{d}", .{ 64, 64 });
     defer canvas.deinit();
+
+    // Load test .zxl file
+    load_zxl: {
+        var zxl_image = ZxlReader.fromFile(allocator, "../../tests/zxl/test_2x2.zxl") catch |err| {
+            log.err(.application, "Failed to load .zxl file: {any}", .{err});
+            break :load_zxl;
+        };
+        defer zxl_image.deinit();
+
+        if (zxl_image.getFrame(0)) |frame| {
+            var y: usize = 0;
+            while (y < frame.height) : (y += 1) {
+                var x: usize = 0;
+                while (x < frame.width) : (x += 1) {
+                    const palette_idx = frame.getPixel(x, y);
+                    const rgba = zxl_image.palette.getColor(palette_idx);
+                    if (rgba.a == 0) continue; // skip transparent
+                    canvas.pixels[y * canvas.pixel_count + x].color = Color.initRgba(
+                        rgba.r,
+                        rgba.g,
+                        rgba.b,
+                        rgba.a,
+                    );
+                }
+            }
+            log.info(.application, "Loaded .zxl: {d}x{d}, {d} palette colors", .{
+                frame.width, frame.height, zxl_image.palette.count,
+            });
+        }
+    }
 
     const color_name = "RED";
     const active_color = ColorLibrary.findByName(color_name) orelse blk: {
