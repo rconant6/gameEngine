@@ -26,6 +26,10 @@ const Region = layout.Region;
 const assets = @import("assets");
 const zxl = @import("zxl");
 const ZxlReader = zxl.ZxlReader;
+const ZxlWriter = zxl.ZxlWriter;
+const ZxlImage = zxl.ZxlImage;
+const math = @import("math");
+const Rgba = math.Rgba;
 const Font = assets.Font;
 const ui = @import("ui");
 const WidgetNode = ui.WidgetNode;
@@ -108,36 +112,6 @@ pub fn main() !void {
     log.info(.application, "Created canvas of {d}x{d}", .{ 64, 64 });
     defer canvas.deinit();
 
-    // Load test .zxl file
-    load_zxl: {
-        var zxl_image = ZxlReader.fromFile(allocator, "../../tests/zxl/test_2x2.zxl") catch |err| {
-            log.err(.application, "Failed to load .zxl file: {any}", .{err});
-            break :load_zxl;
-        };
-        defer zxl_image.deinit();
-
-        if (zxl_image.getFrame(0)) |frame| {
-            var y: usize = 0;
-            while (y < frame.height) : (y += 1) {
-                var x: usize = 0;
-                while (x < frame.width) : (x += 1) {
-                    const palette_idx = frame.getPixel(x, y);
-                    const rgba = zxl_image.palette.getColor(palette_idx);
-                    if (rgba.a == 0) continue; // skip transparent
-                    canvas.pixels[y * canvas.pixel_count + x].color = Color.initRgba(
-                        rgba.r,
-                        rgba.g,
-                        rgba.b,
-                        rgba.a,
-                    );
-                }
-            }
-            log.info(.application, "Loaded .zxl: {d}x{d}, {d} palette colors", .{
-                frame.width, frame.height, zxl_image.palette.count,
-            });
-        }
-    }
-
     const color_name = "RED";
     const active_color = ColorLibrary.findByName(color_name) orelse blk: {
         log.err(.application, "Active Color was not found: {s}", .{color_name});
@@ -173,7 +147,7 @@ pub fn main() !void {
         if (app.kb.isPressed(.Esc)) break;
         if (app.kb.isPressed(.C)) canvas.clear();
 
-        // Undo / Redo (Cmd+Z / Cmd+Shift+Z)
+        // Undo / Redo (Cmd+Z / Cmd+Shift+Z) + Save/Load (Cmd+S / Cmd+O)
         if (app.kb.isDown(.LeftCmd) or app.kb.isDown(.RightCmd)) {
             if (app.kb.isPressed(.Z)) {
                 if (app.kb.isDown(.LeftShift) or app.kb.isDown(.RightShift)) {
@@ -181,6 +155,12 @@ pub fn main() !void {
                 } else {
                     if (canvas.history.undo()) |cmd| cmd.undo(canvas);
                 }
+            }
+            if (app.kb.isPressed(.S)) {
+                saveCanvas(allocator, canvas);
+            }
+            if (app.kb.isPressed(.O)) {
+                loadCanvas(allocator, canvas);
             }
         }
 
@@ -398,6 +378,101 @@ fn syncHsvSliders(layer: *UILayer, color: Color) void {
 fn syncSlidersToColor(layer: *UILayer, color: Color) void {
     syncRgbSliders(layer, color);
     syncHsvSliders(layer, color);
+}
+
+const zxl_path = "output.zxl";
+
+fn saveCanvas(allocator: std.mem.Allocator, canvas: *const Canvas) void {
+    const size: u16 = @intCast(canvas.pixel_count);
+
+    var image = ZxlImage.init(allocator, "canvas") catch |err| {
+        log.err(.application, "Failed to create ZxlImage: {any}", .{err});
+        return;
+    };
+    defer image.deinit();
+
+    // Build palette from canvas pixels
+    const pixel_total = canvas.pixel_count * canvas.pixel_count;
+    const indices = allocator.alloc(u8, pixel_total) catch |err| {
+        log.err(.application, "Failed to alloc pixel indices: {any}", .{err});
+        return;
+    };
+    defer allocator.free(indices);
+
+    for (0..pixel_total) |i| {
+        const c = canvas.pixels[i].color;
+        const rgba = Rgba{ .r = c.rgba.r, .g = c.rgba.g, .b = c.rgba.b, .a = c.rgba.a };
+
+        // Transparent pixels map to index 0
+        if (rgba.a == 0) {
+            indices[i] = 0;
+            continue;
+        }
+
+        // Find or add color to palette
+        if (image.palette.findColor(rgba)) |idx| {
+            indices[i] = idx;
+        } else {
+            const idx = image.palette.addColor(rgba);
+            if (idx == 0) {
+                log.err(.application, "Palette full, too many unique colors", .{});
+                return;
+            }
+            indices[i] = idx;
+        }
+    }
+
+    image.addFrame("canvas", size, size, indices, 0, 0, 0) catch |err| {
+        log.err(.application, "Failed to add frame: {any}", .{err});
+        return;
+    };
+
+    ZxlWriter.toFile(allocator, &image, zxl_path) catch |err| {
+        log.err(.application, "Failed to save .zxl: {any}", .{err});
+        return;
+    };
+
+    log.info(.application, "Saved {s} ({d} palette colors)", .{ zxl_path, image.palette.count });
+}
+
+fn loadCanvas(allocator: std.mem.Allocator, canvas: *Canvas) void {
+    var image = ZxlReader.fromFile(allocator, zxl_path) catch |err| {
+        log.err(.application, "Failed to load {s}: {any}", .{ zxl_path, err });
+        return;
+    };
+    defer image.deinit();
+
+    const frame = image.getFrame(0) orelse {
+        log.err(.application, "No frames in {s}", .{zxl_path});
+        return;
+    };
+
+    // Clear canvas first
+    canvas.clear();
+
+    // Paint pixels — clamp to canvas bounds
+    const max_x = @min(@as(usize, frame.width), canvas.pixel_count);
+    const max_y = @min(@as(usize, frame.height), canvas.pixel_count);
+
+    var y: usize = 0;
+    while (y < max_y) : (y += 1) {
+        var x: usize = 0;
+        while (x < max_x) : (x += 1) {
+            const palette_idx = frame.getPixel(x, y);
+            const rgba = image.palette.getColor(palette_idx);
+            if (rgba.a == 0) continue;
+            canvas.pixels[y * canvas.pixel_count + x].color = Color.initRgba(
+                rgba.r,
+                rgba.g,
+                rgba.b,
+                rgba.a,
+            );
+        }
+    }
+
+    log.info(.application, "Loaded {s} ({d}x{d}, {d} colors)", .{
+        zxl_path, frame.width, frame.height, image.palette.count,
+    });
 }
 
 pub fn screenToCanvas(
