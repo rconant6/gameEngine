@@ -173,6 +173,10 @@ pub fn addAllTests(
             .{ "zxl", mod(modules, .zxl) },
             .{ "math", mod(modules, .math) },
         } },
+        .{ .name = "zxl-writer-tests", .path = "tests/zxl/test_zxl_writer.zig", .imports = &.{
+            .{ "zxl", mod(modules, .zxl) },
+            .{ "math", mod(modules, .math) },
+        } },
     };
 
     // ========================================
