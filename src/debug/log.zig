@@ -127,7 +127,7 @@ pub const LogEntry = struct {
 };
 
 pub const Logger = struct {
-    allocator: Allocator,
+    gpa: Allocator,
     sinks: []Sink,
     min_level: LogLevel,
     category_filters: EnumMap(LogCategory, ?LogLevel),
@@ -136,27 +136,27 @@ pub const Logger = struct {
     var global_logger: *Logger = undefined;
     var initialized: bool = false;
 
-    pub fn init(allocator: Allocator, io: std.Io) !void {
+    pub fn init(gpa: Allocator, io: std.Io) !void {
         global_logger = blk: {
-            const ptr = try allocator.create(Logger);
-            errdefer allocator.destroy(ptr);
+            const ptr = try gpa.create(Logger);
+            errdefer gpa.destroy(ptr);
 
-            var sinks = try allocator.alloc(Sink, 2);
-            errdefer allocator.free(sinks);
+            var sinks = try gpa.alloc(Sink, 2);
+            errdefer gpa.free(sinks);
 
-            const console_sink = try allocator.create(ConsoleSink);
-            errdefer allocator.destroy(console_sink);
+            const console_sink = try gpa.create(ConsoleSink);
+            errdefer gpa.destroy(console_sink);
             console_sink.init(io);
             sinks[0] = console_sink.sink();
 
-            var file_sink = try allocator.create(FileSink);
-            errdefer allocator.destroy(file_sink);
+            var file_sink = try gpa.create(FileSink);
+            errdefer gpa.destroy(file_sink);
             try FileSink.init(file_sink, io);
             sinks[1] = file_sink.sink();
 
             const min_level = if (builtin.mode == .Debug) .trace else .warn;
             ptr.* = .{
-                .allocator = allocator,
+                .gpa = gpa,
                 .sinks = sinks,
                 .min_level = min_level,
                 .category_filters = .{},
@@ -172,12 +172,12 @@ pub const Logger = struct {
         const gl = Logger.global_logger;
 
         for (gl.sinks) |*s| {
-            s.deinit(gl.allocator);
+            s.deinit(gl.gpa);
         }
 
-        gl.allocator.free(gl.sinks);
+        gl.gpa.free(gl.sinks);
 
-        gl.allocator.destroy(gl);
+        gl.gpa.destroy(gl);
         initialized = false;
     }
 };

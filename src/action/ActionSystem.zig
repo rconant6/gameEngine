@@ -13,7 +13,7 @@ const ActionExecutor = @import("ActionExecutor.zig");
 const debug = @import("debug");
 const log = debug.log;
 
-allocator: Allocator,
+gpa: Allocator,
 action_queue: ActionQueue,
 trigger_systems: ArrayList(TriggerSystem),
 
@@ -36,18 +36,18 @@ fn inputTriggerWrapper(
     try InputTrigger.process(world, ctx);
 }
 
-pub fn init(allocator: Allocator) !Self {
+pub fn init(gpa: Allocator) !Self {
     var action_system = Self{
-        .allocator = allocator,
-        .action_queue = ActionQueue.init(allocator),
+        .gpa = gpa,
+        .action_queue = ActionQueue.init(gpa),
         .trigger_systems = .empty,
     };
 
-    try action_system.trigger_systems.append(allocator, .{
+    try action_system.trigger_systems.append(gpa, .{
         .sys = &dummy_state,
         .processFn = collisionTriggerWrapper,
     });
-    try action_system.trigger_systems.append(allocator, .{
+    try action_system.trigger_systems.append(gpa, .{
         .sys = &dummy_state,
         .processFn = inputTriggerWrapper,
     });
@@ -56,10 +56,10 @@ pub fn init(allocator: Allocator) !Self {
 }
 pub fn deinit(self: *Self) void {
     log.info(.action, "Action System shutting down...", .{});
-    self.trigger_systems.deinit(self.allocator);
+    self.trigger_systems.deinit(self.gpa);
     self.action_queue.deinit();
 }
 
 pub fn registerTrigger(self: *Self, trigger_system: TriggerSystem) !void {
-    try self.trigger_systems.append(self.allocator, trigger_system);
+    try self.trigger_systems.append(self.gpa, trigger_system);
 }

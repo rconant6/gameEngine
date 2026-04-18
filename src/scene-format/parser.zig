@@ -31,13 +31,13 @@ const Token = toks.Token;
 const TokenTag = toks.Token.Tag;
 
 pub const Parser = struct {
-    allocator: Allocator,
+    gpa: Allocator,
     lexer: Lexer,
     current_tok: Token,
     previous_tok: ?Token,
     file_name: []const u8,
 
-    pub fn init(allocator: Allocator, src: [:0]const u8, file_name: []const u8) !Parser {
+    pub fn init(gpa: Allocator, src: [:0]const u8, file_name: []const u8) !Parser {
         var lexer = Lexer.init(src);
         const first = lexer.next() catch |err| {
             log.err(.sceneFormat, "Lexer returned error on initialization {}", .{err});
@@ -47,7 +47,7 @@ pub const Parser = struct {
             return ParseError.NoTokenReturned;
         };
         return Parser{
-            .allocator = allocator,
+            .gpa = gpa,
             .lexer = lexer,
             .current_tok = first,
             .previous_tok = null,
@@ -91,17 +91,17 @@ pub const Parser = struct {
         var declarations: ArrayList(Declaration) = .empty;
         errdefer {
             for (declarations.items) |*declaration| {
-                declaration.deinit(self.allocator);
+                declaration.deinit(self.gpa);
             }
-            declarations.deinit(self.allocator);
+            declarations.deinit(self.gpa);
         }
         while (self.current_tok.tag != .eof) {
             const decl = try self.parseDeclaration();
-            try declarations.append(self.allocator, decl);
+            try declarations.append(self.gpa, decl);
         }
         return .{
-            .decls = try declarations.toOwnedSlice(self.allocator),
-            .source_file_name = try self.allocator.dupe(u8, self.file_name),
+            .decls = try declarations.toOwnedSlice(self.gpa),
+            .source_file_name = try self.gpa.dupe(u8, self.file_name),
         };
     }
 
@@ -123,8 +123,8 @@ pub const Parser = struct {
     fn parseSceneDeclaration(self: *Parser, name_token: Token) !ast.SceneDeclaration {
         // NOTE: [name:scene], check for INDENT, parse children or label
         const name_str = lex.lexeme(self.lexer.src, name_token);
-        const name = try self.allocator.dupe(u8, name_str);
-        errdefer self.allocator.free(name);
+        const name = try self.gpa.dupe(u8, name_str);
+        errdefer self.gpa.free(name);
         _ = try self.consume(.scene);
         _ = try self.consume(.r_bracket);
 
@@ -132,16 +132,16 @@ pub const Parser = struct {
         var declarations: ArrayList(ast.Declaration) = .empty;
         errdefer {
             for (declarations.items) |*declaration| {
-                declaration.deinit(self.allocator);
+                declaration.deinit(self.gpa);
             }
-            declarations.deinit(self.allocator);
+            declarations.deinit(self.gpa);
         }
         if (self.check(.indent)) {
             _ = try self.consume(.indent);
             is_container = true;
             while (!self.check(.dedent)) {
                 const decl = try self.parseDeclaration();
-                try declarations.append(self.allocator, decl);
+                try declarations.append(self.gpa, decl);
             }
             _ = try self.consume(.dedent);
         }
@@ -149,7 +149,7 @@ pub const Parser = struct {
         return .{
             .name = name,
             .is_container = is_container,
-            .decls = try declarations.toOwnedSlice(self.allocator),
+            .decls = try declarations.toOwnedSlice(self.gpa),
             .location = name_token.src_loc,
         };
     }
@@ -157,17 +157,17 @@ pub const Parser = struct {
     fn parseTemplateDeclaration(self: *Parser, name_token: Token) !ast.TemplateDeclaration {
         // NOTE: [name:template], expect INDENT, loop components
         const name_str = lex.lexeme(self.lexer.src, name_token);
-        const name = try self.allocator.dupe(u8, name_str);
-        errdefer self.allocator.free(name);
+        const name = try self.gpa.dupe(u8, name_str);
+        errdefer self.gpa.free(name);
         _ = try self.consume(.template);
         _ = try self.consume(.r_bracket);
 
         var components: ArrayList(ast.ComponentDeclaration) = .empty;
         errdefer {
             for (components.items) |*component| {
-                component.deinit(self.allocator);
+                component.deinit(self.gpa);
             }
-            components.deinit(self.allocator);
+            components.deinit(self.gpa);
         }
         if (self.check(.indent)) {
             _ = try self.consume(.indent);
@@ -175,14 +175,14 @@ pub const Parser = struct {
                 _ = try self.consume(.l_bracket);
                 const comp_name_token = try self.consume(.identifier);
                 const comp = try self.parseComponentBlock(comp_name_token);
-                try components.append(self.allocator, comp);
+                try components.append(self.gpa, comp);
             }
             _ = try self.consume(.dedent);
         }
 
         return .{
             .name = name,
-            .components = try components.toOwnedSlice(self.allocator),
+            .components = try components.toOwnedSlice(self.gpa),
             .location = name_token.src_loc,
         };
     }
@@ -190,17 +190,17 @@ pub const Parser = struct {
     fn parseEntityDeclaration(self: *Parser, name_token: Token) !ast.EntityDeclaration {
         // NOTE: [name:entity], expect INDENT, loop components
         const name_str = lex.lexeme(self.lexer.src, name_token);
-        const name = try self.allocator.dupe(u8, name_str);
-        errdefer self.allocator.free(name);
+        const name = try self.gpa.dupe(u8, name_str);
+        errdefer self.gpa.free(name);
         _ = try self.consume(.entity);
         _ = try self.consume(.r_bracket);
 
         var components: ArrayList(ast.ComponentDeclaration) = .empty;
         errdefer {
             for (components.items) |*component| {
-                component.deinit(self.allocator);
+                component.deinit(self.gpa);
             }
-            components.deinit(self.allocator);
+            components.deinit(self.gpa);
         }
         if (self.check(.indent)) {
             _ = try self.consume(.indent);
@@ -208,14 +208,14 @@ pub const Parser = struct {
                 _ = try self.consume(.l_bracket);
                 const comp_name_token = try self.consume(.identifier);
                 const comp = try self.parseComponentBlock(comp_name_token);
-                try components.append(self.allocator, comp);
+                try components.append(self.gpa, comp);
             }
             _ = try self.consume(.dedent);
         }
 
         return .{
             .name = name,
-            .components = try components.toOwnedSlice(self.allocator),
+            .components = try components.toOwnedSlice(self.gpa),
             .location = name_token.src_loc,
         };
     }
@@ -233,19 +233,19 @@ pub const Parser = struct {
         _ = try self.consume(.r_bracket);
 
         var properties: ArrayList(Property) = .empty;
-        errdefer properties.deinit(self.allocator);
+        errdefer properties.deinit(self.gpa);
         if (self.check(.indent)) {
             _ = try self.consume(.indent);
             while (!self.check(.dedent)) {
                 const prop = try self.parseProperty();
-                try properties.append(self.allocator, prop);
+                try properties.append(self.gpa, prop);
             }
             _ = try self.consume(.dedent);
         }
 
         return .{
-            .name = try self.allocator.dupe(u8, name),
-            .properties = try properties.toOwnedSlice(self.allocator),
+            .name = try self.gpa.dupe(u8, name),
+            .properties = try properties.toOwnedSlice(self.gpa),
             .location = name_token.src_loc,
             .asset_type = asset_type,
         };
@@ -266,15 +266,15 @@ pub const Parser = struct {
         }
         _ = try self.consume(.r_bracket);
 
-        const block_name = try self.allocator.dupe(u8, component_name);
-        errdefer self.allocator.free(block_name);
+        const block_name = try self.gpa.dupe(u8, component_name);
+        errdefer self.gpa.free(block_name);
 
         var properties: ArrayList(Property) = .empty;
         errdefer {
             for (properties.items) |*prop| {
-                prop.deinit(self.allocator);
+                prop.deinit(self.gpa);
             }
-            properties.deinit(self.allocator);
+            properties.deinit(self.gpa);
         }
 
         var nested_blocks: ?[]ast.GenericBlock = null;
@@ -283,7 +283,7 @@ pub const Parser = struct {
                 for (blocks) |*block| {
                     block.deinit();
                 }
-                self.allocator.free(blocks);
+                self.gpa.free(blocks);
             }
         }
 
@@ -296,17 +296,17 @@ pub const Parser = struct {
                 !self.check(.l_bracket))
             {
                 const prop = try self.parseProperty();
-                try properties.append(self.allocator, prop);
+                try properties.append(self.gpa, prop);
             }
 
             if (self.check(.dedent)) {
                 _ = try self.consume(.dedent);
                 return ast.ComponentDeclaration{ .generic = .{
-                    .allocator = self.allocator,
+                    .gpa = self.gpa,
                     .location = name_token.src_loc,
                     .name = block_name,
                     .nested_blocks = null,
-                    .properties = if (properties.items.len > 0) try properties.toOwnedSlice(self.allocator) else null,
+                    .properties = if (properties.items.len > 0) try properties.toOwnedSlice(self.gpa) else null,
                 } };
             }
 
@@ -317,11 +317,11 @@ pub const Parser = struct {
         }
 
         return ast.ComponentDeclaration{ .generic = .{
-            .allocator = self.allocator,
+            .gpa = self.gpa,
             .location = name_token.src_loc,
             .name = block_name,
             .nested_blocks = nested_blocks,
-            .properties = if (properties.items.len > 0) try properties.toOwnedSlice(self.allocator) else null,
+            .properties = if (properties.items.len > 0) try properties.toOwnedSlice(self.gpa) else null,
         } };
     }
 
@@ -331,7 +331,7 @@ pub const Parser = struct {
             for (siblings.items) |*block| {
                 block.deinit();
             }
-            siblings.deinit(self.allocator);
+            siblings.deinit(self.gpa);
         }
 
         while (!self.check(.dedent)) {
@@ -340,15 +340,15 @@ pub const Parser = struct {
             const component_name = lex.lexeme(self.lexer.src, name_token);
             _ = try self.consume(.r_bracket);
 
-            const block_name = try self.allocator.dupe(u8, component_name);
-            errdefer self.allocator.free(block_name);
+            const block_name = try self.gpa.dupe(u8, component_name);
+            errdefer self.gpa.free(block_name);
 
             var properties: ArrayList(Property) = .empty;
             errdefer {
                 for (properties.items) |*prop| {
-                    prop.deinit(self.allocator);
+                    prop.deinit(self.gpa);
                 }
-                properties.deinit(self.allocator);
+                properties.deinit(self.gpa);
             }
 
             var nested_blocks: ?[]ast.GenericBlock = null;
@@ -357,7 +357,7 @@ pub const Parser = struct {
                     for (blocks) |*block| {
                         block.deinit();
                     }
-                    self.allocator.free(blocks);
+                    self.gpa.free(blocks);
                 }
             }
 
@@ -366,7 +366,7 @@ pub const Parser = struct {
 
                 while (!self.check(.dedent) and !self.check(.l_bracket)) {
                     const prop = try self.parseProperty();
-                    try properties.append(self.allocator, prop);
+                    try properties.append(self.gpa, prop);
                 }
 
                 if (self.check(.l_bracket)) {
@@ -377,23 +377,23 @@ pub const Parser = struct {
             }
 
             const parent_block = ast.GenericBlock{
-                .allocator = self.allocator,
+                .gpa = self.gpa,
                 .location = name_token.src_loc,
                 .name = block_name,
                 .nested_blocks = nested_blocks,
-                .properties = if (properties.items.len > 0) try properties.toOwnedSlice(self.allocator) else null,
+                .properties = if (properties.items.len > 0) try properties.toOwnedSlice(self.gpa) else null,
             };
 
-            try siblings.append(self.allocator, parent_block);
+            try siblings.append(self.gpa, parent_block);
         }
 
-        return try siblings.toOwnedSlice(self.allocator);
+        return try siblings.toOwnedSlice(self.gpa);
     }
 
     fn parseSpriteBlock(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
         const name_str = lex.lexeme(self.lexer.src, name_token);
-        const name = try self.allocator.dupe(u8, name_str);
-        errdefer self.allocator.free(name);
+        const name = try self.gpa.dupe(u8, name_str);
+        errdefer self.gpa.free(name);
         _ = try self.consume(.colon);
 
         const shape_type_token = try self.consume(.identifier);
@@ -401,28 +401,28 @@ pub const Parser = struct {
         _ = try self.consume(.r_bracket);
 
         var properties: ArrayList(Property) = .empty;
-        errdefer properties.deinit(self.allocator);
+        errdefer properties.deinit(self.gpa);
         if (self.check(.indent)) {
             _ = try self.consume(.indent);
             while (!self.check(.dedent)) {
                 const prop = try self.parseProperty();
-                try properties.append(self.allocator, prop);
+                try properties.append(self.gpa, prop);
             }
             _ = try self.consume(.dedent);
         }
 
         return ast.ComponentDeclaration{ .sprite = .{
             .name = name,
-            .shape_type = try self.allocator.dupe(u8, type_name),
-            .properties = try properties.toOwnedSlice(self.allocator),
+            .shape_type = try self.gpa.dupe(u8, type_name),
+            .properties = try properties.toOwnedSlice(self.gpa),
             .location = name_token.src_loc,
-            .allocator = self.allocator,
+            .gpa = self.gpa,
         } };
     }
     fn parseColliderBlock(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
         const name_str = lex.lexeme(self.lexer.src, name_token);
-        const name = try self.allocator.dupe(u8, name_str);
-        errdefer self.allocator.free(name);
+        const name = try self.gpa.dupe(u8, name_str);
+        errdefer self.gpa.free(name);
         _ = try self.consume(.colon);
 
         const shape_type_token = try self.consume(.identifier);
@@ -430,22 +430,22 @@ pub const Parser = struct {
         _ = try self.consume(.r_bracket);
 
         var properties: ArrayList(Property) = .empty;
-        errdefer properties.deinit(self.allocator);
+        errdefer properties.deinit(self.gpa);
         if (self.check(.indent)) {
             _ = try self.consume(.indent);
             while (!self.check(.dedent)) {
                 const prop = try self.parseProperty();
-                try properties.append(self.allocator, prop);
+                try properties.append(self.gpa, prop);
             }
             _ = try self.consume(.dedent);
         }
 
         return ast.ComponentDeclaration{ .collider = .{
             .name = name,
-            .shape_type = try self.allocator.dupe(u8, type_name),
-            .properties = try properties.toOwnedSlice(self.allocator),
+            .shape_type = try self.gpa.dupe(u8, type_name),
+            .properties = try properties.toOwnedSlice(self.gpa),
             .location = name_token.src_loc,
-            .allocator = self.allocator,
+            .gpa = self.gpa,
         } };
     }
 
@@ -457,11 +457,11 @@ pub const Parser = struct {
 
         const type_annotation = try self.parseTypeAnnotation();
         var value = try self.parseValue(type_annotation);
-        errdefer value.deinit(self.allocator);
+        errdefer value.deinit(self.gpa);
         const location = name_token.src_loc;
 
         return Property{
-            .name = try self.allocator.dupe(u8, name),
+            .name = try self.gpa.dupe(u8, name),
             .type_annotation = type_annotation,
             .value = value,
             .location = location,
@@ -512,25 +512,25 @@ pub const Parser = struct {
         var vals: ArrayList(Value) = .empty;
         errdefer {
             for (vals.items) |*item| {
-                item.deinit(self.allocator);
+                item.deinit(self.gpa);
             }
-            vals.deinit(self.allocator);
+            vals.deinit(self.gpa);
         }
         if (!self.check(.r_brace)) {
             var val = try self.parseSingleValue(element_type);
-            try vals.append(self.allocator, val);
+            try vals.append(self.gpa, val);
 
             while (!self.check(.r_brace) and !self.check(.dedent)) {
                 _ = try self.consume(.comma);
                 val = try self.parseSingleValue(element_type);
-                try vals.append(self.allocator, val);
+                try vals.append(self.gpa, val);
             }
         }
 
         if (has_indent and self.check(.dedent)) _ = try self.advance();
         _ = try self.consume(.r_brace);
 
-        return Value{ .array = try vals.toOwnedSlice(self.allocator) };
+        return Value{ .array = try vals.toOwnedSlice(self.gpa) };
     }
 
     fn parseSingleValue(self: *Parser, base_type: ast.BaseType) !Value {
@@ -549,7 +549,7 @@ pub const Parser = struct {
             .string => blk: {
                 const str_token = try self.consume(.string_lit);
                 const str_lexeme = lex.lexeme(self.lexer.src, str_token);
-                const str_copy = try self.allocator.dupe(u8, str_lexeme);
+                const str_copy = try self.gpa.dupe(u8, str_lexeme);
                 break :blk Value{ .string = str_copy };
             },
 
@@ -563,7 +563,7 @@ pub const Parser = struct {
             .asset => blk: {
                 const asset_token = try self.consume(.string_lit);
                 const asset_name = lex.lexeme(self.lexer.src, asset_token);
-                const asset_copy = try self.allocator.dupe(u8, asset_name);
+                const asset_copy = try self.gpa.dupe(u8, asset_name);
                 break :blk Value{ .assetRef = asset_copy };
             },
         };
@@ -577,8 +577,8 @@ pub const Parser = struct {
             return ParseError.UnsupportedVectorLength;
         }
 
-        var arr = try self.allocator.alloc(f64, arity);
-        errdefer self.allocator.free(arr);
+        var arr = try self.gpa.alloc(f64, arity);
+        errdefer self.gpa.free(arr);
 
         var num = try self.parseNumber();
         arr[0] = num;

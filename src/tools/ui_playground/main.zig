@@ -25,17 +25,17 @@ const screen_w: f32 = @floatFromInt(logical_width);
 const screen_h: f32 = @floatFromInt(logical_height);
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = init.gpa;
+    const gpa = init.gpa;
     const io = init.io;
 
-    var app = try App.init(allocator, io, .{
+    var app = try App.init(gpa, io, .{
         .title = "UI Playground",
         .width = @intCast(logical_width),
         .height = @intCast(logical_height),
     });
     defer app.deinit();
 
-    var font = Font.initFromMemory(allocator, assets.embedded_default_font) catch |err| {
+    var font = Font.initFromMemory(gpa, assets.embedded_default_font) catch |err| {
         log.err(.application, "Failed to load font: {any}", .{err});
         @panic("Cannot load default engine font");
     };
@@ -49,25 +49,25 @@ pub fn main(init: std.process.Init) !void {
     };
 
     // One UIManager per independent test region
-    var test1 = ui.UIManager.init(allocator);
+    var test1 = ui.UIManager.init(gpa);
     defer test1.deinit();
-    var test2 = ui.UIManager.init(allocator);
+    var test2 = ui.UIManager.init(gpa);
     defer test2.deinit();
-    var test3 = ui.UIManager.init(allocator);
+    var test3 = ui.UIManager.init(gpa);
     defer test3.deinit();
-    var test4 = ui.UIManager.init(allocator);
+    var test4 = ui.UIManager.init(gpa);
     defer test4.deinit();
-    var test5 = ui.UIManager.init(allocator);
+    var test5 = ui.UIManager.init(gpa);
     defer test5.deinit();
-    var test6 = ui.UIManager.init(allocator);
+    var test6 = ui.UIManager.init(gpa);
     defer test6.deinit();
-    var test7 = ui.UIManager.init(allocator);
+    var test7 = ui.UIManager.init(gpa);
     defer test7.deinit();
-    var test8 = ui.UIManager.init(allocator);
+    var test8 = ui.UIManager.init(gpa);
     defer test8.deinit();
-    var test9 = ui.UIManager.init(allocator);
+    var test9 = ui.UIManager.init(gpa);
     defer test9.deinit();
-    var test10 = ui.UIManager.init(allocator);
+    var test10 = ui.UIManager.init(gpa);
     defer test10.deinit();
 
     while (app.isRunning()) {

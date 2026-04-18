@@ -40,10 +40,10 @@ const logical_width: i32 = 1920;
 const logical_height: i32 = 1088;
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = init.gpa;
+    const gpa = init.gpa;
     const io = init.io;
 
-    var app = try App.init(allocator, io, .{
+    var app = try App.init(gpa, io, .{
         .title = "Zixel Art",
         .width = logical_width,
         .height = logical_height,
@@ -51,7 +51,7 @@ pub fn main(init: std.process.Init) !void {
     defer app.deinit();
 
     // Load the embedded font
-    var ui_font = Font.initFromMemory(allocator, assets.embedded_default_font) catch |err| {
+    var ui_font = Font.initFromMemory(gpa, assets.embedded_default_font) catch |err| {
         log.err(.application, "Failed to load font: {any}", .{err});
         @panic("Cannot load font");
     };
@@ -67,7 +67,7 @@ pub fn main(init: std.process.Init) !void {
     );
 
     // UI
-    var ui_layer = UILayer.init(allocator);
+    var ui_layer = UILayer.init(gpa);
     ui_layer.addView(
         "toolbar",
         .{ .x = 20, .y = 20, .width = 240, .height = 1048 },
@@ -100,7 +100,7 @@ pub fn main(init: std.process.Init) !void {
     );
 
     // Build canvas grid
-    const canvas = Canvas.init(allocator, layout.canvas, 64) catch |err| {
+    const canvas = Canvas.init(gpa, layout.canvas, 64) catch |err| {
         log.err(
             .application,
             "Unable to create Canvas: {any}",
@@ -156,10 +156,10 @@ pub fn main(init: std.process.Init) !void {
                 }
             }
             if (app.kb.isPressed(.S)) {
-                saveCanvas(allocator, io, canvas);
+                saveCanvas(gpa, io, canvas);
             }
             if (app.kb.isPressed(.O)) {
-                loadCanvas(allocator, io, canvas);
+                loadCanvas(gpa, io, canvas);
             }
         }
 
@@ -381,10 +381,10 @@ fn syncSlidersToColor(layer: *UILayer, color: Color) void {
 
 const zxl_path = "output.zxl";
 
-fn saveCanvas(allocator: std.mem.Allocator, io: std.Io, canvas: *const Canvas) void {
+fn saveCanvas(gpa: std.mem.Allocator, io: std.Io, canvas: *const Canvas) void {
     const size: u16 = @intCast(canvas.pixel_count);
 
-    var image = ZxlImage.init(allocator, "canvas") catch |err| {
+    var image = ZxlImage.init(gpa, "canvas") catch |err| {
         log.err(.application, "Failed to create ZxlImage: {any}", .{err});
         return;
     };
@@ -392,11 +392,11 @@ fn saveCanvas(allocator: std.mem.Allocator, io: std.Io, canvas: *const Canvas) v
 
     // Build palette from canvas pixels
     const pixel_total = canvas.pixel_count * canvas.pixel_count;
-    const indices = allocator.alloc(u8, pixel_total) catch |err| {
+    const indices = gpa.alloc(u8, pixel_total) catch |err| {
         log.err(.application, "Failed to alloc pixel indices: {any}", .{err});
         return;
     };
-    defer allocator.free(indices);
+    defer gpa.free(indices);
 
     for (0..pixel_total) |i| {
         const c = canvas.pixels[i].color;
@@ -426,7 +426,7 @@ fn saveCanvas(allocator: std.mem.Allocator, io: std.Io, canvas: *const Canvas) v
         return;
     };
 
-    ZxlWriter.toFile(allocator, io, &image, zxl_path) catch |err| {
+    ZxlWriter.toFile(gpa, io, &image, zxl_path) catch |err| {
         log.err(.application, "Failed to save .zxl: {any}", .{err});
         return;
     };
@@ -434,8 +434,8 @@ fn saveCanvas(allocator: std.mem.Allocator, io: std.Io, canvas: *const Canvas) v
     log.info(.application, "Saved {s} ({d} palette colors)", .{ zxl_path, image.palette.count });
 }
 
-fn loadCanvas(allocator: std.mem.Allocator, io: std.Io, canvas: *Canvas) void {
-    var image = ZxlReader.fromFile(allocator, io, zxl_path) catch |err| {
+fn loadCanvas(gpa: std.mem.Allocator, io: std.Io, canvas: *Canvas) void {
+    var image = ZxlReader.fromFile(gpa, io, zxl_path) catch |err| {
         log.err(.application, "Failed to load {s}: {any}", .{ zxl_path, err });
         return;
     };

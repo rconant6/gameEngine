@@ -3,7 +3,7 @@ const testing = std.testing;
 const scene_format = @import("scene-format");
 
 test "SceneFormat: parse simple scene file" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [Player:entity]
@@ -12,14 +12,14 @@ test "SceneFormat: parse simple scene file" {
         \\      scale:f32 1.0
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 }
 
 test "SceneFormat: parse entity with Transform component" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [Player:entity]
@@ -29,8 +29,8 @@ test "SceneFormat: parse entity with Transform component" {
         \\      rotation:f32 0.0
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
     const decl = scene.decls[0];
@@ -44,7 +44,7 @@ test "SceneFormat: parse entity with Transform component" {
 }
 
 test "SceneFormat: parse entity with Collider circle" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [Ball:entity]
@@ -54,14 +54,14 @@ test "SceneFormat: parse entity with Collider circle" {
         \\      radius:f32 5.0
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 }
 
 test "SceneFormat: parse entity with Collider rectangle" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [Box:entity]
@@ -72,14 +72,14 @@ test "SceneFormat: parse entity with Collider rectangle" {
         \\      half_height:f32 15.0
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 }
 
 test "SceneFormat: parse entity with Sprite circle" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [Ball:entity]
@@ -92,14 +92,14 @@ test "SceneFormat: parse entity with Sprite circle" {
         \\      visible:bool true
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 }
 
 test "SceneFormat: parse entity with Sprite rectangle" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [Box:entity]
@@ -113,14 +113,14 @@ test "SceneFormat: parse entity with Sprite rectangle" {
         \\      visible:bool true
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 }
 
 test "SceneFormat: parse entity with Velocity" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [MovingBall:entity]
@@ -131,14 +131,14 @@ test "SceneFormat: parse entity with Velocity" {
         \\      angular:f32 0.5
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 }
 
 test "SceneFormat: parse entity with multiple components" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [ComplexEntity:entity]
@@ -157,8 +157,8 @@ test "SceneFormat: parse entity with multiple components" {
         \\      radius:f32 2.0
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 
@@ -180,7 +180,7 @@ test "SceneFormat: parse entity with multiple components" {
 }
 
 test "SceneFormat: parse scene with multiple entities" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [Entity1:entity]
@@ -194,8 +194,8 @@ test "SceneFormat: parse scene with multiple entities" {
         \\      position:vec3 {-5.0, -5.0, 0.0}
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 
@@ -209,15 +209,15 @@ test "SceneFormat: parse scene with multiple entities" {
 }
 
 test "SceneFormat: parse asset declaration" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestFont:asset font]
         \\  path:string "assets/fonts/"
         \\  filename:string "test.ttf"
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 
@@ -229,7 +229,7 @@ test "SceneFormat: parse asset declaration" {
 }
 
 test "SceneFormat: parse Text component with font asset reference" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestFont:asset font]
         \\  path:string "assets/fonts/"
@@ -245,14 +245,14 @@ test "SceneFormat: parse Text component with font asset reference" {
         \\      size:f32 1.0
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 2), scene.decls.len);
 }
 
 test "SceneFormat: parse entity with tag components" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [WrappingEntity:entity]
@@ -265,8 +265,8 @@ test "SceneFormat: parse entity with tag components" {
         \\    [ScreenClamp]
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 
@@ -280,7 +280,7 @@ test "SceneFormat: parse entity with tag components" {
 }
 
 test "SceneFormat: parse scene with comments" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\// This is a test scene
         \\[TestScene:scene]
@@ -294,14 +294,14 @@ test "SceneFormat: parse scene with comments" {
         \\      position:vec3 {1.0, 1.0, 0.0}
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 }
 
 test "SceneFormat: parse Camera component" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [Camera:entity]
@@ -313,14 +313,14 @@ test "SceneFormat: parse Camera component" {
         \\      far:f32 100.0
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 }
 
 test "SceneFormat: parse Rectangle sprite component" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [Ground:entity]
@@ -334,14 +334,14 @@ test "SceneFormat: parse Rectangle sprite component" {
         \\      visible:bool true
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 }
 
 test "SceneFormat: parse color values" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [ColoredEntity:entity]
@@ -355,14 +355,14 @@ test "SceneFormat: parse color values" {
         \\      visible:bool true
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 }
 
 test "SceneFormat: parse vec2, vec3 values" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const source =
         \\[TestScene:scene]
         \\  [VectorEntity:entity]
@@ -374,8 +374,8 @@ test "SceneFormat: parse vec2, vec3 values" {
         \\      angular:f32 0.0
     ;
 
-    var scene = try scene_format.parseString(allocator, source, "test.scene");
-    defer scene.deinit(allocator);
+    var scene = try scene_format.parseString(gpa, source, "test.scene");
+    defer scene.deinit(gpa);
 
     try testing.expectEqual(@as(usize, 1), scene.decls.len);
 }

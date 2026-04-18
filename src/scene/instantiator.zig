@@ -81,22 +81,22 @@ pub const InstantiatorError = error{
 };
 
 pub const Instantiator = struct {
-    allocator: Allocator,
+    gpa: Allocator,
     last_instantiated_entities: std.ArrayList(Entity),
     world: *World,
     assets: *AssetManager,
     in_screen_space: bool = false,
 
-    pub fn init(allocator: Allocator, world: *World, assets: *AssetManager) Instantiator {
+    pub fn init(gpa: Allocator, world: *World, assets: *AssetManager) Instantiator {
         return .{
-            .allocator = allocator,
+            .gpa = gpa,
             .last_instantiated_entities = .empty,
             .world = world,
             .assets = assets,
         };
     }
     pub fn deinit(self: *Instantiator) void {
-        self.last_instantiated_entities.deinit(self.allocator);
+        self.last_instantiated_entities.deinit(self.gpa);
     }
     pub fn clearLastInstantiated(self: *Instantiator, world: *World) void {
         for (self.last_instantiated_entities.items) |entity_id| {
@@ -157,7 +157,7 @@ pub const Instantiator = struct {
         entity_decl: *const EntityDeclaration,
     ) !void {
         const entity = try self.world.createEntity();
-        try self.last_instantiated_entities.append(self.allocator, entity);
+        try self.last_instantiated_entities.append(self.gpa, entity);
 
         for (entity_decl.components) |comp_decl| {
             switch (comp_decl) {
@@ -214,8 +214,8 @@ pub const Instantiator = struct {
                 ) orelse
                     return InstantiatorError.NotOptionalValue;
 
-                const full = try std.fs.path.join(self.allocator, &.{ path, file });
-                defer self.allocator.free(full);
+                const full = try std.fs.path.join(self.gpa, &.{ path, file });
+                defer self.gpa.free(full);
                 break :blk try self.assets.loadFontFromPath(full);
             } else {
                 if (self.assets.fonts.font_path.len < 0)
@@ -228,7 +228,7 @@ pub const Instantiator = struct {
 
         const gop = try self.assets.name_to_font.getOrPut(asset_decl.name);
         if (!gop.found_existing) {
-            const owned_name = try self.allocator.dupe(u8, asset_decl.name);
+            const owned_name = try self.gpa.dupe(u8, asset_decl.name);
             gop.key_ptr.* = owned_name;
             gop.value_ptr.* = handle;
         }
@@ -250,7 +250,7 @@ pub const Instantiator = struct {
             const component = try self.buildTriggerComponent(Components.OnCollision, CollisionTrigger, comp_decl.generic);
             errdefer {
                 for (component.triggers) |trigger| {
-                    self.allocator.free(trigger.other_tag_pattern);
+                    self.gpa.free(trigger.other_tag_pattern);
                 }
             }
             try self.world.addComponent(entity, Components.OnCollision, component);
@@ -422,7 +422,7 @@ pub const Instantiator = struct {
     ) !Components.Sprite {
         var component = std.mem.zeroInit(Components.Sprite, .{});
         var owned_points: []const V2 = undefined;
-        defer self.allocator.free(owned_points);
+        defer self.gpa.free(owned_points);
         if (sprite.properties) |props| {
             for (props) |prop| {
                 if (std.mem.eql(u8, "points", prop.name)) {
@@ -451,7 +451,7 @@ pub const Instantiator = struct {
                 }
             }
         }
-        const polygon = try Shapes.Polygon(WorldPoint).init(self.allocator, owned_points);
+        const polygon = try Shapes.Polygon(WorldPoint).init(self.gpa, owned_points);
         component.geometry = ShapeRegistry.createShapeUnion(Shapes.Polygon(WorldPoint), polygon);
 
         return component;
@@ -495,19 +495,19 @@ pub const Instantiator = struct {
         comp: GenericBlock,
     ) !ComponentType {
         var triggers: std.ArrayList(TriggerType) = .empty;
-        errdefer triggers.deinit(self.allocator);
+        errdefer triggers.deinit(self.gpa);
 
         if (comp.nested_blocks) |blocks| {
             for (blocks) |*nested_block| {
                 if (std.mem.eql(u8, nested_block.name, "trigger")) {
                     const trigger = try self.buildTrigger(TriggerType, nested_block.*);
-                    try triggers.append(self.allocator, trigger);
+                    try triggers.append(self.gpa, trigger);
                 }
             }
         }
 
         return ComponentType{
-            .triggers = try triggers.toOwnedSlice(self.allocator),
+            .triggers = try triggers.toOwnedSlice(self.gpa),
         };
     }
 
@@ -552,17 +552,17 @@ pub const Instantiator = struct {
         }
 
         var actions: std.ArrayList(Action) = .empty;
-        errdefer actions.deinit(self.allocator);
+        errdefer actions.deinit(self.gpa);
         if (trigger_block.nested_blocks) |blocks| {
             for (blocks) |*nested_block| {
                 if (std.mem.eql(u8, nested_block.name, "action")) {
                     const action = try self.buildAction(nested_block.*);
-                    try actions.append(self.allocator, action);
+                    try actions.append(self.gpa, action);
                 }
             }
         }
 
-        trigger.actions = try actions.toOwnedSlice(self.allocator);
+        trigger.actions = try actions.toOwnedSlice(self.gpa);
         return trigger;
     }
 
@@ -671,7 +671,7 @@ pub const Instantiator = struct {
                 if (ptr_info.size == .slice and ptr_info.child == V2) {
                     return switch (value) {
                         .array => |arr| blk: {
-                            const points = try self.allocator.alloc(V2, arr.len);
+                            const points = try self.gpa.alloc(V2, arr.len);
                             for (arr, 0..) |val, i| {
                                 switch (val) {
                                     .vector => |v| {
@@ -681,7 +681,7 @@ pub const Instantiator = struct {
                                         };
                                     },
                                     else => {
-                                        self.allocator.free(points);
+                                        self.gpa.free(points);
                                         return InstantiatorError.ArrayTypeMismatch;
                                     },
                                 }

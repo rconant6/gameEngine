@@ -16,12 +16,12 @@ const V2 = font_data.V2;
 
 const FontReader = @import("FontReader.zig").FontReader;
 
-fn loadFile(alloc: std.mem.Allocator, io: std.Io, path: []const u8) ![]const u8 {
-    return std.Io.Dir.cwd().readFileAllocOptions(io, path, alloc, .unlimited, .@"1", null);
+fn loadFile(gpa: std.mem.Allocator, io: std.Io, path: []const u8) ![]const u8 {
+    return std.Io.Dir.cwd().readFileAllocOptions(io, path, gpa, .unlimited, .@"1", null);
 }
 
-fn loadFromMemory(alloc: std.mem.Allocator, data: []const u8) ![]const u8 {
-    const raw_data = try alloc.alloc(u8, data.len);
+fn loadFromMemory(gpa: std.mem.Allocator, data: []const u8) ![]const u8 {
+    const raw_data = try gpa.alloc(u8, data.len);
     @memcpy(raw_data, data);
     return raw_data;
 }
@@ -38,13 +38,13 @@ fn parseTableEntry(reader: *FontReader) !TableEntry {
     return table_entry;
 }
 
-fn parseLocaTable(reader: *FontReader, alloc: *std.mem.Allocator, entry: TableEntry, numGlyphs: u16) ![]u32 {
+fn parseLocaTable(reader: *FontReader, gpa: *std.mem.Allocator, entry: TableEntry, numGlyphs: u16) ![]u32 {
     reader.seek(entry.offset);
 
     const actual_checksum = reader.calculateChecksum(entry.offset, entry.length, false);
     if (actual_checksum != entry.checksum) return error.LocaTableCorrupted;
 
-    var offsets = try alloc.alloc(u32, numGlyphs + 1);
+    var offsets = try gpa.alloc(u32, numGlyphs + 1);
     for (0..numGlyphs + 1) |i| {
         const short_offset = reader.readU16BigEndian();
         offsets[i] = @as(u32, short_offset) * 2; // Convert to actual byte offset
@@ -165,15 +165,15 @@ fn parseCmapTable(reader: *FontReader, entry: TableEntry) !CmapFormat4Header {
 fn parseCmapFormatData(
     reader: *FontReader,
     map: *std.AutoHashMap(u32, u16),
-    alloc: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     header: CmapFormat4Header,
 ) !void {
     const num_segments: u16 = header.seg_countx2 / 2;
 
-    var end_counts = try alloc.alloc(u16, num_segments);
-    var start_counts = try alloc.alloc(u16, num_segments);
-    var id_deltas = try alloc.alloc(u16, num_segments);
-    var id_range_offsets = try alloc.alloc(u16, num_segments);
+    var end_counts = try gpa.alloc(u16, num_segments);
+    var start_counts = try gpa.alloc(u16, num_segments);
+    var id_deltas = try gpa.alloc(u16, num_segments);
+    var id_range_offsets = try gpa.alloc(u16, num_segments);
     for (0..num_segments) |segment| {
         end_counts[segment] = reader.readU16BigEndian();
     }
@@ -191,7 +191,7 @@ fn parseCmapFormatData(
 
     const glyph_array_size = header.length - (14 + num_segments * 2 * 4 + 2); // header, data, pad
     const glyphs = glyph_array_size / 2;
-    var glyph_id_array = try alloc.alloc(u16, glyphs);
+    var glyph_id_array = try gpa.alloc(u16, glyphs);
     for (0..glyphs) |glyph_id| {
         glyph_id_array[glyph_id] = reader.readU16BigEndian();
     }
@@ -226,7 +226,7 @@ fn parseCmapFormatData(
 
 fn parseGlyph(
     reader: *FontReader,
-    alloc: std.mem.Allocator, // main engine allocator
+    gpa: std.mem.Allocator, // main engine allocator
     temp_arena: std.mem.Allocator, // temp arena
     header: GlyfHeader,
     units_per_em: u16,
@@ -291,10 +291,10 @@ fn parseGlyph(
 
         var absX: i32 = 0;
         var absY: i32 = 0;
-        var filtered_contour_end_pts = try std.ArrayList(u16).initCapacity(alloc, contour_end_pts.len);
-        errdefer filtered_contour_end_pts.deinit(alloc);
-        var filtered_points = try std.ArrayList(V2).initCapacity(alloc, total_points);
-        errdefer filtered_points.deinit(alloc);
+        var filtered_contour_end_pts = try std.ArrayList(u16).initCapacity(gpa, contour_end_pts.len);
+        errdefer filtered_contour_end_pts.deinit(gpa);
+        var filtered_points = try std.ArrayList(V2).initCapacity(gpa, total_points);
+        errdefer filtered_points.deinit(gpa);
         var filtered_point_count: u16 = 0;
         var filtered_index: usize = 0;
         for (0..total_points) |i| {
@@ -322,8 +322,8 @@ fn parseGlyph(
             }
         }
 
-        const points_slice = try filtered_points.toOwnedSlice(alloc);
-        const contour_slice = try filtered_contour_end_pts.toOwnedSlice(alloc);
+        const points_slice = try filtered_points.toOwnedSlice(gpa);
+        const contour_slice = try filtered_contour_end_pts.toOwnedSlice(gpa);
         return FilteredGlyph{
             .points = points_slice,
             .contour_ends = contour_slice,
@@ -335,7 +335,7 @@ fn parseGlyph(
 }
 
 pub const Font = struct {
-    alloc: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     units_per_em: u16 = undefined, // from head
 
     // from hhea table
@@ -348,8 +348,8 @@ pub const Font = struct {
     glyph_shapes: std.AutoHashMap(u16, FilteredGlyph) = undefined, // data for shapes of glyphs
     glyph_triangles: std.AutoHashMap(u16, [][3]usize),
 
-    pub fn init(alloc: std.mem.Allocator, io: std.Io, path: []const u8) !Font {
-        var arena = std.heap.ArenaAllocator.init(alloc);
+    pub fn init(gpa: std.mem.Allocator, io: std.Io, path: []const u8) !Font {
+        var arena = std.heap.ArenaAllocator.init(gpa);
         defer arena.deinit();
 
         const temp_alloc = arena.allocator();
@@ -357,22 +357,22 @@ pub const Font = struct {
 
         const raw_data = try loadFile(temp_alloc, io, path);
 
-        return try initFromData(alloc, temp_alloc, raw_data, &table_directory);
+        return try initFromData(gpa, temp_alloc, raw_data, &table_directory);
     }
 
-    pub fn initFromMemory(alloc: std.mem.Allocator, data: []const u8) !Font {
-        var arena = std.heap.ArenaAllocator.init(alloc);
+    pub fn initFromMemory(gpa: std.mem.Allocator, data: []const u8) !Font {
+        var arena = std.heap.ArenaAllocator.init(gpa);
         defer arena.deinit();
 
         const temp_alloc = arena.allocator();
         var table_directory: std.array_hash_map.Auto(u32, TableEntry) = .{};
 
         // Use the data directly without copying since @embedFile data is already in memory
-        return try initFromData(alloc, temp_alloc, data, &table_directory);
+        return try initFromData(gpa, temp_alloc, data, &table_directory);
     }
 
     fn initFromData(
-        alloc: std.mem.Allocator,
+        gpa: std.mem.Allocator,
         temp_alloc: std.mem.Allocator,
         raw_data: []const u8,
         table_directory: *std.array_hash_map.Auto(u32, TableEntry),
@@ -401,13 +401,13 @@ pub const Font = struct {
         const number_hMetrics = hhea_table.number_hMetrics;
 
         const hmtx_entry = getTable(table_directory, "hmtx") orelse return error.HmtxTableNotFound;
-        var hMetrics = try std.ArrayList(Hmetric).initCapacity(alloc, number_glyphs);
-        errdefer hMetrics.deinit(alloc);
+        var hMetrics = try std.ArrayList(Hmetric).initCapacity(gpa, number_glyphs);
+        errdefer hMetrics.deinit(gpa);
         try parseHmetrics(&reader, &hMetrics, hmtx_entry, number_glyphs, number_hMetrics);
 
         const cmap_entry = getTable(table_directory, "cmap") orelse return error.CmapTableNotFound;
         const cmap_format4_header = try parseCmapTable(&reader, cmap_entry);
-        var map_indicies = std.AutoHashMap(u32, u16).init(alloc);
+        var map_indicies = std.AutoHashMap(u32, u16).init(gpa);
         errdefer map_indicies.deinit();
         try parseCmapFormatData(&reader, &map_indicies, temp_alloc, cmap_format4_header);
 
@@ -417,7 +417,7 @@ pub const Font = struct {
         var temp_alloc_mut = temp_alloc;
         const offsets = try parseLocaTable(&reader, &temp_alloc_mut, loca_entry, number_glyphs);
 
-        var glyphs = std.AutoHashMap(u16, FilteredGlyph).init(alloc);
+        var glyphs = std.AutoHashMap(u16, FilteredGlyph).init(gpa);
         errdefer glyphs.deinit();
         for (0..number_glyphs) |glyphIndex| {
             const start = offsets[glyphIndex];
@@ -428,12 +428,12 @@ pub const Font = struct {
             const header = reader.readStruct(GlyfHeader);
             reader.rewind(getBytesOfPadding(GlyfHeader));
 
-            const glyph_data = try parseGlyph(&reader, alloc, temp_alloc, header, units_per_em);
+            const glyph_data = try parseGlyph(&reader, gpa, temp_alloc, header, units_per_em);
             try glyphs.put(@intCast(glyphIndex), glyph_data);
         }
 
         return Font{
-            .alloc = alloc,
+            .gpa = gpa,
             .units_per_em = units_per_em,
             .ascender = hhea_table.ascender,
             .descender = hhea_table.descender,
@@ -441,23 +441,23 @@ pub const Font = struct {
             .char_to_glyph = map_indicies,
             .glyph_advance_width = hMetrics,
             .glyph_shapes = glyphs,
-            .glyph_triangles = std.AutoHashMap(u16, [][3]usize).init(alloc),
+            .glyph_triangles = std.AutoHashMap(u16, [][3]usize).init(gpa),
         };
     }
 
     pub fn deinit(self: *Font) void {
-        self.glyph_advance_width.deinit(self.alloc);
+        self.glyph_advance_width.deinit(self.gpa);
         self.char_to_glyph.deinit();
         var iter = self.glyph_shapes.iterator();
         while (iter.next()) |entry| {
             const glyph = entry.value_ptr.*;
-            self.alloc.free(glyph.points);
-            self.alloc.free(glyph.contour_ends);
+            self.gpa.free(glyph.points);
+            self.gpa.free(glyph.contour_ends);
         }
         self.glyph_shapes.deinit();
         var tri_iter = self.glyph_triangles.iterator();
         while (tri_iter.next()) |entry| {
-            self.alloc.free(entry.value_ptr.*);
+            self.gpa.free(entry.value_ptr.*);
         }
         self.glyph_triangles.deinit();
     }

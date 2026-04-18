@@ -67,7 +67,7 @@ const PerformanceMetrics = struct {
 };
 
 pub const Engine = struct {
-    allocator: Allocator,
+    gpa: Allocator,
     io: std.Io,
     input: Input,
     renderer: renderer.Renderer,
@@ -92,13 +92,13 @@ pub const Engine = struct {
     window_height: u32,
 
     pub fn init(
-        allocator: Allocator,
+        gpa: Allocator,
         io: std.Io,
         title: []const u8,
         width: u32,
         height: u32,
     ) *Engine {
-        Logger.init(allocator, io) catch |err| fatal("Logger", err);
+        Logger.init(gpa, io) catch |err| fatal("Logger", err);
 
         platform.init() catch |err| fatal("Platform Layer", err);
         log.info(.engine, "Platform layer initialized", .{});
@@ -123,7 +123,7 @@ pub const Engine = struct {
         const scaled_height: u32 = @intFromFloat(f_height * scale_factor);
 
         const rend = renderer.Renderer.init(
-            allocator,
+            gpa,
             io,
             .{
                 .width = scaled_width,
@@ -137,7 +137,7 @@ pub const Engine = struct {
             .{ scaled_width, scaled_height },
         );
 
-        var world = World.init(allocator) catch |err| fatal("ECS World", err);
+        var world = World.init(gpa) catch |err| fatal("ECS World", err);
         log.info(.engine, "ECS(world) initialized", .{});
 
         const camera = world.createEntity() catch |err| fatal("Main Camera Entity", err);
@@ -153,16 +153,16 @@ pub const Engine = struct {
             .priority = 1,
         }) catch |err| fatal("Camera Component", err);
 
-        var asset_manager = AssetManager.init(allocator, io) catch |err| fatal("Asset Manager", err);
+        var asset_manager = AssetManager.init(gpa, io) catch |err| fatal("Asset Manager", err);
         asset_manager.setRenderer(&rend);
         log.info(.engine, "ASSET MANAGER initialized", .{});
-        const action_system = ActionSystem.init(allocator) catch |err| fatal("Action System", err);
+        const action_system = ActionSystem.init(gpa) catch |err| fatal("Action System", err);
         log.info(.engine, "ACTIONS SYSTEM initialized", .{});
 
-        const engine = allocator.create(Engine) catch |err| fatal("Engine Memory Allocation", err);
+        const engine = gpa.create(Engine) catch |err| fatal("Engine Memory Allocation", err);
 
         engine.* = Engine{
-            .allocator = allocator,
+            .gpa = gpa,
             .io = io,
             .input = .init(),
             .assets = asset_manager,
@@ -171,7 +171,7 @@ pub const Engine = struct {
             .world = world,
             .running = true,
             .action_system = action_system,
-            .scene_manager = SceneManager.init(allocator, io),
+            .scene_manager = SceneManager.init(gpa, io),
             .collision_events = .empty,
             .instantiator = undefined,
             .template_manager = undefined,
@@ -181,12 +181,12 @@ pub const Engine = struct {
             .window_height = height,
         };
 
-        engine.instantiator = .init(allocator, &engine.world, &engine.assets);
-        engine.template_manager = .init(allocator, io, &engine.instantiator);
+        engine.instantiator = .init(gpa, &engine.world, &engine.assets);
+        engine.template_manager = .init(gpa, io, &engine.instantiator);
         engine.world.template_manager = &engine.template_manager;
 
         const default_font = engine.assets.getFontByName("__default__") catch |err| fatal("Default Font Loading", err);
-        engine.debugger = .init(allocator, &engine.renderer, default_font);
+        engine.debugger = .init(gpa, &engine.renderer, default_font);
 
         log.info(.engine, "Engine successfully started", .{});
         return engine;
@@ -207,9 +207,9 @@ pub const Engine = struct {
     }
 
     pub fn deinit(self: *Engine) void {
-        const allocator = self.allocator;
+        const gpa = self.gpa;
         self.action_system.deinit();
-        self.collision_events.deinit(self.allocator);
+        self.collision_events.deinit(self.gpa);
         self.scene_manager.deinit();
         self.renderer.deinit();
         self.assets.deinit();
@@ -220,7 +220,7 @@ pub const Engine = struct {
         self.debugger.deinit();
         log.info(.engine, "All systems shutdown", .{});
         Logger.deinit();
-        allocator.destroy(self);
+        gpa.destroy(self);
     }
 
     pub fn shouldClose(self: *const Engine) bool {
@@ -296,7 +296,7 @@ pub const Engine = struct {
             const color = if (fps > 55) Colors.GREEN else if (fps > 30 and fps < 55) Colors.YELLOW else Colors.RED;
             const fps_text = std.fmt.bufPrint(&buf, "FPS: {d:.1}", .{fps}) catch "FPS: --";
             self.debugger.draw.addText(.{
-                .text = self.allocator.dupe(u8, fps_text) catch "",
+                .text = self.gpa.dupe(u8, fps_text) catch "",
                 .position = .{ .x = 10.0, .y = 9.0 },
                 .color = color,
                 .size = 0.5,

@@ -7,19 +7,19 @@ const V2 = fd.V2;
 const EarClipper = @import("ear_clipping.zig").EarClipper;
 
 pub fn buildTriangles(
-    allocator: Allocator,
+    gpa: Allocator,
     glyph: *const FilteredGlyph,
 ) ![][3]usize {
     if (glyph.total_points == 0 or glyph.contour_count == 0) {
         return &[_][3]usize{};
     }
 
-    const contours = try allocator.alloc([]usize, glyph.contour_ends.len);
+    const contours = try gpa.alloc([]usize, glyph.contour_ends.len);
     defer {
         for (contours) |contour| {
-            allocator.free(contour);
+            gpa.free(contour);
         }
-        allocator.free(contours);
+        gpa.free(contours);
     }
 
     var start_idx: usize = 0;
@@ -29,7 +29,7 @@ pub fn buildTriangles(
 
         // Filter out duplicate consecutive vertices
         var filtered: ArrayList(usize) = .empty;
-        defer filtered.deinit(allocator);
+        defer filtered.deinit(gpa);
 
         const epsilon = 0.00001; // Smaller epsilon to be more conservative
 
@@ -45,7 +45,7 @@ pub fn buildTriangles(
             const dy = pt.y - prev_pt.y;
             if (dx * dx + dy * dy < epsilon * epsilon) continue;
 
-            try filtered.append(allocator, idx);
+            try filtered.append(gpa, idx);
         }
 
         // Remove collinear points - intermediate points on straight edges
@@ -91,11 +91,11 @@ pub fn buildTriangles(
             }
         }
 
-        contours[contour_num] = try filtered.toOwnedSlice(allocator);
+        contours[contour_num] = try filtered.toOwnedSlice(gpa);
         start_idx = end_idx; // Next contour starts where this one ended
     }
 
-    var clipper = EarClipper.init(allocator, glyph.points);
+    var clipper = EarClipper.init(gpa, glyph.points);
     defer clipper.deinit();
 
     return try clipper.triangulate(contours);

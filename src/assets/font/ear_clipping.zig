@@ -11,7 +11,7 @@ const log = @import("debug").log;
 const VertexClass = enum { convex, reflex };
 
 pub const EarClipper = struct {
-    allocator: Allocator,
+    gpa: Allocator,
     vertices: []const Point,
 
     polygon: ArrayList(usize), // active vertex indices — shrinks as ears are clipped
@@ -19,9 +19,9 @@ pub const EarClipper = struct {
     triangles: ArrayList(Triangle), // output accumulator
     winding_sign: f32 = -1.0, // -1 = CW, +1 = CCW
 
-    pub fn init(allocator: Allocator, vertices: []const Point) EarClipper {
+    pub fn init(gpa: Allocator, vertices: []const Point) EarClipper {
         return .{
-            .allocator = allocator,
+            .gpa = gpa,
             .vertices = vertices,
             .polygon = .empty,
             .reflex = .empty,
@@ -30,18 +30,18 @@ pub const EarClipper = struct {
     }
 
     pub fn deinit(self: *EarClipper) void {
-        self.polygon.deinit(self.allocator);
-        self.reflex.deinit(self.allocator);
-        self.triangles.deinit(self.allocator);
+        self.polygon.deinit(self.gpa);
+        self.reflex.deinit(self.gpa);
+        self.triangles.deinit(self.gpa);
     }
 
     /// Triangulate one or more contours. The first CW contour is the outer
     /// boundary; any CCW contours are holes that get merged in via bridge edges.
     pub fn triangulate(self: *EarClipper, contours: []const Contour) ![]Triangle {
         var outers: ArrayList(Contour) = .empty;
-        defer outers.deinit(self.allocator);
+        defer outers.deinit(self.gpa);
         var holes: ArrayList(Contour) = .empty;
-        defer holes.deinit(self.allocator);
+        defer holes.deinit(self.gpa);
 
         for (contours) |contour| {
             const area = signedArea(self.vertices, contour);
@@ -50,9 +50,9 @@ pub const EarClipper = struct {
                 log.warn(.assets, "Skipping degenerate contour (area={d:.8})", .{area});
                 continue;
             } else if (area < 0) {
-                try outers.append(self.allocator, contour);
+                try outers.append(self.gpa, contour);
             } else {
-                try holes.append(self.allocator, contour);
+                try holes.append(self.gpa, contour);
             }
         }
 
@@ -61,26 +61,26 @@ pub const EarClipper = struct {
         for (outers.items) |outer| {
             // Assign holes to this outer if they lie inside it
             var matched_holes: ArrayList(Contour) = .empty;
-            defer matched_holes.deinit(self.allocator);
+            defer matched_holes.deinit(self.gpa);
 
             for (holes.items) |hole| {
                 // Test whether the hole's first vertex is inside this outer contour
                 if (hole.len > 0 and pointInContour(self.vertices, outer, self.vertices[hole[0]])) {
-                    try matched_holes.append(self.allocator, hole);
+                    try matched_holes.append(self.gpa, hole);
                 }
             }
 
             const merged = try self.eliminateHoles(outer, matched_holes.items);
-            defer self.allocator.free(merged);
+            defer self.gpa.free(merged);
 
             self.polygon.clearRetainingCapacity();
             self.reflex.clearRetainingCapacity();
 
-            try self.polygon.appendSlice(self.allocator, merged);
+            try self.polygon.appendSlice(self.gpa, merged);
             try self.clipEars();
         }
 
-        return self.triangles.toOwnedSlice(self.allocator);
+        return self.triangles.toOwnedSlice(self.gpa);
     }
 
     // ── Core ear-clipping loop ──────────────────────────────────────────
@@ -91,7 +91,7 @@ pub const EarClipper = struct {
         // Determine winding from signed area
         self.winding_sign = if (signedArea(self.vertices, self.polygon.items) < 0) @as(f32, -1.0) else @as(f32, 1.0);
 
-        try self.reflex.ensureTotalCapacity(self.allocator, self.polygon.items.len);
+        try self.reflex.ensureTotalCapacity(self.gpa, self.polygon.items.len);
         for (0..self.polygon.items.len) |i| {
             self.reflex.appendAssumeCapacity(self.classifyVertex(i));
         }
@@ -131,7 +131,7 @@ pub const EarClipper = struct {
             const prev_idx = (ear + p_len - 1) % p_len;
             const next_idx = (ear + 1) % p_len;
 
-            try self.triangles.append(self.allocator, .{
+            try self.triangles.append(self.gpa, .{
                 self.polygon.items[prev_idx],
                 self.polygon.items[ear],
                 self.polygon.items[next_idx],
@@ -151,7 +151,7 @@ pub const EarClipper = struct {
         }
 
         // Emit the final triangle
-        try self.triangles.append(self.allocator, .{
+        try self.triangles.append(self.gpa, .{
             self.polygon.items[0],
             self.polygon.items[1],
             self.polygon.items[2],
@@ -261,14 +261,14 @@ pub const EarClipper = struct {
     // ── Hole merging ────────────────────────────────────────────────────
 
     fn eliminateHoles(self: *EarClipper, outer: Contour, holes: []const Contour) ![]usize {
-        if (holes.len == 0) return self.allocator.dupe(usize, outer);
+        if (holes.len == 0) return self.gpa.dupe(usize, outer);
 
-        var current_outer = try self.allocator.dupe(usize, outer);
-        errdefer self.allocator.free(current_outer);
+        var current_outer = try self.gpa.dupe(usize, outer);
+        errdefer self.gpa.free(current_outer);
 
         for (holes) |hole| {
             const merged = try self.mergeHoleIntoOuter(current_outer, hole);
-            self.allocator.free(current_outer);
+            self.gpa.free(current_outer);
             current_outer = merged;
         }
 
@@ -352,7 +352,7 @@ pub const EarClipper = struct {
         const hole_bridge = self.findRightmostVertex(hole);
 
         // Result: outer[0..bridge] + hole (rotated to start at bridge) + bridge edges + outer[bridge+1..]
-        const res = try self.allocator.alloc(usize, outer.len + hole.len + 2);
+        const res = try self.gpa.alloc(usize, outer.len + hole.len + 2);
         var n: usize = 0;
 
         for (0..outer_bridge + 1) |i| {

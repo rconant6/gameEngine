@@ -17,11 +17,11 @@ fn monoMillis() i64 {
 }
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = init.gpa;
+    const gpa = init.gpa;
     const io = init.io;
 
     const game = engine.Engine.init(
-        allocator,
+        gpa,
         io,
         "ECS Demo",
         logical_width,

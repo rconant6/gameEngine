@@ -8,12 +8,12 @@ pub const SceneFile = struct {
     decls: []Declaration,
     source_file_name: []const u8,
 
-    pub fn deinit(self: *SceneFile, allocator: Allocator) void {
+    pub fn deinit(self: *SceneFile, gpa: Allocator) void {
         for (self.decls) |*decl| {
-            decl.deinit(allocator);
+            decl.deinit(gpa);
         }
-        allocator.free(self.decls);
-        allocator.free(self.source_file_name);
+        gpa.free(self.decls);
+        gpa.free(self.source_file_name);
     }
 };
 
@@ -24,13 +24,13 @@ pub const Declaration = union(enum) {
     component: ComponentDeclaration,
     template: TemplateDeclaration,
 
-    pub fn deinit(self: *Declaration, allocator: Allocator) void {
+    pub fn deinit(self: *Declaration, gpa: Allocator) void {
         switch (self.*) {
-            .scene => |*s| s.deinit(allocator),
-            .entity => |*e| e.deinit(allocator),
-            .asset => |*a| a.deinit(allocator),
-            .component => |*c| c.deinit(allocator),
-            .template => |*t| t.deinit(allocator),
+            .scene => |*s| s.deinit(gpa),
+            .entity => |*e| e.deinit(gpa),
+            .asset => |*a| a.deinit(gpa),
+            .component => |*c| c.deinit(gpa),
+            .template => |*t| t.deinit(gpa),
         }
     }
 };
@@ -40,12 +40,12 @@ pub const TemplateDeclaration = struct {
     components: []ComponentDeclaration,
     location: SourceLocation,
 
-    pub fn deinit(self: *TemplateDeclaration, allocator: Allocator) void {
+    pub fn deinit(self: *TemplateDeclaration, gpa: Allocator) void {
         for (self.components) |*comp| {
-            comp.deinit(allocator);
+            comp.deinit(gpa);
         }
-        allocator.free(self.name);
-        allocator.free(self.components);
+        gpa.free(self.name);
+        gpa.free(self.components);
     }
 };
 
@@ -55,12 +55,12 @@ pub const SceneDeclaration = struct {
     is_container: bool,
     location: SourceLocation,
 
-    pub fn deinit(self: *SceneDeclaration, allocator: Allocator) void {
-        allocator.free(self.name);
+    pub fn deinit(self: *SceneDeclaration, gpa: Allocator) void {
+        gpa.free(self.name);
         for (self.decls) |*decl| {
-            decl.deinit(allocator);
+            decl.deinit(gpa);
         }
-        allocator.free(self.decls);
+        gpa.free(self.decls);
     }
 };
 pub const EntityDeclaration = struct {
@@ -68,12 +68,12 @@ pub const EntityDeclaration = struct {
     components: []ComponentDeclaration,
     location: SourceLocation,
 
-    pub fn deinit(self: *EntityDeclaration, allocator: Allocator) void {
-        allocator.free(self.name);
+    pub fn deinit(self: *EntityDeclaration, gpa: Allocator) void {
+        gpa.free(self.name);
         for (self.components) |*comp| {
-            comp.deinit(allocator);
+            comp.deinit(gpa);
         }
-        allocator.free(self.components);
+        gpa.free(self.components);
     }
 };
 pub const AssetDeclaration = struct {
@@ -82,13 +82,13 @@ pub const AssetDeclaration = struct {
     properties: ?[]Property,
     location: SourceLocation,
 
-    pub fn deinit(self: *AssetDeclaration, allocator: Allocator) void {
-        allocator.free(self.name);
+    pub fn deinit(self: *AssetDeclaration, gpa: Allocator) void {
+        gpa.free(self.name);
         if (self.properties) |props| {
             for (props) |*prop| {
-                prop.deinit(allocator);
+                prop.deinit(gpa);
             }
-            allocator.free(props);
+            gpa.free(props);
         }
     }
 };
@@ -97,8 +97,8 @@ pub const ComponentDeclaration = union(enum) {
     sprite: SpriteBlock,
     collider: SpriteBlock,
 
-    pub fn deinit(self: *ComponentDeclaration, allocator: Allocator) void {
-        _ = allocator;
+    pub fn deinit(self: *ComponentDeclaration, gpa: Allocator) void {
+        _ = gpa;
         switch (self.*) {
             inline else => |*block| {
                 block.deinit();
@@ -111,22 +111,22 @@ pub const GenericBlock = struct {
     properties: ?[]Property,
     location: SourceLocation,
     nested_blocks: ?[]GenericBlock,
-    allocator: Allocator,
+    gpa: Allocator,
 
     pub fn deinit(self: *GenericBlock) void {
         if (self.properties) |props| {
             for (props) |*prop| {
-                prop.deinit(self.allocator);
+                prop.deinit(self.gpa);
             }
-            self.allocator.free(props);
+            self.gpa.free(props);
         }
         if (self.nested_blocks) |blocks| {
             for (blocks) |*block| {
                 block.deinit();
             }
-            self.allocator.free(blocks);
+            self.gpa.free(blocks);
         }
-        self.allocator.free(self.name);
+        self.gpa.free(self.name);
     }
 };
 pub const SpriteBlock = struct {
@@ -134,17 +134,17 @@ pub const SpriteBlock = struct {
     shape_type: []const u8,
     properties: ?[]Property,
     location: SourceLocation,
-    allocator: Allocator,
+    gpa: Allocator,
 
     pub fn deinit(self: *SpriteBlock) void {
         if (self.properties) |props| {
             for (props) |*prop| {
-                prop.deinit(self.allocator);
+                prop.deinit(self.gpa);
             }
-            self.allocator.free(props);
+            self.gpa.free(props);
         }
-        self.allocator.free(self.name);
-        self.allocator.free(self.shape_type);
+        self.gpa.free(self.name);
+        self.gpa.free(self.shape_type);
     }
 };
 
@@ -154,9 +154,9 @@ pub const Property = struct {
     value: Value,
     location: SourceLocation,
 
-    pub fn deinit(self: *Property, allocator: Allocator) void {
-        allocator.free(self.name);
-        self.value.deinit(allocator);
+    pub fn deinit(self: *Property, gpa: Allocator) void {
+        gpa.free(self.name);
+        self.value.deinit(gpa);
     }
 };
 
@@ -212,16 +212,16 @@ pub const Value = union(enum) {
     assetRef: []const u8,
     array: []Value,
 
-    pub fn deinit(self: *Value, allocator: Allocator) void {
+    pub fn deinit(self: *Value, gpa: Allocator) void {
         switch (self.*) {
-            .string => |s| allocator.free(s),
-            .vector => |v| allocator.free(v),
-            .assetRef => |a| allocator.free(a),
+            .string => |s| gpa.free(s),
+            .vector => |v| gpa.free(v),
+            .assetRef => |a| gpa.free(a),
             .array => |arr| {
                 for (arr) |*val| {
-                    val.deinit(allocator);
+                    val.deinit(gpa);
                 }
-                allocator.free(arr);
+                gpa.free(arr);
             },
             .number, .color, .boolean => {},
         }

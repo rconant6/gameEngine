@@ -17,7 +17,7 @@ pub const AppConfig = struct {
 };
 
 pub const App = struct {
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     window: *plat.Window,
     kb: *const plat.Keyboard,
     mouse: *const plat.Mouse,
@@ -25,8 +25,8 @@ pub const App = struct {
     logical_width: u32,
     logical_height: u32,
 
-    pub fn init(allocator: std.mem.Allocator, io: std.Io, config: AppConfig) !App {
-        try Logger.init(allocator, io);
+    pub fn init(gpa: std.mem.Allocator, io: std.Io, config: AppConfig) !App {
+        try Logger.init(gpa, io);
 
         plat.init() catch |err| {
             log.fatal(.platform, "Failed to start platform layer: {any}", .{err});
@@ -54,7 +54,7 @@ pub const App = struct {
         const scaled_width: u32 = @intFromFloat(f_width * scale_factor);
         const scaled_height: u32 = @intFromFloat(f_height * scale_factor);
 
-        const renderer = rend.Renderer.init(allocator, io, .{
+        const renderer = rend.Renderer.init(gpa, io, .{
             .width = scaled_width,
             .height = scaled_height,
             .native_handle = window.handle,
@@ -69,7 +69,7 @@ pub const App = struct {
         );
 
         return App{
-            .allocator = allocator,
+            .gpa = gpa,
             .window = window,
             .kb = plat.getKeyboard(),
             .mouse = plat.getMouse(),

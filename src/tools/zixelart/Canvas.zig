@@ -20,7 +20,7 @@ pub const PixelCell = struct {
     color: Color,
 };
 
-child_allocator: std.mem.Allocator,
+gpa: std.mem.Allocator,
 arena: std.heap.ArenaAllocator,
 allocator: std.mem.Allocator,
 
@@ -45,7 +45,8 @@ pub fn init(
 ) !*Self {
     const self = try child_alloc.create(Self);
 
-    self.child_allocator = child_alloc;
+    self.gpa = child_alloc;
+
     self.arena = std.heap.ArenaAllocator.init(child_alloc);
     self.allocator = self.arena.allocator();
 
@@ -91,7 +92,7 @@ pub fn init(
 }
 pub fn deinit(self: *Self) void {
     self.arena.deinit();
-    self.child_allocator.destroy(self);
+    self.gpa.destroy(self);
 }
 pub fn setPixel(self: *Self, state: *const ZixelState) void {
     self.pixels[

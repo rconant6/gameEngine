@@ -12,11 +12,11 @@ const Circle = Shapes.Circle(WorldPoint);
 const Ellipse = Shapes.Ellipse(WorldPoint);
 
 test "Line: init with start and end points" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const start = V2{ .x = 0, .y = 0 };
     const end = V2{ .x = 10, .y = 10 };
 
-    const line = try Line.init(allocator, start, end);
+    const line = try Line.init(gpa, start, end);
 
     try testing.expectEqual(@as(f32, 0), line.start.x);
     try testing.expectEqual(@as(f32, 0), line.start.y);
@@ -25,21 +25,21 @@ test "Line: init with start and end points" {
 }
 
 test "Line: horizontal line" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const start = V2{ .x = 0, .y = 5 };
     const end = V2{ .x = 10, .y = 5 };
 
-    const line = try Line.init(allocator, start, end);
+    const line = try Line.init(gpa, start, end);
 
     try testing.expectEqual(line.start.y, line.end.y);
 }
 
 test "Line: vertical line" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const start = V2{ .x = 5, .y = 0 };
     const end = V2{ .x = 5, .y = 10 };
 
-    const line = try Line.init(allocator, start, end);
+    const line = try Line.init(gpa, start, end);
 
     try testing.expectEqual(line.start.x, line.end.x);
 }
@@ -74,14 +74,14 @@ test "Rectangle: dimensions are consistent" {
 }
 
 test "Triangle: init with three points" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const points = [_]V2{
         V2{ .x = 0, .y = 0 },
         V2{ .x = 10, .y = 0 },
         V2{ .x = 5, .y = 10 },
     };
 
-    const tri = try Triangle.init(allocator, &points);
+    const tri = try Triangle.init(gpa, &points);
 
     // Triangle should have 3 vertices
     // Note: vertices are sorted by Y then X
@@ -90,14 +90,14 @@ test "Triangle: init with three points" {
 }
 
 test "Triangle: vertices are sorted" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
     const points = [_]V2{
         V2{ .x = 5, .y = 10 }, // Top
         V2{ .x = 0, .y = 0 },  // Bottom-left
         V2{ .x = 10, .y = 0 }, // Bottom-right
     };
 
-    const tri = try Triangle.init(allocator, &points);
+    const tri = try Triangle.init(gpa, &points);
 
     // After sorting, lowest Y should be first
     try testing.expectEqual(@as(f32, 0), tri.v0.y);

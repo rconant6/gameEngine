@@ -19,18 +19,18 @@ const V2 = core.V2;
 // They will fail until the template system is implemented
 
 test "TemplateInstantiation: load single template from file" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplateFile("examples/player/assets/templates/projectiles.template");
@@ -41,18 +41,18 @@ test "TemplateInstantiation: load single template from file" {
 }
 
 test "TemplateInstantiation: load all templates from directory" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplatesFromDirectory("examples/player/assets/templates/");
@@ -69,18 +69,18 @@ test "TemplateInstantiation: load all templates from directory" {
 }
 
 test "TemplateInstantiation: get template by name" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplateFile("examples/player/assets/templates/projectiles.template");
@@ -91,18 +91,18 @@ test "TemplateInstantiation: get template by name" {
 }
 
 test "TemplateInstantiation: instantiate entity from template" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplateFile("examples/player/assets/templates/projectiles.template");
@@ -127,18 +127,18 @@ test "TemplateInstantiation: instantiate entity from template" {
 }
 
 test "TemplateInstantiation: instantiate multiple entities from same template" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplateFile("examples/player/assets/templates/enemies.template");
@@ -164,18 +164,18 @@ test "TemplateInstantiation: instantiate multiple entities from same template" {
 }
 
 test "TemplateInstantiation: template with polygon sprite" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplateFile("examples/player/assets/templates/asteroids.template");
@@ -197,18 +197,18 @@ test "TemplateInstantiation: template with polygon sprite" {
 }
 
 test "TemplateInstantiation: template with tag component" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplateFile("examples/player/assets/templates/enemies.template");
@@ -223,18 +223,18 @@ test "TemplateInstantiation: template with tag component" {
 }
 
 test "TemplateInstantiation: template with lifetime component" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplateFile("examples/player/assets/templates/effects.template");
@@ -247,18 +247,18 @@ test "TemplateInstantiation: template with lifetime component" {
 }
 
 test "TemplateInstantiation: template not found error" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplateFile("examples/player/assets/templates/projectiles.template");
@@ -270,18 +270,18 @@ test "TemplateInstantiation: template not found error" {
 }
 
 test "TemplateInstantiation: spawn with offset from action" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplateFile("examples/player/assets/templates/projectiles.template");
@@ -298,18 +298,18 @@ test "TemplateInstantiation: spawn with offset from action" {
 }
 
 test "TemplateInstantiation: asteroid break into smaller asteroids" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplateFile("examples/player/assets/templates/asteroids.template");
@@ -332,18 +332,18 @@ test "TemplateInstantiation: asteroid break into smaller asteroids" {
 }
 
 test "TemplateInstantiation: directory load includes all files" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplatesFromDirectory("examples/player/assets/templates/");
@@ -372,18 +372,18 @@ test "TemplateInstantiation: directory load includes all files" {
 }
 
 test "TemplateInstantiation: directory load then instantiate from different files" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplatesFromDirectory("examples/player/assets/templates/");
@@ -407,18 +407,18 @@ test "TemplateInstantiation: directory load then instantiate from different file
 }
 
 test "TemplateInstantiation: directory load empty directory does not error" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     // Loading empty directory should succeed but load nothing
@@ -430,18 +430,18 @@ test "TemplateInstantiation: directory load empty directory does not error" {
 }
 
 test "TemplateInstantiation: directory load skips non-template files" {
-    const allocator = testing.allocator;
+    const gpa = testing.gpa;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(allocator, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io);
     defer assets.deinit();
 
-    var instantiator = Instantiator.init(allocator, &world, &assets);
+    var instantiator = Instantiator.init(gpa, &world, &assets);
     defer instantiator.deinit();
 
-    var template_manager = TemplateManager.init(allocator, std.testing.io, &instantiator);
+    var template_manager = TemplateManager.init(gpa, std.testing.io, &instantiator);
     defer template_manager.deinit();
 
     try template_manager.loadTemplatesFromDirectory("examples/player/assets/templates/");

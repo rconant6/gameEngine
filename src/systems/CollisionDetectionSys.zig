@@ -93,9 +93,9 @@ pub fn detectCollisions(
     const QueryType = @TypeOf(query);
     const Entry = QueryType.Entry;
     var entities: ArrayList(Entry) = .empty;
-    defer entities.deinit(world.allocator);
+    defer entities.deinit(world.gpa);
     while (query.next()) |entry| {
-        try entities.append(world.allocator, entry);
+        try entities.append(world.gpa, entry);
     }
 
     for (entities.items, 0..) |entity_a, i| {
@@ -115,7 +115,7 @@ pub fn detectCollisions(
                                 shape_b,
                                 transform_b.*,
                             )) |hit| {
-                                try collision_events.append(world.allocator, .{
+                                try collision_events.append(world.gpa, .{
                                     .entity_a = entity_a.entity,
                                     .entity_b = entity_b.entity,
                                     .point = hit.point,

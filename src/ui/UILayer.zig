@@ -86,10 +86,10 @@ pub const UILayer = struct {
     pub fn allocator(self: *const UILayer) std.mem.Allocator {
         return self.gpa;
     }
-    pub fn init(alloc: std.mem.Allocator) UILayer {
+    pub fn init(gpa: std.mem.Allocator) UILayer {
         return .{
             .views = .empty,
-            .gpa = alloc,
+            .gpa = gpa,
         };
     }
     pub fn deinit(self: *UILayer) void {
