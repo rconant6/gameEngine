@@ -167,25 +167,24 @@ pub const TypeAnnotation = struct {
 
 pub const AssetType = enum {
     font,
+    zxl,
     // TODO(asset-types): Add when engine implements:
-    // texture,   // 2D images for sprites
     // audio,     // Sound effects and music
     // shader,    // Custom shader programs
-    // sprite,    // Sprite sheet definitions
     // material,  // Material/appearance data
-    // mesh,      // 3D model data (future 3D support)};
+    // mesh,      // 3D model data (future 3D support)
     // NOTE: Lexer will need to have added to keywords
 
     pub fn fromString(str: []const u8) ?AssetType {
         if (std.mem.eql(u8, str, "font")) return .font;
-        // TODO(asset-types): Add checks for new types here
+        if (std.mem.eql(u8, str, "zxl")) return .zxl;
         return null;
     }
 
     pub fn toString(self: AssetType) []const u8 {
         return switch (self) {
             .font => "font",
-            // TODO(asset-types): Add cases for new types here
+            .zxl => "zxl",
         };
     }
 };

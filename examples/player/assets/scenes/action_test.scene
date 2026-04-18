@@ -358,7 +358,7 @@
       position:vec2 {-13.0, 9.0}
     [Text]
       text:string "action system test"
-      font_asset:asset_ref "OrbitronFont"
+      font_name:string "OrbitronFont"
       text_color:color #ffffff
       size:f32 0.6
 
@@ -368,7 +368,7 @@
       position:vec2 {-13.0, -9.0}
     [Text]
       text:string "red=mutual destroy | green=bounce | purple=spawner"
-      font_asset:asset_ref "OrbitronFont"
+      font_name:string "OrbitronFont"
       text_color:color #888888
       size:f32 0.35
 
@@ -377,7 +377,7 @@
       position:vec2 {-13.0, -9.5}
     [Text]
       text:string "yellow=multi-action | cyan=tag-specific | green-center=player (wasd+Space)"
-      font_asset:asset_ref "OrbitronFont"
+      font_name:string "OrbitronFont"
       text_color:color #888888
       size:f32 0.35
       

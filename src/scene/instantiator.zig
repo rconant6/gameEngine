@@ -30,7 +30,6 @@ const Components = ecs.comps;
 
 const asset = @import("assets");
 const Font = asset.Font;
-const FontHandle = asset.FontHandle;
 const AssetManager = asset.AssetManager;
 
 const rend = @import("renderer");
@@ -63,7 +62,6 @@ pub const InstantiatorError = error{
     ColorTypeMismatch,
     EnumTypeMismatch,
     FloatTypeMismatch,
-    FontHandleTypeMismatch,
     IntTypeMismatch,
     KeyCodeTypeMismatch,
     MouseButtonTypeMismatch,
@@ -186,6 +184,11 @@ pub const Instantiator = struct {
                     return InstantiatorError.UnableToLoadFont;
                 };
             },
+            .zxl => {
+                self.instantiateZxl(asset_decl) catch {
+                    return InstantiatorError.UnableToLoadFont; // reuse for now
+                };
+            },
         };
     }
 
@@ -194,44 +197,56 @@ pub const Instantiator = struct {
         asset_decl: *const AssetDeclaration,
     ) !void {
         const props = asset_decl.properties orelse return;
-        const handle = if (getProperty(props, "abs_path")) |prop| blk: {
-            const abs_path_value = try self.extractValueForType(
-                []const u8,
-                prop.value,
-            ) orelse
+
+        if (getProperty(props, "abs_path")) |prop| {
+            const abs_path = try self.extractValueForType([]const u8, prop.value) orelse
                 return InstantiatorError.NotOptionalValue;
-            break :blk try self.assets.loadFontFromPath(abs_path_value);
-        } else if (getProperty(props, "filename")) |f| blk: {
+            try self.assets.loadFontFromPath(asset_decl.name, abs_path);
+        } else if (getProperty(props, "filename")) |f| {
+            const file = try self.extractValueForType([]const u8, f.value) orelse
+                return InstantiatorError.NotOptionalValue;
+            if (getProperty(props, "path")) |p| {
+                const path = try self.extractValueForType([]const u8, p.value) orelse
+                    return InstantiatorError.NotOptionalValue;
+                const full = try std.fs.path.join(self.gpa, &.{ path, file });
+                defer self.gpa.free(full);
+                try self.assets.loadFontFromPath(asset_decl.name, full);
+            } else {
+                try self.assets.loadFont(asset_decl.name, file);
+            }
+        } else {
+            return InstantiatorError.MissingAssetPath;
+        }
+    }
+
+    fn instantiateZxl(
+        self: *Instantiator,
+        asset_decl: *const AssetDeclaration,
+    ) !void {
+        const props = asset_decl.properties orelse return;
+
+        const full_path = if (getProperty(props, "filename")) |f| blk: {
             const file = try self.extractValueForType(
                 []const u8,
                 f.value,
-            ) orelse
-                return InstantiatorError.NotOptionalValue;
+            ) orelse return InstantiatorError.NotOptionalValue;
+
             if (getProperty(props, "path")) |p| {
                 const path = try self.extractValueForType(
                     []const u8,
                     p.value,
-                ) orelse
-                    return InstantiatorError.NotOptionalValue;
+                ) orelse return InstantiatorError.NotOptionalValue;
 
-                const full = try std.fs.path.join(self.gpa, &.{ path, file });
-                defer self.gpa.free(full);
-                break :blk try self.assets.loadFontFromPath(full);
+                break :blk try std.fs.path.join(self.gpa, &.{ path, file });
             } else {
-                if (self.assets.fonts.font_path.len < 0)
-                    return InstantiatorError.MissingAssetPath;
-                break :blk try self.assets.loadFont(file);
+                break :blk try self.gpa.dupe(u8, file);
             }
         } else {
             return InstantiatorError.MissingAssetPath;
         };
+        defer self.gpa.free(full_path);
 
-        const gop = try self.assets.name_to_font.getOrPut(asset_decl.name);
-        if (!gop.found_existing) {
-            const owned_name = try self.gpa.dupe(u8, asset_decl.name);
-            gop.key_ptr.* = owned_name;
-            gop.value_ptr.* = handle;
-        }
+        try self.assets.loadZxl(asset_decl.name, full_path);
     }
 
     // MARK: Components
@@ -717,12 +732,6 @@ pub const Instantiator = struct {
                     return switch (value) {
                         .color => |c| Color.initFromU32Hex(c),
                         else => InstantiatorError.ColorTypeMismatch,
-                    };
-                }
-                if (T == FontHandle) {
-                    return switch (value) {
-                        .assetRef => |a| try self.assets.getFontAssetHandle(a),
-                        else => InstantiatorError.FontHandleTypeMismatch,
                     };
                 }
                 return InstantiatorError.TypeMismatch;

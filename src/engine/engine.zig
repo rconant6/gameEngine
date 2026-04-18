@@ -153,8 +153,10 @@ pub const Engine = struct {
             .priority = 1,
         }) catch |err| fatal("Camera Component", err);
 
-        var asset_manager = AssetManager.init(gpa, io) catch |err| fatal("Asset Manager", err);
-        asset_manager.setRenderer(&rend);
+        // Renderer pointer is re-seated to &engine.renderer after engine.* is assigned below.
+        // Pass undefined here — TextureManager never dereferences the renderer pointer until first
+        // texture upload, which happens after init is complete.
+        const asset_manager = AssetManager.init(gpa, io, undefined) catch |err| fatal("Asset Manager", err);
         log.info(.engine, "ASSET MANAGER initialized", .{});
         const action_system = ActionSystem.init(gpa) catch |err| fatal("Action System", err);
         log.info(.engine, "ACTIONS SYSTEM initialized", .{});
@@ -181,11 +183,13 @@ pub const Engine = struct {
             .window_height = height,
         };
 
+        // Re-seat the renderer pointer to the stable heap address now that engine.* is assigned
+        engine.assets.textures.renderer = &engine.renderer;
         engine.instantiator = .init(gpa, &engine.world, &engine.assets);
         engine.template_manager = .init(gpa, io, &engine.instantiator);
         engine.world.template_manager = &engine.template_manager;
 
-        const default_font = engine.assets.getFontByName("__default__") catch |err| fatal("Default Font Loading", err);
+        const default_font = engine.assets.getFont("__default__") orelse fatal("Default Font Loading", error.FontNotFound);
         engine.debugger = .init(gpa, &engine.renderer, default_font);
 
         log.info(.engine, "Engine successfully started", .{});
@@ -262,6 +266,14 @@ pub const Engine = struct {
         if (debug_enabled) {
             self.checkInternals();
         }
+
+        // Hot reload: poll file mtimes once per second (~60 frames at 60fps)
+        if (self.performance_metrics.frame_count % 60 == 0) {
+            self.assets.checkForChanges() catch |err| {
+                log.warn(.assets, "Hot reload check failed: {}", .{err});
+            };
+        }
+
         Systems.movementSystem(&self.world, dt, &self.debugger);
         Systems.physicsSystem(&self.world, dt);
         Systems.collisionDetectionSystem(

@@ -5,8 +5,8 @@ const debug = @import("debug");
 const log = debug.log;
 
 pub fn getFont(self: *Engine, name: []const u8) !*const Font {
-    return self.assets.getFontByName(name) catch |err| {
-        log.err(.assets, "Unable to get Font[{s}] {any}", .{ name, err });
-        return err;
+    return self.assets.getFont(name) orelse {
+        log.err(.assets, "Font not found: {s}", .{name});
+        return error.FontNotFound;
     };
 }

@@ -227,6 +227,7 @@ pub const Parser = struct {
 
         const asset_type: ast.AssetType = switch (self.current_tok.tag) {
             .font => .font,
+            .zxl => .zxl,
             else => return ParseError.UnknownAssetType,
         };
         _ = try self.advance(); // Consume the asset type token

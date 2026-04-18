@@ -118,6 +118,21 @@ pub const Renderer = struct {
         return self.backend.device;
     }
 
+    pub fn createTexture(self: *Renderer, width: u32, height: u32) !*Texture {
+        return self.backend.createTexture(width, height);
+    }
+
+    pub fn uploadTextureData(
+        self: *Renderer,
+        texture: *Texture,
+        width: u32,
+        height: u32,
+        data: [*]const u8,
+        bytes_per_row: u32,
+    ) void {
+        self.backend.uploadTextureData(texture, width, height, data, bytes_per_row);
+    }
+
     pub fn drawTextureQuad(
         self: *Renderer,
         texture: *Texture,

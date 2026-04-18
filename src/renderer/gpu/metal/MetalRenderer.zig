@@ -143,6 +143,21 @@ pub fn deinit(self: *Self) void {
     // TODO: Release all the MTL resources
 }
 
+pub fn createTexture(self: *Self, width: u32, height: u32) !*MTLTexture {
+    return MetalBridge.createTexture(self.device, width, height);
+}
+
+pub fn uploadTextureData(
+    _: *Self,
+    texture: *MTLTexture,
+    width: u32,
+    height: u32,
+    data: [*]const u8,
+    bytes_per_row: u32,
+) void {
+    MetalBridge.uploadTextureData(texture, width, height, data, bytes_per_row);
+}
+
 pub fn resize(self: *Self, width: u32, height: u32) !void {
     self.width = width;
     self.height = height;

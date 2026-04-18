@@ -8,6 +8,10 @@
 [UIFont:asset font]
   filename:string "pressStart1.ttf"
 
+[TestSprite:asset zxl]
+  path:string "assets/sprites/"
+  filename:string "test_2x2.zxl"
+
 [GameScene:scene]
   [Bouncer:entity]
     [Transform]
@@ -63,7 +67,7 @@
       position:vec2 {-13.0, 8.0}
     [Text]
       text:string "abcdefghijklmnopqrstuvwxyz0123456789:;!*+-=/@#%^&()"
-      font_asset:asset_ref "OrbitronFont"
+      font_name:string "OrbitronFont"
       text_color:color #FF8800
       size:f32 0.80
 
@@ -79,7 +83,6 @@
       stroke_width:f32 1.0
       visible:bool true
     [Physics]
-      velocity:vec2 {0.0, 0.0}
       mass:f32 1.0
       friction:f32 0.5
 
@@ -114,6 +117,14 @@
       fill_color:color #00FFAA
       stroke_color:color #00FFFF
       visible:bool true
+
+  [ZxlTest:entity]
+    [Transform]
+      position:vec2 {5.0, 5.0}
+      scale:f32 1.0
+    [ZxlSprite]
+      asset_name:string "TestSprite"
+      pixel_scale:f32 2.0
 
   [UI:scene]
     [HealthBar:entity]

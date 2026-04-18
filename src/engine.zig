@@ -36,7 +36,6 @@ pub const ShapeRegistry = renderer.ShapeRegistry;
 
 // MARK: Asset Types
 const assets = @import("assets");
-pub const FontHandle = assets.FontHandle;
 pub const Font = assets.Font;
 
 // MARK: ECS Types

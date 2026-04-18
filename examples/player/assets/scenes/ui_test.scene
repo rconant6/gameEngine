@@ -2,6 +2,10 @@
   path:string "assets/fonts/"
   filename: string "Orbitron.ttf"
 
+[TestSprite:asset zxl]
+  path:string "assets/sprites/"
+  filename:string "test_2x2.zxl"
+
 [UITestScene:scene]
   // Background grid helper
   [Background:entity]
@@ -31,6 +35,15 @@
       visible:bool true
     [Tag]
       tags:string "origin"
+
+  // ZXL sprite test — should appear as a small pixel art quad near the origin
+  [ZxlTest:entity]
+    [Transform]
+      position:vec2 {3.0, 3.0}
+      scale:f32 1.0
+    [ZxlSprite]
+      asset_name:string "TestSprite"
+      pixel_scale:f32 2.0
 
   // Player - camera will follow this
   [Player:entity]
@@ -393,7 +406,7 @@
       position:vec2 {-13.0, 9.0}
     [Text]
       text:string "ui test scene - screen-space hud elements"
-      font_asset:asset_ref "OrbitronFont"
+      font_name:string "OrbitronFont"
       text_color:color #ffffff
       size:f32 0.7
 
@@ -402,7 +415,7 @@
       position:vec2 {-13.0, -8.5}
     [Text]
       text:string "arrow keys: pan camera | q/e: zoom in/out | r: reset camera"
-      font_asset:asset_ref "OrbitronFont"
+      font_name:string "OrbitronFont"
       text_color:color #888888
       size:f32 0.35
 
@@ -411,6 +424,6 @@
       position:vec2 {-13.0, -9.0}
     [Text]
       text:string "wasd: move player | WATCH: hud elements should stay fixed on screen!"
-      font_asset:asset_ref "OrbitronFont"
+      font_name:string "OrbitronFont"
       text_color:color #888888
       size:f32 0.35

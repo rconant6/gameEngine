@@ -270,7 +270,7 @@
       position:vec2 {-13.0, 9.0}
     [Text]
       text:string "collision test - circle vs circle"
-      font_asset:asset_ref "OrbitronFont"
+      font_name:string "OrbitronFont"
       text_color:color #ffffff
       size:f32 0.6
 
@@ -280,6 +280,6 @@
       position:vec2 {-13.0, -9.5}
     [Text]
       text:string "blue=static  red=fast  yellow=slow  purple=scaled"
-      font_asset:asset_ref "OrbitronFont"
+      font_name:string "OrbitronFont"
       text_color:color #888888
       size:f32 0.4
