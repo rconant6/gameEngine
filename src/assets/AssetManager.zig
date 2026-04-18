@@ -20,27 +20,27 @@ const Self = @This();
 // Embed the default font at compile time (relative to this file)
 const embedded_orbitron_font = @embedFile("default_orbitron.ttf");
 
-allocator: std.mem.Allocator,
+gpa: std.mem.Allocator,
 fonts: FontManager,
 name_to_font: StringHashMap(FontHandle),
 name_to_zxl: StringHashMap(ZxlAsset),
 renderer: *const Renderer,
 
-pub fn init(alloc: std.mem.Allocator, io: std.Io) !Self {
-    var font_manager: FontManager = .init(alloc, io);
+pub fn init(gpa: std.mem.Allocator, io: std.Io) !Self {
+    var font_manager: FontManager = .init(gpa, io);
     try font_manager.setFontPath("assets/fonts/");
 
-    var name_to_font = StringHashMap(FontHandle).init(alloc);
+    var name_to_font = StringHashMap(FontHandle).init(gpa);
 
     // Load the embedded default font
     const default_handle = try font_manager.loadFontFromMemory("default_orbitron", embedded_orbitron_font);
-    try name_to_font.put(try alloc.dupe(u8, "__default__"), default_handle);
+    try name_to_font.put(try gpa.dupe(u8, "__default__"), default_handle);
 
     return Self{
-        .allocator = alloc,
+        .gpa = gpa,
         .fonts = font_manager,
         .name_to_font = name_to_font,
-        .name_to_zxl = .init(alloc),
+        .name_to_zxl = .init(gpa),
         .renderer = undefined,
     };
 }
@@ -48,14 +48,14 @@ pub fn deinit(self: *Self) void {
     log.info(.assets, "Asset Manager shutting down...", .{});
     var font_iter = self.name_to_font.keyIterator();
     while (font_iter.next()) |key| {
-        self.allocator.free(key.*);
+        self.gpa.free(key.*);
     }
     self.fonts.deinit();
     self.name_to_font.deinit();
 
     var tex_iter = self.name_to_zxl.keyIterator();
     while (tex_iter.next()) |key| {
-        self.allocator.free(key.*);
+        self.gpa.free(key.*);
     }
     self.name_to_zxl.deinit();
 }

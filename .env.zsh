@@ -1,5 +1,5 @@
 # ~/Developer/zig/gameEngine/.env.zsh
-
+alias build='zig build --prominent-compile-errors --summary all'
 alias ui='zig build ui --prominent-compile-errors'
 alias test='zig build test --prominent-compile-errors'
 alias run='zig build play --prominent-compile-errors'

@@ -89,6 +89,33 @@ extern fn metal_command_buffer_present_drawable(
 ) void;
 extern fn metal_buffer_length(buffer: *MTLBuffer) u64;
 
+extern fn metal_create_texture(
+    device: *MTLDevice,
+    width: u32,
+    height: u32,
+) ?*MTLTexture;
+
+extern fn metal_texture_replace_region(
+    texture: *MTLTexture,
+    width: u32,
+    height: u32,
+    data: [*]const u8,
+    bytes_per_row: u32,
+) void;
+
+extern fn metal_render_encoder_set_fragment_texture(
+    encoder: *MTLRenderCommandEncoder,
+    texture: *MTLTexture,
+    index: u64,
+) void;
+
+extern fn metal_create_texture_pipeline_state(
+    device: *MTLDevice,
+    vertex_function: *MTLFunction,
+    fragment_function: *MTLFunction,
+    pixel_format: u64,
+) ?*MTLRenderPipelineState;
+
 // MARK: Zig wrappers for extern functions
 pub const MetalBridge = struct {
     pub fn createDevice() !*MTLDevice {
@@ -214,5 +241,41 @@ pub const MetalBridge = struct {
 
     pub fn getBufferLength(buffer: *MTLBuffer) u64 {
         return metal_buffer_length(buffer);
+    }
+
+    pub fn createTexture(device: *MTLDevice, width: u32, height: u32) !*MTLTexture {
+        return metal_create_texture(device, width, height) orelse MTLError.TextureCreationFailed;
+    }
+
+    pub fn uploadTextureData(
+        texture: *MTLTexture,
+        width: u32,
+        height: u32,
+        data: [*]const u8,
+        bytes_per_row: u32,
+    ) void {
+        metal_texture_replace_region(texture, width, height, data, bytes_per_row);
+    }
+
+    pub fn setFragmentTexture(
+        encoder: *MTLRenderCommandEncoder,
+        texture: *MTLTexture,
+        index: u64,
+    ) void {
+        metal_render_encoder_set_fragment_texture(encoder, texture, index);
+    }
+
+    pub fn createTexturePipelineState(
+        device: *MTLDevice,
+        vertex_function: *MTLFunction,
+        fragment_function: *MTLFunction,
+        pixel_format: MTLPixelFormat,
+    ) !*MTLRenderPipelineState {
+        return metal_create_texture_pipeline_state(
+            device,
+            vertex_function,
+            fragment_function,
+            @intFromEnum(pixel_format),
+        ) orelse MTLError.PipelineCreationFailed;
     }
 };

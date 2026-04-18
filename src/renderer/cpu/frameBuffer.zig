@@ -27,9 +27,9 @@ pub const FrameBuffer = struct {
     width: u32,
     height: u32,
 
-    pub fn init(allocator: std.mem.Allocator, width: u32, height: u32) !FrameBuffer {
+    pub fn init(gpa: std.mem.Allocator, width: u32, height: u32) !FrameBuffer {
         const size: usize = @intCast(width * height);
-        var arena = std.heap.ArenaAllocator.init(allocator);
+        var arena = std.heap.ArenaAllocator.init(gpa);
 
         const buffer_memory = try arena.allocator().alloc(Color, size * 3);
         const display = buffer_memory[0..size];

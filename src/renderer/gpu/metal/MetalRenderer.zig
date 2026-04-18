@@ -64,17 +64,17 @@ frame_number: u64,
 start_time: f64,
 last_frame_time: f64,
 
-allocator: std.mem.Allocator,
+gpa: std.mem.Allocator,
 
-pub fn init(allocator: std.mem.Allocator, io: std.Io, config: RenderConfig) (MTLError || std.mem.Allocator.Error)!Self {
+pub fn init(gpa: std.mem.Allocator, io: std.Io, config: RenderConfig) (MTLError || std.mem.Allocator.Error)!Self {
     const layer = try MetalBridge.getLayerFromView(config.native_handle.?);
     const device = try MetalBridge.createDevice();
     const queue = try MetalBridge.createCommandQueue(device);
 
-    const shader_path = try getShaderPath(allocator, io);
-    defer allocator.free(shader_path);
-    const shader_path_z = try allocator.dupeZ(u8, shader_path);
-    defer allocator.free(shader_path_z);
+    const shader_path = try getShaderPath(gpa, io);
+    defer gpa.free(shader_path);
+    const shader_path_z = try gpa.dupeZ(u8, shader_path);
+    defer gpa.free(shader_path_z);
     const library = try MetalBridge.createLibraryFromFile(device, shader_path_z);
     const vertex_fn = try MetalBridge.createFunction(library, "vertex_main");
     const fragment_fn = try MetalBridge.createFunction(library, "fragment_main");
@@ -85,7 +85,7 @@ pub fn init(allocator: std.mem.Allocator, io: std.Io, config: RenderConfig) (MTL
     const buffer_size = MAX_VERT_SIZE * vertex_size;
     const options = @intFromEnum(MTLResourceOptions.storageModeShared);
     const vertex_buffer = try MetalBridge.createBuffer(device, buffer_size, options);
-    const batch = GeometryBatch.init(allocator);
+    const batch = GeometryBatch.init(gpa);
     const pipeline_state = try MetalBridge.createRenderPipelineState(
         device,
         vertex_fn,
@@ -95,7 +95,7 @@ pub fn init(allocator: std.mem.Allocator, io: std.Io, config: RenderConfig) (MTL
 
     const tex_buffer_size = 256 * 1024; // 256KB
     const tex_vertex_buffer = try MetalBridge.createBuffer(device, tex_buffer_size, options);
-    const tex_batch = TextureBatch.init(allocator);
+    const tex_batch = TextureBatch.init(gpa);
     const texture_pipeline_state = try MetalBridge.createTexturePipelineState(
         device,
         tex_vertex_fn,
@@ -123,16 +123,16 @@ pub fn init(allocator: std.mem.Allocator, io: std.Io, config: RenderConfig) (MTL
         .frame_number = 0,
         .start_time = 0.0, // TODO: get time from platform
         .last_frame_time = 0.0,
-        .allocator = allocator,
+        .gpa = gpa,
     };
 }
-fn getShaderPath(allocator: std.mem.Allocator, io: std.Io) ![]const u8 {
+fn getShaderPath(gpa: std.mem.Allocator, io: std.Io) ![]const u8 {
     var path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const exe_len = std.process.executablePath(io, &path_buf) catch return MTLError.ShaderPathError;
     const exe_path = path_buf[0..exe_len];
     const exe_dir = std.fs.path.dirname(exe_path) orelse return MTLError.ShaderPathError;
 
-    return std.fs.path.join(allocator, &.{ exe_dir, "default.metallib" }) catch {
+    return std.fs.path.join(gpa, &.{ exe_dir, "default.metallib" }) catch {
         return MTLError.ShaderPathError;
     };
 }

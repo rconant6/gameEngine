@@ -17,7 +17,7 @@ pub const ReadError = error{
 
 const magic = "ZXL\x00";
 
-pub fn fromBytes(allocator: Allocator, data: []const u8) ReadError!ZxlImage {
+pub fn fromBytes(gpa: Allocator, data: []const u8) ReadError!ZxlImage {
     if (data.len < 16) return error.UnexpectedEof;
 
     if (!std.mem.eql(u8, data[0..4], magic)) return error.InvalidMagic;
@@ -54,7 +54,7 @@ pub fn fromBytes(allocator: Allocator, data: []const u8) ReadError!ZxlImage {
 
     var pos: usize = 16 + palette_bytes;
 
-    var image = try ZxlImage.init(allocator, "");
+    var image = try ZxlImage.init(gpa, "");
     errdefer image.deinit();
     image.palette = palette;
 
@@ -88,14 +88,14 @@ pub fn fromBytes(allocator: Allocator, data: []const u8) ReadError!ZxlImage {
     return image;
 }
 
-pub fn fromFile(allocator: Allocator, io: std.Io, path: []const u8) !ZxlImage {
-    const buf = std.Io.Dir.cwd().readFileAllocOptions(io, path, allocator, .unlimited, .@"1", null) catch |err| {
+pub fn fromFile(gpa: Allocator, io: std.Io, path: []const u8) !ZxlImage {
+    const buf = std.Io.Dir.cwd().readFileAllocOptions(io, path, gpa, .unlimited, .@"1", null) catch |err| {
         log.err(.application, "Unable to open file {s}: {any}", .{ path, err });
         return err;
     };
-    defer allocator.free(buf);
+    defer gpa.free(buf);
 
-    return try fromBytes(allocator, buf);
+    return try fromBytes(gpa, buf);
 }
 
 fn readU16Le(bytes: *const [2]u8) u16 {

@@ -3,7 +3,7 @@ const testing = std.testing;
 const scene_format = @import("scene-format");
 
 test "SceneFormat: parse simple scene file" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [Player:entity]
@@ -19,7 +19,7 @@ test "SceneFormat: parse simple scene file" {
 }
 
 test "SceneFormat: parse entity with Transform component" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [Player:entity]
@@ -44,7 +44,7 @@ test "SceneFormat: parse entity with Transform component" {
 }
 
 test "SceneFormat: parse entity with Collider circle" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [Ball:entity]
@@ -61,7 +61,7 @@ test "SceneFormat: parse entity with Collider circle" {
 }
 
 test "SceneFormat: parse entity with Collider rectangle" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [Box:entity]
@@ -79,7 +79,7 @@ test "SceneFormat: parse entity with Collider rectangle" {
 }
 
 test "SceneFormat: parse entity with Sprite circle" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [Ball:entity]
@@ -99,7 +99,7 @@ test "SceneFormat: parse entity with Sprite circle" {
 }
 
 test "SceneFormat: parse entity with Sprite rectangle" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [Box:entity]
@@ -120,7 +120,7 @@ test "SceneFormat: parse entity with Sprite rectangle" {
 }
 
 test "SceneFormat: parse entity with Velocity" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [MovingBall:entity]
@@ -138,7 +138,7 @@ test "SceneFormat: parse entity with Velocity" {
 }
 
 test "SceneFormat: parse entity with multiple components" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [ComplexEntity:entity]
@@ -180,7 +180,7 @@ test "SceneFormat: parse entity with multiple components" {
 }
 
 test "SceneFormat: parse scene with multiple entities" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [Entity1:entity]
@@ -209,7 +209,7 @@ test "SceneFormat: parse scene with multiple entities" {
 }
 
 test "SceneFormat: parse asset declaration" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestFont:asset font]
         \\  path:string "assets/fonts/"
@@ -229,7 +229,7 @@ test "SceneFormat: parse asset declaration" {
 }
 
 test "SceneFormat: parse Text component with font asset reference" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestFont:asset font]
         \\  path:string "assets/fonts/"
@@ -252,7 +252,7 @@ test "SceneFormat: parse Text component with font asset reference" {
 }
 
 test "SceneFormat: parse entity with tag components" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [WrappingEntity:entity]
@@ -280,7 +280,7 @@ test "SceneFormat: parse entity with tag components" {
 }
 
 test "SceneFormat: parse scene with comments" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\// This is a test scene
         \\[TestScene:scene]
@@ -301,7 +301,7 @@ test "SceneFormat: parse scene with comments" {
 }
 
 test "SceneFormat: parse Camera component" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [Camera:entity]
@@ -320,7 +320,7 @@ test "SceneFormat: parse Camera component" {
 }
 
 test "SceneFormat: parse Rectangle sprite component" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [Ground:entity]
@@ -341,7 +341,7 @@ test "SceneFormat: parse Rectangle sprite component" {
 }
 
 test "SceneFormat: parse color values" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [ColoredEntity:entity]
@@ -362,7 +362,7 @@ test "SceneFormat: parse color values" {
 }
 
 test "SceneFormat: parse vec2, vec3 values" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const source =
         \\[TestScene:scene]
         \\  [VectorEntity:entity]

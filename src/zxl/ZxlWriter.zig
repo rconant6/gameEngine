@@ -7,7 +7,7 @@ const ZxlFrame = img.ZxlFrame;
 
 const magic = "ZXL\x00";
 
-pub fn toBytes(allocator: Allocator, image: *const ZxlImage) ![]u8 {
+pub fn toBytes(gpa: Allocator, image: *const ZxlImage) ![]u8 {
     // Compute total size
     const palette_bytes: usize = @as(usize, image.palette.count) * 4;
 
@@ -18,8 +18,8 @@ pub fn toBytes(allocator: Allocator, image: *const ZxlImage) ![]u8 {
     }
 
     const total = 16 + palette_bytes + frames_bytes;
-    const buf = try allocator.alloc(u8, total);
-    errdefer allocator.free(buf);
+    const buf = try gpa.alloc(u8, total);
+    errdefer gpa.free(buf);
 
     var pos: usize = 0;
 
@@ -85,9 +85,9 @@ pub fn toBytes(allocator: Allocator, image: *const ZxlImage) ![]u8 {
     return buf;
 }
 
-pub fn toFile(allocator: Allocator, io: std.Io, image: *const ZxlImage, path: []const u8) !void {
-    const bytes = try toBytes(allocator, image);
-    defer allocator.free(bytes);
+pub fn toFile(gpa: Allocator, io: std.Io, image: *const ZxlImage, path: []const u8) !void {
+    const bytes = try toBytes(gpa, image);
+    defer gpa.free(bytes);
 
     var buf: [4096]u8 = undefined;
     const file = try std.Io.Dir.cwd().createFile(io, path, .{});

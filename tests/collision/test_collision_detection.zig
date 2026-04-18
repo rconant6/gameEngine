@@ -255,7 +255,7 @@ test "CollisionDetection: rect-rect with scale" {
 // MARK: World Integration Tests
 
 test "CollisionDetection: detect collisions in world with two circles" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -293,7 +293,7 @@ test "CollisionDetection: detect collisions in world with two circles" {
 }
 
 test "CollisionDetection: detect no collisions when circles far apart" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -326,7 +326,7 @@ test "CollisionDetection: detect no collisions when circles far apart" {
 }
 
 test "CollisionDetection: detect multiple collisions" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -369,7 +369,7 @@ test "CollisionDetection: detect multiple collisions" {
 }
 
 test "CollisionDetection: ignore entities without collider" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -399,7 +399,7 @@ test "CollisionDetection: ignore entities without collider" {
 }
 
 test "CollisionDetection: collision events contain correct entity IDs" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 

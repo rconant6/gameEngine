@@ -12,7 +12,7 @@ const Circle = Shapes.Circle(WorldPoint);
 const Ellipse = Shapes.Ellipse(WorldPoint);
 
 test "Line: init with start and end points" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const start = V2{ .x = 0, .y = 0 };
     const end = V2{ .x = 10, .y = 10 };
 
@@ -25,7 +25,7 @@ test "Line: init with start and end points" {
 }
 
 test "Line: horizontal line" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const start = V2{ .x = 0, .y = 5 };
     const end = V2{ .x = 10, .y = 5 };
 
@@ -35,7 +35,7 @@ test "Line: horizontal line" {
 }
 
 test "Line: vertical line" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const start = V2{ .x = 5, .y = 0 };
     const end = V2{ .x = 5, .y = 10 };
 
@@ -74,7 +74,7 @@ test "Rectangle: dimensions are consistent" {
 }
 
 test "Triangle: init with three points" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const points = [_]V2{
         V2{ .x = 0, .y = 0 },
         V2{ .x = 10, .y = 0 },
@@ -90,7 +90,7 @@ test "Triangle: init with three points" {
 }
 
 test "Triangle: vertices are sorted" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     const points = [_]V2{
         V2{ .x = 5, .y = 10 }, // Top
         V2{ .x = 0, .y = 0 },  // Bottom-left

@@ -107,7 +107,7 @@ fn drawGlyph(
     const triangles = if (font.glyph_triangles.get(glyph_index)) |cached|
         cached
     else blk: {
-        const tris = try glyph_builder.buildTriangles(font.alloc, glyph);
+        const tris = try glyph_builder.buildTriangles(font.gpa, glyph);
         try font.glyph_triangles.put(glyph_index, tris);
         break :blk tris;
     };
@@ -147,7 +147,7 @@ fn drawGlyphScreen(
     const triangles = if (font.glyph_triangles.get(glyph_index)) |cached|
         cached
     else blk: {
-        const tris = try glyph_builder.buildTriangles(font.alloc, glyph);
+        const tris = try glyph_builder.buildTriangles(font.gpa, glyph);
         try font.glyph_triangles.put(glyph_index, tris);
         break :blk tris;
     };

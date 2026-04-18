@@ -31,6 +31,7 @@ pub const MetalError = error{
     LayerUnavailable,
     DrawableUnavailable,
     TextureUnavailable,
+    TextureCreationFailed,
 
     RenderPassCreationFailed,
     RenderEncoderCreationFailed,
@@ -40,11 +41,15 @@ pub const Vertex = extern struct {
     position: [2]f32, // x, y, in clip space [-1, 1]
     color: [4]f32, // r, g, b, a in range [0, 1]
 };
+pub const TextureVertex = extern struct {
+    position: [2]f32, // clip space x,y
+    texcoord: [2]f32, // u, v in [0,1]
+};
 pub const VertexBufferPool = struct {
     buffers: std.ArrayList(*MTLBuffer),
     current_index: usize,
     buffer_size: usize,
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
 };
 
 const MTLStorageMode = enum(u32) {

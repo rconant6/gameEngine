@@ -15,7 +15,7 @@ const CollisionDetectionSys = systems.CollisionDetectionSys;
 // MARK: End-to-End Integration Tests
 
 test "E2E: create world, add entities, detect collisions" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -50,7 +50,7 @@ test "E2E: create world, add entities, detect collisions" {
 }
 
 test "E2E: physics simulation with collisions" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -120,7 +120,7 @@ test "E2E: physics simulation with collisions" {
 }
 
 test "E2E: multiple entities with different collision shapes" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -167,7 +167,7 @@ test "E2E: multiple entities with different collision shapes" {
 }
 
 test "E2E: scale affects collision detection" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -203,7 +203,7 @@ test "E2E: scale affects collision detection" {
 }
 
 test "E2E: query system with transforms and velocities" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -251,7 +251,7 @@ test "E2E: query system with transforms and velocities" {
 }
 
 test "E2E: component removal and collision detection" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -294,7 +294,7 @@ test "E2E: component removal and collision detection" {
 }
 
 test "E2E: entity destruction and collision detection" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -337,7 +337,7 @@ test "E2E: entity destruction and collision detection" {
 }
 
 test "E2E: V2 math in transform updates" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -381,7 +381,7 @@ test "E2E: V2 math in transform updates" {
 }
 
 test "E2E: collision normal calculation with V2" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 
@@ -428,7 +428,7 @@ test "E2E: collision normal calculation with V2" {
 }
 
 test "E2E: stress test with many entities" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
     var world = try World.init(gpa);
     defer world.deinit();
 

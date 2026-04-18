@@ -28,8 +28,8 @@ const Size = lo.Size;
 const EdgeInsets = lo.EdgeInsets;
 const Alignment = @import("alignment.zig").Alignment;
 
-fn alloc(a: Allocator, widget_data: anytype) *WidgetNode {
-    const node = a.create(WidgetNode) catch |err| {
+fn alloc(gpa: Allocator, widget_data: anytype) *WidgetNode {
+    const node = gpa.create(WidgetNode) catch |err| {
         log.fatal(.ui, "Unable to create widget: {any}", .{err});
         @panic("UI: out of memory");
     };
@@ -51,14 +51,14 @@ const LabelOpts = struct {
     color: Color = Colors.WHITE,
 };
 
-pub fn label(a: Allocator, text: []const u8, opts: LabelOpts) *WidgetNode {
+pub fn label(gpa: Allocator, text: []const u8, opts: LabelOpts) *WidgetNode {
     const raw_size: V2 = if (opts.font) |f| f.measureText(
         text,
         opts.font_scale,
     ) else .{ .x = 0, .y = 0 };
 
     const size: Size = .{ .width = raw_size.x, .height = raw_size.y };
-    return alloc(a, Label{
+    return alloc(gpa, Label{
         .tb = .{
             .text = text,
             .font = opts.font,
@@ -75,8 +75,8 @@ const PanelOpts = struct {
     border_width: f32 = 1,
     padding: EdgeInsets = .all(0),
 };
-pub fn panel(a: Allocator, child: *WidgetNode, opts: PanelOpts) *WidgetNode {
-    return alloc(a, Panel{
+pub fn panel(gpa: Allocator, child: *WidgetNode, opts: PanelOpts) *WidgetNode {
+    return alloc(gpa, Panel{
         .background = opts.background,
         .border_color = opts.border_color,
         .border_width = opts.border_width,
@@ -92,9 +92,9 @@ pub const HStackOpts = struct {
     cross_axis: Alignment.Vertical = .center,
 };
 
-pub fn hstack(a: Allocator, children: []const *WidgetNode, opts: HStackOpts) *WidgetNode {
-    const nodes = allocChildren(a, children);
-    return alloc(a, HStack{
+pub fn hstack(gpa: Allocator, children: []const *WidgetNode, opts: HStackOpts) *WidgetNode {
+    const nodes = allocChildren(gpa, children);
+    return alloc(gpa, HStack{
         .children = nodes,
         .spacing = opts.spacing,
         .cross_axis = opts.cross_axis,
@@ -108,9 +108,9 @@ pub const VStackOpts = struct {
     cross_axis: Alignment.Horizontal = .start,
 };
 
-pub fn vstack(a: Allocator, children: []const *WidgetNode, opts: VStackOpts) *WidgetNode {
-    const nodes = allocChildren(a, children);
-    return alloc(a, VStack{
+pub fn vstack(gpa: Allocator, children: []const *WidgetNode, opts: VStackOpts) *WidgetNode {
+    const nodes = allocChildren(gpa, children);
+    return alloc(gpa, VStack{
         .children = nodes,
         .spacing = opts.spacing,
         .cross_axis = opts.cross_axis,
@@ -124,8 +124,8 @@ pub const ColorRectOpts = struct {
     border_width: f32 = 0,
 };
 
-pub fn colorRect(a: Allocator, color: Color, opts: ColorRectOpts) *WidgetNode {
-    return alloc(a, ColorRect{
+pub fn colorRect(gpa: Allocator, color: Color, opts: ColorRectOpts) *WidgetNode {
+    return alloc(gpa, ColorRect{
         .color = color,
         .border_color = opts.border_color,
         .border_width = opts.border_width,
@@ -144,8 +144,8 @@ pub const ChickletOpts = struct {
     on_click: ?*const fn () void = null,
 };
 
-pub fn chicklet(a: Allocator, name: []const u8, opts: ChickletOpts) *WidgetNode {
-    return alloc(a, Chicklet{
+pub fn chicklet(gpa: Allocator, name: []const u8, opts: ChickletOpts) *WidgetNode {
+    return alloc(gpa, Chicklet{
         .colors = opts.colors,
         .id = name,
         .selected = opts.is_selected,
@@ -168,12 +168,12 @@ pub const ButtonOpts = struct {
 };
 
 pub fn button(
-    a: Allocator,
+    gpa: Allocator,
     id: []const u8,
     text: []const u8,
     opts: ButtonOpts,
 ) *WidgetNode {
-    return alloc(a, Button{
+    return alloc(gpa, Button{
         .id = id,
         .text_info = .{
             .text = text,
@@ -194,8 +194,8 @@ pub const SliderOpts = struct {
     thumb_color: Color = Colors.WHITE,
 };
 
-pub fn slider(a: Allocator, id: []const u8, opts: SliderOpts) *WidgetNode {
-    return alloc(a, Slider{
+pub fn slider(gpa: Allocator, id: []const u8, opts: SliderOpts) *WidgetNode {
+    return alloc(gpa, Slider{
         .id = id,
         .min = opts.min,
         .max = opts.max,
@@ -212,8 +212,8 @@ pub const DividerOpts = struct {
     color: Color = Colors.CHARCOAL,
 };
 
-pub fn divider(a: Allocator, opts: DividerOpts) *WidgetNode {
-    return alloc(a, Divider{
+pub fn divider(gpa: Allocator, opts: DividerOpts) *WidgetNode {
+    return alloc(gpa, Divider{
         .size = opts.size,
         .color = opts.color,
     });
@@ -221,8 +221,8 @@ pub fn divider(a: Allocator, opts: DividerOpts) *WidgetNode {
 
 // ── Spacer ──
 
-pub fn spacer(a: Allocator, min_size: ?f32) *WidgetNode {
-    return alloc(a, Spacer{
+pub fn spacer(gpa: Allocator, min_size: ?f32) *WidgetNode {
+    return alloc(gpa, Spacer{
         .min_size = min_size,
     });
 }
@@ -235,9 +235,9 @@ pub const GridOpts = struct {
     v_spacing: f32 = 4,
 };
 
-pub fn grid(a: Allocator, children: []const *WidgetNode, opts: GridOpts) *WidgetNode {
-    const nodes = allocChildren(a, children);
-    return alloc(a, Grid{
+pub fn grid(gpa: Allocator, children: []const *WidgetNode, opts: GridOpts) *WidgetNode {
+    const nodes = allocChildren(gpa, children);
+    return alloc(gpa, Grid{
         .children = nodes,
         .columns = opts.columns,
         .h_spacing = opts.h_spacing,
@@ -247,8 +247,8 @@ pub fn grid(a: Allocator, children: []const *WidgetNode, opts: GridOpts) *Widget
 
 // ── Internal helpers ──
 
-fn allocChildren(a: Allocator, children: []const *WidgetNode) []WidgetNode {
-    const nodes = a.alloc(WidgetNode, children.len) catch |err| {
+fn allocChildren(gpa: Allocator, children: []const *WidgetNode) []WidgetNode {
+    const nodes = gpa.alloc(WidgetNode, children.len) catch |err| {
         log.fatal(.ui, "Unable to allocate children: {any}", .{err});
         @panic("UI: out of memory");
     };

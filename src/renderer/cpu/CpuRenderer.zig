@@ -43,12 +43,12 @@ width: u32,
 height: u32,
 fw: f32,
 fh: f32,
-allocator: std.mem.Allocator,
+gpa: std.mem.Allocator,
 clear_color: Color,
 
-pub fn init(allocator: std.mem.Allocator, config: RenderConfig) !CpuRenderer {
+pub fn init(gpa: std.mem.Allocator, config: RenderConfig) !CpuRenderer {
     const frame_buffer = try FrameBuffer.init(
-        allocator,
+        gpa,
         config.width,
         config.height,
     );
@@ -59,7 +59,7 @@ pub fn init(allocator: std.mem.Allocator, config: RenderConfig) !CpuRenderer {
         .height = config.height,
         .fw = @floatFromInt(config.width),
         .fh = @floatFromInt(config.height),
-        .allocator = allocator,
+        .gpa = gpa,
         .clear_color = Color.init(0, 0, 0, 1),
     };
 }

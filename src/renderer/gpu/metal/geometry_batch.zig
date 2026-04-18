@@ -27,18 +27,18 @@ pub const DrawCall = struct {
 pub const GeometryBatch = struct {
     vertices: std.ArrayList(Vertex),
     draw_calls: std.ArrayList(DrawCall),
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
 
-    pub fn init(allocator: std.mem.Allocator) GeometryBatch {
+    pub fn init(gpa: std.mem.Allocator) GeometryBatch {
         return .{
             .vertices = .empty,
             .draw_calls = .empty,
-            .allocator = allocator,
+            .gpa = gpa,
         };
     }
     pub fn deinit(self: *GeometryBatch) void {
-        self.vertices.deinit(self.allocator);
-        self.draw_calls.deinit(self.allocator);
+        self.vertices.deinit(self.gpa);
+        self.draw_calls.deinit(self.gpa);
     }
     pub fn clear(self: *GeometryBatch) void {
         self.vertices.clearRetainingCapacity();
@@ -165,10 +165,10 @@ pub const GeometryBatch = struct {
         else
             makeVertex(line.end, transform, ctx, color);
         const vertices = [_]Vertex{ start_vert, end_vert };
-        try self.vertices.appendSlice(self.allocator, &vertices);
+        try self.vertices.appendSlice(self.gpa, &vertices);
 
         try self.draw_calls.append(
-            self.allocator,
+            self.gpa,
             .{
                 .primitive_type = .line,
                 .vertex_start = batch_offset,
@@ -203,8 +203,8 @@ pub const GeometryBatch = struct {
             break :blk count;
         };
 
-        try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
-        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
+        try self.vertices.ensureTotalCapacity(self.gpa, self.vertices.items.len + vertex_count);
+        try self.draw_calls.ensureTotalCapacity(self.gpa, self.draw_calls.items.len + call_count);
 
         const fc = if (has_fill) utils.colorToFloat(fill_color.?) else undefined;
         const sc = if (has_outline) utils.colorToFloat(stroke_color.?) else undefined;
@@ -225,8 +225,8 @@ pub const GeometryBatch = struct {
             else
                 makeVertex(tri.v2, transform, ctx, fc);
             const vertices = [_]Vertex{ v0, v1, v2 };
-            try self.vertices.appendSlice(self.allocator, &vertices);
-            try self.draw_calls.append(self.allocator, .{
+            try self.vertices.appendSlice(self.gpa, &vertices);
+            try self.draw_calls.append(self.gpa, .{
                 .primitive_type = .triangle,
                 .vertex_start = batch_offset,
                 .vertex_count = 3,
@@ -284,8 +284,8 @@ pub const GeometryBatch = struct {
             break :blk count;
         };
 
-        try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
-        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
+        try self.vertices.ensureTotalCapacity(self.gpa, self.vertices.items.len + vertex_count);
+        try self.draw_calls.ensureTotalCapacity(self.gpa, self.draw_calls.items.len + call_count);
 
         const fc = if (has_fill) utils.colorToFloat(fill_color.?) else undefined;
         const sc = if (has_outline) utils.colorToFloat(stroke_color.?) else undefined;
@@ -367,8 +367,8 @@ pub const GeometryBatch = struct {
         const call_count = (if (has_fill) poly.fill_call_count else 0) +
             (if (has_outline) poly.outline_call_count else 0);
 
-        try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
-        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
+        try self.vertices.ensureTotalCapacity(self.gpa, self.vertices.items.len + vertex_count);
+        try self.draw_calls.ensureTotalCapacity(self.gpa, self.draw_calls.items.len + call_count);
 
         const fc = if (has_fill) utils.colorToFloat(fill_color.?) else undefined;
         const sc = if (has_outline) utils.colorToFloat(stroke_color.?) else undefined;
@@ -450,8 +450,8 @@ pub const GeometryBatch = struct {
             break :blk count;
         };
 
-        try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
-        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
+        try self.vertices.ensureTotalCapacity(self.gpa, self.vertices.items.len + vertex_count);
+        try self.draw_calls.ensureTotalCapacity(self.gpa, self.draw_calls.items.len + call_count);
 
         const fc = if (has_fill) utils.colorToFloat(fill_color.?) else undefined;
         const sc = if (has_outline) utils.colorToFloat(stroke_color.?) else undefined;

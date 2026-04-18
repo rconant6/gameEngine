@@ -162,7 +162,7 @@ test "OnTime - multiple triggers with different intervals" {
 }
 
 test "TimeBasedTriggerSystem - process with delta_time" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -219,7 +219,7 @@ test "TimeBasedTriggerSystem - process with delta_time" {
 }
 
 test "TimeBasedTriggerSystem - multiple entities" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -287,7 +287,7 @@ test "TimeBasedTriggerSystem - multiple entities" {
 }
 
 test "TimeBasedTriggerSystem - error when no delta_time" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();

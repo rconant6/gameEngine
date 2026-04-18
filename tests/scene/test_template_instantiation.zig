@@ -19,7 +19,7 @@ const V2 = core.V2;
 // They will fail until the template system is implemented
 
 test "TemplateInstantiation: load single template from file" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -41,7 +41,7 @@ test "TemplateInstantiation: load single template from file" {
 }
 
 test "TemplateInstantiation: load all templates from directory" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -69,7 +69,7 @@ test "TemplateInstantiation: load all templates from directory" {
 }
 
 test "TemplateInstantiation: get template by name" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -91,7 +91,7 @@ test "TemplateInstantiation: get template by name" {
 }
 
 test "TemplateInstantiation: instantiate entity from template" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -127,7 +127,7 @@ test "TemplateInstantiation: instantiate entity from template" {
 }
 
 test "TemplateInstantiation: instantiate multiple entities from same template" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -164,7 +164,7 @@ test "TemplateInstantiation: instantiate multiple entities from same template" {
 }
 
 test "TemplateInstantiation: template with polygon sprite" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -197,7 +197,7 @@ test "TemplateInstantiation: template with polygon sprite" {
 }
 
 test "TemplateInstantiation: template with tag component" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -223,7 +223,7 @@ test "TemplateInstantiation: template with tag component" {
 }
 
 test "TemplateInstantiation: template with lifetime component" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -247,7 +247,7 @@ test "TemplateInstantiation: template with lifetime component" {
 }
 
 test "TemplateInstantiation: template not found error" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -270,7 +270,7 @@ test "TemplateInstantiation: template not found error" {
 }
 
 test "TemplateInstantiation: spawn with offset from action" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -298,7 +298,7 @@ test "TemplateInstantiation: spawn with offset from action" {
 }
 
 test "TemplateInstantiation: asteroid break into smaller asteroids" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -332,7 +332,7 @@ test "TemplateInstantiation: asteroid break into smaller asteroids" {
 }
 
 test "TemplateInstantiation: directory load includes all files" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -372,7 +372,7 @@ test "TemplateInstantiation: directory load includes all files" {
 }
 
 test "TemplateInstantiation: directory load then instantiate from different files" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -407,7 +407,7 @@ test "TemplateInstantiation: directory load then instantiate from different file
 }
 
 test "TemplateInstantiation: directory load empty directory does not error" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();
@@ -430,7 +430,7 @@ test "TemplateInstantiation: directory load empty directory does not error" {
 }
 
 test "TemplateInstantiation: directory load skips non-template files" {
-    const gpa = testing.gpa;
+    const gpa = testing.allocator;
 
     var world = try World.init(gpa);
     defer world.deinit();

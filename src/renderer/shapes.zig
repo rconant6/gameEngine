@@ -12,11 +12,11 @@ pub fn Circle(comptime PointType: type) type {
         radius: f32,
 
         pub fn init(
-            alloc: Allocator,
+            gpa: Allocator,
             origin: PointType,
             r: f32,
         ) !@This() {
-            _ = alloc;
+            _ = gpa;
             return .{
                 .origin = origin,
                 .radius = r,
@@ -32,13 +32,13 @@ pub fn Rectangle(comptime PointType: type) type {
         half_width: f32,
 
         pub fn init(
-            alloc: Allocator,
+            gpa: Allocator,
             x: f32,
             y: f32,
             w: f32,
             h: f32,
         ) !@This() {
-            _ = alloc;
+            _ = gpa;
             return .{
                 .center = .{ .x = x - w / 2, .y = y - h / 2 },
                 .half_width = w / 2,
@@ -114,10 +114,10 @@ pub fn Triangle(comptime PointType: type) type {
         v2: PointType,
 
         pub fn init(
-            alloc: Allocator,
+            gpa: Allocator,
             points: []const PointType,
         ) !@This() {
-            _ = alloc;
+            _ = gpa;
             std.debug.assert(points.len == 3);
             var verts = [3]PointType{ points[0], points[1], points[2] };
             std.mem.sort(PointType, &verts, {}, hf.sortPointByYThenX);
@@ -136,11 +136,11 @@ pub fn Line(comptime PointType: type) type {
         end: PointType,
 
         pub fn init(
-            alloc: Allocator,
+            gpa: Allocator,
             start: PointType,
             end: PointType,
         ) !@This() {
-            _ = alloc;
+            _ = gpa;
             return .{
                 .start = start,
                 .end = end,
@@ -151,7 +151,7 @@ pub fn Line(comptime PointType: type) type {
 
 pub fn Polygon(comptime PointType: type) type {
     return struct {
-        allocator: Allocator,
+        gpa: Allocator,
         points: []const PointType,
         center: PointType = .{ .x = 0, .y = 0 },
         fill_call_count: usize = 0,
@@ -160,11 +160,11 @@ pub fn Polygon(comptime PointType: type) type {
         vertex_count: usize = 0,
 
         pub fn init(
-            alloc: Allocator,
+            gpa: Allocator,
             points: []const PointType,
         ) !@This() {
-            const owned_points = try alloc.dupe(PointType, points);
-            errdefer alloc.free(owned_points);
+            const owned_points = try gpa.dupe(PointType, points);
+            errdefer gpa.free(owned_points);
 
             const area = tris.signedArea(owned_points);
             if (area < 0) {
@@ -174,7 +174,7 @@ pub fn Polygon(comptime PointType: type) type {
             const center = hf.calculateCentroid(owned_points);
 
             var poly: @This() = .{
-                .allocator = alloc,
+                .gpa = gpa,
                 .points = owned_points,
                 .center = center,
                 .triangle_cache = null,
@@ -193,14 +193,14 @@ pub fn Polygon(comptime PointType: type) type {
         }
 
         pub fn deinit(self: *@This()) void {
-            if (self.triangle_cache) |triangles| self.allocator.free(triangles);
-            self.allocator.free(self.points);
+            if (self.triangle_cache) |triangles| self.gpa.free(triangles);
+            self.gpa.free(self.points);
         }
 
         pub fn getTriangles(self: *@This()) ![][3]PointType {
             if (self.triangle_cache) |triangles| return triangles;
 
-            const triangles = try tris.triangulate(self.allocator, self.points);
+            const triangles = try tris.triangulate(self.gpa, self.points);
 
             self.triangle_cache = triangles;
             return triangles;
