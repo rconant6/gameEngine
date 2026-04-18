@@ -57,7 +57,7 @@ pub const App = struct {
         const renderer = rend.Renderer.init(gpa, io, .{
             .width = scaled_width,
             .height = scaled_height,
-            .native_handle = window.handle,
+            .native_handle = plat.getNativeWindowHandle(window),
         }) catch |err| {
             log.fatal(.renderer, "Renderer init failed: {any}", .{err});
             @panic("App: renderer init failed");
@@ -92,7 +92,7 @@ pub const App = struct {
 
     pub fn beginFrame(self: *App) !void {
         plat.clearInputStates();
-        _ = plat.pollEvent();
+        while (plat.pollEvent()) |_| {}
         self.renderer.beginFrame() catch |err| {
             log.err(.renderer, "BeginFrame failed: {any}", .{err});
         };

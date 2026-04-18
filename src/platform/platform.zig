@@ -10,6 +10,7 @@ pub const MouseButton = id.MouseButton;
 pub const MouseData = id.MouseData;
 pub const Window = PlatformImpl.Window;
 const math = @import("math");
+const V2 = math.V2;
 const V2I = math.V2I;
 // Internal use only - used by platform implementations
 pub const mapToGameKeyCode = id.mapToGameKeyCode;
@@ -17,6 +18,12 @@ pub const mapToGameMouseButton = id.mapToGameMouseButton;
 
 // Input system
 pub const Input = @import("Input.zig");
+
+// Shared input state — owned here, updated by pollEvent().
+var keyboard_state: Keyboard = .{};
+var mouse_state: Mouse = .{
+    .buttons = InputDevice(MouseButton){},
+};
 
 const PlatformImpl = switch (builtin.os.tag) {
     .macos => @import("macos.zig"),
@@ -51,13 +58,14 @@ pub const WindowConfig = struct {
 };
 
 pub fn getKeyboard() *const Keyboard {
-    return PlatformImpl.getKeyboard();
+    return &keyboard_state;
 }
 pub fn getMouse() *const Mouse {
-    return PlatformImpl.getMouse();
+    return &mouse_state;
 }
 pub fn clearInputStates() void {
-    PlatformImpl.clearInputFrameStates();
+    keyboard_state.clearFrameStates();
+    mouse_state.clearState();
 }
 
 pub const Event = union(enum) {
@@ -126,23 +134,50 @@ pub fn swapBuffers(window: *Window, offset: u32) void {
     PlatformImpl.swapBuffers(window, offset);
 }
 
+// Drains one OS event, updates shared input state, and returns the event.
+// Callers should loop until null to process the full frame queue.
 pub fn pollEvent() ?Event {
-    return PlatformImpl.pollEvent();
+    const event = PlatformImpl.pollNextEvent() orelse return null;
+    applyEventToState(event);
+    return event;
 }
 pub fn waitEvent() Event {
     return PlatformImpl.waitEvent();
 }
 
+fn applyEventToState(event: Event) void {
+    switch (event) {
+        .KeyPress => |e| keyboard_state.updateState(e.key, true),
+        .KeyRelease => |e| keyboard_state.updateState(e.key, false),
+        .MouseButtonPress => |e| mouse_state.buttons.updateState(e.button, true),
+        .MouseButtonRelease => |e| mouse_state.buttons.updateState(e.button, false),
+        .MouseMove => |e| {
+            const pos = V2{ .x = @floatFromInt(e.x), .y = @floatFromInt(e.y) };
+            mouse_state.updateAnalogState(pos, .ZERO);
+        },
+        .MouseWheel => |e| {
+            mouse_state.scroll_delta = mouse_state.scroll_delta.add(.{ .x = e.delta_x, .y = e.delta_y });
+        },
+        else => {},
+    }
+}
+
 pub fn isKeyDown(window: *Window, key: KeyCode) bool {
-    return PlatformImpl.isKeyDown(window, key);
+    _ = window;
+    return keyboard_state.isDown(key);
 }
 
 pub fn getMousePosition(window: *Window) V2I {
-    return PlatformImpl.getMousePosition(window);
+    _ = window;
+    return .{
+        .x = @intFromFloat(mouse_state.position.x),
+        .y = @intFromFloat(mouse_state.position.y),
+    };
 }
 
 pub fn isMouseButtonDown(window: *Window, button: MouseButton) bool {
-    return PlatformImpl.isMouseButtonDown(window, button);
+    _ = window;
+    return mouse_state.buttons.isDown(button);
 }
 
 pub fn setMouseCursorVisible(window: *Window, visible: bool) void {

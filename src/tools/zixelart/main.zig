@@ -147,7 +147,7 @@ pub fn main(init: std.process.Init) !void {
         if (app.kb.isPressed(.C)) canvas.clear();
 
         // Undo / Redo (Cmd+Z / Cmd+Shift+Z) + Save/Load (Cmd+S / Cmd+O)
-        if (app.kb.isDown(.LeftCmd) or app.kb.isDown(.RightCmd)) {
+        if (app.kb.isDown(.LeftSuper) or app.kb.isDown(.RightSuper)) {
             if (app.kb.isPressed(.Z)) {
                 if (app.kb.isDown(.LeftShift) or app.kb.isDown(.RightShift)) {
                     if (canvas.history.redo()) |cmd| cmd.redo(canvas);

@@ -64,6 +64,7 @@ pub const KeyModifiers = packed struct {
     shift: bool = false,
     control: bool = false,
     alt: bool = false,
+    super: bool = false, // Cmd on macOS, Win/Meta on Linux/Windows
     caps_lock: bool = false,
 };
 
@@ -154,8 +155,8 @@ pub const KeyCode = enum(u8) {
     RightCtrl = 61,
     LeftAlt = 62,
     RightAlt = 63,
-    LeftCmd = 64,
-    RightCmd = 65,
+    LeftSuper = 64, // Cmd on macOS, Win/Meta on Linux/Windows
+    RightSuper = 65,
 
     // Punctuation (66-76)
     Semicolon = 66,
@@ -286,8 +287,8 @@ pub fn mapToGameKeyCode(osKeyCode: u16) KeyCode {
             0x3E => .RightCtrl,
             0x3A => .LeftAlt,
             0x3D => .RightAlt,
-            0x37 => .LeftCmd,
-            0x36 => .RightCmd,
+            0x37 => .LeftSuper,
+            0x36 => .RightSuper,
 
             // Punctuation (macOS keycodes)
             0x29 => .Semicolon,
@@ -401,8 +402,8 @@ pub fn mapToGameKeyCode(osKeyCode: u16) KeyCode {
             0xA3 => .RightCtrl,
             0x12 => .LeftAlt,
             0xA5 => .RightAlt,
-            0x5B => .LeftCmd,
-            0x5C => .RightCmd,
+            0x5B => .LeftSuper,
+            0x5C => .RightSuper,
 
             // Punctuation
             0xBA => .Semicolon,
@@ -514,8 +515,8 @@ pub fn mapToGameKeyCode(osKeyCode: u16) KeyCode {
             0xFFE4 => .RightCtrl,
             0xFFE9 => .LeftAlt,
             0xFFEA => .RightAlt,
-            0xFFEB => .LeftCmd,
-            0xFFEC => .RightCmd,
+            0xFFEB => .LeftSuper,
+            0xFFEC => .RightSuper,
 
             // Punctuation
             0x3B => .Semicolon,

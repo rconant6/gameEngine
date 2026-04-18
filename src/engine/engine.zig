@@ -128,7 +128,7 @@ pub const Engine = struct {
             .{
                 .width = scaled_width,
                 .height = scaled_height,
-                .native_handle = window.handle,
+                .native_handle = platform.getNativeWindowHandle(window),
             },
         ) catch |err| fatal("Renderer", err);
         log.info(
@@ -321,7 +321,7 @@ pub const Engine = struct {
 
     pub fn beginFrame(self: *Engine) void {
         platform.clearInputStates();
-        _ = platform.pollEvent();
+        while (platform.pollEvent()) |_| {}
         self.input.keyboard = platform.getKeyboard();
         self.input.mouse = platform.getMouse();
         self.renderer.beginFrame() catch |err| {

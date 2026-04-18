@@ -102,21 +102,31 @@ class EventHandler {
     self.keyEventQueue.append(rawEvent)
   }
   func handleMouseEvent(_ event: NSEvent) {
-    let mouseButton = event.buttonNumber
-    let isDown: UInt8 =
-      (event.type == .leftMouseDown || event.type == .rightMouseDown
-        || event.type == .otherMouseDown
-        || event.type == .leftMouseDragged || event.type == .rightMouseDragged) ? 1 : 0
     let loc = event.locationInWindow
-    let (scroll_x, scroll_y) =
-      (event.type == .scrollWheel) ? (event.scrollingDeltaX, event.scrollingDeltaY) : (0, 0)
-    let rawEvent = RawMouseEvent(
-      x: Float(loc.x), y: Float(loc.y),
-      scroll_x: Float(scroll_x),
-      scroll_y: Float(scroll_y),
-      button: UInt8(mouseButton), isDown: isDown, padding: 0)
 
-    self.mouseEventQueue.append(rawEvent)
+    switch event.type {
+    case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+      self.mouseEventQueue.append(RawMouseEvent(
+        x: Float(loc.x), y: Float(loc.y),
+        scroll_x: 0, scroll_y: 0,
+        button: UInt8(event.buttonNumber), isDown: 1, padding: 0))
+    case .leftMouseUp, .rightMouseUp, .otherMouseUp:
+      self.mouseEventQueue.append(RawMouseEvent(
+        x: Float(loc.x), y: Float(loc.y),
+        scroll_x: 0, scroll_y: 0,
+        button: UInt8(event.buttonNumber), isDown: 0, padding: 0))
+    case .scrollWheel:
+      self.mouseEventQueue.append(RawMouseEvent(
+        x: Float(loc.x), y: Float(loc.y),
+        scroll_x: Float(event.scrollingDeltaX), scroll_y: Float(event.scrollingDeltaY),
+        button: 0xFF, isDown: 0, padding: 0))
+    case .mouseMoved, .leftMouseDragged, .rightMouseDragged:
+      self.mouseEventQueue.append(RawMouseEvent(
+        x: Float(loc.x), y: Float(loc.y),
+        scroll_x: 0, scroll_y: 0,
+        button: 0xFF, isDown: 0, padding: 0))
+    default: break
+    }
   }
 
   func pollNextMouse() -> RawMouseEvent? {
