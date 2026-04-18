@@ -24,38 +24,27 @@ fn GenerateDebugCategory(comptime CategoryEnum: type) type {
     const field_count = enum_info.fields.len;
     const padding_bits = (8 - (field_count % 8)) % 8;
 
-    var fields: [field_count + (if (padding_bits > 0) 1 else 0)]std.builtin.Type.StructField = undefined;
+    const total_fields = field_count + (if (padding_bits > 0) 1 else 0);
+    var field_names: [total_fields][]const u8 = undefined;
+    var field_types: [total_fields]type = undefined;
+    var field_attrs: [total_fields]std.builtin.Type.StructField.Attributes = undefined;
 
+    const true_val: bool = true;
     for (enum_info.fields, 0..) |enum_field, i| {
-        fields[i] = .{
-            .name = enum_field.name,
-            .type = bool,
-            .default_value_ptr = &true,
-            .is_comptime = false,
-            .alignment = 0,
-        };
+        field_names[i] = enum_field.name;
+        field_types[i] = bool;
+        field_attrs[i] = .{ .default_value_ptr = &true_val };
     }
 
     if (padding_bits > 0) {
-        const PaddingType = @Type(.{ .int = .{
-            .signedness = .unsigned,
-            .bits = padding_bits,
-        } });
-        fields[field_count] = .{
-            .name = "padding",
-            .type = PaddingType,
-            .default_value_ptr = &@as(PaddingType, 0),
-            .is_comptime = false,
-            .alignment = 0,
-        };
+        const PaddingType = @Int(.unsigned, padding_bits);
+        const zero_val: PaddingType = 0;
+        field_names[field_count] = "padding";
+        field_types[field_count] = PaddingType;
+        field_attrs[field_count] = .{ .default_value_ptr = &zero_val };
     }
 
-    const PackedStruct = @Type(.{ .@"struct" = .{
-        .layout = .@"packed",
-        .fields = &fields,
-        .decls = &.{},
-        .is_tuple = false,
-    } });
+    const PackedStruct = @Struct(.@"packed", null, &field_names, &field_types, &field_attrs);
 
     return struct {
         bits: PackedStruct,

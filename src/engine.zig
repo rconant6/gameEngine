@@ -19,7 +19,7 @@ pub const V2 = math.V2;
 pub const V2I = math.V2I;
 pub const V2U = math.V2U;
 pub const WorldPoint = V2;
-pub const ScreenPoint = V2I;
+pub const ScreenPoint = math.ScreenPoint;
 
 // MARK: Renderer Types
 const renderer = @import("renderer");
@@ -36,7 +36,6 @@ pub const ShapeRegistry = renderer.ShapeRegistry;
 
 // MARK: Asset Types
 const assets = @import("assets");
-pub const FontHandle = assets.FontHandle;
 pub const Font = assets.Font;
 
 // MARK: ECS Types
@@ -84,7 +83,4 @@ pub const TemplateManager = scene.TemplateManager;
 const debug = @import("debug");
 pub const DebugCategory = debug.DebugCategory;
 pub const Debugger = debug.DebugManager;
-pub const ErrorEntry = debug.ErrorEntry;
-pub const ErrorLogger = debug.ErrorLogger;
-pub const Severity = debug.Severity;
-pub const Subsystem = debug.SubSystem;
+pub const log = debug.log;

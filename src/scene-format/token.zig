@@ -72,6 +72,7 @@ pub const Token = struct {
 
         // Keywords asset-types
         font,
+        zxl,
 
         // Literals
         number,

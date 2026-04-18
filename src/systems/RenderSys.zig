@@ -14,6 +14,7 @@ const Text = ecs.Text;
 const Transform = ecs.Transform;
 const UIElement = ecs.UIElement;
 const World = ecs.World;
+const ZxlSprite = ecs.ZxlSprite;
 const rend = @import("renderer");
 const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
@@ -84,7 +85,7 @@ pub fn run(
         const transform = entry.get(0);
         const text = entry.get(1);
 
-        const font = asset_manager.getFont(text.font_asset) orelse continue;
+        const font = asset_manager.getFont(text.font_name) orelse continue;
 
         renderer.drawText(
             font,
@@ -129,6 +130,54 @@ pub fn run(
             );
         }
         count += 1;
+    }
+
+    var zxl_query = world.query(.{ Transform, ZxlSprite });
+    while (zxl_query.next()) |entry| {
+        const transform: *const Transform = entry.get(0);
+        const zxl_sprite: *ZxlSprite = entry.get(1);
+
+        if (!zxl_sprite.visible) continue;
+
+        const zxl_asset = asset_manager.getZxlAsset(zxl_sprite.asset_name) orelse continue;
+        const frame_count = zxl_asset.image.frames.items.len;
+        const frame = zxl_asset.image.getFrame(zxl_sprite.current_frame) orelse continue;
+
+        // Advance animation if playing and has multiple frames
+        if (zxl_sprite.playing and frame_count > 1) {
+            zxl_sprite.elapsed_ms += dt * 1000.0;
+            if (zxl_sprite.elapsed_ms >= @as(f32, @floatFromInt(frame.duration_ms))) {
+                zxl_sprite.elapsed_ms -= @as(f32, @floatFromInt(frame.duration_ms));
+                zxl_sprite.current_frame = @intCast((zxl_sprite.current_frame + 1) % frame_count);
+            }
+        }
+
+        // Get or lazily create GPU texture for this frame
+        const texture = asset_manager.getOrCreateFrameTexture(
+            zxl_asset,
+            zxl_sprite.current_frame,
+        ) catch continue;
+
+        // Compute world-space dimensions from pixel size
+        const world_width = @as(f32, @floatFromInt(frame.width)) * zxl_sprite.pixel_scale;
+        const world_height = @as(f32, @floatFromInt(frame.height)) * zxl_sprite.pixel_scale;
+
+        // Normalized origin from frame's pixel origin
+        const origin = [2]f32{
+            @as(f32, @floatFromInt(frame.origin_x)) / @as(f32, @floatFromInt(frame.width)),
+            @as(f32, @floatFromInt(frame.origin_y)) / @as(f32, @floatFromInt(frame.height)),
+        };
+
+        renderer.drawTextureQuad(
+            texture,
+            world_width,
+            world_height,
+            origin,
+            .{ .offset = transform.position, .rotation = transform.rotation, .scale = transform.scale },
+            ctx,
+            zxl_sprite.flip_h,
+            zxl_sprite.flip_v,
+        );
     }
 
     debugger.run(dt, ctx);

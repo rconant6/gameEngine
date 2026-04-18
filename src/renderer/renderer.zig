@@ -3,7 +3,6 @@ const math = @import("math");
 pub const V2 = math.V2;
 pub const WorldPoint = math.WorldPoint;
 pub const ScreenPoint = math.ScreenPoint;
-// Shapes
 const shapes_module = @import("shapes.zig");
 pub const Shapes = shapes_module;
 const registry = @import("registry");
@@ -15,13 +14,23 @@ const build_options = @import("build_options");
 const col = @import("color.zig");
 pub const Color = col.Color;
 pub const Colors = col.Colors;
+pub const ColorLibrary = col.ColorLibrary;
+pub const Hue = col.Hue;
+pub const Temperature = col.Temperature;
+pub const Saturation = col.Saturation;
+pub const Tone = col.Tone;
+pub const Family = col.Family;
+pub const TaggedColor = col.TaggedColor;
+pub const Generator = col.generators;
+
 const utils = @import("geometry_utils.zig");
 pub const Transform = utils.Transform;
 pub const ScreenAnchor = utils.ScreenAnchor;
 pub const scalePt = utils.scalePt;
 pub const rotatePt = utils.rotatePt;
 pub const movePt = utils.movePt;
-pub const gameToScreen = utils.gameToScreen;
+pub const worldToScreenInt = utils.worldToScreenInt;
+pub const worldToScreen = utils.worldToScreen;
 pub const screenToGame = utils.screenToGame;
 pub const screenToClip = utils.screenToClip;
 pub const toClip = utils.toClip;
@@ -29,6 +38,8 @@ pub const getAnchorPos = utils.getAnchorPosition;
 pub const RenderContext = @import("RenderContext.zig");
 const text_module = @import("text.zig");
 const Font = text_module.Font;
+const debug = @import("debug");
+const log = debug.log;
 
 // CPU renderer is currently disabled - code kept for reference
 // const CpuRenderer = if (build_options.backend == .cpu)
@@ -67,9 +78,11 @@ pub const Renderer = struct {
         .vulkan => VulkanRenderer,
         .opengl => OpenGLRenderer,
     };
+    pub const Device = BackendImpl.Device;
+    pub const Texture = BackendImpl.Texture;
 
-    pub fn init(allocator: std.mem.Allocator, config: RendererConfig) !Renderer {
-        const backend = try BackendImpl.init(allocator, config);
+    pub fn init(gpa: std.mem.Allocator, io: std.Io, config: RendererConfig) !Renderer {
+        const backend = try BackendImpl.init(gpa, io, config);
         return .{
             .backend = backend,
             .width = config.width,
@@ -77,6 +90,7 @@ pub const Renderer = struct {
         };
     }
     pub fn deinit(self: *Renderer) void {
+        log.info(.renderer, "Renderer shutting down...", .{});
         self.backend.deinit();
     }
 
@@ -98,6 +112,48 @@ pub const Renderer = struct {
     }
     pub fn setClearColor(self: *Renderer, color: Color) void {
         self.backend.setClearColor(color);
+    }
+
+    pub fn getDevice(self: *Renderer) *Device {
+        return self.backend.device;
+    }
+
+    pub fn createTexture(self: *Renderer, width: u32, height: u32) !*Texture {
+        return self.backend.createTexture(width, height);
+    }
+
+    pub fn uploadTextureData(
+        self: *Renderer,
+        texture: *Texture,
+        width: u32,
+        height: u32,
+        data: [*]const u8,
+        bytes_per_row: u32,
+    ) void {
+        self.backend.uploadTextureData(texture, width, height, data, bytes_per_row);
+    }
+
+    pub fn drawTextureQuad(
+        self: *Renderer,
+        texture: *Texture,
+        width: f32,
+        height: f32,
+        origin: [2]f32,
+        transform: ?Transform,
+        ctx: RenderContext,
+        flip_h: bool,
+        flip_v: bool,
+    ) void {
+        self.backend.drawTextureQuad(
+            texture,
+            width,
+            height,
+            origin,
+            transform,
+            ctx,
+            flip_h,
+            flip_v,
+        );
     }
 
     pub fn drawGeometry(
@@ -128,6 +184,18 @@ pub const Renderer = struct {
         ctx: RenderContext,
     ) void {
         text_module.drawText(self, font, text, position, scale, color, ctx);
+    }
+
+    pub fn drawTextScreen(
+        self: *Renderer,
+        font: *const Font,
+        text: []const u8,
+        position: ScreenPoint,
+        scale: f32,
+        color: Color,
+        ctx: RenderContext,
+    ) void {
+        text_module.drawTextScreen(self, font, text, position, scale, color, ctx);
     }
 
     // TODO: All of these need to return errors/nil if called for the wrong backend

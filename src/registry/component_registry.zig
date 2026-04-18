@@ -1,44 +1,29 @@
 const std = @import("std");
 const ecs = @import("ecs");
 const Components = ecs.comps;
-const Type = std.builtin.Type;
 
 pub const ComponentData = blk: {
     const registry = ComponentRegistry;
+    const len = registry.component_types.len;
 
-    var enum_fields: [registry.component_types.len]Type.EnumField = undefined;
+    var enum_names: [len][]const u8 = undefined;
+    var enum_values: [len]u16 = undefined;
     for (registry.component_names, 0..) |name, i| {
-        enum_fields[i] = .{
-            .name = name[0..name.len :0],
-            .value = i,
-        };
+        enum_names[i] = name;
+        enum_values[i] = i;
     }
-    const TagEnum = @Type(.{
-        .@"enum" = .{
-            .tag_type = u16,
-            .fields = &enum_fields,
-            .decls = &.{},
-            .is_exhaustive = true,
-        },
-    });
+    const TagEnum = @Enum(u16, .exhaustive, &enum_names, &enum_values);
 
-    var union_fields: [registry.component_types.len]Type.UnionField = undefined;
+    var union_names: [len][]const u8 = undefined;
+    var union_types: [len]type = undefined;
+    var union_attrs: [len]std.builtin.Type.UnionField.Attributes = undefined;
     for (registry.component_types, registry.component_names, 0..) |comp_type, name, i| {
-        union_fields[i] = .{
-            .name = name[0..name.len :0],
-            .type = comp_type,
-            .alignment = @alignOf(comp_type),
-        };
+        union_names[i] = name;
+        union_types[i] = comp_type;
+        union_attrs[i] = .{};
     }
 
-    break :blk @Type(.{
-        .@"union" = .{
-            .layout = .auto,
-            .tag_type = TagEnum,
-            .fields = &union_fields,
-            .decls = &.{},
-        },
-    });
+    break :blk @Union(.auto, TagEnum, &union_names, &union_types, &union_attrs);
 };
 
 pub const ComponentRegistry = struct {

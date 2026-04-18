@@ -6,7 +6,7 @@ private var appDelegate: AppDelegate?
 @MainActor
 var activeWindows: [OpaquePointer: GameWindow] = [:]
 @MainActor
-private var globalEventHandler: EventHandler!
+var globalEventHandler: EventHandler!
 
 @MainActor
 @_cdecl("init")

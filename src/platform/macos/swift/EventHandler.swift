@@ -54,10 +54,44 @@ class EventHandler {
     case .leftMouseDown, .leftMouseUp,
       .rightMouseDown, .rightMouseUp,
       .otherMouseDown, .otherMouseUp,
-      .scrollWheel:
+      .scrollWheel,
+      .mouseMoved, .leftMouseDragged, .rightMouseDragged:
       handleMouseEvent(event)
+    case .flagsChanged:
+      handleFlagsChanged(event)
     default: break  // stuff not needed/supported (yet)
     }
+  }
+
+  private func handleFlagsChanged(_ event: NSEvent) {
+    let flags = event.modifierFlags
+    let keyCode = event.keyCode
+
+    // macOS fires flagsChanged once per modifier state change.
+    // Determine if this specific key is now down based on its flag.
+    let isDown: Bool
+    switch keyCode {
+    case 0x37: // Left Cmd
+      isDown = flags.contains(.command)
+    case 0x36: // Right Cmd
+      isDown = flags.contains(.command)
+    case 0x38: // Left Shift
+      isDown = flags.contains(.shift)
+    case 0x3C: // Right Shift
+      isDown = flags.contains(.shift)
+    case 0x3B: // Left Control
+      isDown = flags.contains(.control)
+    case 0x3E: // Right Control
+      isDown = flags.contains(.control)
+    case 0x3A: // Left Option
+      isDown = flags.contains(.option)
+    case 0x3D: // Right Option
+      isDown = flags.contains(.option)
+    default:
+      return
+    }
+
+    self.keyEventQueue.append(RawKeyEvent(keycode: keyCode, isDown: isDown))
   }
 
   private func handleKeyEvent(_ event: NSEvent) {
@@ -71,7 +105,8 @@ class EventHandler {
     let mouseButton = event.buttonNumber
     let isDown: UInt8 =
       (event.type == .leftMouseDown || event.type == .rightMouseDown
-        || event.type == .otherMouseDown) ? 1 : 0
+        || event.type == .otherMouseDown
+        || event.type == .leftMouseDragged || event.type == .rightMouseDragged) ? 1 : 0
     let loc = event.locationInWindow
     let (scroll_x, scroll_y) =
       (event.type == .scrollWheel) ? (event.scrollingDeltaX, event.scrollingDeltaY) : (0, 0)

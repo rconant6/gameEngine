@@ -1,7 +1,6 @@
 const std = @import("std");
 const renderer = @import("renderer");
 const Shapes = renderer.Shapes;
-const Type = std.builtin.Type;
 const math = @import("math");
 const WorldPoint = math.WorldPoint;
 const ScreenPoint = math.ScreenPoint;
@@ -12,41 +11,26 @@ pub const point_type_names = .{ "World", "Screen" };
 
 pub const ShapeData = blk: {
     const registry = ShapeRegistry;
+    const len = ShapeRegistry.shape_types.len;
 
-    var enum_fields: [ShapeRegistry.shape_types.len]Type.EnumField = undefined;
+    var enum_names: [len][]const u8 = undefined;
+    var enum_values: [len]u8 = undefined;
     for (registry.shape_names, 0..) |name, i| {
-        enum_fields[i] = .{
-            .name = name[0..name.len :0],
-            .value = i,
-        };
+        enum_names[i] = name;
+        enum_values[i] = i;
     }
+    const TagEnum = @Enum(u8, .exhaustive, &enum_names, &enum_values);
 
-    const TagEnum = @Type(.{
-        .@"enum" = .{
-            .tag_type = u8,
-            .fields = &enum_fields,
-            .decls = &.{},
-            .is_exhaustive = true,
-        },
-    });
-
-    var union_fields: [registry.shape_types.len]Type.UnionField = undefined;
+    var union_names: [len][]const u8 = undefined;
+    var union_types: [len]type = undefined;
+    var union_attrs: [len]std.builtin.Type.UnionField.Attributes = undefined;
     for (registry.shape_types, registry.shape_names, 0..) |shape_type, name, i| {
-        union_fields[i] = .{
-            .name = name[0..name.len :0],
-            .type = shape_type,
-            .alignment = @alignOf(shape_type),
-        };
+        union_names[i] = name;
+        union_types[i] = shape_type;
+        union_attrs[i] = .{};
     }
 
-    break :blk @Type(.{
-        .@"union" = .{
-            .layout = .auto,
-            .tag_type = TagEnum,
-            .fields = &union_fields,
-            .decls = &.{},
-        },
-    });
+    break :blk @Union(.auto, TagEnum, &union_names, &union_types, &union_attrs);
 };
 
 pub const ShapeRegistry = struct {

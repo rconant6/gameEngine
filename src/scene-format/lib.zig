@@ -30,10 +30,10 @@ pub fn lexeme(src: [:0]const u8, token: Token) []const u8 {
     return src[start..end];
 }
 pub fn parseString(
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     src: [:0]const u8,
     file_name: []const u8,
 ) !SceneFile {
-    var parser = try Parser.init(allocator, src, file_name);
+    var parser = try Parser.init(gpa, src, file_name);
     return try parser.parse();
 }

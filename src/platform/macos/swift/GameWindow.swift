@@ -2,6 +2,17 @@ import AppKit
 
 #if USE_METAL
 import MetalKit
+
+class GameMTKView: MTKView {
+  override var acceptsFirstResponder: Bool { true }
+
+  override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    // Prevent macOS from swallowing Cmd+key combos.
+    // Forward them as normal key events so our handler sees them.
+    globalEventHandler.handleEvent(event)
+    return true
+  }
+}
 #endif
 
 class GameWindow: NSWindow {
@@ -34,7 +45,7 @@ class GameWindow: NSWindow {
       fatalError("Metal is not supported on this device")
     }
 
-    let metalView = MTKView(frame: contentRect, device: device)
+    let metalView = GameMTKView(frame: contentRect, device: device)
     metalView.layer?.contentsScale = 1.0
     metalView.isPaused = true
     metalView.enableSetNeedsDisplay = true

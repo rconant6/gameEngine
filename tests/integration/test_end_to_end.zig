@@ -15,8 +15,8 @@ const CollisionDetectionSys = systems.CollisionDetectionSys;
 // MARK: End-to-End Integration Tests
 
 test "E2E: create world, add entities, detect collisions" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     // Create two overlapping circles
@@ -41,7 +41,7 @@ test "E2E: create world, add entities, detect collisions" {
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;
-    defer collision_events.deinit(allocator);
+    defer collision_events.deinit(gpa);
 
     try CollisionDetectionSys.detectCollisions(&world, &collision_events);
 
@@ -50,8 +50,8 @@ test "E2E: create world, add entities, detect collisions" {
 }
 
 test "E2E: physics simulation with collisions" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     // Create moving ball
@@ -93,7 +93,7 @@ test "E2E: physics simulation with collisions" {
 
     // Check for collisions
     var collision_events: std.ArrayList(Collision) = .empty;
-    defer collision_events.deinit(allocator);
+    defer collision_events.deinit(gpa);
 
     try CollisionDetectionSys.detectCollisions(&world, &collision_events);
 
@@ -120,8 +120,8 @@ test "E2E: physics simulation with collisions" {
 }
 
 test "E2E: multiple entities with different collision shapes" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     // Circle 1
@@ -158,7 +158,7 @@ test "E2E: multiple entities with different collision shapes" {
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;
-    defer collision_events.deinit(allocator);
+    defer collision_events.deinit(gpa);
 
     try CollisionDetectionSys.detectCollisions(&world, &collision_events);
 
@@ -167,8 +167,8 @@ test "E2E: multiple entities with different collision shapes" {
 }
 
 test "E2E: scale affects collision detection" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     // Small scaled circle
@@ -194,7 +194,7 @@ test "E2E: scale affects collision detection" {
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;
-    defer collision_events.deinit(allocator);
+    defer collision_events.deinit(gpa);
 
     try CollisionDetectionSys.detectCollisions(&world, &collision_events);
 
@@ -203,8 +203,8 @@ test "E2E: scale affects collision detection" {
 }
 
 test "E2E: query system with transforms and velocities" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     // Create multiple entities with different components
@@ -251,8 +251,8 @@ test "E2E: query system with transforms and velocities" {
 }
 
 test "E2E: component removal and collision detection" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     const e1 = try world.createEntity();
@@ -276,7 +276,7 @@ test "E2E: component removal and collision detection" {
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;
-    defer collision_events.deinit(allocator);
+    defer collision_events.deinit(gpa);
 
     // Should have collision
     try CollisionDetectionSys.detectCollisions(&world, &collision_events);
@@ -294,8 +294,8 @@ test "E2E: component removal and collision detection" {
 }
 
 test "E2E: entity destruction and collision detection" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     const e1 = try world.createEntity();
@@ -319,7 +319,7 @@ test "E2E: entity destruction and collision detection" {
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;
-    defer collision_events.deinit(allocator);
+    defer collision_events.deinit(gpa);
 
     // Should have collision
     try CollisionDetectionSys.detectCollisions(&world, &collision_events);
@@ -337,8 +337,8 @@ test "E2E: entity destruction and collision detection" {
 }
 
 test "E2E: V2 math in transform updates" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     const e = try world.createEntity();
@@ -381,8 +381,8 @@ test "E2E: V2 math in transform updates" {
 }
 
 test "E2E: collision normal calculation with V2" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     const e1 = try world.createEntity();
@@ -406,7 +406,7 @@ test "E2E: collision normal calculation with V2" {
     });
 
     var collision_events: std.ArrayList(Collision) = .empty;
-    defer collision_events.deinit(allocator);
+    defer collision_events.deinit(gpa);
 
     try CollisionDetectionSys.detectCollisions(&world, &collision_events);
 
@@ -428,8 +428,8 @@ test "E2E: collision normal calculation with V2" {
 }
 
 test "E2E: stress test with many entities" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     // Create 20 entities
@@ -448,7 +448,7 @@ test "E2E: stress test with many entities" {
     }
 
     var collision_events: std.ArrayList(Collision) = .empty;
-    defer collision_events.deinit(allocator);
+    defer collision_events.deinit(gpa);
 
     try CollisionDetectionSys.detectCollisions(&world, &collision_events);
 

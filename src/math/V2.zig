@@ -54,3 +54,11 @@ pub fn format(self: *const V2, w: *std.Io.Writer) !void {
     try w.print("x:{d:2}, y:{d:2}", .{ self.x, self.y });
 }
 pub const ZERO = V2{ .x = 0, .y = 0 };
+
+/// Convert to integer coordinates for rasterization
+pub fn toPixel(self: V2) struct { x: i32, y: i32 } {
+    return .{
+        .x = @intFromFloat(self.x),
+        .y = @intFromFloat(self.y),
+    };
+}

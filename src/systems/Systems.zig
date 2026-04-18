@@ -70,7 +70,7 @@ pub fn debugEntityInfoSystem(world: *World, debugger: *DebugManager) void {
             var buf: [64]u8 = undefined;
             const tags = std.fmt.bufPrint(&buf, "t: {s}", .{tag.tags}) catch "ERROR";
             debugger.draw.addText(.{
-                .text = world.allocator.dupe(u8, tags) catch "",
+                .text = world.gpa.dupe(u8, tags) catch "",
                 .position = .{ .x = transform.position.x, .y = transform.position.y + 1.0 },
                 .color = Colors.LIGHT_GRAY,
                 .size = 0.3,
@@ -92,7 +92,7 @@ pub fn debugEntityInfoSystem(world: *World, debugger: *DebugManager) void {
             .cat = DebugCategory.single(.entity_info),
         });
         debugger.draw.addText(.{
-            .text = world.allocator.dupe(u8, text) catch "",
+            .text = world.gpa.dupe(u8, text) catch "",
             .position = .{ .x = transform.position.x, .y = transform.position.y + 1.5 },
             .color = Colors.WHITE,
             .size = 0.3,

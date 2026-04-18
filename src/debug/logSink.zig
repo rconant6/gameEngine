@@ -1,0 +1,257 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
+const log = @import("log.zig");
+const LogEntry = log.LogEntry;
+const LogCategory = log.LogCategory;
+
+const reset = "\x1b[0m";
+const bold = "\x1b[1m";
+const dim = "\x1b[2m";
+const italic = "\x1b[3m";
+const white = "\x1b[37m";
+const grey = "\x1b[90m";
+const cyan = "\x1b[36m";
+const bold_white = white ++ bold;
+
+/// ConsoleSink immidiately writes to the console
+/// showing the level, category, user message and simple timestamp
+pub const ConsoleSink = struct {
+    const Self = @This();
+
+    buffer: [4096]u8,
+    writer: std.Io.File.Writer,
+
+    pub fn init(self: *Self, io: std.Io) void {
+        self.buffer = undefined;
+        self.writer = std.Io.File.stderr().writer(io, &self.buffer);
+    }
+    pub fn sink(self: *Self) Sink {
+        return .{
+            .ptr = self,
+            .vtable = &.{
+                .write = writeFn,
+                .flush = flushFn,
+                .deinit = deinitFn,
+            },
+        };
+    }
+    fn writeFn(ptr: *anyopaque, entry: LogEntry) void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.write(entry);
+    }
+    fn flushFn(ptr: *anyopaque) void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.flush();
+    }
+    fn deinitFn(ptr: *anyopaque, gpa: Allocator) void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.deinit(gpa);
+    }
+    pub fn write(self: *Self, entry: LogEntry) void {
+        const level_color = entry.level.getAnsiColor();
+        var time_buf: [10]u8 = undefined;
+        const time_str = entry.time.formatConsole(&time_buf) catch "(00:00:00)";
+        // Layout: [LEVEL] CATEGORY: MESSAGE  TIME
+        self.writer.interface.print("{s}[{s:}]{s} {s:}: {s}{s}{s}  {s}{s}{s}\n", .{
+            // Level
+            level_color,
+            entry.level.getLevelName(),
+            reset,
+
+            // Category
+            @tagName(entry.category),
+
+            // THE MESSAGE (Bold White Focus)
+            bold_white,
+            entry.message,
+            reset,
+
+            // Timestamp (Cyan)
+            cyan,
+            time_str,
+            reset,
+        }) catch return;
+
+        self.writer.interface.flush() catch return;
+    }
+    pub fn flush(self: *Self) void {
+        _ = self;
+        // self.writer.flush() catch return;
+    }
+    pub fn deinit(self: *Self, gpa: Allocator) void {
+        gpa.destroy(self);
+    }
+};
+
+/// FileSink batch writes logs to a rotating pool of files
+/// that are located in logs/
+/// game.log is the most recent run and stores game_(1-4).log for storage
+/// of previous runs.
+/// game_4.log gets removed on each run and 1-3 will shuffle down one per run
+pub const FileSink = struct {
+    const Self = @This();
+    const log_files = [_][]const u8{
+        "game.log",
+        "game.1.log",
+        "game.2.log",
+        "game.3.log",
+        "game.4.log",
+    };
+
+    io: std.Io,
+    log_dir: std.Io.Dir,
+    log_file: std.Io.File,
+    log_writer: std.Io.File.Writer,
+    log_buffer: [65336]u8 = undefined,
+    entry_count: usize = 0,
+    enabled: bool = false,
+
+    pub fn init(self: *FileSink, io: std.Io) !void {
+        var log_dir = getLogDir(io) catch |err| {
+            std.debug.print("Unable to get logs directory: {any}\n", .{err});
+            return error.FailedToCreateFileLogger;
+        };
+        try rotateLogs(log_dir, io);
+
+        self.io = io;
+        self.log_dir = try getLogDir(io);
+        self.log_file = try log_dir.createFile(io, log_files[0], .{});
+        self.enabled = true;
+        self.log_writer = self.log_file.writer(io, &self.log_buffer);
+    }
+
+    pub fn sink(self: *Self) Sink {
+        return .{
+            .ptr = self,
+            .vtable = &.{
+                .write = writeFn,
+                .flush = flushFn,
+                .deinit = deinitFn,
+            },
+        };
+    }
+    fn writeFn(ptr: *anyopaque, entry: LogEntry) void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.write(entry);
+    }
+    fn flushFn(ptr: *anyopaque) void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.flush();
+    }
+    pub fn deinitFn(ptr: *anyopaque, gpa: Allocator) void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.deinit(gpa);
+    }
+
+    pub fn write(self: *Self, entry: LogEntry) void {
+        if (!self.enabled) return;
+        if (self.entry_count > 100) self.flush();
+
+        var time_buf: [20]u8 = undefined;
+        const time_str = entry.time.formatISO08601(&time_buf) catch "0000-00-00T00:00:00Z";
+
+        // Layout: LEVEL category message time\n
+        var w = &self.log_writer.interface;
+        w.print(
+            "{s:<5}  {s:<10}  {s}  {s:>20}\n",
+            .{
+                entry.level.getLevelName(),
+                @tagName(entry.category),
+                entry.message,
+                time_str,
+            },
+        ) catch |err| {
+            self.enabled = false;
+            log.err(
+                .debug,
+                "FileLogger failed to write to buffer: {any}",
+                .{err},
+            );
+        };
+
+        self.entry_count += 1;
+    }
+    pub fn flush(self: *Self) void {
+        if (!self.enabled) return;
+
+        var w = &self.log_writer.interface;
+        w.flush() catch |err| {
+            self.enabled = false;
+            log.err(
+                .debug,
+                "FileLogger failed to flush and is now disabled: {any}",
+                .{err},
+            );
+        };
+        self.log_file.sync(self.io) catch |err| {
+            self.enabled = false;
+            log.err(
+                .debug,
+                "FileLogger failed to sync and is now disabled: {any}",
+                .{err},
+            );
+        };
+
+        self.entry_count = 0;
+    }
+
+    pub fn deinit(self: *Self, gpa: Allocator) void {
+        self.flush();
+        self.log_file.close(self.io);
+        self.log_dir.close(self.io);
+        gpa.destroy(self);
+    }
+
+    fn getLogDir(io: std.Io) !std.Io.Dir {
+        var exe_path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+        const exe_len = try std.process.executablePath(io, &exe_path_buf);
+        const exe_path = exe_path_buf[0..exe_len];
+        const exe_dir = std.fs.path.dirname(exe_path) orelse ".";
+
+        var log_path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+        const log_path = try std.fmt.bufPrint(&log_path_buf, "{s}/logs", .{exe_dir});
+
+        try std.Io.Dir.cwd().createDirPath(io, log_path);
+        return try std.Io.Dir.cwd().openDir(io, log_path, .{});
+    }
+
+    fn rotateLogs(dir: std.Io.Dir, io: std.Io) !void {
+        const max_rotations = log_files.len;
+        dir.deleteFile(io, log_files[max_rotations - 1]) catch |err| switch (err) {
+            error.FileNotFound => {},
+            else => return err,
+        };
+
+        var i: usize = max_rotations - 1;
+        while (i > 0) : (i -= 1) {
+            std.Io.Dir.rename(dir, log_files[i - 1], dir, log_files[i], io) catch |err| switch (err) {
+                error.FileNotFound => continue,
+                else => return err,
+            };
+        }
+    }
+};
+
+pub const Sink = struct {
+    ptr: *anyopaque,
+    vtable: *const VTable,
+
+    pub const VTable = struct {
+        write: *const fn (ptr: *anyopaque, entry: LogEntry) void,
+        flush: *const fn (ptr: *anyopaque) void,
+        deinit: *const fn (ptr: *anyopaque, gpa: Allocator) void,
+    };
+
+    pub fn write(self: Sink, entry: LogEntry) void {
+        self.vtable.write(self.ptr, entry);
+    }
+
+    pub fn flush(self: Sink) void {
+        self.vtable.flush(self.ptr);
+    }
+
+    pub fn deinit(self: *Sink, gpa: Allocator) void {
+        self.vtable.deinit(self.ptr, gpa);
+    }
+};

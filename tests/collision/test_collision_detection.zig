@@ -255,8 +255,8 @@ test "CollisionDetection: rect-rect with scale" {
 // MARK: World Integration Tests
 
 test "CollisionDetection: detect collisions in world with two circles" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     const entity_a = try world.createEntity();
@@ -280,7 +280,7 @@ test "CollisionDetection: detect collisions in world with two circles" {
     });
 
     var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
-    defer collisions.deinit(allocator);
+    defer collisions.deinit(gpa);
 
     try CollisionDetectionSys.detectCollisions(&world, &collisions);
 
@@ -293,8 +293,8 @@ test "CollisionDetection: detect collisions in world with two circles" {
 }
 
 test "CollisionDetection: detect no collisions when circles far apart" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     const entity_a = try world.createEntity();
@@ -318,7 +318,7 @@ test "CollisionDetection: detect no collisions when circles far apart" {
     });
 
     var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
-    defer collisions.deinit(allocator);
+    defer collisions.deinit(gpa);
 
     try CollisionDetectionSys.detectCollisions(&world, &collisions);
 
@@ -326,8 +326,8 @@ test "CollisionDetection: detect no collisions when circles far apart" {
 }
 
 test "CollisionDetection: detect multiple collisions" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     const entity_a = try world.createEntity();
@@ -361,7 +361,7 @@ test "CollisionDetection: detect multiple collisions" {
     });
 
     var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
-    defer collisions.deinit(allocator);
+    defer collisions.deinit(gpa);
 
     try CollisionDetectionSys.detectCollisions(&world, &collisions);
 
@@ -369,8 +369,8 @@ test "CollisionDetection: detect multiple collisions" {
 }
 
 test "CollisionDetection: ignore entities without collider" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     const entity_a = try world.createEntity();
@@ -391,7 +391,7 @@ test "CollisionDetection: ignore entities without collider" {
     });
 
     var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
-    defer collisions.deinit(allocator);
+    defer collisions.deinit(gpa);
 
     try CollisionDetectionSys.detectCollisions(&world, &collisions);
 
@@ -399,8 +399,8 @@ test "CollisionDetection: ignore entities without collider" {
 }
 
 test "CollisionDetection: collision events contain correct entity IDs" {
-    const allocator = testing.allocator;
-    var world = try World.init(allocator);
+    const gpa = testing.allocator;
+    var world = try World.init(gpa);
     defer world.deinit();
 
     const entity_a = try world.createEntity();
@@ -424,7 +424,7 @@ test "CollisionDetection: collision events contain correct entity IDs" {
     });
 
     var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
-    defer collisions.deinit(allocator);
+    defer collisions.deinit(gpa);
 
     try CollisionDetectionSys.detectCollisions(&world, &collisions);
 

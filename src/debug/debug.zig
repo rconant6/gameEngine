@@ -3,15 +3,14 @@ const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
-
+const RenderContext = rend.RenderContext;
+pub const log = @import("log.zig");
+pub const LogLevel = log.LogLevel;
+pub const LogCategory = log.LogCategory;
+pub const LogEntry = log.LogEntry;
+pub const Logger = log.Logger;
 pub const debug_enabled = builtin.mode == .Debug;
 
-// Error logging (temporary home until proper logging system is implemented)
-pub const error_logger = @import("error_logger.zig");
-pub const ErrorLogger = error_logger.ErrorLogger;
-pub const ErrorEntry = error_logger.ErrorEntry;
-pub const Severity = error_logger.Severity;
-pub const SubSystem = error_logger.SubSystem;
 // MARK: DebugManager
 const DebugManagerImpl = @import("DebugManager.zig");
 pub const DebugManager = if (debug_enabled) DebugManagerImpl else DebugManagerStub;
@@ -28,9 +27,10 @@ const DebugManagerStub = struct {
         _ = self;
     }
 
-    pub fn run(self: *@This(), dt: f32) void {
+    pub fn run(self: *@This(), dt: f32, ctx: RenderContext) void {
         _ = self;
         _ = dt;
+        _ = ctx;
     }
 };
 

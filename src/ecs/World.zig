@@ -12,21 +12,24 @@ const scene = @import("scene");
 const TemplateManager = scene.TemplateManager;
 const comps = @import("Components.zig");
 const Tag = comps.Tag;
+const debug = @import("debug");
+const log = debug.log;
 
-allocator: std.mem.Allocator,
+gpa: std.mem.Allocator,
 next_entity_id: usize,
 component_storages: Storages,
 template_manager: *TemplateManager = undefined, // gets set by engine on init
 
-pub fn init(alloc: Allocator) !Self {
+pub fn init(gpa: Allocator) !Self {
     return .{
-        .allocator = alloc,
+        .gpa = gpa,
         .next_entity_id = 1, // 0 is dummy/invalid entity
-        .component_storages = Storages.init(alloc),
+        .component_storages = Storages.init(gpa),
     };
 }
 
 pub fn deinit(self: *Self) void {
+    log.info(.ecs, "ECS(world) shutting down...", .{});
     for (0..self.next_entity_id) |entity_id| {
         self.destroyEntity(Entity{ .id = entity_id });
     }
@@ -34,7 +37,7 @@ pub fn deinit(self: *Self) void {
     var storage_iter = self.component_storages.valueIterator();
     while (storage_iter.next()) |interface| {
         interface.vtable.deinit(interface.ptr);
-        interface.vtable.destroy(interface.ptr, self.allocator);
+        interface.vtable.destroy(interface.ptr, self.gpa);
     }
     self.component_storages.deinit();
 }
@@ -108,29 +111,29 @@ pub fn findEntityByTag(self: *Self, tag: []const u8) ?Entity {
 }
 pub fn findEntitiesByTag(self: *Self, tag: []const u8) []Entity {
     var entities: ArrayList(Entity) = .empty;
-    errdefer entities.deinit(self.allocator);
+    errdefer entities.deinit(self.gpa);
     var q = self.query(.{Tag});
     while (q.next()) |entry| {
         const tags = entry.get(0);
         if (tags.hasTag(tag))
-            entities.append(self.allocator, entry.entity) catch {
+            entities.append(self.gpa, entry.entity) catch {
                 // TODO: logging
             };
     }
-    return entities.toOwnedSlice(self.allocator) catch &[_]Entity{};
+    return entities.toOwnedSlice(self.gpa) catch &[_]Entity{};
 }
 pub fn findEntitiesByPattern(self: *Self, pattern: []const u8) []Entity {
     var entities: ArrayList(Entity) = .empty;
-    errdefer entities.deinit(self.allocator);
+    errdefer entities.deinit(self.gpa);
     var q = self.query(.{Tag});
     while (q.next()) |entry| {
         const tags = entry.get(0);
         if (tags.matchesPattern(pattern))
-            entities.append(self.allocator, entry.entity) catch {
+            entities.append(self.gpa, entry.entity) catch {
                 // TODO: logging
             };
     }
-    return entities.toOwnedSlice(self.allocator) catch &[_]Entity{};
+    return entities.toOwnedSlice(self.gpa) catch &[_]Entity{};
 }
 
 pub fn query(self: *Self, comptime component_types: anytype) Query(buildStorageTupleType(component_types)) {
@@ -155,25 +158,11 @@ pub fn query(self: *Self, comptime component_types: anytype) Query(buildStorageT
 }
 fn buildStorageTupleType(comptime component_types: anytype) type {
     const num = std.meta.fields(@TypeOf(component_types)).len;
-    var fields: [num]std.builtin.Type.StructField = undefined;
-
+    var types: [num]type = undefined;
     inline for (0..num) |i| {
-        const T = component_types[i];
-        fields[i] = .{
-            .name = std.fmt.comptimePrint("{d}", .{i}),
-            .type = *ComponentStorage(T),
-            .default_value_ptr = null,
-            .is_comptime = false,
-            .alignment = @alignOf(*ComponentStorage(T)),
-        };
+        types[i] = *ComponentStorage(component_types[i]);
     }
-
-    return @Type(.{ .@"struct" = .{
-        .layout = .auto,
-        .fields = &fields,
-        .decls = &.{},
-        .is_tuple = true,
-    } });
+    return @Tuple(&types);
 }
 
 fn getStorage(self: *const Self, comptime T: type) *ComponentStorage(T) {
@@ -187,8 +176,8 @@ fn registerComponent(self: *Self, comptime T: type) !void {
     if (self.component_storages.contains(name)) return error.ComponentAlreadyRegistered;
 
     const StorageType = ComponentStorage(T);
-    const storage = try self.allocator.create(StorageType);
-    storage.* = try ComponentStorage(T).init(self.allocator);
+    const storage = try self.gpa.create(StorageType);
+    storage.* = try ComponentStorage(T).init(self.gpa);
 
     try self.component_storages.put(name, wrapStorage(T, storage));
 }

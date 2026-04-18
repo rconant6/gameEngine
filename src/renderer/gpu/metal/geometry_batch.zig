@@ -27,18 +27,18 @@ pub const DrawCall = struct {
 pub const GeometryBatch = struct {
     vertices: std.ArrayList(Vertex),
     draw_calls: std.ArrayList(DrawCall),
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
 
-    pub fn init(allocator: std.mem.Allocator) GeometryBatch {
+    pub fn init(gpa: std.mem.Allocator) GeometryBatch {
         return .{
             .vertices = .empty,
             .draw_calls = .empty,
-            .allocator = allocator,
+            .gpa = gpa,
         };
     }
     pub fn deinit(self: *GeometryBatch) void {
-        self.vertices.deinit(self.allocator);
-        self.draw_calls.deinit(self.allocator);
+        self.vertices.deinit(self.gpa);
+        self.draw_calls.deinit(self.gpa);
     }
     pub fn clear(self: *GeometryBatch) void {
         self.vertices.clearRetainingCapacity();
@@ -128,8 +128,8 @@ pub const GeometryBatch = struct {
     ) Vertex {
         // Apply transform offset to screen-space point
         const transformed = if (xform) |t| blk: {
-            const offset_x: i32 = if (t.offset) |off| @intFromFloat(off.x) else 0;
-            const offset_y: i32 = if (t.offset) |off| @intFromFloat(off.y) else 0;
+            const offset_x: f32 = if (t.offset) |off| off.x else 0;
+            const offset_y: f32 = if (t.offset) |off| off.y else 0;
             break :blk ScreenPoint{
                 .x = point.x + offset_x,
                 .y = point.y + offset_y,
@@ -165,10 +165,10 @@ pub const GeometryBatch = struct {
         else
             makeVertex(line.end, transform, ctx, color);
         const vertices = [_]Vertex{ start_vert, end_vert };
-        try self.vertices.appendSlice(self.allocator, &vertices);
+        try self.vertices.appendSlice(self.gpa, &vertices);
 
         try self.draw_calls.append(
-            self.allocator,
+            self.gpa,
             .{
                 .primitive_type = .line,
                 .vertex_start = batch_offset,
@@ -203,8 +203,8 @@ pub const GeometryBatch = struct {
             break :blk count;
         };
 
-        try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
-        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
+        try self.vertices.ensureTotalCapacity(self.gpa, self.vertices.items.len + vertex_count);
+        try self.draw_calls.ensureTotalCapacity(self.gpa, self.draw_calls.items.len + call_count);
 
         const fc = if (has_fill) utils.colorToFloat(fill_color.?) else undefined;
         const sc = if (has_outline) utils.colorToFloat(stroke_color.?) else undefined;
@@ -225,8 +225,8 @@ pub const GeometryBatch = struct {
             else
                 makeVertex(tri.v2, transform, ctx, fc);
             const vertices = [_]Vertex{ v0, v1, v2 };
-            try self.vertices.appendSlice(self.allocator, &vertices);
-            try self.draw_calls.append(self.allocator, .{
+            try self.vertices.appendSlice(self.gpa, &vertices);
+            try self.draw_calls.append(self.gpa, .{
                 .primitive_type = .triangle,
                 .vertex_start = batch_offset,
                 .vertex_count = 3,
@@ -284,8 +284,8 @@ pub const GeometryBatch = struct {
             break :blk count;
         };
 
-        try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
-        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
+        try self.vertices.ensureTotalCapacity(self.gpa, self.vertices.items.len + vertex_count);
+        try self.draw_calls.ensureTotalCapacity(self.gpa, self.draw_calls.items.len + call_count);
 
         const fc = if (has_fill) utils.colorToFloat(fill_color.?) else undefined;
         const sc = if (has_outline) utils.colorToFloat(stroke_color.?) else undefined;
@@ -367,8 +367,8 @@ pub const GeometryBatch = struct {
         const call_count = (if (has_fill) poly.fill_call_count else 0) +
             (if (has_outline) poly.outline_call_count else 0);
 
-        try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
-        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
+        try self.vertices.ensureTotalCapacity(self.gpa, self.vertices.items.len + vertex_count);
+        try self.draw_calls.ensureTotalCapacity(self.gpa, self.draw_calls.items.len + call_count);
 
         const fc = if (has_fill) utils.colorToFloat(fill_color.?) else undefined;
         const sc = if (has_outline) utils.colorToFloat(stroke_color.?) else undefined;
@@ -450,8 +450,8 @@ pub const GeometryBatch = struct {
             break :blk count;
         };
 
-        try self.vertices.ensureTotalCapacity(self.allocator, self.vertices.items.len + vertex_count);
-        try self.draw_calls.ensureTotalCapacity(self.allocator, self.draw_calls.items.len + call_count);
+        try self.vertices.ensureTotalCapacity(self.gpa, self.vertices.items.len + vertex_count);
+        try self.draw_calls.ensureTotalCapacity(self.gpa, self.draw_calls.items.len + call_count);
 
         const fc = if (has_fill) utils.colorToFloat(fill_color.?) else undefined;
         const sc = if (has_outline) utils.colorToFloat(stroke_color.?) else undefined;
@@ -466,18 +466,11 @@ pub const GeometryBatch = struct {
             const angle1 = i_f * angle_step;
             const angle2 = (i_f + 1.0) * angle_step;
 
-            const XType = @TypeOf(circle.origin.x);
-            const p1 = if (XType == i32) PointType{
-                .x = circle.origin.x + @as(i32, @intFromFloat(circle.radius * @cos(angle1))),
-                .y = circle.origin.y + @as(i32, @intFromFloat(circle.radius * @sin(angle1))),
-            } else PointType{
+            const p1 = PointType{
                 .x = circle.origin.x + circle.radius * @cos(angle1),
                 .y = circle.origin.y + circle.radius * @sin(angle1),
             };
-            const p2 = if (XType == i32) PointType{
-                .x = circle.origin.x + @as(i32, @intFromFloat(circle.radius * @cos(angle2))),
-                .y = circle.origin.y + @as(i32, @intFromFloat(circle.radius * @sin(angle2))),
-            } else PointType{
+            const p2 = PointType{
                 .x = circle.origin.x + circle.radius * @cos(angle2),
                 .y = circle.origin.y + circle.radius * @sin(angle2),
             };

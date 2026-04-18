@@ -26,18 +26,21 @@ pub const Template = struct {
 };
 
 pub const TemplateManager = struct {
-    allocator: Allocator,
+    gpa: Allocator,
+    io: std.Io,
     template_files: std.ArrayList(*SceneFile),
     templates: std.StringHashMap(Template),
     instantiator: *Instantiator,
 
     pub fn init(
-        allocator: Allocator,
+        gpa: Allocator,
+        io: std.Io,
         instantiator: *Instantiator,
     ) TemplateManager {
         return .{
-            .allocator = allocator,
-            .templates = std.StringHashMap(Template).init(allocator),
+            .gpa = gpa,
+            .io = io,
+            .templates = std.StringHashMap(Template).init(gpa),
             .template_files = .empty,
             .instantiator = instantiator,
         };
@@ -46,16 +49,16 @@ pub const TemplateManager = struct {
     pub fn deinit(self: *TemplateManager) void {
         var iter = self.templates.iterator();
         while (iter.next()) |entry| {
-            self.allocator.free(entry.key_ptr.*); // Free lowercase key
-            self.allocator.free(entry.value_ptr.name); // Free original name
+            self.gpa.free(entry.key_ptr.*); // Free lowercase key
+            self.gpa.free(entry.value_ptr.name); // Free original name
         }
         self.templates.deinit();
 
         for (self.template_files.items) |file| {
-            file.deinit(self.allocator);
-            self.allocator.destroy(file);
+            file.deinit(self.gpa);
+            self.gpa.destroy(file);
         }
-        self.template_files.deinit(self.allocator);
+        self.template_files.deinit(self.gpa);
     }
 
     pub fn instantiate(
@@ -89,22 +92,22 @@ pub const TemplateManager = struct {
             return;
         }
 
-        const owned_file = try self.allocator.create(SceneFile);
-        errdefer self.allocator.destroy(owned_file);
-        owned_file.* = try load.loadTemplateFile(self.allocator, name);
-        try self.template_files.append(self.allocator, owned_file);
+        const owned_file = try self.gpa.create(SceneFile);
+        errdefer self.gpa.destroy(owned_file);
+        owned_file.* = try load.loadTemplateFile(self.gpa, self.io, name);
+        try self.template_files.append(self.gpa, owned_file);
 
         for (owned_file.decls) |decl| {
             switch (decl) {
                 .template => |t| {
                     const owned_name_lower = try std.ascii.allocLowerString(
-                        self.allocator,
+                        self.gpa,
                         t.name,
                     );
-                    errdefer self.allocator.free(owned_name_lower);
+                    errdefer self.gpa.free(owned_name_lower);
 
-                    const owned_name = try self.allocator.dupe(u8, t.name);
-                    errdefer self.allocator.free(owned_name);
+                    const owned_name = try self.gpa.dupe(u8, t.name);
+                    errdefer self.gpa.free(owned_name);
 
                     const template: Template = .{
                         .declaration = t,
@@ -118,21 +121,21 @@ pub const TemplateManager = struct {
     }
 
     pub fn loadTemplatesFromDirectory(self: *TemplateManager, dir_path: []const u8) !void {
-        var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
-        defer dir.close();
+        var dir = try std.Io.Dir.cwd().openDir(self.io, dir_path, .{});
+        defer dir.close(self.io);
 
         var iter = dir.iterate();
-        while (try iter.next()) |entry| {
+        while (try iter.next(self.io)) |entry| {
             switch (entry.kind) {
                 .file => {
                     if (std.mem.endsWith(u8, entry.name, ".template")) {
                         const full_path = try std.fmt.allocPrint(
-                            self.allocator,
+                            self.gpa,
                             "{s}{s}",
                             .{ dir_path, entry.name },
                         );
-                        errdefer self.allocator.free(full_path);
-                        defer self.allocator.free(full_path);
+                        errdefer self.gpa.free(full_path);
+                        defer self.gpa.free(full_path);
                         try self.loadTemplateFile(full_path);
                     }
                 },

@@ -7,11 +7,13 @@ const rend = @import("renderer.zig");
 const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
 const WorldPoint = rend.WorldPoint;
+const ScreenPoint = rend.ScreenPoint;
 const Color = rend.Color;
 const ShapeRegistry = rend.ShapeRegistry;
 const Shapes = rend.Shapes;
 const ShapeData = rend.ShapeData;
 const V2 = rend.V2;
+const log = @import("debug").log;
 
 pub fn drawText(
     renderer: *Renderer,
@@ -26,7 +28,10 @@ pub fn drawText(
     var x_pos = position.x;
     for (text) |char| {
         const ascii_val: u32 = @intCast(char);
-        const glyph_index = font.char_to_glyph.get(ascii_val) orelse continue;
+        const glyph_index = font.char_to_glyph.get(ascii_val) orelse {
+            log.err(.assets, "ASCII val: {d} not found", .{ascii_val});
+            continue;
+        };
         if (f.glyph_shapes.get(glyph_index)) |glyph| {
             drawGlyph(
                 renderer,
@@ -37,8 +42,48 @@ pub fn drawText(
                 .{ .x = x_pos, .y = position.y },
                 color,
                 ctx,
-            ) catch {
-                // Skip glyphs that fail to render
+            ) catch |err| {
+                log.err(.assets, "{c} failed to render {any}", .{ char, err });
+                continue;
+            };
+        }
+
+        const advance_f: f32 = @floatFromInt(f.glyph_advance_width.items[glyph_index].advance_width);
+        const em_f: f32 = @floatFromInt(f.units_per_em);
+        x_pos += (advance_f / em_f) * scale;
+    }
+}
+pub fn drawTextScreen(
+    renderer: *Renderer,
+    font: *const Font,
+    text: []const u8,
+    position: ScreenPoint,
+    scale: f32,
+    color: Color,
+    ctx: RenderContext,
+) void {
+    const f = @constCast(font);
+    var x_pos: f32 = position.x;
+    const y_pos: f32 = position.y;
+    for (text) |char| {
+        const ascii_val: u32 = @intCast(char);
+        const glyph_index = font.char_to_glyph.get(ascii_val) orelse {
+            log.err(.assets, "ASCII val: {d} not found (screen)", .{ascii_val});
+            continue;
+        };
+        if (f.glyph_shapes.get(glyph_index)) |glyph| {
+            drawGlyphScreen(
+                renderer,
+                f,
+                glyph_index,
+                &glyph,
+                scale,
+                x_pos,
+                y_pos,
+                color,
+                ctx,
+            ) catch |err| {
+                log.err(.assets, "{c} failed to render (screen) {any}", .{ char, err });
                 continue;
             };
         }
@@ -55,14 +100,14 @@ fn drawGlyph(
     glyph_index: u16,
     glyph: *const FilteredGlyph,
     scale: f32,
-    pos: V2,
+    pos: WorldPoint,
     color: Color,
     ctx: RenderContext,
 ) !void {
     const triangles = if (font.glyph_triangles.get(glyph_index)) |cached|
         cached
     else blk: {
-        const tris = try glyph_builder.buildTriangles(font.alloc, glyph);
+        const tris = try glyph_builder.buildTriangles(font.gpa, glyph);
         try font.glyph_triangles.put(glyph_index, tris);
         break :blk tris;
     };
@@ -72,13 +117,53 @@ fn drawGlyph(
         const p1 = glyph.points[tri[1]];
         const p2 = glyph.points[tri[2]];
 
-        const t0 = V2{ .x = p0.x * scale + pos.x, .y = p0.y * scale + pos.y };
-        const t1 = V2{ .x = p1.x * scale + pos.x, .y = p1.y * scale + pos.y };
-        const t2 = V2{ .x = p2.x * scale + pos.x, .y = p2.y * scale + pos.y };
+        const t0 = WorldPoint{ .x = p0.x * scale + pos.x, .y = p0.y * scale + pos.y };
+        const t1 = WorldPoint{ .x = p1.x * scale + pos.x, .y = p1.y * scale + pos.y };
+        const t2 = WorldPoint{ .x = p2.x * scale + pos.x, .y = p2.y * scale + pos.y };
 
         const triangle: Shapes.Triangle(WorldPoint) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
         renderer.drawGeometry(
             ShapeRegistry.createShapeUnion(Shapes.Triangle(WorldPoint), triangle),
+            .{},
+            color,
+            null,
+            1.0,
+            ctx,
+        );
+    }
+}
+
+fn drawGlyphScreen(
+    renderer: *Renderer,
+    font: *Font,
+    glyph_index: u16,
+    glyph: *const FilteredGlyph,
+    scale: f32,
+    x_pos: f32,
+    y_pos: f32,
+    color: Color,
+    ctx: RenderContext,
+) !void {
+    const triangles = if (font.glyph_triangles.get(glyph_index)) |cached|
+        cached
+    else blk: {
+        const tris = try glyph_builder.buildTriangles(font.gpa, glyph);
+        try font.glyph_triangles.put(glyph_index, tris);
+        break :blk tris;
+    };
+
+    for (triangles) |tri| {
+        const p0 = glyph.points[tri[0]];
+        const p1 = glyph.points[tri[1]];
+        const p2 = glyph.points[tri[2]];
+
+        const t0 = ScreenPoint{ .x = p0.x * scale + x_pos, .y = -p0.y * scale + y_pos };
+        const t1 = ScreenPoint{ .x = p1.x * scale + x_pos, .y = -p1.y * scale + y_pos };
+        const t2 = ScreenPoint{ .x = p2.x * scale + x_pos, .y = -p2.y * scale + y_pos };
+
+        const triangle: Shapes.Triangle(ScreenPoint) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
+        renderer.drawGeometry(
+            ShapeRegistry.createShapeUnion(Shapes.Triangle(ScreenPoint), triangle),
             .{},
             color,
             null,

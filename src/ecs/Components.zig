@@ -8,8 +8,6 @@ const rend = @import("renderer");
 const ScreenAnchor = rend.ScreenAnchor;
 const Color = rend.Color;
 const Shape = rend.Shape;
-const asset = @import("assets");
-const FontHandle = asset.FontHandle;
 const action = @import("action");
 
 // MARK: Action Components (defined in action module, re-exported for ECS use)
@@ -48,7 +46,7 @@ pub const Sprite = struct {
 };
 pub const Text = struct {
     text: []const u8,
-    font_asset: FontHandle,
+    font_name: []const u8,
     size: f32,
     text_color: Color,
 };
@@ -82,6 +80,18 @@ pub const Health = struct {
     remaining: i32,
 };
 pub const Tag = @import("Tag.zig");
+
+// MARK: Sprite Components
+pub const ZxlSprite = struct {
+    asset_name: []const u8, // matches name from [X:asset zxl] in scene file
+    current_frame: u16 = 0, // which animation frame to show
+    pixel_scale: f32 = 1.0, // world-units per pixel
+    flip_h: bool = false, // mirror horizontally
+    flip_v: bool = false, // mirror vertically
+    visible: bool = true,
+    playing: bool = true, // advance animation each frame
+    elapsed_ms: f32 = 0, // accumulator for frame timing
+};
 
 // MARK: Tagging Comonents
 pub const ScreenSpace = struct { _dummy: u8 = 0 };

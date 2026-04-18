@@ -162,9 +162,9 @@ test "OnTime - multiple triggers with different intervals" {
 }
 
 test "TimeBasedTriggerSystem - process with delta_time" {
-    const allocator = testing.allocator;
+    const gpa = testing.allocator;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
     const entity = try world.createEntity();
@@ -175,7 +175,7 @@ test "TimeBasedTriggerSystem - process with delta_time" {
     };
 
     // Allocate actions array on heap for proper cleanup
-    const actions = try allocator.alloc(Action.Action, 1);
+    const actions = try gpa.alloc(Action.Action, 1);
     actions[0] = action;
 
     const trigger = TimeTrigger{
@@ -184,7 +184,7 @@ test "TimeBasedTriggerSystem - process with delta_time" {
     };
 
     // Allocate triggers array on heap for proper cleanup
-    const triggers = try allocator.alloc(TimeTrigger, 1);
+    const triggers = try gpa.alloc(TimeTrigger, 1);
     triggers[0] = trigger;
 
     try world.addComponent(entity, OnTime, .{
@@ -196,7 +196,7 @@ test "TimeBasedTriggerSystem - process with delta_time" {
         .elapsed = &elapsed,
     });
 
-    var action_queue = Action.ActionQueue.init(allocator);
+    var action_queue = Action.ActionQueue.init(gpa);
     defer action_queue.deinit();
 
     const ctx = Action.TriggerContext{
@@ -219,9 +219,9 @@ test "TimeBasedTriggerSystem - process with delta_time" {
 }
 
 test "TimeBasedTriggerSystem - multiple entities" {
-    const allocator = testing.allocator;
+    const gpa = testing.allocator;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
     const entity1 = try world.createEntity();
@@ -233,7 +233,7 @@ test "TimeBasedTriggerSystem - multiple entities" {
     };
 
     // Allocate for entity1
-    const actions1 = try allocator.alloc(Action.Action, 1);
+    const actions1 = try gpa.alloc(Action.Action, 1);
     actions1[0] = action;
 
     const trigger1 = TimeTrigger{
@@ -241,7 +241,7 @@ test "TimeBasedTriggerSystem - multiple entities" {
         .actions = actions1,
     };
 
-    const triggers1 = try allocator.alloc(TimeTrigger, 1);
+    const triggers1 = try gpa.alloc(TimeTrigger, 1);
     triggers1[0] = trigger1;
 
     try world.addComponent(entity1, OnTime, .{
@@ -253,7 +253,7 @@ test "TimeBasedTriggerSystem - multiple entities" {
     });
 
     // Allocate for entity2
-    const actions2 = try allocator.alloc(Action.Action, 1);
+    const actions2 = try gpa.alloc(Action.Action, 1);
     actions2[0] = action;
 
     const trigger2 = TimeTrigger{
@@ -261,7 +261,7 @@ test "TimeBasedTriggerSystem - multiple entities" {
         .actions = actions2,
     };
 
-    const triggers2 = try allocator.alloc(TimeTrigger, 1);
+    const triggers2 = try gpa.alloc(TimeTrigger, 1);
     triggers2[0] = trigger2;
 
     try world.addComponent(entity2, OnTime, .{
@@ -272,7 +272,7 @@ test "TimeBasedTriggerSystem - multiple entities" {
         .elapsed = &elapsed2,
     });
 
-    var action_queue = Action.ActionQueue.init(allocator);
+    var action_queue = Action.ActionQueue.init(gpa);
     defer action_queue.deinit();
 
     const ctx = Action.TriggerContext{
@@ -287,12 +287,12 @@ test "TimeBasedTriggerSystem - multiple entities" {
 }
 
 test "TimeBasedTriggerSystem - error when no delta_time" {
-    const allocator = testing.allocator;
+    const gpa = testing.allocator;
 
-    var world = try World.init(allocator);
+    var world = try World.init(gpa);
     defer world.deinit();
 
-    var action_queue = Action.ActionQueue.init(allocator);
+    var action_queue = Action.ActionQueue.init(gpa);
     defer action_queue.deinit();
 
     const ctx = Action.TriggerContext{

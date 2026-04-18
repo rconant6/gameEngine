@@ -9,37 +9,37 @@ const Value = scene.Value;
 const Property = scene.Property;
 const ComponentDeclaration = scene.ComponentDeclaration;
 
-fn parseSource(allocator: std.mem.Allocator, src: [:0]const u8) !SceneFile {
-    var parser = try Parser.init(allocator, src, "test.scene");
+fn parseSource(gpa: std.mem.Allocator, src: [:0]const u8) !SceneFile {
+    var parser = try Parser.init(gpa, src, "test.scene");
     return try parser.parse();
 }
 
-fn freeSceneFile(scene_file: *SceneFile, allocator: std.mem.Allocator) void {
-    scene_file.deinit(allocator);
+fn freeSceneFile(scene_file: *SceneFile, gpa: std.mem.Allocator) void {
+    scene_file.deinit(gpa);
 }
 
 // MARK: Basic Declaration Tests
 
 test "parser - parse empty scene file" {
     const src: [:0]const u8 = "";
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     try testing.expectEqual(@as(usize, 0), result.decls.len);
 }
 
 test "parser - parse simple scene declaration" {
     const src: [:0]const u8 = "[TestScene:scene]";
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     try testing.expectEqual(@as(usize, 1), result.decls.len);
     try testing.expect(result.decls[0] == .scene);
@@ -54,12 +54,12 @@ test "parser - parse scene with nested entities" {
         \\    [Transform]
         \\      position:vec3 {0.0, 0.0, 0.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     try testing.expectEqual(@as(usize, 1), result.decls.len);
     try testing.expect(result.decls[0] == .scene);
@@ -79,12 +79,12 @@ test "parser - parse entity declaration" {
         \\    rotation:f32 0.0
         \\    scale:f32 1.0
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     try testing.expectEqual(@as(usize, 1), result.decls.len);
     try testing.expect(result.decls[0] == .entity);
@@ -103,12 +103,12 @@ test "parser - parse asset declaration" {
         \\[MainFont:asset font]
         \\  abs_path:string "assets/fonts/arcadeFont.ttf"
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     try testing.expectEqual(@as(usize, 1), result.decls.len);
     try testing.expect(result.decls[0] == .asset);
@@ -132,12 +132,12 @@ test "parser - generic component with properties" {
         \\    position:vec3 {1.0, 2.0, 3.0}
         \\    rotation:f32 45.0
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     const entity = result.decls[0].entity;
     try testing.expectEqual(@as(usize, 1), entity.components.len);
@@ -163,12 +163,12 @@ test "parser - sprite component with shape type" {
         \\    radius:f32 2.0
         \\    fill_color:color #00FF00
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     const component = result.decls[0].entity.components[0];
     try testing.expect(component == .sprite);
@@ -185,12 +185,12 @@ test "parser - collider component with shape type" {
         \\    center:vec2 {0.0, 0.0}
         \\    half_width:f32 1.5
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     const component = result.decls[0].entity.components[0];
     try testing.expect(component == .collider);
@@ -210,12 +210,12 @@ test "parser - number values" {
         \\    float_value:f32 3.14
         \\    negative:f32 -2.5
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     const props = result.decls[0].entity.components[0].generic.properties.?;
     try testing.expectEqual(@as(usize, 3), props.len);
@@ -237,12 +237,12 @@ test "parser - string values" {
         \\    name:string "Hello World"
         \\    path:string "assets/fonts/font.ttf"
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     const props = result.decls[0].entity.components[0].generic.properties.?;
     try testing.expectEqual(@as(usize, 2), props.len);
@@ -261,12 +261,12 @@ test "parser - boolean values" {
         \\    visible:bool true
         \\    enabled:bool false
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     const props = result.decls[0].entity.components[0].generic.properties.?;
     try testing.expectEqual(@as(usize, 2), props.len);
@@ -286,12 +286,12 @@ test "parser - color values" {
         \\    stroke_color:color #00FF00
         \\    text_color:color #0000FF
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     const props = result.decls[0].entity.components[0].generic.properties.?;
     try testing.expectEqual(@as(usize, 3), props.len);
@@ -313,12 +313,12 @@ test "parser - vector values" {
         \\    pos2d:vec2 {1.0, 2.0}
         \\    pos3d:vec3 {3.0, 4.0, 5.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     const props = result.decls[0].entity.components[0].generic.properties.?;
     try testing.expectEqual(@as(usize, 2), props.len);
@@ -341,12 +341,12 @@ test "parser - array of vectors" {
         \\  [Sprite:polygon]
         \\    points:vec2[] {{0.0, 1.0}, {0.951, 0.309}, {0.588, -0.809}}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     const props = result.decls[0].entity.components[0].sprite.properties.?;
     try testing.expectEqual(@as(usize, 1), props.len);
@@ -369,12 +369,12 @@ test "parser - asset reference" {
         \\  [Text]
         \\    font_asset:asset_ref "OrbitronFont"
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     const props = result.decls[0].entity.components[0].generic.properties.?;
     try testing.expectEqual(@as(usize, 1), props.len);
@@ -398,12 +398,12 @@ test "parser - multiple entities with various components" {
         \\  [Velocity]
         \\    linear:vec2 {1.0, 0.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     try testing.expectEqual(@as(usize, 2), result.decls.len);
 
@@ -427,12 +427,12 @@ test "parser - scene with multiple levels of nesting" {
         \\      [Transform]
         \\        position:vec2 {-10.0, -8.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     try testing.expectEqual(@as(usize, 1), result.decls.len);
     const game_scene = result.decls[0].scene;
@@ -463,12 +463,12 @@ test "parser - full scene with assets, entities, and nested scenes" {
         \\      text:string "Player"
         \\      font_asset:asset_ref "MainFont"
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     try testing.expectEqual(@as(usize, 2), result.decls.len);
 
@@ -488,12 +488,12 @@ test "parser - empty component" {
         \\[Test:entity]
         \\  [ScreenClamp]
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     const component = result.decls[0].entity.components[0];
     try testing.expect(component == .generic);
@@ -516,12 +516,12 @@ test "parser - various shape types" {
         \\  [Sprite:polygon]
         \\    points:vec2[] {{0.0, 1.0}, {1.0, 0.0}}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var da = std.heap.DebugAllocator(.{}){};
+    defer _ = da.deinit();
+    const gpa = da.allocator();
 
-    var result = try parseSource(allocator, src);
-    defer freeSceneFile(&result, allocator);
+    var result = try parseSource(gpa, src);
+    defer freeSceneFile(&result, gpa);
 
     try testing.expectEqual(@as(usize, 4), result.decls.len);
 

@@ -43,6 +43,10 @@ pub fn distance(self: V2I, other: V2I) f32 {
     return (self.sub(other)).magnitude();
 }
 
+pub fn format(self: *const V2I, w: *std.Io.Writer) !void {
+    try w.print("x:{d}, y:{d}", .{ self.x, self.y });
+}
+
 pub fn zero() V2I {
     return .{ .x = 0, .y = 0 };
 }
