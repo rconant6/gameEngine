@@ -2,6 +2,11 @@
 // Engine Library - Public API
 // ============================================================================
 
+// MARK: App (window + renderer + input shell)
+const app_mod = @import("app");
+pub const App = app_mod.App;
+pub const AppConfig = app_mod.AppConfig;
+
 // MARK: Engine Struct
 const engine = @import("engine/engine.zig");
 pub const Engine = engine.Engine;

@@ -13,8 +13,8 @@ pub fn getGameBounds(ctx: RenderContext) struct { width: f32, height: f32 } {
 }
 
 pub fn getGameWidth(self: *const Engine) f32 {
-    const aspect = @as(f32, @floatFromInt(self.renderer.width)) /
-        @as(f32, @floatFromInt(self.renderer.height));
+    const aspect = @as(f32, @floatFromInt(self.app.renderer.width)) /
+        @as(f32, @floatFromInt(self.app.renderer.height));
     return 20.0 * aspect;
 }
 

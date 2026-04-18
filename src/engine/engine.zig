@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const build_options = @import("build_options");
+const App = @import("app").App;
 const platform = @import("platform");
 const Input = platform.Input;
 const KeyCode = platform.KeyCode;
@@ -67,12 +68,11 @@ const PerformanceMetrics = struct {
 };
 
 pub const Engine = struct {
+    app: *App,
     gpa: Allocator,
     io: std.Io,
     input: Input,
-    renderer: renderer.Renderer,
     assets: assets.AssetManager,
-    window: platform.Window,
     world: ecs.World,
     collision_events: ArrayList(Collision),
     action_system: ActionSystem,
@@ -87,55 +87,14 @@ pub const Engine = struct {
 
     active_camera_entity: Entity,
 
-    // Logical window dimensions (for UIElement / ScreenPoint Rendering)
-    window_width: u32,
-    window_height: u32,
-
-    pub fn init(
-        gpa: Allocator,
-        io: std.Io,
-        title: []const u8,
-        width: u32,
-        height: u32,
-    ) *Engine {
-        Logger.init(gpa, io) catch |err| fatal("Logger", err);
-
-        platform.init() catch |err| fatal("Platform Layer", err);
-        log.info(.engine, "Platform layer initialized", .{});
-
-        const window = platform.createWindow(.{
-            .title = title,
-            .width = width,
-            .height = height,
-        }) catch |err| fatal("Window Creation", err);
-        log.info(
-            .engine,
-            "Main window initialized {{width: {d}, height: {d}}}",
-            .{ width, height },
-        );
-
-        const scale_factor = platform.getWindowScaleFactor(window);
+    pub fn init(app: *App) *Engine {
+        const gpa = app.gpa;
+        const io = app.io;
+        const width = app.logical_width;
+        const height = app.logical_height;
         const f_width: f32 = @floatFromInt(width);
         const f_height: f32 = @floatFromInt(height);
         const aspect_ratio = f_width / f_height;
-
-        const scaled_width: u32 = @intFromFloat(f_width * scale_factor);
-        const scaled_height: u32 = @intFromFloat(f_height * scale_factor);
-
-        const rend = renderer.Renderer.init(
-            gpa,
-            io,
-            .{
-                .width = scaled_width,
-                .height = scaled_height,
-                .native_handle = platform.getNativeWindowHandle(window),
-            },
-        ) catch |err| fatal("Renderer", err);
-        log.info(
-            .engine,
-            "Renderer initialized: {{scaled width: {d}, scaled height: {d}}}",
-            .{ scaled_width, scaled_height },
-        );
 
         var world = World.init(gpa) catch |err| fatal("ECS World", err);
         log.info(.engine, "ECS(world) initialized", .{});
@@ -164,12 +123,11 @@ pub const Engine = struct {
         const engine = gpa.create(Engine) catch |err| fatal("Engine Memory Allocation", err);
 
         engine.* = Engine{
+            .app = app,
             .gpa = gpa,
             .io = io,
             .input = .init(),
             .assets = asset_manager,
-            .renderer = rend,
-            .window = window.*,
             .world = world,
             .running = true,
             .action_system = action_system,
@@ -179,18 +137,16 @@ pub const Engine = struct {
             .template_manager = undefined,
             .debugger = undefined,
             .active_camera_entity = camera,
-            .window_width = width,
-            .window_height = height,
         };
 
         // Re-seat the renderer pointer to the stable heap address now that engine.* is assigned
-        engine.assets.textures.renderer = &engine.renderer;
+        engine.assets.textures.renderer = &engine.app.renderer;
         engine.instantiator = .init(gpa, &engine.world, &engine.assets);
         engine.template_manager = .init(gpa, io, &engine.instantiator);
         engine.world.template_manager = &engine.template_manager;
 
         const default_font = engine.assets.getFont("__default__") orelse fatal("Default Font Loading", error.FontNotFound);
-        engine.debugger = .init(gpa, &engine.renderer, default_font);
+        engine.debugger = .init(gpa, &engine.app.renderer, default_font);
 
         log.info(.engine, "Engine successfully started", .{});
         return engine;
@@ -215,20 +171,17 @@ pub const Engine = struct {
         self.action_system.deinit();
         self.collision_events.deinit(self.gpa);
         self.scene_manager.deinit();
-        self.renderer.deinit();
         self.assets.deinit();
         self.world.deinit();
-        self.window.deinit();
         self.instantiator.deinit();
         self.template_manager.deinit();
         self.debugger.deinit();
         log.info(.engine, "All systems shutdown", .{});
-        Logger.deinit();
         gpa.destroy(self);
     }
 
     pub fn shouldClose(self: *const Engine) bool {
-        return !self.running or self.window.shouldClose();
+        return !self.running or !self.app.isRunning();
     }
 
     pub fn checkInternals(self: *Engine) void {
@@ -292,14 +245,14 @@ pub const Engine = struct {
         Systems.cameraTrackingSystem(&self.world, dt);
         Systems.lifetimeSystem(&self.world, dt);
         Systems.renderSystem(
-            &self.renderer,
+            &self.app.renderer,
             &self.world,
             &self.assets,
             self.active_camera_entity,
             dt,
             &self.debugger,
-            self.window_width,
-            self.window_height,
+            self.app.logical_width,
+            self.app.logical_height,
         );
         if (debug_enabled) {
             Systems.debugEntityInfoSystem(&self.world, &self.debugger);
@@ -320,26 +273,20 @@ pub const Engine = struct {
     }
 
     pub fn beginFrame(self: *Engine) void {
-        platform.clearInputStates();
-        while (platform.pollEvent()) |_| {}
+        self.app.beginFrame() catch |err| {
+            log.err(.engine, "BeginFrame failed: {any}", .{err});
+        };
         self.input.keyboard = platform.getKeyboard();
         self.input.mouse = platform.getMouse();
-        self.renderer.beginFrame() catch |err| {
-            log.err(.renderer, "BeginFrame failed: {any}", .{err});
-        };
     }
     pub fn endFrame(self: *Engine) void {
-        if (build_options.backend == .cpu) {
-            const offset = self.renderer.getDisplayBufferOffset() orelse 0;
-            self.window.swapBuffers(offset);
-        }
-        self.renderer.endFrame() catch |err| {
-            log.err(.renderer, "EndFrame failed: {any}", .{err});
+        self.app.endFrame() catch |err| {
+            log.err(.engine, "EndFrame failed: {any}", .{err});
         };
     }
     pub fn clear(self: *Engine, color: Color) void {
-        self.renderer.setClearColor(color);
-        self.renderer.clear();
+        self.app.renderer.setClearColor(color);
+        self.app.renderer.clear();
     }
 
     // Creating shapes by hand

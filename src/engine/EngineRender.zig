@@ -7,5 +7,5 @@ const RenderTransform = renderer.Transform;
 pub fn draw(self: *Engine, shape: anytype, xform: ?RenderTransform) void {
     const T = @TypeOf(shape);
     const shape_union = ShapeRegistry.createShapeUnion(T);
-    self.renderer.drawShape(shape_union, xform);
+    self.app.renderer.drawShape(shape_union, xform);
 }

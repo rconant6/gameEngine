@@ -25,6 +25,7 @@ pub const M = enum(u8) {
     scene,
     ui,
     systems,
+    app,
     engine,
     zxl,
     build_options,
@@ -132,7 +133,7 @@ const module_defs = [_]ModuleDef{
             .{ "ecs", .ecs },                   .{ "assets", .assets },
             .{ "renderer", .renderer },         .{ "build_options", .build_options },
             .{ "registry", .registry },         .{ "platform", .platform },
-            .{ "action", .action },             .{ "engine", .engine },
+            .{ "action", .action },
         },
     },
     // UI
@@ -153,17 +154,26 @@ const module_defs = [_]ModuleDef{
             .{ "action", .action },
         },
     },
-    // Engine (top-level)
+    // App (window + renderer + input shell — used by tools and engine)
+    .{
+        .name = "app",
+        .path = "src/app/app.zig",
+        .deps = &.{
+            .{ "platform", .platform }, .{ "renderer", .renderer },
+            .{ "math", .math },
+        },
+    },
+    // Engine (game runtime — sits on top of app)
     .{
         .name = "engine",
         .path = "src/Engine.zig",
         .deps = &.{
-            .{ "math", .math },                 .{ "platform", .platform },
-            .{ "renderer", .renderer },         .{ "build_options", .build_options },
-            .{ "assets", .assets },             .{ "ecs", .ecs },
-            .{ "scene-format", .scene_format }, .{ "action", .action },
-            .{ "scene", .scene },               .{ "registry", .registry },
-            .{ "systems", .systems },
+            .{ "app", .app },                   .{ "math", .math },
+            .{ "platform", .platform },         .{ "renderer", .renderer },
+            .{ "build_options", .build_options }, .{ "assets", .assets },
+            .{ "ecs", .ecs },                   .{ "scene-format", .scene_format },
+            .{ "action", .action },             .{ "scene", .scene },
+            .{ "registry", .registry },         .{ "systems", .systems },
         },
     },
     // ZXL
@@ -270,20 +280,8 @@ pub fn build(b: *std.Build) void {
     });
     b.installArtifact(engine_lib);
 
-    // ========================================
-    // Tool shared app module
-    // ========================================
-    const app_module = b.createModule(.{
-        .root_source_file = b.path("src/tools/app.zig"),
-    });
-    const tool_deps = [_]M{ .platform, .renderer, .math, .debug, .ui };
-    for (tool_deps) |dep| {
-        const def = module_defs[@intFromEnum(dep)];
-        app_module.addImport(def.name, m.get(&modules, dep));
-    }
-
-    // Common tool imports (app + tool_deps + assets)
-    const tool_extra_deps = [_]M{ .platform, .renderer, .math, .debug, .assets, .ui, .zxl };
+    // Common tool imports (app + extras)
+    const tool_extra_deps = [_]M{ .app, .platform, .renderer, .math, .debug, .assets, .ui, .zxl };
 
     // ========================================
     // ZixelArt
@@ -293,7 +291,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    zixelart_module.addImport("app", app_module);
     for (tool_extra_deps) |dep| {
         const def = module_defs[@intFromEnum(dep)];
         zixelart_module.addImport(def.name, m.get(&modules, dep));
@@ -318,7 +315,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    ui_playground_module.addImport("app", app_module);
     for (tool_extra_deps) |dep| {
         const def = module_defs[@intFromEnum(dep)];
         ui_playground_module.addImport(def.name, m.get(&modules, dep));

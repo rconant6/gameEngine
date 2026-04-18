@@ -20,13 +20,14 @@ pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
     const io = init.io;
 
-    const game = engine.Engine.init(
-        gpa,
-        io,
-        "ECS Demo",
-        logical_width,
-        logical_height,
-    );
+    var app = try engine.App.init(gpa, io, .{
+        .title = "ECS Demo",
+        .width = logical_width,
+        .height = logical_height,
+    });
+    defer app.deinit();
+
+    const game = engine.Engine.init(&app);
     defer game.deinit();
 
     // leave to make sure it's ok if there are collisions or reimports
@@ -327,7 +328,7 @@ pub fn main(init: std.process.Init) !void {
             .width = logical_width,
             .ortho_size = logical_height / 2,
         };
-        game.renderer.drawTextScreen(font, "test screen", .{ .x = 100, .y = 100 }, 30.0, engine.Colors.WHITE, ctx);
+        game.app.renderer.drawTextScreen(font, "test screen", .{ .x = 100, .y = 100 }, 30.0, engine.Colors.WHITE, ctx);
 
         game.endFrame();
 

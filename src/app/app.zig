@@ -18,6 +18,7 @@ pub const AppConfig = struct {
 
 pub const App = struct {
     gpa: std.mem.Allocator,
+    io: std.Io,
     window: *plat.Window,
     kb: *const plat.Keyboard,
     mouse: *const plat.Mouse,
@@ -70,6 +71,7 @@ pub const App = struct {
 
         return App{
             .gpa = gpa,
+            .io = io,
             .window = window,
             .kb = plat.getKeyboard(),
             .mouse = plat.getMouse(),
