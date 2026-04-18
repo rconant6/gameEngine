@@ -6,7 +6,7 @@ pub const FontHandle = struct {
 };
 
 const FontEntry = struct {
-    normalized_path: []const u8,
+    normalized_path: [:0]const u8,
     font: *Font,
 };
 
@@ -57,7 +57,7 @@ pub const FontManager = struct {
 
     pub fn loadFontFromMemory(self: *FontManager, name: []const u8, data: []const u8) !FontHandle {
         // Use a synthetic path name for embedded fonts
-        const synthetic_path = try std.fmt.allocPrint(self.allocator, "<embedded:{s}>", .{name});
+        const synthetic_path = try std.fmt.allocPrintSentinel(self.allocator, "<embedded:{s}>", .{name}, 0);
         errdefer self.allocator.free(synthetic_path);
 
         // Check if already loaded
@@ -82,7 +82,7 @@ pub const FontManager = struct {
         return new_handle;
     }
 
-    fn load(self: *FontManager, normalized_path: []const u8) !FontHandle {
+    fn load(self: *FontManager, normalized_path: [:0]const u8) !FontHandle {
         if (self.path_to_handle.get(normalized_path)) |handle| {
             self.allocator.free(normalized_path);
             return handle;
@@ -113,7 +113,7 @@ pub const FontManager = struct {
         self: *FontManager,
         base_path: []const u8,
         name: []const u8,
-    ) ![]const u8 {
+    ) ![:0]const u8 {
         const joined = try std.fs.path.join(self.allocator, &[_][]const u8{ base_path, name });
         defer self.allocator.free(joined);
 

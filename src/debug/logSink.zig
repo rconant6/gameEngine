@@ -19,19 +19,12 @@ const bold_white = white ++ bold;
 pub const ConsoleSink = struct {
     const Self = @This();
 
-    stderr: std.Io.File,
     buffer: [4096]u8,
-    writer: std.Io.Writer,
+    writer: std.Io.File.Writer,
 
-    pub fn init(io: std.Io) Self {
-        const stderr = std.Io.File.stderr();
-        var self = Self{
-            .stderr = stderr,
-            .buffer = undefined,
-            .writer = undefined,
-        };
-        self.writer = stderr.writer(io, &self.buffer).interface;
-        return self;
+    pub fn init(self: *Self, io: std.Io) void {
+        self.buffer = undefined;
+        self.writer = std.Io.File.stderr().writer(io, &self.buffer);
     }
     pub fn sink(self: *Self) Sink {
         return .{
@@ -60,7 +53,7 @@ pub const ConsoleSink = struct {
         var time_buf: [10]u8 = undefined;
         const time_str = entry.time.formatConsole(&time_buf) catch "(00:00:00)";
         // Layout: [LEVEL] CATEGORY: MESSAGE  TIME
-        self.writer.print("{s}[{s:}]{s} {s:}: {s}{s}{s}  {s}{s}{s}\n", .{
+        self.writer.interface.print("{s}[{s:}]{s} {s:}: {s}{s}{s}  {s}{s}{s}\n", .{
             // Level
             level_color,
             entry.level.getLevelName(),
@@ -80,7 +73,7 @@ pub const ConsoleSink = struct {
             reset,
         }) catch return;
 
-        self.writer.flush() catch return;
+        self.writer.interface.flush() catch return;
     }
     pub fn flush(self: *Self) void {
         _ = self;
@@ -121,13 +114,11 @@ pub const FileSink = struct {
         };
         try rotateLogs(log_dir, io);
 
-        self.* = .{
-            .io = io,
-            .log_dir = try getLogDir(io),
-            .log_file = try log_dir.createFile(io, log_files[0], .{}),
-            .enabled = true,
-            .log_writer = self.log_file.writer(io, &self.log_buffer),
-        };
+        self.io = io;
+        self.log_dir = try getLogDir(io);
+        self.log_file = try log_dir.createFile(io, log_files[0], .{});
+        self.enabled = true;
+        self.log_writer = self.log_file.writer(io, &self.log_buffer);
     }
 
     pub fn sink(self: *Self) Sink {

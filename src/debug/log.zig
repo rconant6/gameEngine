@@ -146,7 +146,7 @@ pub const Logger = struct {
 
             const console_sink = try allocator.create(ConsoleSink);
             errdefer allocator.destroy(console_sink);
-            console_sink.* = ConsoleSink.init(io);
+            console_sink.init(io);
             sinks[0] = console_sink.sink();
 
             var file_sink = try allocator.create(FileSink);
