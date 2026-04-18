@@ -90,25 +90,12 @@ pub fn Query(comptime ComponentTypes: type) type {
 
         fn buildComponentPointers(comptime StorageTypes: type) type {
             const storage_fields = std.meta.fields(StorageTypes);
-            var result_fields: [storage_fields.len]std.builtin.Type.StructField = undefined;
-
+            var types: [storage_fields.len]type = undefined;
             for (storage_fields, 0..) |field, i| {
                 const StorageType = std.meta.Child(field.type);
-                result_fields[i] = .{
-                    .name = std.fmt.comptimePrint("{d}", .{i}),
-                    .type = *StorageType.ComponentType,
-                    .default_value_ptr = null,
-                    .is_comptime = false,
-                    .alignment = @alignOf(*const StorageType.ComponentType),
-                };
+                types[i] = *StorageType.ComponentType;
             }
-
-            return @Type(.{ .@"struct" = .{
-                .layout = .auto,
-                .fields = &result_fields,
-                .decls = &.{},
-                .is_tuple = true,
-            } });
+            return @Tuple(&types);
         }
     };
 }

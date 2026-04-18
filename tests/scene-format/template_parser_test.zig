@@ -24,7 +24,7 @@ test "template: minimal - empty template declaration" {
     const src: [:0]const u8 =
         \\[Empty:template]
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -46,7 +46,7 @@ test "template: minimal - single component no properties" {
         \\[Simple:template]
         \\  [ScreenWrap]
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -69,7 +69,7 @@ test "template: minimal - single component with one property" {
         \\  [Transform]
         \\    position:vec2 {0.0, 0.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -94,7 +94,7 @@ test "template: basic - single component with multiple properties" {
         \\    rotation:f32 0.0
         \\    scale:f32 1.0
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -123,7 +123,7 @@ test "template: multiple components - two simple components" {
         \\  [Velocity]
         \\    linear:vec2 {0.0, -500.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -153,7 +153,7 @@ test "template: multiple components - transform, velocity, and sprite" {
         \\    radius:f32 1.0
         \\    fill_color:color #FF0000
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -184,7 +184,7 @@ test "template: multiple components - with collider and tags" {
         \\  [Tag]
         \\    names:string[] {"asteroid", "hostile"}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -214,7 +214,7 @@ test "template: multiple components - with lifetime component" {
         \\  [Lifetime]
         \\    remaining:f32 0.5
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -256,7 +256,7 @@ test "template: sprite - circle variant" {
         \\    radius:f32 1.5
         \\    fill_color:color #00FF00
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -285,7 +285,7 @@ test "template: sprite - polygon variant with multiple points" {
         \\    fill_color:color #0000FF
         \\    stroke_color:color #FFFFFF
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -326,7 +326,7 @@ test "template: sprite - complex polygon with 12 points" {
         \\    fill_color:color #8B4513
         \\    stroke_color:color #B87333
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -374,7 +374,7 @@ test "template: nested - OnCollision with single trigger and action" {
         \\        type:string "destroy_self"
         \\        priority:i32 0
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -424,7 +424,7 @@ test "template: nested - OnCollision with multiple actions" {
         \\        message:string "explosion"
         \\        priority:i32 1
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -469,7 +469,7 @@ test "template: nested - OnCollision with property verification" {
         \\        message:string "brick_break"
         \\        priority:i32 1
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -524,7 +524,7 @@ test "template: nested - OnInput with keyboard trigger" {
         \\        offset:vec2 {0.0, 0.0}
         \\        priority:i32 0
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -569,7 +569,7 @@ test "template: nested - OnInput with spawn_entity action properties" {
         \\        offset:vec2 {0.0, -30.0}
         \\        priority:i32 0
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -620,7 +620,7 @@ test "template: multiple - two simple templates" {
         \\  [Transform]
         \\    position:vec2 {0.0, 0.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -654,7 +654,7 @@ test "template: multiple - three projectile templates with different velocities"
         \\  [Velocity]
         \\    linear:vec2 {0.0, -1200.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -692,7 +692,7 @@ test "template: distinction - template vs entity" {
         \\    [Transform]
         \\      position:vec2 {1.0, 1.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -728,7 +728,7 @@ test "template: distinction - multiple types in one file" {
         \\    [Transform]
         \\      position:vec2 {0.0, 0.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

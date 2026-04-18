@@ -30,7 +30,7 @@ pub fn configureModule(
     }
 
     // Swift library paths — discovered dynamically so they survive Xcode/SDK updates
-    const sdk_path = std.zig.system.darwin.getSdk(b.allocator, &target.result) orelse
+    const sdk_path = std.zig.system.darwin.getSdk(b.allocator, b.graph.io, &target.result) orelse
         @panic("Could not find macOS SDK. Is Xcode or Command Line Tools installed?");
     const sdk_swift = std.fs.path.join(b.allocator, &.{ sdk_path, "usr/lib/swift" }) catch @panic("OOM");
     module.addLibraryPath(.{ .cwd_relative = sdk_swift });
@@ -139,8 +139,8 @@ pub fn linkSwiftLibrary(
     if (target.result.os.tag != .macos) return;
     const sl = swift_lib orelse return;
 
-    exe.linkSystemLibrary("c++");
-    exe.addObjectFile(.{ .cwd_relative = sl.lib_path });
+    exe.root_module.linkSystemLibrary("c++", .{});
+    exe.root_module.addObjectFile(.{ .cwd_relative = sl.lib_path });
     exe.step.dependOn(sl.swift_step);
 
     if (sl.metallib_install) |metallib_step| {

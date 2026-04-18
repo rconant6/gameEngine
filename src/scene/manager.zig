@@ -8,13 +8,15 @@ const log = debug.log;
 
 pub const SceneManager = struct {
     allocator: Allocator,
+    io: std.Io,
     scenes: std.StringHashMap(*SceneFile),
     scene_file_paths: std.StringHashMap([]const u8),
     active_scene_name: ?[]const u8,
 
-    pub fn init(allocator: Allocator) SceneManager {
+    pub fn init(allocator: Allocator, io: std.Io) SceneManager {
         return .{
             .allocator = allocator,
+            .io = io,
             .scenes = .init(allocator),
             .scene_file_paths = .init(allocator),
             .active_scene_name = null,
@@ -49,7 +51,7 @@ pub const SceneManager = struct {
             return SceneManagerError.SceneAlreadyLoaded;
         }
 
-        const scene = load.loadSceneFile(self.allocator, file_path) catch |err| {
+        const scene = load.loadSceneFile(self.allocator, self.io, file_path) catch |err| {
             log.err(.scene, "Unable to load {s}: {any}", .{ name, err });
             return err;
         };
@@ -94,7 +96,7 @@ pub const SceneManager = struct {
         const file_path = self.scene_file_paths.get(scene_name) orelse
             return SceneManagerError.SceneNotFound;
 
-        const new_scene = try load.loadSceneFile(self.allocator, file_path);
+        const new_scene = try load.loadSceneFile(self.allocator, self.io, file_path);
 
         const old_scene = self.scenes.get(scene_name).?;
         old_scene.deinit(self.allocator);

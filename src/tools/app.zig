@@ -25,8 +25,8 @@ pub const App = struct {
     logical_width: u32,
     logical_height: u32,
 
-    pub fn init(allocator: std.mem.Allocator, config: AppConfig) !App {
-        try Logger.init(allocator);
+    pub fn init(allocator: std.mem.Allocator, io: std.Io, config: AppConfig) !App {
+        try Logger.init(allocator, io);
 
         plat.init() catch |err| {
             log.fatal(.platform, "Failed to start platform layer: {any}", .{err});
@@ -54,7 +54,7 @@ pub const App = struct {
         const scaled_width: u32 = @intFromFloat(f_width * scale_factor);
         const scaled_height: u32 = @intFromFloat(f_height * scale_factor);
 
-        const renderer = rend.Renderer.init(allocator, .{
+        const renderer = rend.Renderer.init(allocator, io, .{
             .width = scaled_width,
             .height = scaled_height,
             .native_handle = window.handle,

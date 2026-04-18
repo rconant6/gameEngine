@@ -12,13 +12,15 @@ const FontEntry = struct {
 
 pub const FontManager = struct {
     allocator: std.mem.Allocator,
+    io: std.Io,
     fonts: std.ArrayList(FontEntry),
     path_to_handle: std.StringHashMap(FontHandle),
     font_path: []const u8,
 
-    pub fn init(alloc: std.mem.Allocator) FontManager {
+    pub fn init(alloc: std.mem.Allocator, io: std.Io) FontManager {
         return .{
             .allocator = alloc,
+            .io = io,
             .fonts = std.ArrayList(FontEntry).empty,
             .path_to_handle = std.StringHashMap(FontHandle).init(alloc),
             .font_path = "",
@@ -41,13 +43,13 @@ pub const FontManager = struct {
         self.font_path = try self.allocator.dupe(u8, path);
     }
     pub fn loadFont(self: *FontManager, name: []const u8) !FontHandle {
-        const normalized_path = try normalizePath(self.allocator, self.font_path, name);
+        const normalized_path = try self.normalizePath(self.font_path, name);
         errdefer self.allocator.free(normalized_path);
 
         return self.load(normalized_path);
     }
     pub fn loadFontFromPath(self: *FontManager, path: []const u8) !FontHandle {
-        const normalized_path = try std.fs.cwd().realpathAlloc(self.allocator, path);
+        const normalized_path = try std.Io.Dir.cwd().realPathFileAlloc(self.io, path, self.allocator);
         errdefer self.allocator.free(normalized_path);
 
         return self.load(normalized_path);
@@ -88,7 +90,7 @@ pub const FontManager = struct {
 
         const font_ptr = try self.allocator.create(Font);
         errdefer self.allocator.destroy(font_ptr);
-        font_ptr.* = try Font.init(self.allocator, normalized_path);
+        font_ptr.* = try Font.init(self.allocator, self.io, normalized_path);
 
         const entry = FontEntry{
             .font = font_ptr,
@@ -108,14 +110,14 @@ pub const FontManager = struct {
     }
 
     fn normalizePath(
-        alloc: std.mem.Allocator,
+        self: *FontManager,
         base_path: []const u8,
         name: []const u8,
     ) ![]const u8 {
-        const joined = try std.fs.path.join(alloc, &[_][]const u8{ base_path, name });
-        defer alloc.free(joined);
+        const joined = try std.fs.path.join(self.allocator, &[_][]const u8{ base_path, name });
+        defer self.allocator.free(joined);
 
-        const absolute = try std.fs.cwd().realpathAlloc(alloc, joined);
+        const absolute = try std.Io.Dir.cwd().realPathFileAlloc(self.io, joined, self.allocator);
 
         return absolute;
     }

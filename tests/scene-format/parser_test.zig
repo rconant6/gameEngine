@@ -22,7 +22,7 @@ fn freeSceneFile(scene_file: *SceneFile, allocator: std.mem.Allocator) void {
 
 test "parser - parse empty scene file" {
     const src: [:0]const u8 = "";
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -34,7 +34,7 @@ test "parser - parse empty scene file" {
 
 test "parser - parse simple scene declaration" {
     const src: [:0]const u8 = "[TestScene:scene]";
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -54,7 +54,7 @@ test "parser - parse scene with nested entities" {
         \\    [Transform]
         \\      position:vec3 {0.0, 0.0, 0.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -79,7 +79,7 @@ test "parser - parse entity declaration" {
         \\    rotation:f32 0.0
         \\    scale:f32 1.0
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -103,7 +103,7 @@ test "parser - parse asset declaration" {
         \\[MainFont:asset font]
         \\  abs_path:string "assets/fonts/arcadeFont.ttf"
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -132,7 +132,7 @@ test "parser - generic component with properties" {
         \\    position:vec3 {1.0, 2.0, 3.0}
         \\    rotation:f32 45.0
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -163,7 +163,7 @@ test "parser - sprite component with shape type" {
         \\    radius:f32 2.0
         \\    fill_color:color #00FF00
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -185,7 +185,7 @@ test "parser - collider component with shape type" {
         \\    center:vec2 {0.0, 0.0}
         \\    half_width:f32 1.5
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -210,7 +210,7 @@ test "parser - number values" {
         \\    float_value:f32 3.14
         \\    negative:f32 -2.5
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -237,7 +237,7 @@ test "parser - string values" {
         \\    name:string "Hello World"
         \\    path:string "assets/fonts/font.ttf"
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -261,7 +261,7 @@ test "parser - boolean values" {
         \\    visible:bool true
         \\    enabled:bool false
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -286,7 +286,7 @@ test "parser - color values" {
         \\    stroke_color:color #00FF00
         \\    text_color:color #0000FF
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -313,7 +313,7 @@ test "parser - vector values" {
         \\    pos2d:vec2 {1.0, 2.0}
         \\    pos3d:vec3 {3.0, 4.0, 5.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -341,7 +341,7 @@ test "parser - array of vectors" {
         \\  [Sprite:polygon]
         \\    points:vec2[] {{0.0, 1.0}, {0.951, 0.309}, {0.588, -0.809}}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -369,7 +369,7 @@ test "parser - asset reference" {
         \\  [Text]
         \\    font_asset:asset_ref "OrbitronFont"
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -398,7 +398,7 @@ test "parser - multiple entities with various components" {
         \\  [Velocity]
         \\    linear:vec2 {1.0, 0.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -427,7 +427,7 @@ test "parser - scene with multiple levels of nesting" {
         \\      [Transform]
         \\        position:vec2 {-10.0, -8.0}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -463,7 +463,7 @@ test "parser - full scene with assets, entities, and nested scenes" {
         \\      text:string "Player"
         \\      font_asset:asset_ref "MainFont"
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -488,7 +488,7 @@ test "parser - empty component" {
         \\[Test:entity]
         \\  [ScreenClamp]
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -516,7 +516,7 @@ test "parser - various shape types" {
         \\  [Sprite:polygon]
         \\    points:vec2[] {{0.0, 1.0}, {1.0, 0.0}}
     ;
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

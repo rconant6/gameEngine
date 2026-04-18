@@ -39,12 +39,11 @@ const UILayer = ui.UILayer;
 const logical_width: i32 = 1920;
 const logical_height: i32 = 1088;
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    const io = init.io;
 
-    var app = try App.init(allocator, .{
+    var app = try App.init(allocator, io, .{
         .title = "Zixel Art",
         .width = logical_width,
         .height = logical_height,
@@ -157,10 +156,10 @@ pub fn main() !void {
                 }
             }
             if (app.kb.isPressed(.S)) {
-                saveCanvas(allocator, canvas);
+                saveCanvas(allocator, io, canvas);
             }
             if (app.kb.isPressed(.O)) {
-                loadCanvas(allocator, canvas);
+                loadCanvas(allocator, io, canvas);
             }
         }
 
@@ -382,7 +381,7 @@ fn syncSlidersToColor(layer: *UILayer, color: Color) void {
 
 const zxl_path = "output.zxl";
 
-fn saveCanvas(allocator: std.mem.Allocator, canvas: *const Canvas) void {
+fn saveCanvas(allocator: std.mem.Allocator, io: std.Io, canvas: *const Canvas) void {
     const size: u16 = @intCast(canvas.pixel_count);
 
     var image = ZxlImage.init(allocator, "canvas") catch |err| {
@@ -427,7 +426,7 @@ fn saveCanvas(allocator: std.mem.Allocator, canvas: *const Canvas) void {
         return;
     };
 
-    ZxlWriter.toFile(allocator, &image, zxl_path) catch |err| {
+    ZxlWriter.toFile(allocator, io, &image, zxl_path) catch |err| {
         log.err(.application, "Failed to save .zxl: {any}", .{err});
         return;
     };
@@ -435,8 +434,8 @@ fn saveCanvas(allocator: std.mem.Allocator, canvas: *const Canvas) void {
     log.info(.application, "Saved {s} ({d} palette colors)", .{ zxl_path, image.palette.count });
 }
 
-fn loadCanvas(allocator: std.mem.Allocator, canvas: *Canvas) void {
-    var image = ZxlReader.fromFile(allocator, zxl_path) catch |err| {
+fn loadCanvas(allocator: std.mem.Allocator, io: std.Io, canvas: *Canvas) void {
+    var image = ZxlReader.fromFile(allocator, io, zxl_path) catch |err| {
         log.err(.application, "Failed to load {s}: {any}", .{ zxl_path, err });
         return;
     };

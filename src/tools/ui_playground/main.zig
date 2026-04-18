@@ -24,12 +24,11 @@ const logical_height: i32 = 720;
 const screen_w: f32 = @floatFromInt(logical_width);
 const screen_h: f32 = @floatFromInt(logical_height);
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    const io = init.io;
 
-    var app = try App.init(allocator, .{
+    var app = try App.init(allocator, io, .{
         .title = "UI Playground",
         .width = @intCast(logical_width),
         .height = @intCast(logical_height),

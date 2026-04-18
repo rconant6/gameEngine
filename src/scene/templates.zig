@@ -27,16 +27,19 @@ pub const Template = struct {
 
 pub const TemplateManager = struct {
     allocator: Allocator,
+    io: std.Io,
     template_files: std.ArrayList(*SceneFile),
     templates: std.StringHashMap(Template),
     instantiator: *Instantiator,
 
     pub fn init(
         allocator: Allocator,
+        io: std.Io,
         instantiator: *Instantiator,
     ) TemplateManager {
         return .{
             .allocator = allocator,
+            .io = io,
             .templates = std.StringHashMap(Template).init(allocator),
             .template_files = .empty,
             .instantiator = instantiator,
@@ -91,7 +94,7 @@ pub const TemplateManager = struct {
 
         const owned_file = try self.allocator.create(SceneFile);
         errdefer self.allocator.destroy(owned_file);
-        owned_file.* = try load.loadTemplateFile(self.allocator, name);
+        owned_file.* = try load.loadTemplateFile(self.allocator, self.io, name);
         try self.template_files.append(self.allocator, owned_file);
 
         for (owned_file.decls) |decl| {
@@ -118,11 +121,11 @@ pub const TemplateManager = struct {
     }
 
     pub fn loadTemplatesFromDirectory(self: *TemplateManager, dir_path: []const u8) !void {
-        var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
-        defer dir.close();
+        var dir = try std.Io.Dir.cwd().openDir(self.io, dir_path, .{});
+        defer dir.close(self.io);
 
         var iter = dir.iterate();
-        while (try iter.next()) |entry| {
+        while (try iter.next(self.io)) |entry| {
             switch (entry.kind) {
                 .file => {
                     if (std.mem.endsWith(u8, entry.name, ".template")) {

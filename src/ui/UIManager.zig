@@ -22,7 +22,7 @@ const Self = @This();
 gpa: std.mem.Allocator,
 arena: std.heap.ArenaAllocator,
 root: ?*WidgetNode,
-state_map: std.StringArrayHashMap(WidgetState),
+state_map: std.StringHashMap(WidgetState),
 font: Font,
 
 pub fn init(backing_alloc: std.mem.Allocator) Self {

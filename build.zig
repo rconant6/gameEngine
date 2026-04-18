@@ -8,6 +8,7 @@ const tests = @import("build/tests.zig");
 pub const RendererBackend = enum { metal, vulkan, opengl, cpu };
 
 /// Tool modules, used as indices into the modules array.
+/// NOTE: must be the same order in module_defs
 pub const M = enum(u8) {
     math,
     debug,
@@ -59,11 +60,13 @@ const module_defs = [_]ModuleDef{
             .{ "build_options", .build_options }, .{ "assets", .assets },
         },
     },
+    // Assets
     .{
         .name = "assets",
         .path = "src/assets/assets.zig",
         .deps = &.{
             .{ "math", .math }, .{ "renderer", .renderer },
+            .{ "zxl", .zxl },
         },
     },
     // Platform
@@ -200,7 +203,7 @@ pub fn build(b: *std.Build) void {
             \\ERROR: CPU renderer is not currently supported.
             \\      Use -Drenderer=metal for macOS or remove the -Drenderer flag.;
         , .{});
-        std.posix.exit(1);
+        return;
     }
 
     // Build options (generated module)
@@ -369,8 +372,8 @@ pub fn build(b: *std.Build) void {
     // Clean
     // ========================================
     const clean_step = b.step("clean", "Remove all build artifacts");
-    clean_step.dependOn(&b.addRemoveDirTree(.{ .cwd_relative = "zig-out" }).step);
-    clean_step.dependOn(&b.addRemoveDirTree(.{ .cwd_relative = ".zig-cache" }).step);
+    clean_step.dependOn(&b.addSystemCommand(&.{ "rm", "-rf", "zig-out" }).step);
+    clean_step.dependOn(&b.addSystemCommand(&.{ "rm", "-rf", ".zig-cache" }).step);
 
     // ========================================
     // Tests

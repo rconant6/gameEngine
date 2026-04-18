@@ -10,22 +10,25 @@ const LoadError = error{
 
 pub fn loadSceneFile(
     allocator: std.mem.Allocator,
+    io: std.Io,
     file_path: []const u8,
 ) !scene_format.SceneFile {
     const folder = "scenes/";
-    return loadFile(allocator, file_path, folder, ".scene");
+    return loadFile(allocator, io, file_path, folder, ".scene");
 }
 
 pub fn loadTemplateFile(
     allocator: std.mem.Allocator,
+    io: std.Io,
     file_path: []const u8,
 ) !scene_format.SceneFile {
     const folder = "templates/";
-    return loadFile(allocator, file_path, folder, ".template");
+    return loadFile(allocator, io, file_path, folder, ".template");
 }
 
 fn loadFile(
     allocator: std.mem.Allocator,
+    io: std.Io,
     file_path: []const u8,
     folder: []const u8,
     ext: []const u8,
@@ -49,13 +52,13 @@ fn loadFile(
     const needs_free = is_simple_filename or !has_extension;
     defer if (needs_free) allocator.free(resolved_path);
 
-    const buf: [:0]u8 = try std.fs.cwd().readFileAllocOptions(
-        allocator,
+    const buf: [:0]u8 = try std.Io.Dir.cwd().readFileAllocOptions(
+        io,
         resolved_path,
-        1024 * 1024,
-        null,
+        allocator,
+        std.Io.Limit.limited(1024 * 1024),
         .@"1",
-        @as(u8, 0),
+        0,
     );
     errdefer allocator.free(buf);
 

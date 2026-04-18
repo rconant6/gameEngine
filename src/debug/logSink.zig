@@ -19,18 +19,18 @@ const bold_white = white ++ bold;
 pub const ConsoleSink = struct {
     const Self = @This();
 
-    stderr: std.fs.File,
+    stderr: std.Io.File,
     buffer: [4096]u8,
     writer: std.Io.Writer,
 
-    pub fn init() Self {
-        const stderr = std.fs.File.stderr();
+    pub fn init(io: std.Io) Self {
+        const stderr = std.Io.File.stderr();
         var self = Self{
             .stderr = stderr,
             .buffer = undefined,
             .writer = undefined,
         };
-        self.writer = stderr.writer(&self.buffer).interface;
+        self.writer = stderr.writer(io, &self.buffer).interface;
         return self;
     }
     pub fn sink(self: *Self) Sink {
@@ -106,25 +106,27 @@ pub const FileSink = struct {
         "game.4.log",
     };
 
-    log_dir: std.fs.Dir,
-    log_file: std.fs.File,
-    log_writer: std.fs.File.Writer,
+    io: std.Io,
+    log_dir: std.Io.Dir,
+    log_file: std.Io.File,
+    log_writer: std.Io.File.Writer,
     log_buffer: [65336]u8 = undefined,
     entry_count: usize = 0,
     enabled: bool = false,
 
-    pub fn init(self: *FileSink) !void {
-        var log_dir = getLogDir() catch |err| {
+    pub fn init(self: *FileSink, io: std.Io) !void {
+        var log_dir = getLogDir(io) catch |err| {
             std.debug.print("Unable to get logs directory: {any}\n", .{err});
             return error.FailedToCreateFileLogger;
         };
-        try rotateLogs(log_dir);
+        try rotateLogs(log_dir, io);
 
         self.* = .{
-            .log_dir = try getLogDir(),
-            .log_file = try log_dir.createFile(log_files[0], .{}),
+            .io = io,
+            .log_dir = try getLogDir(io),
+            .log_file = try log_dir.createFile(io, log_files[0], .{}),
             .enabled = true,
-            .log_writer = self.log_file.writer(&self.log_buffer),
+            .log_writer = self.log_file.writer(io, &self.log_buffer),
         };
     }
 
@@ -191,7 +193,7 @@ pub const FileSink = struct {
                 .{err},
             );
         };
-        self.log_file.sync() catch |err| {
+        self.log_file.sync(self.io) catch |err| {
             self.enabled = false;
             log.err(
                 .debug,
@@ -205,33 +207,34 @@ pub const FileSink = struct {
 
     pub fn deinit(self: *Self, gpa: Allocator) void {
         self.flush();
-        self.log_file.close();
-        self.log_dir.close();
+        self.log_file.close(self.io);
+        self.log_dir.close(self.io);
         gpa.destroy(self);
     }
 
-    fn getLogDir() !std.fs.Dir {
-        var exe_path_buf: [std.fs.max_path_bytes]u8 = undefined;
-        const exe_dir_path = try std.fs.selfExeDirPath((&exe_path_buf));
-        const exe_dir = std.fs.path.dirname(exe_dir_path) orelse ".";
+    fn getLogDir(io: std.Io) !std.Io.Dir {
+        var exe_path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
+        const exe_len = try std.process.executablePath(io, &exe_path_buf);
+        const exe_path = exe_path_buf[0..exe_len];
+        const exe_dir = std.fs.path.dirname(exe_path) orelse ".";
 
-        var log_path_buf: [std.fs.max_path_bytes]u8 = undefined;
+        var log_path_buf: [std.Io.Dir.max_path_bytes]u8 = undefined;
         const log_path = try std.fmt.bufPrint(&log_path_buf, "{s}/logs", .{exe_dir});
 
-        try std.fs.cwd().makePath(log_path);
-        return try std.fs.cwd().openDir(log_path, .{});
+        try std.Io.Dir.cwd().createDirPath(io, log_path);
+        return try std.Io.Dir.cwd().openDir(io, log_path, .{});
     }
 
-    fn rotateLogs(dir: std.fs.Dir) !void {
+    fn rotateLogs(dir: std.Io.Dir, io: std.Io) !void {
         const max_rotations = log_files.len;
-        dir.deleteFile(log_files[max_rotations - 1]) catch |err| switch (err) {
+        dir.deleteFile(io, log_files[max_rotations - 1]) catch |err| switch (err) {
             error.FileNotFound => {},
             else => return err,
         };
 
         var i: usize = max_rotations - 1;
         while (i > 0) : (i -= 1) {
-            dir.rename(log_files[i - 1], log_files[i]) catch |err| switch (err) {
+            std.Io.Dir.rename(dir, log_files[i - 1], dir, log_files[i], io) catch |err| switch (err) {
                 error.FileNotFound => continue,
                 else => return err,
             };

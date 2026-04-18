@@ -16,16 +16,8 @@ const V2 = font_data.V2;
 
 const FontReader = @import("FontReader.zig").FontReader;
 
-fn loadFile(alloc: std.mem.Allocator, path: []const u8) ![]const u8 {
-    const file = try std.fs.openFileAbsolute(path, .{});
-    defer file.close();
-
-    const file_size = try file.getEndPos();
-    const raw_data = try alloc.alloc(u8, file_size);
-    const data_read = try file.readAll(raw_data);
-    std.debug.assert(data_read == file_size);
-
-    return raw_data;
+fn loadFile(alloc: std.mem.Allocator, io: std.Io, path: []const u8) ![]const u8 {
+    return std.Io.Dir.cwd().readFileAllocOptions(io, path, alloc, .unlimited, .@"1", null);
 }
 
 fn loadFromMemory(alloc: std.mem.Allocator, data: []const u8) ![]const u8 {
@@ -356,14 +348,14 @@ pub const Font = struct {
     glyph_shapes: std.AutoHashMap(u16, FilteredGlyph) = undefined, // data for shapes of glyphs
     glyph_triangles: std.AutoHashMap(u16, [][3]usize),
 
-    pub fn init(alloc: std.mem.Allocator, path: []const u8) !Font {
+    pub fn init(alloc: std.mem.Allocator, io: std.Io, path: []const u8) !Font {
         var arena = std.heap.ArenaAllocator.init(alloc);
         defer arena.deinit();
 
         const temp_alloc = arena.allocator();
-        var table_directory = std.AutoArrayHashMap(u32, TableEntry).init(temp_alloc);
+        var table_directory: std.array_hash_map.Auto(u32, TableEntry) = .{};
 
-        const raw_data = try loadFile(temp_alloc, path);
+        const raw_data = try loadFile(temp_alloc, io, path);
 
         return try initFromData(alloc, temp_alloc, raw_data, &table_directory);
     }
@@ -373,7 +365,7 @@ pub const Font = struct {
         defer arena.deinit();
 
         const temp_alloc = arena.allocator();
-        var table_directory = std.AutoArrayHashMap(u32, TableEntry).init(temp_alloc);
+        var table_directory: std.array_hash_map.Auto(u32, TableEntry) = .{};
 
         // Use the data directly without copying since @embedFile data is already in memory
         return try initFromData(alloc, temp_alloc, data, &table_directory);
@@ -383,7 +375,7 @@ pub const Font = struct {
         alloc: std.mem.Allocator,
         temp_alloc: std.mem.Allocator,
         raw_data: []const u8,
-        table_directory: *std.AutoArrayHashMap(u32, TableEntry),
+        table_directory: *std.array_hash_map.Auto(u32, TableEntry),
     ) !Font {
         var reader = FontReader{ .data = raw_data };
 
@@ -391,7 +383,7 @@ pub const Font = struct {
         const number_tables = font_dir_header.num_tables;
         for (0..number_tables) |_| {
             const table_entry = try parseTableEntry(&reader);
-            try table_directory.put(table_entry.tag, table_entry);
+            try table_directory.put(temp_alloc, table_entry.tag, table_entry);
         }
 
         const head_entry = getTable(table_directory, "head") orelse return error.HeadTableNotFound;
@@ -505,7 +497,7 @@ fn getBytesOfPadding(comptime T: type) usize {
     };
 }
 
-fn getTable(tables: *const std.AutoArrayHashMap(u32, TableEntry), name: []const u8) ?TableEntry {
+fn getTable(tables: *const std.array_hash_map.Auto(u32, TableEntry), name: []const u8) ?TableEntry {
     const tag = std.mem.readInt(u32, name[0..4], .big);
     return tables.get(tag);
 }

@@ -88,19 +88,12 @@ pub fn fromBytes(allocator: Allocator, data: []const u8) ReadError!ZxlImage {
     return image;
 }
 
-pub fn fromFile(allocator: Allocator, path: []const u8) !ZxlImage {
-    const file = std.fs.cwd().openFile(path, .{}) catch |err| {
+pub fn fromFile(allocator: Allocator, io: std.Io, path: []const u8) !ZxlImage {
+    const buf = std.Io.Dir.cwd().readFileAllocOptions(io, path, allocator, .unlimited, .@"1", null) catch |err| {
         log.err(.application, "Unable to open file {s}: {any}", .{ path, err });
         return err;
     };
-    defer file.close();
-
-    const file_size = try file.getEndPos();
-    const buf = try allocator.alloc(u8, file_size);
     defer allocator.free(buf);
-
-    const bytes_read = try file.readAll(buf);
-    _ = bytes_read;
 
     return try fromBytes(allocator, buf);
 }

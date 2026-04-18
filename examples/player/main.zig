@@ -10,13 +10,19 @@ const Colors = engine.Colors;
 const logical_width = 1920;
 const logical_height = 1080;
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+fn monoMillis() i64 {
+    var ts: std.c.timespec = undefined;
+    _ = std.c.clock_gettime(std.c.CLOCK.MONOTONIC, &ts);
+    return ts.sec * 1000 + @divTrunc(ts.nsec, 1_000_000);
+}
+
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    const io = init.io;
 
     const game = engine.Engine.init(
         allocator,
+        io,
         "ECS Demo",
         logical_width,
         logical_height,
@@ -229,7 +235,7 @@ pub fn main() !void {
     // }
 
     // +++++++ GAME LOOP FOR NOW ++++++++++ //
-    var last_time = std.time.milliTimestamp();
+    var last_time = monoMillis();
 
     // Camera control settings
     const camera_pan_speed: f32 = 10.0; // units per second
@@ -239,7 +245,7 @@ pub fn main() !void {
     // Camera tracking tuning
     var camera_tracking_enabled = true;
     while (!game.shouldClose()) {
-        const current_time = std.time.milliTimestamp();
+        const current_time = monoMillis();
         const dt: f32 = @as(f32, @floatFromInt(current_time - last_time)) / 1000.0;
         last_time = current_time;
 

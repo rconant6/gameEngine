@@ -68,6 +68,7 @@ const PerformanceMetrics = struct {
 
 pub const Engine = struct {
     allocator: Allocator,
+    io: std.Io,
     input: Input,
     renderer: renderer.Renderer,
     assets: assets.AssetManager,
@@ -92,11 +93,12 @@ pub const Engine = struct {
 
     pub fn init(
         allocator: Allocator,
+        io: std.Io,
         title: []const u8,
         width: u32,
         height: u32,
     ) *Engine {
-        Logger.init(allocator) catch |err| fatal("Logger", err);
+        Logger.init(allocator, io) catch |err| fatal("Logger", err);
 
         platform.init() catch |err| fatal("Platform Layer", err);
         log.info(.engine, "Platform layer initialized", .{});
@@ -122,6 +124,7 @@ pub const Engine = struct {
 
         const rend = renderer.Renderer.init(
             allocator,
+            io,
             .{
                 .width = scaled_width,
                 .height = scaled_height,
@@ -150,7 +153,8 @@ pub const Engine = struct {
             .priority = 1,
         }) catch |err| fatal("Camera Component", err);
 
-        const asset_manager = AssetManager.init(allocator) catch |err| fatal("Asset Manager", err);
+        var asset_manager = AssetManager.init(allocator, io) catch |err| fatal("Asset Manager", err);
+        asset_manager.setRenderer(&rend);
         log.info(.engine, "ASSET MANAGER initialized", .{});
         const action_system = ActionSystem.init(allocator) catch |err| fatal("Action System", err);
         log.info(.engine, "ACTIONS SYSTEM initialized", .{});
@@ -159,6 +163,7 @@ pub const Engine = struct {
 
         engine.* = Engine{
             .allocator = allocator,
+            .io = io,
             .input = .init(),
             .assets = asset_manager,
             .renderer = rend,
@@ -166,7 +171,7 @@ pub const Engine = struct {
             .world = world,
             .running = true,
             .action_system = action_system,
-            .scene_manager = SceneManager.init(allocator),
+            .scene_manager = SceneManager.init(allocator, io),
             .collision_events = .empty,
             .instantiator = undefined,
             .template_manager = undefined,
@@ -177,7 +182,7 @@ pub const Engine = struct {
         };
 
         engine.instantiator = .init(allocator, &engine.world, &engine.assets);
-        engine.template_manager = .init(allocator, &engine.instantiator);
+        engine.template_manager = .init(allocator, io, &engine.instantiator);
         engine.world.template_manager = &engine.template_manager;
 
         const default_font = engine.assets.getFontByName("__default__") catch |err| fatal("Default Font Loading", err);

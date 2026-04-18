@@ -85,14 +85,17 @@ pub fn toBytes(allocator: Allocator, image: *const ZxlImage) ![]u8 {
     return buf;
 }
 
-pub fn toFile(allocator: Allocator, image: *const ZxlImage, path: []const u8) !void {
+pub fn toFile(allocator: Allocator, io: std.Io, image: *const ZxlImage, path: []const u8) !void {
     const bytes = try toBytes(allocator, image);
     defer allocator.free(bytes);
 
-    const file = try std.fs.cwd().createFile(path, .{});
-    defer file.close();
+    var buf: [4096]u8 = undefined;
+    const file = try std.Io.Dir.cwd().createFile(io, path, .{});
+    defer file.close(io);
 
-    try file.writeAll(bytes);
+    var w = file.writer(io, &buf);
+    try w.interface.writeAll(bytes);
+    try w.interface.flush();
 }
 
 fn writeU16Le(buf: *[2]u8, val: u16) void {

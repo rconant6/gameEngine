@@ -158,25 +158,11 @@ pub fn query(self: *Self, comptime component_types: anytype) Query(buildStorageT
 }
 fn buildStorageTupleType(comptime component_types: anytype) type {
     const num = std.meta.fields(@TypeOf(component_types)).len;
-    var fields: [num]std.builtin.Type.StructField = undefined;
-
+    var types: [num]type = undefined;
     inline for (0..num) |i| {
-        const T = component_types[i];
-        fields[i] = .{
-            .name = std.fmt.comptimePrint("{d}", .{i}),
-            .type = *ComponentStorage(T),
-            .default_value_ptr = null,
-            .is_comptime = false,
-            .alignment = @alignOf(*ComponentStorage(T)),
-        };
+        types[i] = *ComponentStorage(component_types[i]);
     }
-
-    return @Type(.{ .@"struct" = .{
-        .layout = .auto,
-        .fields = &fields,
-        .decls = &.{},
-        .is_tuple = true,
-    } });
+    return @Tuple(&types);
 }
 
 fn getStorage(self: *const Self, comptime T: type) *ComponentStorage(T) {

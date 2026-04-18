@@ -78,9 +78,11 @@ pub const Renderer = struct {
         .vulkan => VulkanRenderer,
         .opengl => OpenGLRenderer,
     };
+    pub const Device = BackendImpl.Device;
+    pub const Texture = BackendImpl.Texture;
 
-    pub fn init(allocator: std.mem.Allocator, config: RendererConfig) !Renderer {
-        const backend = try BackendImpl.init(allocator, config);
+    pub fn init(allocator: std.mem.Allocator, io: std.Io, config: RendererConfig) !Renderer {
+        const backend = try BackendImpl.init(allocator, io, config);
         return .{
             .backend = backend,
             .width = config.width,
@@ -110,6 +112,33 @@ pub const Renderer = struct {
     }
     pub fn setClearColor(self: *Renderer, color: Color) void {
         self.backend.setClearColor(color);
+    }
+
+    pub fn getDevice(self: *Renderer) *Device {
+        return self.backend.device;
+    }
+
+    pub fn drawTextureQuad(
+        self: *Renderer,
+        texture: *Texture,
+        width: f32,
+        height: f32,
+        origin: [2]f32,
+        transform: ?Transform,
+        ctx: RenderContext,
+        flip_h: bool,
+        flip_v: bool,
+    ) void {
+        self.backend.drawTextureQuad(
+            texture,
+            width,
+            height,
+            origin,
+            transform,
+            ctx,
+            flip_h,
+            flip_v,
+        );
     }
 
     pub fn drawGeometry(

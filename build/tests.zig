@@ -245,7 +245,7 @@ fn addTest(
     });
 
     if (spec.link_engine) {
-        t.linkLibrary(engine_lib);
+        t.root_module.linkLibrary(engine_lib);
     }
 
     // Ensure platform libraries (e.g. Swift on macOS) are built before tests,
