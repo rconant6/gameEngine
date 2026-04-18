@@ -6,7 +6,7 @@ const log = debug.log;
 
 const FontAsset = struct {
     font: *Font,
-    source_path: []const u8, // absolute path, or "<embedded:name>" for in-memory fonts
+    source_path: [:0]const u8, // absolute path, or "<embedded:name>" for in-memory fonts (sentinel-terminated to match allocator size)
     last_modified: i96, // nanoseconds mtime from stat; 0 = embedded, never reloaded
 };
 
@@ -65,7 +65,9 @@ pub const FontManager = struct {
 
     // Load a font from an in-memory buffer (e.g. @embedFile)
     pub fn loadFromMemory(self: *FontManager, name: []const u8, data: []const u8) !void {
-        const source_path = try std.fmt.allocPrint(self.gpa, "<embedded:{s}>", .{name});
+        const source_path_slice = try std.fmt.allocPrint(self.gpa, "<embedded:{s}>", .{name});
+        defer self.gpa.free(source_path_slice);
+        const source_path = try self.gpa.dupeZ(u8, source_path_slice);
         errdefer self.gpa.free(source_path);
 
         const font_ptr = try self.gpa.create(Font);
@@ -115,7 +117,7 @@ pub const FontManager = struct {
 
     // --- internals ---
 
-    fn store(self: *FontManager, name: []const u8, font_ptr: *Font, source_path: []const u8, mtime: i96) !void {
+    fn store(self: *FontManager, name: []const u8, font_ptr: *Font, source_path: [:0]const u8, mtime: i96) !void {
         const gop = try self.assets.getOrPut(name);
         if (gop.found_existing) {
             // Replace: deinit old font and free old source_path

@@ -12,7 +12,7 @@ const log = debug.log;
 pub const TextureAsset = struct {
     image: ZxlImage,
     frame_textures: std.ArrayList(?*Texture), // null = not yet uploaded, populated lazily
-    source_path: []const u8, // absolute path on disk
+    source_path: [:0]const u8, // absolute path on disk (sentinel-terminated to match allocator size)
     last_modified: i96, // nanoseconds mtime from stat
 };
 
@@ -123,7 +123,7 @@ pub const TextureManager = struct {
         name: []const u8,
         image: ZxlImage,
         frame_textures: std.ArrayList(?*Texture),
-        source_path: []const u8,
+        source_path: [:0]const u8,
         mtime: i96,
     ) !void {
         const gop = try self.assets.getOrPut(name);
