@@ -6,6 +6,7 @@ alias run='zig build play --error-style minimal'
 alias release='zig build play --error-style minimal -Doptimize=ReleaseFast'
 alias small='zig build play --error-style minimal -Doptimize=ReleaseSmall'
 alias art='zig build zixelart --error-style minimal'
+alias level='zig build sceneEdit --error-style minimal'
 alias clean='zig build clean'
 
 # Project dirs

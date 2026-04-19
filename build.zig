@@ -168,12 +168,12 @@ const module_defs = [_]ModuleDef{
         .name = "engine",
         .path = "src/Engine.zig",
         .deps = &.{
-            .{ "app", .app },                   .{ "math", .math },
-            .{ "platform", .platform },         .{ "renderer", .renderer },
+            .{ "app", .app },                     .{ "math", .math },
+            .{ "platform", .platform },           .{ "renderer", .renderer },
             .{ "build_options", .build_options }, .{ "assets", .assets },
-            .{ "ecs", .ecs },                   .{ "scene-format", .scene_format },
-            .{ "action", .action },             .{ "scene", .scene },
-            .{ "registry", .registry },         .{ "systems", .systems },
+            .{ "ecs", .ecs },                     .{ "scene-format", .scene_format },
+            .{ "action", .action },               .{ "scene", .scene },
+            .{ "registry", .registry },           .{ "systems", .systems },
         },
     },
     // ZXL
@@ -281,7 +281,18 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(engine_lib);
 
     // Common tool imports (app + extras)
-    const tool_extra_deps = [_]M{ .app, .platform, .renderer, .math, .debug, .assets, .ui, .zxl };
+    const tool_extra_deps = [_]M{
+        .app,
+        .platform,
+        .renderer,
+        .math,
+        .debug,
+        .assets,
+        .ui,
+        .zxl,
+        .scene,
+        .scene_format,
+    };
 
     // ========================================
     // ZixelArt
@@ -306,6 +317,30 @@ pub fn build(b: *std.Build) void {
     run_zixelart.step.dependOn(b.getInstallStep());
     run_zixelart.setCwd(b.path("zig-out/bin"));
     b.step("zixelart", "Run the Pixel Art Editor").dependOn(&run_zixelart.step);
+
+    // ========================================
+    // SceneEditor
+    // ========================================
+    const scene_editor_module = b.addModule("scene_editor", .{
+        .root_source_file = b.path("src/tools/editor/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    for (tool_extra_deps) |dep| {
+        const def = module_defs[@intFromEnum(dep)];
+        scene_editor_module.addImport(def.name, m.get(&modules, dep));
+    }
+
+    const scene_editor_exe = b.addExecutable(.{
+        .name = "sceneEdit",
+        .root_module = scene_editor_module,
+    });
+    b.installArtifact(scene_editor_exe);
+
+    const run_scene_edit = b.addRunArtifact(scene_editor_exe);
+    run_scene_edit.step.dependOn(b.getInstallStep());
+    run_scene_edit.setCwd(b.path("zig-out/bin"));
+    b.step("sceneEdit", "Run the Scene File Editor").dependOn(&run_scene_edit.step);
 
     // ========================================
     // UI Playground
@@ -362,7 +397,7 @@ pub fn build(b: *std.Build) void {
     // ========================================
     // Platform-specific linking (Swift runtime on macOS, no-op elsewhere)
     // ========================================
-    linkPlatformLibraries(&.{ engine_lib, zixelart_exe, ui_playground_exe, player_exe }, swift_lib, target);
+    linkPlatformLibraries(&.{ engine_lib, zixelart_exe, ui_playground_exe, player_exe, scene_editor_exe }, swift_lib, target);
 
     // ========================================
     // Clean
