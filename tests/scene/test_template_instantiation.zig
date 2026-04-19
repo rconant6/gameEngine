@@ -24,7 +24,7 @@ test "TemplateInstantiation: load single template from file" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -46,7 +46,7 @@ test "TemplateInstantiation: load all templates from directory" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -74,7 +74,7 @@ test "TemplateInstantiation: get template by name" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -96,7 +96,7 @@ test "TemplateInstantiation: instantiate entity from template" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -132,7 +132,7 @@ test "TemplateInstantiation: instantiate multiple entities from same template" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -169,7 +169,7 @@ test "TemplateInstantiation: template with polygon sprite" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -202,7 +202,7 @@ test "TemplateInstantiation: template with tag component" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -228,7 +228,7 @@ test "TemplateInstantiation: template with lifetime component" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -252,7 +252,7 @@ test "TemplateInstantiation: template not found error" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -275,7 +275,7 @@ test "TemplateInstantiation: spawn with offset from action" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -303,7 +303,7 @@ test "TemplateInstantiation: asteroid break into smaller asteroids" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -337,7 +337,7 @@ test "TemplateInstantiation: directory load includes all files" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -377,7 +377,7 @@ test "TemplateInstantiation: directory load then instantiate from different file
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -412,7 +412,7 @@ test "TemplateInstantiation: directory load empty directory does not error" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);
@@ -435,7 +435,7 @@ test "TemplateInstantiation: directory load skips non-template files" {
     var world = try World.init(gpa);
     defer world.deinit();
 
-    var assets = try AssetManager.init(gpa, std.testing.io);
+    var assets = try AssetManager.init(gpa, std.testing.io, undefined);
     defer assets.deinit();
 
     var instantiator = Instantiator.init(gpa, &world, &assets);

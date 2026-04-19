@@ -129,6 +129,9 @@ pub fn addAllTests(
         .{ .name = "nested-block-parser-tests", .path = "tests/scene-format/parser_nested_blocks_test.zig", .imports = &.{
             .{ "scene-format", mod(modules, .scene_format) },
         } },
+        .{ .name = "scene-writer-tests", .path = "tests/scene-format/writer_test.zig", .imports = &.{
+            .{ "scene-format", mod(modules, .scene_format) },
+        } },
         .{ .name = "scene-tests", .path = "tests/scene/test_scene_integration.zig", .imports = &.{
             .{ "scene-format", mod(modules, .scene_format) },
         } },
