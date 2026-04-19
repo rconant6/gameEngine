@@ -23,6 +23,7 @@ pub const SceneFile = ast.SceneFile;
 pub const SpriteBlock = ast.SpriteBlock;
 pub const TypeAnnotation = ast.TypeAnnotation;
 pub const Value = ast.Value;
+pub const serialize = @import("writer.zig").serialize;
 
 pub fn lexeme(src: [:0]const u8, token: Token) []const u8 {
     const start = token.loc.start;

@@ -1,4 +1,5 @@
 const std = @import("std");
+const Writer = std.Io.Writer;
 const Allocator = std.mem.Allocator;
 const tok = @import("token.zig");
 pub const Token = tok.Token;
@@ -190,16 +191,31 @@ pub const AssetType = enum {
 };
 
 pub const BaseType = enum {
-    vec2,
-    vec3,
+    asset,
+    bool,
+    color,
     f32,
     i32,
-    u32,
-    bool,
     string,
-    color,
-    asset,
+    u32,
+    vec2,
+    vec3,
     // custom, // TODO: this is coming later
+
+    pub fn format(self: @This(), w: *Writer) !void {
+        const str: []const u8 = switch (self) {
+            .asset => "asset",
+            .bool => "bool",
+            .color => "color",
+            .f32 => "f32",
+            .i32 => "i32",
+            .string => "string",
+            .u32 => "u32",
+            .vec2 => "vec2",
+            .vec3 => "vec3",
+        };
+        try w.print("{s}", .{str});
+    }
 };
 
 pub const Value = union(enum) {
