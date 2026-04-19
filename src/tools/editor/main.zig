@@ -1,0 +1,102 @@
+// main
+const std = @import("std");
+
+const App = @import("app").App;
+const assets = @import("assets");
+const Font = assets.Font;
+const scene = @import("scene");
+const scene_fmt = @import("scene-format");
+const ui = @import("ui");
+const UILayer = ui.UILayer;
+const debug = @import("debug");
+const log = debug.log;
+const rend = @import("renderer");
+const Colors = rend.Colors;
+const Color = rend.Color;
+
+const Hierarchy = @import("Hierarchy.zig");
+const Inspector = @import("Inspector.zig");
+const EditorState = @import("EditorState.zig");
+
+const logical_width: i32 = 1920;
+const logical_height: i32 = 1080;
+
+pub fn main(init: std.process.Init) !void {
+    const gpa = init.gpa;
+    const io = init.io;
+
+    var app = try App.init(gpa, io, .{
+        .title = "Scene Editor",
+        .width = logical_width,
+        .height = logical_height,
+    });
+    defer app.deinit();
+
+    var state = EditorState.init(gpa);
+    defer state.deinit();
+
+    var ui_font = Font.initFromMemory(gpa, assets.embedded_default_font) catch |err| {
+        log.err(.application, "Failed to load font: {any}", .{err});
+        @panic("Cannot load font");
+    };
+    defer ui_font.deinit();
+
+    const size = ui_font.measureText("Hello World", 24.0);
+    log.info(.assets, "Font: width: {d}, height {d}", .{ size.x, size.y });
+
+    var ui_layer = UILayer.init(gpa);
+    defer ui_layer.deinit();
+
+    ui_layer.addView(
+        "hierarchy",
+        .{ .x = 0, .y = 0, .width = 280, .height = 1080 },
+        Hierarchy.buildTree,
+        .{},
+    );
+    ui_layer.addView(
+        "inspector",
+        .{ .x = 1620, .y = 0, .width = 300, .height = 1080 },
+        Inspector.buildTree,
+        .{},
+    );
+
+    const ctx: rend.RenderContext = .{
+        .camera_loc = .{ .x = 0, .y = 0 },
+        .height = logical_height,
+        .width = logical_width,
+        .ortho_size = logical_height / 2,
+    };
+
+    while (app.isRunning()) {
+        try app.beginFrame();
+
+        app.renderer.setClearColor(Colors.DARK_GRAY);
+        app.renderer.clear();
+
+        if (app.kb.isPressed(.Esc)) break;
+
+        const mouse_pos = app.mouse.position;
+
+        handleInput(&state, &app);
+        drawViewport(&state, &app);
+        ui_layer.update(
+            &state,
+            mouse_pos.x,
+            mouse_pos.y,
+            false,
+            false,
+        );
+        ui_layer.render(&app.renderer, &ui_font, ctx);
+
+        try app.endFrame();
+    }
+}
+
+fn handleInput(state: *EditorState, app: *App) void {
+    _ = state;
+    _ = app;
+}
+fn drawViewport(state: *EditorState, app: *App) void {
+    _ = state;
+    _ = app;
+}

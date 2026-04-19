@@ -7,8 +7,8 @@ const log = debug.log;
 
 pub const AppConfig = struct {
     title: []const u8,
-    width: u32 = 1024,
-    height: u32 = 768,
+    width: u32 = 1920,
+    height: u32 = 1080,
     resizable: bool = true,
     // future flags:
     // assets: bool = false,
