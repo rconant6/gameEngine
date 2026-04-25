@@ -35,6 +35,20 @@ pub fn main(init: std.process.Init) !void {
     var state = EditorState.init(gpa);
     defer state.deinit();
 
+    // Load test scene for development
+    const test_scene_src = @embedFile("test_scene.scene");
+    const test_scene_src_z = try std.mem.concatWithSentinel(gpa, u8, &.{test_scene_src}, 0);
+    defer gpa.free(test_scene_src_z);
+    const parsed = scene_fmt.parseString(gpa, test_scene_src_z, "game.scene") catch |err| blk: {
+        log.err(.application, "Failed to parse test scene: {any}", .{err});
+        break :blk null;
+    };
+    if (parsed) |sf| {
+        const sf_ptr = try gpa.create(scene_fmt.SceneFile);
+        sf_ptr.* = sf;
+        state.scene_file = sf_ptr;
+    }
+
     var ui_font = Font.initFromMemory(gpa, assets.embedded_default_font) catch |err| {
         log.err(.application, "Failed to load font: {any}", .{err});
         @panic("Cannot load font");
@@ -83,8 +97,8 @@ pub fn main(init: std.process.Init) !void {
             &state,
             mouse_pos.x,
             mouse_pos.y,
-            false,
-            false,
+            app.mouse.buttons.isPressed(.Left),
+            app.mouse.buttons.isReleased(.Left),
         );
         ui_layer.render(&app.renderer, &ui_font, ctx);
 

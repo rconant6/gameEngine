@@ -258,9 +258,9 @@ pub fn main(init: std.process.Init) !void {
             test7.setRoot(
                 make.panel(a, make.hstack(a, &.{
                     make.label(a, "File", .{ .font_scale = 22.0 }),
-                    make.spacer(a, 1),
+                    make.hspacer(a, 1),
                     make.label(a, "Edit", .{ .font_scale = 22.0 }),
-                    make.spacer(a, 1),
+                    make.hspacer(a, 1),
                     make.label(a, "View", .{ .font_scale = 22.0 }),
                 }, .{ .spacing = 10 }), .{
                     .padding = ui.EdgeInsets.symmetric(16, 8),
@@ -280,9 +280,9 @@ pub fn main(init: std.process.Init) !void {
             test8.setRoot(
                 make.panel(a, make.vstack(a, &.{
                     make.label(a, "Top", .{ .font_scale = 22.0 }),
-                    make.spacer(a, null),
+                    make.vspacer(a, null),
                     make.label(a, "Middle", .{ .font_scale = 22.0 }),
-                    make.spacer(a, null),
+                    make.vspacer(a, null),
                     make.label(a, "Bottom", .{ .font_scale = 22.0 }),
                 }, .{ .spacing = 4 }), .{
                     .padding = ui.EdgeInsets.all(12),

@@ -7,7 +7,15 @@ const scene_fmt = @import("scene-format");
 pub const SceneFile = scene_fmt.SceneFile;
 const EntityDeclaration = scene_fmt.EntityDeclaration;
 
-const EntityRef = struct {
+pub const EditorCommand = union(enum) {
+    open_file,
+    save_file,
+    close_file,
+    select_entity,
+    deselect,
+};
+
+pub const EntityRef = struct {
     scene_idx: ?usize,
     entity_idx: usize,
 };
@@ -21,6 +29,7 @@ selected: ?EntityRef,
 dirty: bool,
 camera_pos: V2,
 camera_zoom: f32,
+// TODO: do we want to keep a quick list of the entities vice scanning every rebuild?
 
 pub fn init(gpa: Allocator) Self {
     return .{
@@ -34,16 +43,27 @@ pub fn init(gpa: Allocator) Self {
     };
 }
 pub fn deinit(self: *Self) void {
-    _ = self;
+    if (self.scene_file) |sf| {
+        sf.deinit(self.gpa);
+        self.gpa.destroy(sf);
+    }
+    if (self.scene_path.len > 0) self.gpa.free(self.scene_path);
 }
 
-pub fn loadFile(self: *Self, path: []const u8) !void {
-    _ = self;
-    _ = path;
+pub fn loadFileFromPath(self: *Self, path: []const u8) !void {
+    self.scene_path = try self.gpa.dupe(path);
+    errdefer self.gpa.free(self.scene_path);
+
+    // actually read in the file from the path
 }
 
 pub fn save(self: *Self) !void {
-    _ = self;
+    if (!self.dirty) return;
+    // actually write out the file
+}
+
+pub fn closeFile(self: *Self) !void {
+    if (self.dirty) self.save();
 }
 
 pub fn getSelectedEntity(self: *const Self) ?*EntityDeclaration {
