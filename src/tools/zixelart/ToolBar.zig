@@ -61,7 +61,7 @@ pub fn buildTree(
                 .is_selected = tool == .picker,
             }),
             make.label(arena, "Picker", .{ .color = Colors.UI_BUTTON_TEXT }),
-            make.spacer(arena, null),
+            make.vspacer(arena, null),
         }, .{ .spacing = 30 }),
         .{
             .border_color = Colors.CHARCOAL,

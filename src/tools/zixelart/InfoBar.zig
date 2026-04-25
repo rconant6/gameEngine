@@ -32,7 +32,7 @@ pub fn buildTree(
                 std.ascii.upperString(state.buf[64..128], state.active_color_name),
                 .{ .font_scale = text_scale, .color = state.active_color },
             ),
-            make.spacer(arena, null),
+            make.hspacer(arena, null),
             make.label(
                 arena,
                 "64x64",
@@ -43,7 +43,7 @@ pub fn buildTree(
                 "100%",
                 .{ .font_scale = text_scale, .color = Colors.UI_BUTTON_NORMAL },
             ),
-            make.spacer(arena, null),
+            make.hspacer(arena, null),
             make.label(
                 arena,
                 coord_text,
