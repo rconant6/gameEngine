@@ -35,7 +35,7 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
         } else {
             // Layout at temporary origin to measure
             const child_size = child.layout(.{
-                .constraints = .loose(remaining_width, li.constraints.max_height),
+                .constraints = .loose(li.constraints.max_width, li.constraints.max_height),
                 .pos = .ZERO,
                 .font = li.font,
             });

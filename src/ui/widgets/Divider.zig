@@ -9,39 +9,41 @@ const l_out = @import("../layout.zig");
 const Constraints = l_out.Constraints;
 const LayoutInfo = l_out.LayoutInfo;
 const RenderInfo = l_out.RenderInfo;
-const EdgeInsets = l_out.EdgeInsets;
 const Size = l_out.Size;
 const Rect = @import("../Rect.zig");
-const WidgetNode = @import("WidgetNode.zig");
+
+const Axis = l_out.Axis;
 
 const Self = @This();
 
+axis: Axis = .horizontal,
 size: f32 = 2,
-color: Color = Colors.RED,
+color: Color = Colors.CHARCOAL,
 
 pub fn layout(self: *Self, li: LayoutInfo) Size {
-    const size: Size = .{
-        .width = self.size,
-        .height = li.constraints.max_height,
+    return switch (self.axis) {
+        .horizontal => .{ .width = li.constraints.max_width, .height = self.size },
+        .vertical => .{ .width = self.size, .height = li.constraints.max_height },
     };
-
-    return size.constrain(li.constraints);
 }
 
 pub fn render(self: *Self, ri: RenderInfo) void {
     const bounds = ri.bounds;
-    const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse
-        return;
-    const bg_shape = rend.ShapeRegistry.createShapeUnion(
-        ScreenRect,
-        ScreenRect.initFromTopLeft(
+    const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse return;
+    const rect = switch (self.axis) {
+        .horizontal => ScreenRect.initFromTopLeft(
             .{ .x = bounds.x, .y = bounds.y },
             bounds.width,
-            2,
+            self.size,
         ),
-    );
+        .vertical => ScreenRect.initFromTopLeft(
+            .{ .x = bounds.x, .y = bounds.y },
+            self.size,
+            bounds.height,
+        ),
+    };
     ri.renderer.drawGeometry(
-        bg_shape,
+        rend.ShapeRegistry.createShapeUnion(ScreenRect, rect),
         null,
         self.color,
         null,

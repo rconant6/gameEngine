@@ -21,6 +21,7 @@ background: Color,
 border_color: ?Color,
 border_width: f32,
 padding: EdgeInsets,
+fill: bool = false,
 
 pub fn layout(self: *Self, li: LayoutInfo) Size {
     const child_constraints = li.constraints.deflate(self.padding);
@@ -32,9 +33,14 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
         .font = li.font,
     });
 
-    const size: Size = .{
-        .width = child_size.width + self.padding.horizontal(),
-        .height = child_size.height + self.padding.vertical(),
+    const natural_w = child_size.width + self.padding.horizontal();
+    const natural_h = child_size.height + self.padding.vertical();
+    const size: Size = if (self.fill) .{
+        .width = li.constraints.max_width,
+        .height = li.constraints.max_height,
+    } else .{
+        .width = natural_w,
+        .height = natural_h,
     };
 
     return size.constrain(li.constraints);

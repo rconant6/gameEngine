@@ -32,11 +32,11 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
         if (child.widget == .Spacer) {
             spacer_count += 1;
         } else {
-            // Layout at temporary origin to measure
+            // Layout at temporary origin to measure — use full height, not shrinking budget
             const child_size = child.layout(.{
                 .constraints = .loose(
                     li.constraints.max_width,
-                    remaining_height,
+                    li.constraints.max_height,
                 ),
                 .pos = .ZERO,
                 .font = li.font,

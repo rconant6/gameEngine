@@ -1,5 +1,6 @@
 pub const Rect = @import("Rect.zig");
 const lo = @import("layout.zig");
+pub const Axis = lo.Axis;
 pub const Size = lo.Size;
 pub const Constraints = lo.Constraints;
 pub const EdgeInsets = lo.EdgeInsets;

@@ -9,6 +9,8 @@ const RenderContext = rend.RenderContext;
 const Rect = @import("Rect.zig");
 const V2 = @import("math").V2;
 
+pub const Axis = enum { horizontal, vertical };
+
 /// Used to pass required info to widgets for layout purposes
 pub const LayoutInfo = struct {
     // Required for widgets with text

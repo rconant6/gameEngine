@@ -214,8 +214,19 @@ pub const DividerOpts = struct {
     color: Color = Colors.CHARCOAL,
 };
 
-pub fn divider(arena: Allocator, opts: DividerOpts) *WidgetNode {
+/// Horizontal rule — full width, fixed height. Use inside VStack.
+pub fn hdivider(arena: Allocator, opts: DividerOpts) *WidgetNode {
     return alloc(arena, Divider{
+        .axis = .horizontal,
+        .size = opts.size,
+        .color = opts.color,
+    });
+}
+
+/// Vertical rule — fixed width, full height. Use inside HStack.
+pub fn vdivider(arena: Allocator, opts: DividerOpts) *WidgetNode {
+    return alloc(arena, Divider{
+        .axis = .vertical,
         .size = opts.size,
         .color = opts.color,
     });
@@ -223,8 +234,18 @@ pub fn divider(arena: Allocator, opts: DividerOpts) *WidgetNode {
 
 // ── Spacer ──
 
-pub fn spacer(arena: Allocator, min_size: ?f32) *WidgetNode {
+/// Vertical spacer — expands along the main axis of a VStack.
+pub fn vspacer(arena: Allocator, min_size: ?f32) *WidgetNode {
     return alloc(arena, Spacer{
+        .axis = .vertical,
+        .min_size = min_size,
+    });
+}
+
+/// Horizontal spacer — expands along the main axis of an HStack.
+pub fn hspacer(arena: Allocator, min_size: ?f32) *WidgetNode {
+    return alloc(arena, Spacer{
+        .axis = .horizontal,
         .min_size = min_size,
     });
 }
