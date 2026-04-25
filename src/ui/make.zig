@@ -28,8 +28,8 @@ const Size = lo.Size;
 const EdgeInsets = lo.EdgeInsets;
 const Alignment = @import("alignment.zig").Alignment;
 
-fn alloc(gpa: Allocator, widget_data: anytype) *WidgetNode {
-    const node = gpa.create(WidgetNode) catch |err| {
+fn alloc(arena: Allocator, widget_data: anytype) *WidgetNode {
+    const node = arena.create(WidgetNode) catch |err| {
         log.fatal(.ui, "Unable to create widget: {any}", .{err});
         @panic("UI: out of memory");
     };
@@ -51,14 +51,14 @@ const LabelOpts = struct {
     color: Color = Colors.WHITE,
 };
 
-pub fn label(gpa: Allocator, text: []const u8, opts: LabelOpts) *WidgetNode {
+pub fn label(arena: Allocator, text: []const u8, opts: LabelOpts) *WidgetNode {
     const raw_size: V2 = if (opts.font) |f| f.measureText(
         text,
         opts.font_scale,
     ) else .{ .x = 0, .y = 0 };
 
     const size: Size = .{ .width = raw_size.x, .height = raw_size.y };
-    return alloc(gpa, Label{
+    return alloc(arena, Label{
         .tb = .{
             .text = text,
             .font = opts.font,
@@ -70,17 +70,19 @@ pub fn label(gpa: Allocator, text: []const u8, opts: LabelOpts) *WidgetNode {
 }
 
 const PanelOpts = struct {
-    background: Color = Colors.CHARCOAL,
-    border_color: Color = Colors.WHITE,
+    background: Color = Colors.UI_PANEL_BG,
+    border_color: Color = Colors.UI_PANEL_BORDER,
     border_width: f32 = 1,
-    padding: EdgeInsets = .all(0),
+    padding: EdgeInsets = .all(5),
+    fill: bool = false,
 };
-pub fn panel(gpa: Allocator, child: *WidgetNode, opts: PanelOpts) *WidgetNode {
-    return alloc(gpa, Panel{
+pub fn panel(arena: Allocator, child: *WidgetNode, opts: PanelOpts) *WidgetNode {
+    return alloc(arena, Panel{
         .background = opts.background,
         .border_color = opts.border_color,
         .border_width = opts.border_width,
         .padding = opts.padding,
+        .fill = opts.fill,
         .child = child,
     });
 }
@@ -92,9 +94,9 @@ pub const HStackOpts = struct {
     cross_axis: Alignment.Vertical = .center,
 };
 
-pub fn hstack(gpa: Allocator, children: []const *WidgetNode, opts: HStackOpts) *WidgetNode {
-    const nodes = allocChildren(gpa, children);
-    return alloc(gpa, HStack{
+pub fn hstack(arena: Allocator, children: []const *WidgetNode, opts: HStackOpts) *WidgetNode {
+    const nodes = allocChildren(arena, children);
+    return alloc(arena, HStack{
         .children = nodes,
         .spacing = opts.spacing,
         .cross_axis = opts.cross_axis,
@@ -108,9 +110,9 @@ pub const VStackOpts = struct {
     cross_axis: Alignment.Horizontal = .start,
 };
 
-pub fn vstack(gpa: Allocator, children: []const *WidgetNode, opts: VStackOpts) *WidgetNode {
-    const nodes = allocChildren(gpa, children);
-    return alloc(gpa, VStack{
+pub fn vstack(arena: Allocator, children: []const *WidgetNode, opts: VStackOpts) *WidgetNode {
+    const nodes = allocChildren(arena, children);
+    return alloc(arena, VStack{
         .children = nodes,
         .spacing = opts.spacing,
         .cross_axis = opts.cross_axis,
@@ -124,8 +126,8 @@ pub const ColorRectOpts = struct {
     border_width: f32 = 0,
 };
 
-pub fn colorRect(gpa: Allocator, color: Color, opts: ColorRectOpts) *WidgetNode {
-    return alloc(gpa, ColorRect{
+pub fn colorRect(arena: Allocator, color: Color, opts: ColorRectOpts) *WidgetNode {
+    return alloc(arena, ColorRect{
         .color = color,
         .border_color = opts.border_color,
         .border_width = opts.border_width,
@@ -144,8 +146,8 @@ pub const ChickletOpts = struct {
     on_click: ?*const fn () void = null,
 };
 
-pub fn chicklet(gpa: Allocator, name: []const u8, opts: ChickletOpts) *WidgetNode {
-    return alloc(gpa, Chicklet{
+pub fn chicklet(arena: Allocator, name: []const u8, opts: ChickletOpts) *WidgetNode {
+    return alloc(arena, Chicklet{
         .colors = opts.colors,
         .id = name,
         .selected = opts.is_selected,
@@ -168,12 +170,12 @@ pub const ButtonOpts = struct {
 };
 
 pub fn button(
-    gpa: Allocator,
+    arena: Allocator,
     id: []const u8,
     text: []const u8,
     opts: ButtonOpts,
 ) *WidgetNode {
-    return alloc(gpa, Button{
+    return alloc(arena, Button{
         .id = id,
         .text_info = .{
             .text = text,
@@ -194,8 +196,8 @@ pub const SliderOpts = struct {
     thumb_color: Color = Colors.WHITE,
 };
 
-pub fn slider(gpa: Allocator, id: []const u8, opts: SliderOpts) *WidgetNode {
-    return alloc(gpa, Slider{
+pub fn slider(arena: Allocator, id: []const u8, opts: SliderOpts) *WidgetNode {
+    return alloc(arena, Slider{
         .id = id,
         .min = opts.min,
         .max = opts.max,
@@ -212,8 +214,8 @@ pub const DividerOpts = struct {
     color: Color = Colors.CHARCOAL,
 };
 
-pub fn divider(gpa: Allocator, opts: DividerOpts) *WidgetNode {
-    return alloc(gpa, Divider{
+pub fn divider(arena: Allocator, opts: DividerOpts) *WidgetNode {
+    return alloc(arena, Divider{
         .size = opts.size,
         .color = opts.color,
     });
@@ -221,8 +223,8 @@ pub fn divider(gpa: Allocator, opts: DividerOpts) *WidgetNode {
 
 // ── Spacer ──
 
-pub fn spacer(gpa: Allocator, min_size: ?f32) *WidgetNode {
-    return alloc(gpa, Spacer{
+pub fn spacer(arena: Allocator, min_size: ?f32) *WidgetNode {
+    return alloc(arena, Spacer{
         .min_size = min_size,
     });
 }
@@ -235,9 +237,9 @@ pub const GridOpts = struct {
     v_spacing: f32 = 4,
 };
 
-pub fn grid(gpa: Allocator, children: []const *WidgetNode, opts: GridOpts) *WidgetNode {
-    const nodes = allocChildren(gpa, children);
-    return alloc(gpa, Grid{
+pub fn grid(arena: Allocator, children: []const *WidgetNode, opts: GridOpts) *WidgetNode {
+    const nodes = allocChildren(arena, children);
+    return alloc(arena, Grid{
         .children = nodes,
         .columns = opts.columns,
         .h_spacing = opts.h_spacing,
@@ -247,8 +249,8 @@ pub fn grid(gpa: Allocator, children: []const *WidgetNode, opts: GridOpts) *Widg
 
 // ── Internal helpers ──
 
-fn allocChildren(gpa: Allocator, children: []const *WidgetNode) []WidgetNode {
-    const nodes = gpa.alloc(WidgetNode, children.len) catch |err| {
+fn allocChildren(arena: Allocator, children: []const *WidgetNode) []WidgetNode {
+    const nodes = arena.alloc(WidgetNode, children.len) catch |err| {
         log.fatal(.ui, "Unable to allocate children: {any}", .{err});
         @panic("UI: out of memory");
     };
