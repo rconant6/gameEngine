@@ -8,7 +8,7 @@ pub const App = app_mod.App;
 pub const AppConfig = app_mod.AppConfig;
 
 // MARK: Engine Struct
-const engine = @import("engine/engine.zig");
+const engine = @import("engine/Engine.zig");
 pub const Engine = engine.Engine;
 
 // MARK: Platform Types
