@@ -292,6 +292,7 @@ pub fn build(b: *std.Build) void {
         .zxl,
         .scene,
         .scene_format,
+        .engine,
     };
 
     // ========================================
