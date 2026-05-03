@@ -18,9 +18,9 @@ const Colors = rend.Colors;
 const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
 
+pub const CollisionDetectionSys = @import("CollisionDetectionSys.zig");
 pub const movementSystem = @import("MovementSys.zig").run;
 pub const physicsSystem = @import("PhysicsSys.zig").run;
-pub const CollisionDetectionSys = @import("CollisionDetectionSys.zig");
 pub const collisionDetectionSystem = CollisionDetectionSys.run;
 pub const actionSystem = @import("ActionSys.zig").run;
 pub const lifetimeSystem = @import("LifetimeSys.zig").run;

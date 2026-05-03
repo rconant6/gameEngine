@@ -4,6 +4,7 @@ const macos = @import("build/macos.zig");
 const linux = @import("build/linux.zig");
 const windows = @import("build/windows.zig");
 const tests = @import("build/tests.zig");
+const fuzz = @import("build/fuzz.zig");
 
 pub const RendererBackend = enum { metal, vulkan, opengl, cpu };
 
@@ -413,6 +414,15 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run all tests");
     const platform_step: ?*std.Build.Step = if (swift_lib) |sl| sl.swift_step else null;
     tests.addAllTests(b, target, optimize, &modules, engine_lib, test_step, platform_step);
+
+    // ========================================
+    // Fuzz steps (opt-in, not part of `zig build test`)
+    // Run: zig build fuzz-lexer --fuzz
+    //      zig build fuzz-parser --fuzz
+    //      zig build fuzz-font --fuzz
+    //      zig build fuzz-math --fuzz
+    // ========================================
+    fuzz.addFuzzSteps(b, target, optimize);
 }
 
 // ========================================

@@ -33,6 +33,17 @@ const DebugCategory = debug.DebugCategory;
 const Debugger = debug.DebugManager;
 const Systems = @import("systems");
 
+// Allows control of what gets updated in simulations
+// use case is for the level editor vs. an actual game (want camera but nothing else)
+pub const SimulateOpts = struct {
+    movement: bool = true,
+    physics: bool = true,
+    collision: bool = true,
+    actions: bool = true,
+    camera: bool = true,
+    lifetime: bool = true,
+};
+
 const PerformanceMetrics = struct {
     current_fps: f32 = 0,
     frame_time_ms: f32 = 0,
@@ -45,7 +56,7 @@ const PerformanceMetrics = struct {
     min_fps: f32 = std.math.inf(f32),
     max_fps: f32 = 0,
 
-    pub fn update(self: *PerformanceMetrics, dt: f32) void {
+    pub fn perfUpdate(self: *PerformanceMetrics, dt: f32) void {
         self.frame_count += 1;
         self.fps_frame_accum += 1.0;
         self.fps_time_accum += dt;
@@ -214,8 +225,9 @@ pub const Engine = struct {
         }
     }
 
-    pub fn update(self: *Engine, dt: f32) void {
-        self.performance_metrics.update(dt);
+    // NOTE: helper for doing system updates that can be configured base on what is needed
+    fn simulate(self: *Engine, dt: f32, opts: SimulateOpts) void {
+        self.performance_metrics.perfUpdate(dt);
         if (debug_enabled) {
             self.checkInternals();
         }
@@ -227,23 +239,29 @@ pub const Engine = struct {
             };
         }
 
-        Systems.movementSystem(&self.world, dt, &self.debugger);
-        Systems.physicsSystem(&self.world, dt);
-        Systems.collisionDetectionSystem(
+        if (opts.movement) Systems.movementSystem(&self.world, dt, &self.debugger);
+        if (opts.physics) Systems.physicsSystem(&self.world, dt);
+        if (opts.collision) Systems.collisionDetectionSystem(
             &self.world,
             &self.collision_events,
             &self.debugger,
         );
 
-        const context: TriggerContext = .{
-            .collision_events = self.collision_events.items,
-            .input = &self.input,
-            .delta_time = dt,
-            .action_queue = &self.action_system.action_queue,
-        };
-        Systems.actionSystem(&self.world, &self.action_system, context) catch {};
-        Systems.cameraTrackingSystem(&self.world, dt);
-        Systems.lifetimeSystem(&self.world, dt);
+        if (opts.actions) {
+            const context: TriggerContext = .{
+                .collision_events = self.collision_events.items,
+                .input = &self.input,
+                .delta_time = dt,
+                .action_queue = &self.action_system.action_queue,
+            };
+            Systems.actionSystem(&self.world, &self.action_system, context) catch {};
+        }
+        if (opts.camera) Systems.cameraTrackingSystem(&self.world, dt);
+        if (opts.lifetime) Systems.lifetimeSystem(&self.world, dt);
+    }
+
+    // NOTE: helper for just rendering the current frame and state
+    fn render(self: *Engine, dt: f32) void {
         Systems.renderSystem(
             &self.app.renderer,
             &self.world,
@@ -270,6 +288,12 @@ pub const Engine = struct {
                 .owns_text = true,
             });
         }
+    }
+
+    // NOTE: Simple wrapper for actual games to do all
+    pub fn update(self: *Engine, dt: f32, opts: SimulateOpts) void {
+        self.simulate(dt, opts);
+        self.render(dt);
     }
 
     pub fn beginFrame(self: *Engine) void {

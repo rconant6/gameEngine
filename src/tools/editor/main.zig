@@ -1,6 +1,6 @@
 // main
 const std = @import("std");
-
+const engine = @import("engine");
 const App = @import("app").App;
 const assets = @import("assets");
 const Font = assets.Font;
@@ -31,6 +31,9 @@ pub fn main(init: std.process.Init) !void {
         .height = logical_height,
     });
     defer app.deinit();
+
+    const eng = engine.Engine.init(&app);
+    defer eng.deinit();
 
     var state = EditorState.init(gpa);
     defer state.deinit();
@@ -82,10 +85,10 @@ pub fn main(init: std.process.Init) !void {
     };
 
     while (app.isRunning()) {
-        try app.beginFrame();
+        eng.beginFrame();
 
-        app.renderer.setClearColor(Colors.DARK_GRAY);
-        app.renderer.clear();
+        eng.clear(Colors.DARK_GRAY);
+        eng.update(0, .{});
 
         if (app.kb.isPressed(.Esc)) break;
 

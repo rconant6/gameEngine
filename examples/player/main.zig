@@ -318,7 +318,7 @@ pub fn main(init: std.process.Init) !void {
         }
         // ===== END CAMERA CONTROLS =====
 
-        game.update(dt);
+        game.update(dt, .{});
 
         // Test screen-space text rendering
         const font = game.getFont("__default__") catch unreachable;

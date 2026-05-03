@@ -9,5 +9,10 @@ alias art='zig build zixelart --error-style minimal'
 alias level='zig build sceneEdit --error-style minimal'
 alias clean='zig build clean'
 
+# NOTE: --fuzz (continuous mode) is broken in Zig 0.16.0 (builtin.StackTrace type mismatch bug).
+# These run a single deterministic seed pass instead — still catches panics and failed assertions.
+# Re-enable --fuzz when Zig patches test_runner.zig.
+alias test-full='zig build test --error-style minimal && zig build fuzz-lexer & zig build fuzz-parser & zig build fuzz-font & zig build fuzz-math & wait'
+
 # Project dirs
 export ENGINE_ROOT=~/Developer/zig/gameEngine
