@@ -1,4 +1,4 @@
-const Engine = @import("../engine.zig").Engine;
+const Engine = @import("../Engine.zig").Engine;
 const core = @import("math");
 const V2 = core.V2;
 const renderer = @import("renderer");

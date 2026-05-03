@@ -1,4 +1,4 @@
-const Engine = @import("engine.zig").Engine;
+const Engine = @import("Engine.zig").Engine;
 const scene = @import("scene");
 const log = @import("debug").log;
 

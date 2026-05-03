@@ -1,4 +1,4 @@
-const Engine = @import("../engine.zig").Engine;
+const Engine = @import("../Engine.zig").Engine;
 const assets = @import("assets");
 const Font = assets.Font;
 const debug = @import("debug");

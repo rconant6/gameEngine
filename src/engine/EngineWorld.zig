@@ -19,7 +19,7 @@ pub const TrackingMode = ecs.TrackingMode;
 pub const Transform = ecs.Transform;
 pub const Velocity = ecs.Velocity;
 pub const World = ecs.World;
-const Engine = @import("../engine.zig").Engine;
+const Engine = @import("../Engine.zig").Engine;
 
 pub fn createEntity(self: *Engine) Entity {
     return self.world.createEntity() catch {};

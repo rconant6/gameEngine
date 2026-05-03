@@ -1,5 +1,5 @@
 const std = @import("std");
-const Engine = @import("../engine.zig").Engine;
+const Engine = @import("../Engine.zig").Engine;
 const ecs = @import("ecs");
 const Entity = ecs.Entity;
 const Camera = ecs.Camera;
