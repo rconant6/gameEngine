@@ -49,7 +49,7 @@ const MetalRenderer = if (build_options.backend == .metal)
 else
     void;
 const VulkanRenderer = if (build_options.backend == .vulkan)
-    @import("./gpu/vulcan/vulcan_renderer.zig").VulkanRenderer
+    @import("./gpu/vulkan/vulkan_renderer.zig")
 else
     void;
 const OpenGLRenderer = if (build_options.backend == .opengl)

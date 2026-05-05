@@ -1,1 +1,0 @@
-pub const VulcanRenderer = struct {};
