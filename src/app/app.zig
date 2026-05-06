@@ -26,10 +26,15 @@ pub const App = struct {
     logical_width: u32,
     logical_height: u32,
 
-    pub fn init(gpa: std.mem.Allocator, io: std.Io, config: AppConfig) !App {
+    pub fn init(
+        gpa: std.mem.Allocator,
+        io: std.Io,
+        env: *std.process.Environ.Map,
+        config: AppConfig,
+    ) !App {
         try Logger.init(gpa, io);
 
-        plat.init() catch |err| {
+        plat.init(gpa, env) catch |err| {
             log.fatal(.platform, "Failed to start platform layer: {any}", .{err});
             @panic("App: platform init failed");
         };

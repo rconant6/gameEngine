@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 // INFO: c.calls are for the swift bridge; not duplicated in windows/linux.zig
 const c = @cImport({
     @cInclude("macos_bridge.h");
@@ -34,7 +35,9 @@ pub const Window = struct {
     }
 };
 
-pub fn init() !void {
+pub fn init(gpa: Allocator, env: *std.process.Environ.Map) !void {
+    _ = env;
+    _ = gpa;
     return c.init();
 }
 pub fn deinit() void {

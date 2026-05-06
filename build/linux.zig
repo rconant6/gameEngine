@@ -9,10 +9,10 @@ pub fn configureModule(
     renderer: RendererBackend,
 ) void {
     module.link_libc = true;
-    for ([_][]const u8{ "wayland-client", "xkbcommon" }) |lib| module.linkSystemLibrary(lib, .{});
+    // for ([_][]const u8{ "xkbcommon" }) |lib| module.linkSystemLibrary(lib, .{});
     switch (renderer) {
         .vulkan => module.linkSystemLibrary("vulkan", .{}),
-        .opengl => module.linkSystemLibrary("GL", .{}),
+        .opengl => @panic("openGL is not implemented"),
         .metal => @panic("Metal is not available on Linux"),
         .cpu => {},
     }

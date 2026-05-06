@@ -24,8 +24,9 @@ const logical_height: i32 = 1080;
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
     const io = init.io;
+    const env = init.environ_map;
 
-    var app = try App.init(gpa, io, .{
+    var app = try App.init(gpa, io, env, .{
         .title = "Scene Editor",
         .width = logical_width,
         .height = logical_height,

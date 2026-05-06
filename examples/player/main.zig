@@ -19,8 +19,9 @@ fn monoMillis() i64 {
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
     const io = init.io;
+    const env = init.environ_map;
 
-    var app = try engine.App.init(gpa, io, .{
+    var app = try engine.App.init(gpa, io, env, .{
         .title = "ECS Demo",
         .width = logical_width,
         .height = logical_height,

@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");
 const id = @import("InputDevice.zig");
 pub const InputDevice = id.InputDevice;
@@ -118,8 +119,8 @@ pub const Event = union(enum) {
     },
 };
 
-pub fn init() !void {
-    return PlatformImpl.init();
+pub fn init(gpa: Allocator, env: *std.process.Environ.Map) !void {
+    return PlatformImpl.init(gpa, env);
 }
 pub fn deinit() void {
     PlatformImpl.deinit();
