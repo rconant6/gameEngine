@@ -34,7 +34,7 @@ pub const App = struct {
     ) !App {
         try Logger.init(gpa, io);
 
-        plat.init(gpa, env) catch |err| {
+        plat.init(gpa, io, env) catch |err| {
             log.fatal(.platform, "Failed to start platform layer: {any}", .{err});
             @panic("App: platform init failed");
         };

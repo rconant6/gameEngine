@@ -119,8 +119,12 @@ pub const Event = union(enum) {
     },
 };
 
-pub fn init(gpa: Allocator, env: *std.process.Environ.Map) !void {
-    return PlatformImpl.init(gpa, env);
+pub fn init(
+    gpa: Allocator,
+    io: std.Io,
+    env: *std.process.Environ.Map,
+) !void {
+    return PlatformImpl.init(gpa, io, env);
 }
 pub fn deinit() void {
     PlatformImpl.deinit();
