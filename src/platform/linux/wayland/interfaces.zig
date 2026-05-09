@@ -11,47 +11,55 @@
 //! If they fire, the interface is out of sync w/ the spec
 
 const std = @import("std");
-const protocol = @import("protocall.zig");
-const WlFixed = protocol.WlFixed;
+const wire = @import("wire.zig");
+const WlFixed = wire.WlFixed;
+
+pub const WlErrors = enum {
+    invalid_obj, // obj doesn't exist
+    invalid_method, // bad request or obj doesn't support
+    no_memory, // server is out of memory
+    implementation, // implementation error on the compositor side
+};
+comptime {
+    std.debug.assert(@intFromEnum(WlErrors.invalid_obj) == 0);
+    std.debug.assert(@intFromEnum(WlErrors.invalid_method) == 1);
+    std.debug.assert(@intFromEnum(WlErrors.no_memory) == 2);
+    std.debug.assert(@intFromEnum(WlErrors.implementation) == 3);
+}
 
 // wl_display (obj_id = 1, fixed by protocol)
 // Core Global Object, special singleton object
 // used for internal Wayland features
-pub const Display = struct {
-    // Requests
+pub const WlDisplay = struct {
     pub const Request = union(enum) {
         sync: struct { callback: u32 },
         get_registry: struct { registry: u32 },
     };
-    // Events
     pub const Event = union(enum) {
         err: struct {
             object_id: u32,
             code: u32,
             msg: []const u8,
         },
-        deleteId: struct {
+        delete_id: struct {
             id: u32,
         },
     };
-    // Errors
-    pub const Error = enum {
-        invalid_obj, // obj doesn't exist
-        invalid_method, // bad request or obj doesn't support
-        no_memory, // server is out of memory
-        implementation, // implementation error on the compositor side
-    };
-};
+    comptime {
+        std.debug.assert(@intFromEnum(WlDisplay.Request.sync) == 0);
+        std.debug.assert(@intFromEnum(WlDisplay.Request.get_registry) == 1);
 
-pub const Registry = struct {
-    // Requests
+        std.debug.assert(@intFromEnum(WlDisplay.Event.err) == 0);
+        std.debug.assert(@intFromEnum(WlDisplay.Event.delete_id) == 1);
+    }
+};
+pub const WlRegistry = struct {
     pub const Request = union(enum) {
         bind: struct {
             name: u32,
             new_id: u32,
         },
     };
-    // Events
     pub const Event = union(enum) {
         global: struct {
             name: u32,
@@ -63,31 +71,20 @@ pub const Registry = struct {
         },
     };
 };
+comptime {
+    std.debug.assert(@intFromEnum(WlRegistry.Request.bind) == 0);
+
+    std.debug.assert(@intFromEnum(WlRegistry.Event.global) == 0);
+    std.debug.assert(@intFromEnum(WlRegistry.Event.global_remove) == 1);
+}
 
 pub const Callback = struct {
-    // Events
     pub const Event = union(enum) {
         done: struct {
             callback_data: u32,
         },
     };
 };
-
-
-    
 comptime {
-    std.debug.assert(@intFromEnum(Display.Event.err) == 0);
-    std.debug.assert(@intFromEnum(Display.Event.deleteId) == 1);
-    std.debug.assert(@intFromEnum(Display.Request.sync) == 0);
-    std.debug.assert(@intFromEnum(Display.Request.get_registry) == 1);
-    std.debug.assert(@intFromEnum(Display.Error.invalid_obj) == 0);
-    std.debug.assert(@intFromEnum(Display.Error.invalid_method) == 1);
-    std.debug.assert(@intFromEnum(Display.Error.no_memory) == 2);
-    std.debug.assert(@intFromEnum(Display.Error.implementation) == 3);
-
-    std.debug.assert(@intFromEnum(Registry.Request.bind) == 0);
-    std.debug.assert(@intFromEnum(Registry.Event.global) == 0);
-    std.debug.assert(@intFromEnum(Registry.Event.global_remove) == 1);
-
     std.debug.assert(@intFromEnum(Callback.Event.done) == 0);
 }
