@@ -11,6 +11,7 @@ const faces = @import("linux/wayland/interfaces.zig");
 const WlDisplay = faces.WlDisplay;
 const WlRegistry = faces.WlRegistry;
 const WlCompositor = faces.WlCompositor;
+const WlSeat = faces.WlSeat;
 const Event = plat.Event;
 const KeyModifiers = plat.KeyModifiers;
 const WindowConfig = plat.WindowConfig;
@@ -61,16 +62,22 @@ pub const Window = struct {
 
 var conn: *WlConnection = undefined;
 const display_id: u32 = 1; // always 1, set by protocol
-var compositor_id: u32 = 0;
-var xdg_wm_bsae_id: u32 = 0;
-var seat_id: u32 = 0;
-var compositor_name: u32 = 0;
-var xdg_wm_base_name: u32 = 0;
-var seat_name: u32 = 0;
 
 var display_proxy: wire.Proxy(WlDisplay) = undefined;
 var registry_proxy: wire.Proxy(WlRegistry) = undefined;
 var compositor_proxy: wire.Proxy(WlCompositor) = undefined;
+var seat_proxy: wire.Proxy(WlSeat) = undefined;
+
+const BoundGlobal = struct {
+    name: u32 = 0,
+    version: u32 = 0,
+    obj_id: u32 = 0,
+    interface: []const u8 = "",
+};
+
+var compositor: BoundGlobal = .{};
+var seat: BoundGlobal = .{};
+var xdg_wm_base: BoundGlobal = .{};
 
 pub fn init(gpa: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     conn = try WlConnection.init(gpa, io, env);
@@ -82,39 +89,61 @@ pub fn init(gpa: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     try conn.registerProxy(WlDisplay, &display_proxy);
 
     const registry_id = conn.ids.alloc();
+    log.debug(.platform, "registry id: {d}", .{registry_id});
     registry_proxy = .{
         .obj_id = registry_id,
         .conn = conn,
         .on_event = onRegistryEvent,
     };
     try conn.registerProxy(WlRegistry, &registry_proxy);
-
     try display_proxy.send(.{ .get_registry = .{ .registry = registry_id } });
 
     const cb_id = conn.ids.alloc();
+    log.debug(.platform, "callback id: {d}", .{cb_id});
     try display_proxy.send(.{ .sync = .{ .callback = cb_id } });
     try conn.drain(cb_id);
 
     log.info(
         .platform,
         "Globals enumerated: compositor: {d}, xdg_wm_base: {d} seat: {d}",
-        .{ compositor_name, xdg_wm_base_name, seat_name },
+        .{ compositor.name, xdg_wm_base.name, seat.name },
     );
 
-    compositor_id = conn.ids.alloc();
+    compositor.obj_id = conn.ids.alloc();
+    log.debug(.platform, "compositor id: {d}", .{compositor.obj_id});
     try registry_proxy.send(.{ .bind = .{
-        .name = compositor_name,
-        .new_id = compositor_id,
+        .name = compositor.name,
+        .interface = compositor.interface,
+        .version = compositor.version,
+        .new_id = compositor.obj_id,
     } });
     compositor_proxy = .{
-        .obj_id = compositor_id,
+        .obj_id = compositor.obj_id,
         .conn = conn,
         .on_event = onCompositorEvent,
     };
     try conn.registerProxy(WlCompositor, &compositor_proxy);
+
+    seat.obj_id = conn.ids.alloc();
+    log.debug(.platform, "seat id: {d}", .{seat.obj_id});
+    try registry_proxy.send(.{ .bind = .{
+        .name = seat.name,
+        .interface = seat.interface,
+        .version = seat.version,
+        .new_id = seat.obj_id,
+    } });
+    seat_proxy = .{
+        .obj_id = seat.obj_id,
+        .conn = conn,
+        .on_event = onSeatEvent,
+    };
+    try conn.registerProxy(WlSeat, &seat_proxy);
+
+    try display_proxy.send(.{ .sync = .{ .callback = cb_id } });
+    try conn.drain(cb_id);
 }
 pub fn deinit() void {
-    registry_proxy.send(.{
+    compositor_proxy.send(.{
         .release = .{},
     }) catch |e| {
         log.err(.platform, "Unable to release the compositor: {any}", .{e});
@@ -122,6 +151,12 @@ pub fn deinit() void {
     conn.deinit();
 }
 
+fn onSeatEvent(event: WlSeat.Event) !void {
+    switch (event) {
+        .capabilities => |c| log.info(.platform, "Seat capes: {d}", .{c.capes}),
+        .name => |s| log.info(.platform, "Seat name: {s}", .{s.name}),
+    }
+}
 fn onDisplayEvent(event: WlDisplay.Event) !void {
     switch (event) {
         .err => |e| {
@@ -140,15 +175,21 @@ fn onRegistryEvent(event: WlRegistry.Event) !void {
         .global => |g| {
             log.info(
                 .platform,
-                "global: {s} v{}",
-                .{ g.interface, g.version },
+                "GLOBAL: {d}  {s}  v:{}",
+                .{ g.name, g.interface, g.version },
             );
             if (std.mem.eql(u8, g.interface, "wl_compositor")) {
-                compositor_name = g.name;
+                compositor.interface = "wl_compositor";
+                compositor.name = g.name;
+                compositor.version = g.version;
             } else if (std.mem.eql(u8, g.interface, "xdg_wm_base")) {
-                xdg_wm_base_name = g.name;
+                xdg_wm_base.interface = "xdg_wm_base";
+                xdg_wm_base.name = g.name;
+                xdg_wm_base.version = g.version;
             } else if (std.mem.eql(u8, g.interface, "wl_seat")) {
-                seat_name = g.name;
+                seat.interface = "wl_seat";
+                seat.name = g.name;
+                seat.version = g.version;
             }
         },
         .global_remove => {},

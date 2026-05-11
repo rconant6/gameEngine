@@ -305,6 +305,8 @@ pub const Connection = struct {
     pub fn drain(self: *Connection, stop_obj_id: u32) !void {
         while (true) {
             const m = try self.nextMessage();
+            if (m.header.obj_id == stop_obj_id) return;
+
             if (self.handlers.get(m.header.obj_id)) |h| {
                 try h.handle_fn(h.ctx, m.header.opcode(), m.bytes);
             } else {
@@ -323,7 +325,6 @@ pub const Connection = struct {
                 );
                 _ = self.handlers.remove(deleted);
             }
-            if (m.header.obj_id == stop_obj_id) return;
         }
     }
 };

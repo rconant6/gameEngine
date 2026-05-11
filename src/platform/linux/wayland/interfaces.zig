@@ -57,6 +57,8 @@ pub const WlRegistry = struct {
     pub const Request = union(enum) {
         bind: struct {
             name: u32,
+            interface: []const u8,
+            version: u32,
             new_id: u32,
         },
     };
@@ -94,6 +96,32 @@ comptime {
     std.debug.assert(@intFromEnum(WlCompositor.Request.create_surface) == 0);
     std.debug.assert(@intFromEnum(WlCompositor.Request.create_region) == 1);
     std.debug.assert(@intFromEnum(WlCompositor.Request.release) == 2);
+}
+
+pub const WlSeat = struct {
+    pub const Request = union(enum) {
+        get_pointer: struct { new_id: u32 },
+        get_keyboard: struct { new_id: u32 },
+        get_touch: struct { new_id: u32 },
+        release: struct {},
+    };
+    pub const Event = union(enum) {
+        capabilities: struct {
+            capes: u32,
+        },
+        name: struct {
+            name: []const u8,
+        },
+    };
+};
+comptime {
+    std.debug.assert(@intFromEnum(WlSeat.Request.get_pointer) == 0);
+    std.debug.assert(@intFromEnum(WlSeat.Request.get_keyboard) == 1);
+    std.debug.assert(@intFromEnum(WlSeat.Request.get_touch) == 2);
+    std.debug.assert(@intFromEnum(WlSeat.Request.release) == 3);
+
+    std.debug.assert(@intFromEnum(WlSeat.Event.capabilities) == 0);
+    std.debug.assert(@intFromEnum(WlSeat.Event.name) == 1);
 }
 
 pub const Callback = struct {
