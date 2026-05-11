@@ -8,8 +8,9 @@ const WlFixed = wire.WlFixed;
 const WlHeader = wire.Header;
 const WlConnection = wire.Connection;
 const faces = @import("linux/wayland/interfaces.zig");
-const WLDisplay = faces.WlDisplay;
+const WlDisplay = faces.WlDisplay;
 const WlRegistry = faces.WlRegistry;
+const WlCompositor = faces.WlCompositor;
 const Event = plat.Event;
 const KeyModifiers = plat.KeyModifiers;
 const WindowConfig = plat.WindowConfig;
@@ -17,22 +18,6 @@ const Capabilities = plat.Capabilities;
 const DisplayInfo = plat.DisplayInfo;
 const V2I = @import("math").V2I;
 const log = @import("debug").log;
-
-// const WaylandState = struct {
-// stream: std.Io.net.Stream = undefined, // unix socket id
-// send_buf: [4096]u8 = undefined, // outgoing msg buffer
-// recv_buf: [65536]u8 = undefined, // incoming msg buffer
-// recv_len: usize = 0, // valid bytes in recv_buf
-
-// display_id: u32 = 1, // always 1, set by protocol
-// registry_id: u32 = 0, // get from the registry
-//     compositor_id: u32 = 0, // from the registry
-//     xdg_wm_base_id: u32 = 0, // from the registry
-//     seat_id: u32 = 0, // from teh registry
-//     keyboard_id: u32 = 0, // created from the seat
-//     pointer_id: u32 = 0, // created from the seat
-//     ids: wlp.ObjIdAllocator = .{}, // ID counter, starts at 2 (display = 1)
-// };
 
 pub const Window = struct {
     surface_id: u32, // wl_surface
@@ -75,52 +60,103 @@ pub const Window = struct {
 };
 
 var conn: *WlConnection = undefined;
-var display_id: u32 = 1; // always 1, set by protocol
-var registry_id: u32 = 0; // get from the registry
+const display_id: u32 = 1; // always 1, set by protocol
+var compositor_id: u32 = 0;
+var xdg_wm_bsae_id: u32 = 0;
+var seat_id: u32 = 0;
+var compositor_name: u32 = 0;
+var xdg_wm_base_name: u32 = 0;
+var seat_name: u32 = 0;
+
+var display_proxy: wire.Proxy(WlDisplay) = undefined;
+var registry_proxy: wire.Proxy(WlRegistry) = undefined;
+var compositor_proxy: wire.Proxy(WlCompositor) = undefined;
 
 pub fn init(gpa: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     conn = try WlConnection.init(gpa, io, env);
-    registry_id = conn.ids.alloc(); // Protocol gives next available
+    display_proxy = .{
+        .conn = conn,
+        .obj_id = display_id,
+        .on_event = onDisplayEvent,
+    };
+    try conn.registerProxy(WlDisplay, &display_proxy);
 
-    try conn.sendRaw(display_id, WLDisplay.Request{ .get_registry = .{ .registry = registry_id } });
+    const registry_id = conn.ids.alloc();
+    registry_proxy = .{
+        .obj_id = registry_id,
+        .conn = conn,
+        .on_event = onRegistryEvent,
+    };
+    try conn.registerProxy(WlRegistry, &registry_proxy);
 
-    try drain(0);
+    try display_proxy.send(.{ .get_registry = .{ .registry = registry_id } });
+
+    const cb_id = conn.ids.alloc();
+    try display_proxy.send(.{ .sync = .{ .callback = cb_id } });
+    try conn.drain(cb_id);
+
+    log.info(
+        .platform,
+        "Globals enumerated: compositor: {d}, xdg_wm_base: {d} seat: {d}",
+        .{ compositor_name, xdg_wm_base_name, seat_name },
+    );
+
+    compositor_id = conn.ids.alloc();
+    try registry_proxy.send(.{ .bind = .{
+        .name = compositor_name,
+        .new_id = compositor_id,
+    } });
+    compositor_proxy = .{
+        .obj_id = compositor_id,
+        .conn = conn,
+        .on_event = onCompositorEvent,
+    };
+    try conn.registerProxy(WlCompositor, &compositor_proxy);
 }
-
-fn drain(stop_obj_id: u32) !void {
-    while (true) {
-        const m = try conn.nextMessage();
-        dispatch(m.header.obj_id, m.header.opcode(), m.bytes);
-        if (m.header.obj_id == stop_obj_id) return;
-    }
-}
-
-fn dispatch(obj_id: u32, opcode: u16, payload: []const u8) void {
-    if (obj_id == 1) {
-        switch (opcode) {
-            0 => {
-                const T = std.meta.fields(WLDisplay.Event)[@intFromEnum(WLDisplay.Event.err)].type;
-                const msg = try wire.parse(T, payload);
-                log.err(.platform, "display error: {any}", .{msg});
-            },
-            else => {},
-        }
-    } else if (obj_id == registry_id) {
-        switch (opcode) {
-            0 => {
-                const T = std.meta.fields(WlRegistry.Event)[@intFromEnum(WlRegistry.Event.global)].type;
-                const msg = try wire.parse(T, payload);
-                std.debug.print("{any}\n", .{msg});
-            },
-            else => log.debug(.platform, "Not implemented: registry_id", .{}),
-        }
-    } else {
-        log.warn(.platform, "dispatch missed", .{});
-    }
-}
-
 pub fn deinit() void {
+    registry_proxy.send(.{
+        .release = .{},
+    }) catch |e| {
+        log.err(.platform, "Unable to release the compositor: {any}", .{e});
+    };
     conn.deinit();
+}
+
+fn onDisplayEvent(event: WlDisplay.Event) !void {
+    switch (event) {
+        .err => |e| {
+            log.err(
+                .platform,
+                "wl_display error: obj: {d} code: {d} msg: {s}",
+                .{ e.object_id, e.code, e.msg },
+            );
+            return error.WaylandProtocolError;
+        },
+        .delete_id => {},
+    }
+}
+fn onRegistryEvent(event: WlRegistry.Event) !void {
+    switch (event) {
+        .global => |g| {
+            log.info(
+                .platform,
+                "global: {s} v{}",
+                .{ g.interface, g.version },
+            );
+            if (std.mem.eql(u8, g.interface, "wl_compositor")) {
+                compositor_name = g.name;
+            } else if (std.mem.eql(u8, g.interface, "xdg_wm_base")) {
+                xdg_wm_base_name = g.name;
+            } else if (std.mem.eql(u8, g.interface, "wl_seat")) {
+                seat_name = g.name;
+            }
+        },
+        .global_remove => {},
+    }
+}
+fn onCompositorEvent(event: WlCompositor.Event) !void {
+    switch (event) {}
+    return;
 }
 
 pub fn createWindow(config: WindowConfig) !*Window {

@@ -78,7 +78,26 @@ comptime {
     std.debug.assert(@intFromEnum(WlRegistry.Event.global_remove) == 1);
 }
 
+pub const WlCompositor = struct {
+    pub const Request = union(enum) {
+        create_surface: struct {
+            new_id: u32,
+        },
+        create_region: struct {
+            new_id: u32,
+        },
+        release: struct {},
+    };
+    pub const Event = union(enum) {};
+};
+comptime {
+    std.debug.assert(@intFromEnum(WlCompositor.Request.create_surface) == 0);
+    std.debug.assert(@intFromEnum(WlCompositor.Request.create_region) == 1);
+    std.debug.assert(@intFromEnum(WlCompositor.Request.release) == 2);
+}
+
 pub const Callback = struct {
+    pub const Request = union(enum) {};
     pub const Event = union(enum) {
         done: struct {
             callback_data: u32,
