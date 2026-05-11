@@ -13,6 +13,7 @@
 const std = @import("std");
 const wire = @import("wire.zig");
 const WlFixed = wire.WlFixed;
+const WlArray = wire.WlArray;
 
 pub const WlErrors = enum {
     invalid_obj, // obj doesn't exist
@@ -98,6 +99,11 @@ comptime {
     std.debug.assert(@intFromEnum(WlCompositor.Request.release) == 2);
 }
 
+pub const SeatCape = struct {
+    const pointer: u32 = 1;
+    const keyboard: u32 = 2;
+    const touch: u32 = 4;
+};
 pub const WlSeat = struct {
     pub const Request = union(enum) {
         get_pointer: struct { new_id: u32 },
@@ -123,6 +129,105 @@ comptime {
     std.debug.assert(@intFromEnum(WlSeat.Event.capabilities) == 0);
     std.debug.assert(@intFromEnum(WlSeat.Event.name) == 1);
 }
+
+pub const WlPointer = struct {
+    pub const Request = union(enum) {
+        set_cursor: struct {
+            serial: u32,
+            surface: u32,
+            hotspot_x: i32,
+            hotspot_y: i32,
+        },
+        release: struct {},
+    };
+    pub const Event = union(enum) {
+        enter: struct {
+            serial: u32,
+            surface: u32,
+            surface_x: WlFixed,
+            surface_y: WlFixed,
+        },
+        leave: struct {
+            serial: u32,
+            surface: u32,
+        },
+        motion: struct {
+            time: u32,
+            surface_x: WlFixed,
+            surface_y: WlFixed,
+        },
+        button: struct {
+            serial: u32,
+            time: u32,
+            button: u32,
+            state: u32,
+        },
+        axis: struct {
+            time: u32,
+            axis: u32,
+            value: WlFixed,
+        },
+        frame: struct {},
+        axis_source: struct {
+            source: u32,
+        },
+        axis_stop: struct {
+            time: u32,
+            axis: u32,
+        },
+        axis_discrete: struct {
+            axis: u32,
+            discrete: i32,
+        },
+        axis_value120: struct {
+            axis: u32,
+            value120: i32,
+        },
+        axis_relative_direction: struct {
+            axis: u32,
+            direction: u32,
+        },
+    };
+};
+
+pub const WlKeyboard = struct {
+    pub const Request = union(enum) {
+        release: struct {},
+    };
+    pub const Event = union(enum) {
+        keymap: struct {
+            format: u32,
+            fd: void,
+            size: u32,
+        },
+        enter: struct {
+            serial: u32,
+            surface: u32,
+            keys: WlArray,
+        },
+        leave: struct {
+            serial: u32,
+            surface: u32,
+        },
+        key: struct {
+            serial: u32,
+            time: u32,
+            key: u32,
+            state: u32,
+        },
+        modifiers: struct {
+            serial: u32,
+            mods_depressed: u32,
+            mods_latched: u32,
+            mods_locked: u32,
+            group: u32,
+        },
+        repeat_info: struct {
+            rate: u32,
+            delay: u32,
+        },
+    };
+};
 
 pub const Callback = struct {
     pub const Request = union(enum) {};

@@ -12,6 +12,9 @@ const WlDisplay = faces.WlDisplay;
 const WlRegistry = faces.WlRegistry;
 const WlCompositor = faces.WlCompositor;
 const WlSeat = faces.WlSeat;
+const WlKeyboard = faces.WlKeyboard;
+const WlPointer = faces.WlPointer;
+const SeatCap = faces.SeatCape;
 const Event = plat.Event;
 const KeyModifiers = plat.KeyModifiers;
 const WindowConfig = plat.WindowConfig;
@@ -63,11 +66,6 @@ pub const Window = struct {
 var conn: *WlConnection = undefined;
 const display_id: u32 = 1; // always 1, set by protocol
 
-var display_proxy: wire.Proxy(WlDisplay) = undefined;
-var registry_proxy: wire.Proxy(WlRegistry) = undefined;
-var compositor_proxy: wire.Proxy(WlCompositor) = undefined;
-var seat_proxy: wire.Proxy(WlSeat) = undefined;
-
 const BoundGlobal = struct {
     name: u32 = 0,
     version: u32 = 0,
@@ -75,8 +73,21 @@ const BoundGlobal = struct {
     interface: []const u8 = "",
 };
 
+var display_proxy: wire.Proxy(WlDisplay) = undefined;
+var registry_proxy: wire.Proxy(WlRegistry) = undefined;
+var compositor_proxy: wire.Proxy(WlCompositor) = undefined;
 var compositor: BoundGlobal = .{};
+
 var seat: BoundGlobal = .{};
+var seat_proxy: wire.Proxy(WlSeat) = undefined;
+var has_pointer: bool = false;
+var pointer: BoundGlobal = .{};
+var pointer_proxy: wire.Proxy(WlPointer) = undefined;
+var has_keyboard: bool = false;
+var keyboard: BoundGlobal = .{};
+var keyboard_proxy: wire.Proxy(WlKeyboard) = undefined;
+// var has_touch: bool = false;
+
 var xdg_wm_base: BoundGlobal = .{};
 
 pub fn init(gpa: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
@@ -141,6 +152,33 @@ pub fn init(gpa: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
 
     try display_proxy.send(.{ .sync = .{ .callback = cb_id } });
     try conn.drain(cb_id);
+
+    if (has_keyboard) {
+        keyboard.obj_id = conn.ids.alloc();
+        try seat_proxy.send(.{ .get_keyboard = .{ .new_id = keyboard.obj_id } });
+        keyboard_proxy = .{
+            .obj_id = keyboard.obj_id,
+            .conn = conn,
+            .on_event = onKeyboardEvent,
+        };
+        try conn.registerProxy(WlKeyboard, &keyboard_proxy);
+
+        log.info(.platform, "Wayland found a keyboard {d}", .{keyboard.obj_id});
+    }
+    if (has_pointer) {
+        pointer.obj_id = conn.ids.alloc();
+        try seat_proxy.send(.{ .get_pointer = .{ .new_id = pointer.obj_id } });
+        keyboard_proxy = .{
+            .obj_id = pointer.obj_id,
+            .conn = conn,
+            .on_event = onPointerEvent,
+        };
+        try conn.registerProxy(WlKeyboard, &keyboard_proxy);
+
+        log.info(.platform, "Wayland found a pointer {d}", .{keyboard.obj_id});
+    }
+    try display_proxy.send(.{ .sync = .{ .callback = cb_id } });
+    try conn.drain(cb_id);
 }
 pub fn deinit() void {
     compositor_proxy.send(.{
@@ -151,9 +189,36 @@ pub fn deinit() void {
     conn.deinit();
 }
 
+fn onKeyboardEvent(event: WlKeyboard.Event) !void {
+    switch (event) {
+        .enter => |ent| log.trace(.platform, "KB Enter event serial {d}, surf {d}", .{ ent.serial, ent.surface }),
+        .leave => |l| log.trace(.platform, "KB Leave event serial {d} surf {d}", .{ l.serial, l.surface }),
+        .keymap => |km| log.trace(.platform, "KB Keymap event format {d}", .{km.format}),
+        .key => |k| log.trace(.platform, "KB Key event key {d}", .{k.key}),
+        .modifiers => |mds| log.trace(.platform, "KB Modifiers event group {d}", .{mds.group}),
+        .repeat_info => |ri| log.trace(.platform, "KB Repeat Info event rate {d}", .{ri.rate}),
+    }
+}
+fn onPointerEvent(event: WlPointer.Event) !void {
+    switch (event) {
+        .enter => |ent| log.trace(.platform, "PTR enter event serial {d}, surf {d}", .{ ent.serial, ent.surface }),
+        .leave => |l| log.trace(.platform, "PTR leave event serial {d} surf {d}", .{ l.serial, l.surface }),
+        .button => |b| log.trace(.platform, "PTR event button {d}", .{b.button}),
+        .frame => log.trace(.platform, "PTR frame event", .{}),
+        else => |e| {
+            log.warn(.platform, "PTR event not implemented: {any}", .{e});
+        },
+    }
+}
+
 fn onSeatEvent(event: WlSeat.Event) !void {
     switch (event) {
-        .capabilities => |c| log.info(.platform, "Seat capes: {d}", .{c.capes}),
+        .capabilities => |c| {
+            log.info(.platform, "Seat capes: {d}", .{c.capes});
+            has_pointer = (c.capes & SeatCap.pointer) != 0;
+            has_keyboard = (c.capes & SeatCap.keyboard) != 0;
+            // has_touch = (c.capes & SeatCap.touch) != 0;
+        },
         .name => |s| log.info(.platform, "Seat name: {s}", .{s.name}),
     }
 }

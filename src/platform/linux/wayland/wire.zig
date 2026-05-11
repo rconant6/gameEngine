@@ -33,6 +33,11 @@ pub const Message = struct {
     bytes: []const u8,
 };
 
+pub const WlArray = struct {
+    len: u32,
+    data: []const u8,
+};
+
 // OBJ_ID who i'm sending it to
 // opcode - what i'm sending
 // val - payload
@@ -61,6 +66,9 @@ fn emit(obj_id: u32, opcode: u16, msg: anytype, buf: []u8) usize {
                     WlFixed => {
                         std.mem.writeInt(u32, buf[offset..][0..4], @bitCast(value), .little);
                         offset += 4;
+                    },
+                    WlArray => {
+                        // not implemented
                     },
                     []const u8 => {
                         const len: u32 = @intCast(value.len + 1);
@@ -115,6 +123,21 @@ fn parse(comptime T: type, data: []const u8) !T {
                     .little,
                 );
                 offset += 4;
+            },
+            WlArray => {
+                const len = std.mem.readInt(
+                    u32,
+                    data[offset..][0..4],
+                    .little,
+                );
+                offset += 4;
+                @field(result, field.name) = WlArray{
+                    .len = len,
+                    .data = data[offset..][4 .. 4 + len],
+                };
+                offset += len;
+                const pad = wlAlign(len, 32);
+                offset += pad;
             },
             []const u8 => {
                 const len = std.mem.readInt(
@@ -182,6 +205,9 @@ pub const ObjIdAllocator = struct {
 
 inline fn wlPad(len: usize) usize {
     return (4 - @mod(len, 4)) % 4;
+}
+inline fn wlAlign(len: usize, lim: u32) usize {
+    return (lim - @mod(len, lim)) % lim;
 }
 
 pub const Connection = struct {
