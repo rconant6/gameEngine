@@ -100,9 +100,9 @@ comptime {
 }
 
 pub const SeatCape = struct {
-    const pointer: u32 = 1;
-    const keyboard: u32 = 2;
-    const touch: u32 = 4;
+    pub const pointer: u32 = 1;
+    pub const keyboard: u32 = 2;
+    pub const touch: u32 = 4;
 };
 pub const WlSeat = struct {
     pub const Request = union(enum) {

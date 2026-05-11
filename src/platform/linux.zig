@@ -168,14 +168,14 @@ pub fn init(gpa: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     if (has_pointer) {
         pointer.obj_id = conn.ids.alloc();
         try seat_proxy.send(.{ .get_pointer = .{ .new_id = pointer.obj_id } });
-        keyboard_proxy = .{
+        pointer_proxy = .{
             .obj_id = pointer.obj_id,
             .conn = conn,
             .on_event = onPointerEvent,
         };
-        try conn.registerProxy(WlKeyboard, &keyboard_proxy);
+        try conn.registerProxy(WlPointer, &pointer_proxy);
 
-        log.info(.platform, "Wayland found a pointer {d}", .{keyboard.obj_id});
+        log.info(.platform, "Wayland found a pointer {d}", .{pointer.obj_id});
     }
     try display_proxy.send(.{ .sync = .{ .callback = cb_id } });
     try conn.drain(cb_id);

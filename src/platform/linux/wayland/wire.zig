@@ -10,7 +10,7 @@ pub const WlFixed = packed struct {
         _ = self;
         return 0.0;
     }
-    pub fn fromF32(f: f32) WlFixed {
+    pub fn fromF32(f: u32) WlFixed {
         _ = f;
         return .{ .frac = 0, .integer = 0 };
     }
@@ -117,12 +117,13 @@ fn parse(comptime T: type, data: []const u8) !T {
                 offset += 4;
             },
             WlFixed => {
-                @field(result, field.name) = std.mem.readInt(
+                const bits = std.mem.readInt(
                     u32,
                     data[offset..][0..4],
                     .little,
                 );
                 offset += 4;
+                @field(result, field.name) = WlFixed.fromF32(bits);
             },
             WlArray => {
                 const len = std.mem.readInt(
@@ -152,6 +153,7 @@ fn parse(comptime T: type, data: []const u8) !T {
                 const pad = wlPad(offset);
                 offset += pad; // offset to nearest 4
             },
+            void => {},
             else => @compileError("parse: unsupported field type " ++ @typeName(field.type)),
         }
     }
