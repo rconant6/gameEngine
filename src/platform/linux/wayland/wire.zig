@@ -117,7 +117,7 @@ fn parse(comptime T: type, data: []const u8) !T {
                     .little,
                 );
                 offset += 4;
-                @field(result, field.name) = WlFixed.fromF32(bits);
+                @field(result, field.name) = WlFixed.fromU32(bits);
             },
             WlArray => {
                 const len = std.mem.readInt(

@@ -14,7 +14,7 @@ const WlSeat = faces.WlSeat;
 const WlKeyboard = faces.WlKeyboard;
 const WlPointer = faces.WlPointer;
 const WlSurface = faces.WlSurface;
-const SeatCap = faces.SeatCape;
+const WlSeatCape = faces.WlSeatCape;
 const XdgWmBase = faces.XdgWmBase;
 const XdgSurface = faces.XdgSurface;
 const XdgToplevel = faces.XdgToplevel;
@@ -27,6 +27,7 @@ const DisplayInfo = plat.DisplayInfo;
 const V2I = @import("math").V2I;
 const log = @import("debug").log;
 
+var gpa: Allocator = undefined;
 var conn: *WlConnection = undefined;
 const display_id: u32 = 1; // always 1, set by protocol
 
@@ -57,9 +58,9 @@ var keyboard_proxy: wire.Proxy(WlKeyboard) = undefined;
 var xdg_wm_base: BoundGlobal = .{};
 var xdg_wm_base_proxy: wire.Proxy(XdgWmBase) = undefined;
 var xdg_surface: BoundGlobal = .{};
-var xdg_surface_proxy: wire.Proxy(XdgWmBase) = undefined;
+var xdg_surface_proxy: wire.Proxy(XdgSurface) = undefined;
 var xdg_toplevel: BoundGlobal = .{};
-var xdg_toplevel_proxy: wire.Proxy(XdgWmBase) = undefined;
+var xdg_toplevel_proxy: wire.Proxy(XdgToplevel) = undefined;
 
 var xdg_surface_serial: u32 = 0;
 
@@ -73,12 +74,14 @@ pub const Window = struct {
     height: u32 = 0,
     should_close: bool = false,
 
-    events: [64]Event,
     event_head: usize = 0,
     event_tail: usize = 0,
+    event_max: usize = 64,
+    events: []Event,
 
     pub fn deinit(self: *Window) void {
-        _ = self;
+        gpa.free(self.events);
+        gpa.destroy(self);
     }
 
     pub fn shouldClose(self: *const Window) bool {
@@ -137,11 +140,11 @@ pub fn createWindow(config: WindowConfig) !*Window {
         .on_event = onXdgToplevelEvent,
     };
     try conn.registerProxy(XdgToplevel, &xdg_toplevel_proxy);
-    xdg_toplevel_proxy.send(XdgToplevel.Request{ .set_title = .{
+    try xdg_toplevel_proxy.send(XdgToplevel.Request{ .set_title = .{
         .title = config.title,
     } });
 
-    try surface_proxy.send(WlSurface.Request{ .commit = .{.{}} });
+    try surface_proxy.send(WlSurface.Request{ .commit = .{} });
 
     while (xdg_surface_serial != 0) {
         _ = try conn.nextMessage();
@@ -151,17 +154,23 @@ pub fn createWindow(config: WindowConfig) !*Window {
         .serial = xdg_surface_serial,
     } });
 
-    return Window{
+    const window = try gpa.create(Window);
+    const events = try gpa.alloc(Event, 64);
+    log.debug(.platform, "events len: {d}", .{events.len});
+    window.* = .{
         .width = config.width,
         .height = config.height,
         .surface_id = surface_id,
         .xdg_surface_id = xdg_surface.obj_id,
         .xdg_toplevel_id = xdg_toplevel.obj_id,
-        .events = .{},
+        .events = events,
     };
+
+    return window;
 }
 
-pub fn init(gpa: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
+pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
+    gpa = alloc;
     conn = try WlConnection.init(gpa, io, env);
     display_proxy = .{
         .conn = conn,
@@ -324,8 +333,8 @@ fn onSeatEvent(event: WlSeat.Event) !void {
     switch (event) {
         .capabilities => |c| {
             log.info(.platform, "Seat capes: {d}", .{c.capes});
-            has_pointer = (c.capes & SeatCap.pointer) != 0;
-            has_keyboard = (c.capes & SeatCap.keyboard) != 0;
+            has_pointer = (c.capes & WlSeatCape.pointer) != 0;
+            has_keyboard = (c.capes & WlSeatCape.keyboard) != 0;
             // has_touch = (c.capes & SeatCap.touch) != 0;
         },
         .name => |s| log.info(.platform, "Seat name: {s}", .{s.name}),

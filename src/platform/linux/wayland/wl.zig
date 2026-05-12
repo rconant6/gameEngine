@@ -24,8 +24,8 @@ pub const WlFixed = packed struct {
         _ = self;
         return 0.0;
     }
-    pub fn fromF32(f: f32) WlFixed {
-        _ = f;
+    pub fn fromU32(u: u32) WlFixed {
+        _ = u;
         return .{ .frac = 0, .integer = 0 };
     }
 };
@@ -115,9 +115,9 @@ comptime {
 }
 
 pub const WlSeatCape = struct {
-    const pointer: u32 = 1;
-    const keyboard: u32 = 2;
-    const touch: u32 = 4;
+    pub const pointer: u32 = 1;
+    pub const keyboard: u32 = 2;
+    pub const touch: u32 = 4;
 };
 pub const WlSeat = struct {
     pub const Request = union(enum) {
