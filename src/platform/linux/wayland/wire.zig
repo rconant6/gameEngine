@@ -1,20 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const log = @import("debug").log;
-
-pub const WlFixed = packed struct {
-    frac: u8,
-    integer: i24,
-
-    pub fn toF32(self: WlFixed) f32 {
-        _ = self;
-        return 0.0;
-    }
-    pub fn fromF32(f: u32) WlFixed {
-        _ = f;
-        return .{ .frac = 0, .integer = 0 };
-    }
-};
+const wire = @import("interfaces.zig");
+const WlFixed = wire.WlFixed;
+const WlArray = wire.WlArray;
 
 pub const Header = packed struct {
     obj_id: u32,
@@ -31,11 +20,6 @@ pub const Header = packed struct {
 pub const Message = struct {
     header: Header,
     bytes: []const u8,
-};
-
-pub const WlArray = struct {
-    len: u32,
-    data: []const u8,
 };
 
 // OBJ_ID who i'm sending it to
@@ -68,7 +52,17 @@ fn emit(obj_id: u32, opcode: u16, msg: anytype, buf: []u8) usize {
                         offset += 4;
                     },
                     WlArray => {
-                        // not implemented
+                        // BUG: probably not right for now
+                        const len: u32 = @intCast(value.len + 1);
+                        std.mem.writeInt(u32, buf[offset..][0..4], len, .little);
+                        offset += 4;
+                        @memcpy(buf[offset..][0..value.len], value);
+                        offset += value.len;
+                        buf[offset] = 0;
+                        offset += 1;
+                        const pad = wlPad(len);
+                        @memset(buf[offset..][0..pad], 0);
+                        offset += pad;
                     },
                     []const u8 => {
                         const len: u32 = @intCast(value.len + 1);
@@ -137,7 +131,7 @@ fn parse(comptime T: type, data: []const u8) !T {
                     .data = data[offset..][4 .. 4 + len],
                 };
                 offset += len;
-                const pad = wlAlign(len, 32);
+                const pad = wlPad(len);
                 offset += pad;
             },
             []const u8 => {
