@@ -7,23 +7,24 @@ const WlFixed = wire.WlFixed;
 const WlHeader = wire.Header;
 const WlConnection = wire.Connection;
 const faces = @import("linux/wayland/interfaces.zig");
-const WlDisplay = faces.WlDisplay;
-const WlRegistry = faces.WlRegistry;
 const WlCompositor = faces.WlCompositor;
-const WlSeat = faces.WlSeat;
+const WlDisplay = faces.WlDisplay;
 const WlKeyboard = faces.WlKeyboard;
+const WlOutput = faces.WlOutput;
 const WlPointer = faces.WlPointer;
-const WlSurface = faces.WlSurface;
+const WlRegistry = faces.WlRegistry;
+const WlSeat = faces.WlSeat;
 const WlSeatCape = faces.WlSeatCape;
-const XdgWmBase = faces.XdgWmBase;
+const WlSurface = faces.WlSurface;
 const XdgSurface = faces.XdgSurface;
 const XdgToplevel = faces.XdgToplevel;
+const XdgWmBase = faces.XdgWmBase;
 const plat = @import("platform.zig");
+const Capabilities = plat.Capabilities;
+const DisplayInfo = plat.DisplayInfo;
 const Event = plat.Event;
 const KeyModifiers = plat.KeyModifiers;
 const WindowConfig = plat.WindowConfig;
-const Capabilities = plat.Capabilities;
-const DisplayInfo = plat.DisplayInfo;
 const V2I = @import("math").V2I;
 const log = @import("debug").log;
 
@@ -53,6 +54,12 @@ var pointer_proxy: wire.Proxy(WlPointer) = undefined;
 var has_keyboard: bool = false;
 var keyboard: BoundGlobal = .{};
 var keyboard_proxy: wire.Proxy(WlKeyboard) = undefined;
+var output: BoundGlobal = .{};
+var output_proxy: wire.Proxy(WlOutput) = undefined;
+var output_width: i32 = 0;
+var output_height: i32 = 0;
+var output_refresh: i32 = 0;
+var output_scale: i32 = 0;
 // var has_touch: bool = false;
 
 var xdg_wm_base: BoundGlobal = .{};
@@ -268,6 +275,24 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     };
     try conn.registerProxy(XdgWmBase, &xdg_wm_base_proxy);
     log.info(.platform, "Registered XDG_BASE_PROXY: {d}", .{xdg_wm_base.obj_id});
+
+    output.obj_id = conn.ids.alloc();
+    output_proxy = .{
+        .obj_id = output.obj_id,
+        .conn = conn,
+        .on_event = onOutputEvent,
+    };
+    try conn.registerProxy(WlOutput, &output_proxy);
+    try registry_proxy.send(.{ .bind = .{
+        .name = output.name,
+        .interface = output.interface,
+        .version = output.version,
+        .new_id = output.obj_id,
+    } });
+    log.info(.platform, "Bound Output: {d}", .{output.obj_id});
+
+    try display_proxy.send(.{ .sync = .{ .callback = cb_id } });
+    try conn.drain(cb_id);
 }
 pub fn deinit() void {
     compositor_proxy.send(.{
@@ -278,6 +303,38 @@ pub fn deinit() void {
     conn.deinit();
 }
 
+fn onOutputEvent(event: WlOutput.Event) !void {
+    switch (event) {
+        .geometry => |g| {
+            log.info(
+                .platform,
+                "output geometry: {d}x{d} mm, make={s} model={s}",
+                .{ g.physical_width, g.physical_height, g.make, g.model },
+            );
+        },
+        .mode => |m| {
+            output_width = m.width;
+            output_height = m.height;
+            output_refresh = m.refresh;
+            log.info(
+                .platform,
+                "output mode: {d}x{d} @ {d}mHz",
+                .{ m.width, m.height, m.refresh },
+            );
+        },
+        .scale => |s| {
+            output_scale = s.scale;
+            log.info(.platform, "output scale: {d}", .{output_scale});
+        },
+        .done => {},
+        .name => |n| {
+            log.info(.platform, "output name: {s}", .{n.name});
+        },
+        .description => |d| {
+            log.info(.platform, "output description: {s}", .{d.desc});
+        },
+    }
+}
 fn onSurfaceEvent(event: WlSurface.Event) !void {
     switch (event) {
         else => {
@@ -373,6 +430,10 @@ fn onRegistryEvent(event: WlRegistry.Event) !void {
                 seat.interface = "wl_seat";
                 seat.name = g.name;
                 seat.version = g.version;
+            } else if (std.mem.eql(u8, g.interface, "wl_output")) {
+                xdg_wm_base.interface = "wl_output";
+                xdg_wm_base.name = g.name;
+                xdg_wm_base.version = g.version;
             }
         },
         .global_remove => {},

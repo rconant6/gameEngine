@@ -30,6 +30,7 @@ pub const WlCompositor = wl.WlCompositor;
 pub const WlDisplay = wl.WlDisplay;
 pub const WlFixed = wl.WlFixed;
 pub const WlKeyboard = wl.WlKeyboard;
+pub const WlOutput = wl.WlOutput;
 pub const WlPointer = wl.WlPointer;
 pub const WlRegistry = wl.WlRegistry;
 pub const WlSeat = wl.WlSeat;

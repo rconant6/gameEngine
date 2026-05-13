@@ -280,3 +280,31 @@ pub const WlSurface = struct {
         preferred_buffer_transform: struct { transform: u32 },
     };
 };
+
+pub const WlOutput = struct {
+    pub const Request = union(enum) {
+        release: struct {},
+    };
+    pub const Event = union(enum) {
+        geometry: struct {
+            x: i32,
+            y: i32,
+            physical_width: i32,
+            physical_height: i32,
+            subpixel: i32,
+            make: []const u8,
+            model: []const u8,
+            transform: i32,
+        },
+        mode: struct {
+            flags: u32,
+            width: i32,
+            height: i32,
+            refresh: i32,
+        },
+        done: struct {},
+        scale: struct { scale: i32 },
+        name: struct { name: []const u8 },
+        description: struct { desc: []const u8 },
+    };
+};
