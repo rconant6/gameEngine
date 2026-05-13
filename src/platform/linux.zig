@@ -203,12 +203,11 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
 
     log.info(
         .platform,
-        "Globals enumerated: compositor: {d}, xdg_wm_base: {d} seat: {d}",
-        .{ compositor.name, xdg_wm_base.name, seat.name },
+        "Used globals enumerated:\n compositor: {d}\n xdg_wm_base: {d}\n seat: {d}\n output: {d}",
+        .{ compositor.name, xdg_wm_base.name, seat.name, output.name },
     );
 
     compositor.obj_id = conn.ids.alloc();
-    log.debug(.platform, "compositor id: {d}", .{compositor.obj_id});
     try registry_proxy.send(.{ .bind = .{
         .name = compositor.name,
         .interface = compositor.interface,
@@ -221,9 +220,9 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
         .on_event = onCompositorEvent,
     };
     try conn.registerProxy(WlCompositor, &compositor_proxy);
+    log.debug(.platform, "Bound COMPOSITOR: {d}", .{compositor.obj_id});
 
     seat.obj_id = conn.ids.alloc();
-    log.debug(.platform, "seat id: {d}", .{seat.obj_id});
     try registry_proxy.send(.{ .bind = .{
         .name = seat.name,
         .interface = seat.interface,
@@ -240,6 +239,7 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     const cb_id2 = conn.ids.alloc();
     try display_proxy.send(.{ .sync = .{ .callback = cb_id2 } });
     try conn.drain(cb_id2);
+    log.debug(.platform, "Bound SEAT {d}", .{seat.obj_id});
 
     if (has_keyboard) {
         keyboard.obj_id = conn.ids.alloc();
@@ -251,7 +251,7 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
         };
         try conn.registerProxy(WlKeyboard, &keyboard_proxy);
 
-        log.info(.platform, "Wayland found a keyboard {d}", .{keyboard.obj_id});
+        log.info(.platform, "Found KEYBOARD: {d}", .{keyboard.obj_id});
     }
     if (has_pointer) {
         pointer.obj_id = conn.ids.alloc();
@@ -263,7 +263,7 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
         };
         try conn.registerProxy(WlPointer, &pointer_proxy);
 
-        log.info(.platform, "Wayland found a pointer {d}", .{pointer.obj_id});
+        log.info(.platform, "Found MOUSE: {d}", .{pointer.obj_id});
     }
     const cb_id3 = conn.ids.alloc();
     try display_proxy.send(.{ .sync = .{ .callback = cb_id3 } });
@@ -335,13 +335,8 @@ fn onOutputEvent(event: WlOutput.Event) !void {
             output_scale = s.scale;
             log.info(.platform, "output scale: {d}", .{output_scale});
         },
+        .name, .description => {},
         .done => {},
-        .name => |n| {
-            log.info(.platform, "output name: {s}", .{n.name});
-        },
-        .description => |d| {
-            log.info(.platform, "output description: {s}", .{d.desc});
-        },
     }
 }
 fn onSurfaceEvent(event: WlSurface.Event) !void {
@@ -440,9 +435,9 @@ fn onRegistryEvent(event: WlRegistry.Event) !void {
                 seat.name = g.name;
                 seat.version = g.version;
             } else if (std.mem.eql(u8, g.interface, "wl_output")) {
-                xdg_wm_base.interface = "wl_output";
-                xdg_wm_base.name = g.name;
-                xdg_wm_base.version = g.version;
+                output.interface = "wl_output";
+                output.name = g.name;
+                output.version = g.version;
             }
         },
         .global_remove => {},
@@ -497,7 +492,7 @@ pub fn getNativeWindowHandle(window: *Window) *anyopaque {
 
 pub fn getWindowScaleFactor(window: *Window) f32 {
     _ = window;
-    return 1.0;
+    return @floatFromInt(output_scale);
 }
 
 pub fn getDisplays(allocator: std.mem.Allocator) ![]DisplayInfo {

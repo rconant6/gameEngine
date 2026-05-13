@@ -128,7 +128,7 @@ fn parse(comptime T: type, data: []const u8) !T {
                 offset += 4;
                 @field(result, field.name) = WlArray{
                     .len = len,
-                    .data = data[offset..][4 .. 4 + len],
+                    .data = data[offset..][0..len],
                 };
                 offset += len;
                 const pad = wlPad(len);
