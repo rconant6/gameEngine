@@ -153,13 +153,13 @@ pub fn createWindow(config: WindowConfig) !*Window {
 
     try surface_proxy.send(WlSurface.Request{ .commit = .{} });
 
-    while (xdg_surface_serial != 0) {
-        _ = try conn.nextMessage();
-    }
+    try conn.drain(xdg_surface.obj_id);
 
     try xdg_surface_proxy.send(XdgSurface.Request{ .ack_configure = .{
         .serial = xdg_surface_serial,
     } });
+
+    try surface_proxy.send(WlSurface.Request{ .commit = .{} });
 
     const window = try gpa.create(Window);
     const events = try gpa.alloc(Event, 64);
@@ -237,8 +237,9 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     };
     try conn.registerProxy(WlSeat, &seat_proxy);
 
-    try display_proxy.send(.{ .sync = .{ .callback = cb_id } });
-    try conn.drain(cb_id);
+    const cb_id2 = conn.ids.alloc();
+    try display_proxy.send(.{ .sync = .{ .callback = cb_id2 } });
+    try conn.drain(cb_id2);
 
     if (has_keyboard) {
         keyboard.obj_id = conn.ids.alloc();
@@ -264,35 +265,43 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
 
         log.info(.platform, "Wayland found a pointer {d}", .{pointer.obj_id});
     }
-    try display_proxy.send(.{ .sync = .{ .callback = cb_id } });
-    try conn.drain(cb_id);
+    const cb_id3 = conn.ids.alloc();
+    try display_proxy.send(.{ .sync = .{ .callback = cb_id3 } });
+    try conn.drain(cb_id3);
 
     xdg_wm_base.obj_id = conn.ids.alloc();
+    try registry_proxy.send(.{ .bind = .{
+        .name = xdg_wm_base.name,
+        .interface = xdg_wm_base.interface,
+        .version = xdg_wm_base.version,
+        .new_id = xdg_wm_base.obj_id,
+    } });
     xdg_wm_base_proxy = .{
         .obj_id = xdg_wm_base.obj_id,
         .conn = conn,
         .on_event = onXdgWmBaseEvent,
     };
     try conn.registerProxy(XdgWmBase, &xdg_wm_base_proxy);
-    log.info(.platform, "Registered XDG_BASE_PROXY: {d}", .{xdg_wm_base.obj_id});
+    log.info(.platform, "Bound xdg_wm_base: {d}", .{xdg_wm_base.obj_id});
 
     output.obj_id = conn.ids.alloc();
-    output_proxy = .{
-        .obj_id = output.obj_id,
-        .conn = conn,
-        .on_event = onOutputEvent,
-    };
-    try conn.registerProxy(WlOutput, &output_proxy);
     try registry_proxy.send(.{ .bind = .{
         .name = output.name,
         .interface = output.interface,
         .version = output.version,
         .new_id = output.obj_id,
     } });
+    output_proxy = .{
+        .obj_id = output.obj_id,
+        .conn = conn,
+        .on_event = onOutputEvent,
+    };
+    try conn.registerProxy(WlOutput, &output_proxy);
     log.info(.platform, "Bound Output: {d}", .{output.obj_id});
 
-    try display_proxy.send(.{ .sync = .{ .callback = cb_id } });
-    try conn.drain(cb_id);
+    const cb_id4 = conn.ids.alloc();
+    try display_proxy.send(.{ .sync = .{ .callback = cb_id4 } });
+    try conn.drain(cb_id4);
 }
 pub fn deinit() void {
     compositor_proxy.send(.{
