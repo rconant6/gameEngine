@@ -92,7 +92,7 @@ pub const Connection = struct {
 
         var iter = self.handlers.iterator();
         while (iter.next()) |entry| {
-            self.gpa.free(entry.value_ptr);
+            self.gpa.destroy(entry.value_ptr);
         }
         self.handlers.deinit(self.gpa);
 
@@ -133,14 +133,15 @@ pub const Connection = struct {
         on_event: *const fn (T.Event, *anyopaque) anyerror!void,
     ) !Connection.Proxy(T) {
         const id = self.ids.alloc();
-        const proxy: Connection.Proxy(T) = .{
+        const proxy = try self.gpa.create(Connection.Proxy(T));
+        proxy.* = .{
             .obj_id = id,
             .ctx = ctx,
             .on_event = on_event,
         };
-        try self.registerProxy(T, &proxy);
+        try self.registerProxy(T, proxy);
 
-        return proxy;
+        return proxy.*;
     }
 
     // MARK: Internal Helpers

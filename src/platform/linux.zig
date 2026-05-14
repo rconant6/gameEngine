@@ -50,7 +50,7 @@ fn startWayland(empty_state: *WaylandState) !void {
         .ctx = empty_state,
         .on_event = handlers.onRegistryEvent,
     };
-    try empty_state.conn.registerProxy(WlRegistry, empty_state.registry_proxy);
+    try empty_state.conn.registerProxy(WlRegistry, &empty_state.registry_proxy);
     try empty_state.display_proxy.send(
         empty_state.conn,
         WlDisplay.Request{
@@ -92,6 +92,7 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     try wl.conn.roundTrip();
 
     if (wl.has_keyboard) {
+        log.trace(.platform, "Has keyboard", .{});
         wl.keyboard.proxy = try wl.conn.allocProxy(
             WlKeyboard,
             wl,
@@ -158,7 +159,7 @@ pub const Window = struct {
     width: u32 = 0,
     height: u32 = 0,
     should_close: bool = false,
-    events: RingBuffer,
+    events: EventRingBuffer,
 
     pub fn deinit(self: *Window) void {
         self.state.xdg_toplevel.send(wl.conn, XdgToplevel.Request{ .destroy = .{} }) catch |e| {
@@ -199,7 +200,6 @@ pub const Window = struct {
 
 pub fn createWindow(config: WindowConfig) !*Window {
     const window = try gpa.create(Window);
-    const events = try gpa.alloc(Event, 64);
     window.state = .{};
 
     window.state.surface = try wl.conn.allocProxy(
@@ -266,7 +266,7 @@ pub fn createWindow(config: WindowConfig) !*Window {
 
     window.width = config.width;
     window.height = config.height;
-    window.events = events;
+    window.events = try .init(gpa);
 
     return window;
 }
@@ -343,17 +343,29 @@ pub fn getCapabilities() Capabilities {
     };
 }
 
-const RingBuffer = struct {
+const EventRingBuffer = struct {
+    alloc: Allocator,
     head: usize = 0,
     tail: usize = 0,
     max: usize = 64,
     data: []Event,
 
-    pub fn push(self: *RingBuffer, e: Event) void {
+    pub fn init(alloc: Allocator) !EventRingBuffer {
+        return .{
+            .alloc = alloc,
+            .data = try alloc.alloc(Event, 64),
+        };
+    }
+
+    pub fn deinit(self: *EventRingBuffer) void {
+        self.alloc.free(self.data);
+    }
+
+    pub fn push(self: *EventRingBuffer, e: Event) void {
         self.data[self.event_tail % 64] = e;
         self.tail += 1;
     }
-    pub fn popFront(self: *RingBuffer) ?Event {
+    pub fn popFront(self: *EventRingBuffer) ?Event {
         if (self.head == self.tail) return null;
         const event = self.data[self.head % 64];
         self.head += 1;
