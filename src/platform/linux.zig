@@ -2,9 +2,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const net = std.Io.net;
 const wire = @import("linux/wayland/wire.zig");
-const ObjIdAllocator = wire.ObjIdAllocator;
-const WlFixed = wire.WlFixed;
-const WlHeader = wire.Header;
 const WlConnection = wire.Connection;
 const faces = @import("linux/wayland/interfaces.zig");
 const WlCompositor = faces.WlCompositor;
@@ -19,75 +16,166 @@ const WlSurface = faces.WlSurface;
 const XdgSurface = faces.XdgSurface;
 const XdgToplevel = faces.XdgToplevel;
 const XdgWmBase = faces.XdgWmBase;
+const state = @import("linux/wayland/state.zig");
+const WlWindow = state.WindowState;
+const BoundObject = state.BoundObject;
+const WaylandState = state.WaylandState;
+const OuputInfo = state.OutputInfo;
+const handlers = @import("linux/wayland/handlers.zig");
+const consts = @import("linux/wayland/consts.zig");
+
 const plat = @import("platform.zig");
 const Capabilities = plat.Capabilities;
 const DisplayInfo = plat.DisplayInfo;
 const Event = plat.Event;
 const KeyModifiers = plat.KeyModifiers;
 const WindowConfig = plat.WindowConfig;
+
 const V2I = @import("math").V2I;
 const log = @import("debug").log;
 
 var gpa: Allocator = undefined;
-var conn: *WlConnection = undefined;
-const display_id: u32 = 1; // always 1, set by protocol
+var wl: *WaylandState = undefined;
 
-const BoundGlobal = struct {
-    name: u32 = 0,
-    version: u32 = 0,
-    obj_id: u32 = 0,
-    interface: []const u8 = "",
-};
+fn startWayland(empty_state: *WaylandState) !void {
+    empty_state.display_proxy = .{
+        .obj_id = 1, // display is always 1 per protocol
+        .ctx = empty_state,
+        .on_event = handlers.onDisplayEvent,
+    };
+    try empty_state.conn.registerProxy(WlDisplay, &empty_state.display_proxy);
 
-var display_proxy: wire.Proxy(WlDisplay) = undefined;
-var registry_proxy: wire.Proxy(WlRegistry) = undefined;
-var compositor: BoundGlobal = .{};
-var compositor_proxy: wire.Proxy(WlCompositor) = undefined;
-var surface_id: u32 = 0;
-var surface_proxy: wire.Proxy(WlSurface) = undefined;
+    empty_state.registry_proxy = .{
+        .obj_id = empty_state.conn.ids.alloc(),
+        .ctx = empty_state,
+        .on_event = handlers.onRegistryEvent,
+    };
+    try empty_state.conn.registerProxy(WlRegistry, empty_state.registry_proxy);
+    try empty_state.display_proxy.send(
+        empty_state.conn,
+        WlDisplay.Request{
+            .get_registry = .{ .registry = empty_state.registry_proxy.obj_id },
+        },
+    );
+    try empty_state.conn.roundTrip();
+}
 
-var seat: BoundGlobal = .{};
-var seat_proxy: wire.Proxy(WlSeat) = undefined;
-var has_pointer: bool = false;
-var pointer: BoundGlobal = .{};
-var pointer_proxy: wire.Proxy(WlPointer) = undefined;
-var has_keyboard: bool = false;
-var keyboard: BoundGlobal = .{};
-var keyboard_proxy: wire.Proxy(WlKeyboard) = undefined;
-var output: BoundGlobal = .{};
-var output_proxy: wire.Proxy(WlOutput) = undefined;
-var output_width: i32 = 0;
-var output_height: i32 = 0;
-var output_refresh: i32 = 0;
-var output_scale: i32 = 0;
-// var has_touch: bool = false;
+pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
+    gpa = alloc;
+    wl = try gpa.create(WaylandState);
+    wl.conn = try WlConnection.init(gpa, io, env);
 
-var xdg_wm_base: BoundGlobal = .{};
-var xdg_wm_base_proxy: wire.Proxy(XdgWmBase) = undefined;
-var xdg_surface: BoundGlobal = .{};
-var xdg_surface_proxy: wire.Proxy(XdgSurface) = undefined;
-var xdg_toplevel: BoundGlobal = .{};
-var xdg_toplevel_proxy: wire.Proxy(XdgToplevel) = undefined;
+    try startWayland(wl);
 
-var xdg_surface_serial: u32 = 0;
+    log.info(
+        .platform,
+        "Used globals enumerated:\n compositor: {d}\n xdg_wm_base: {d}\n seat: {d}\n output: {d}",
+        .{ wl.compositor.name, wl.xdg_wm_base.name, wl.seat.name, wl.output.name },
+    );
+
+    try wl.conn.bindGlobal(
+        WlCompositor,
+        &wl.compositor,
+        wl.registry_proxy.obj_id,
+        consts.wl_compositor,
+        wl,
+        handlers.onCompositorEvent,
+    );
+    try wl.conn.bindGlobal(
+        WlSeat,
+        &wl.seat,
+        wl.registry_proxy.obj_id,
+        consts.wl_seat,
+        wl,
+        handlers.onSeatEvent,
+    );
+    try wl.conn.roundTrip();
+
+    if (wl.has_keyboard) {
+        wl.keyboard.proxy = try wl.conn.allocProxy(
+            WlKeyboard,
+            wl,
+            handlers.onKeyboardEvent,
+        );
+        try wl.seat.proxy.send(wl.conn, WlSeat.Request{
+            .get_keyboard = .{ .new_id = wl.keyboard.proxy.obj_id },
+        });
+        log.info(.platform, "Found KEYBOARD: {d}", .{wl.keyboard.proxy.obj_id});
+    }
+    if (wl.has_pointer) {
+        wl.pointer.proxy = try wl.conn.allocProxy(
+            WlPointer,
+            wl,
+            handlers.onPointerEvent,
+        );
+        try wl.seat.proxy.send(wl.conn, WlSeat.Request{
+            .get_pointer = .{ .new_id = wl.pointer.proxy.obj_id },
+        });
+        log.info(.platform, "Found POINTER: {d}", .{wl.pointer.proxy.obj_id});
+    }
+    try wl.conn.roundTrip();
+
+    try wl.conn.bindGlobal(
+        XdgWmBase,
+        &wl.xdg_wm_base,
+        wl.registry_proxy.obj_id,
+        consts.xdg_wm_base,
+        wl,
+        handlers.onXdgWmBaseEvent,
+    );
+    try wl.conn.roundTrip();
+
+    try wl.conn.bindGlobal(
+        WlOutput,
+        &wl.output,
+        wl.registry_proxy.obj_id,
+        consts.wl_output,
+        wl,
+        handlers.onOutputEvent,
+    );
+    try wl.conn.roundTrip();
+}
+pub fn deinit() void {
+    wl.compositor.proxy.send(wl.conn, WlCompositor.Request{ .release = .{} }) catch |e| {
+        log.err(.platform, "Failed to destroy compositor {any}", .{e});
+    };
+    wl.seat.proxy.send(wl.conn, WlSeat.Request{ .release = .{} }) catch |e| {
+        log.err(.platform, "Failed to destroy wl_seat {any}", .{e});
+    };
+    wl.output.proxy.send(wl.conn, WlOutput.Request{ .release = .{} }) catch |e| {
+        log.err(.platform, "Failed to destroy wl_output {any}", .{e});
+    };
+    wl.xdg_wm_base.proxy.send(wl.conn, XdgWmBase.Request{ .release = .{} }) catch |e| {
+        log.err(.platform, "Failed to destroy xdg_wm_base {any}", .{e});
+    };
+
+    wl.conn.deinit();
+    gpa.destroy(wl);
+}
 
 pub const Window = struct {
-    surface_id: u32 = 0, // wl_surface
-    xdg_surface_id: u32 = 0, // xdg_surface wrapper
-    xdg_toplevel_id: u32 = 0, // xdg_toplevel (the actual window)
-    configured: bool = false, // has compositor sent configure+ack?
-
+    state: state.WindowState,
     width: u32 = 0,
     height: u32 = 0,
     should_close: bool = false,
-
-    event_head: usize = 0,
-    event_tail: usize = 0,
-    event_max: usize = 64,
-    events: []Event,
+    events: RingBuffer,
 
     pub fn deinit(self: *Window) void {
-        gpa.free(self.events);
+        self.state.xdg_toplevel.send(wl.conn, XdgToplevel.Request{ .destroy = .{} }) catch |e| {
+            log.err(.platform, "Failed to destroy xdg_toplevel {any}", .{e});
+        };
+        self.state.xdg_surface.send(wl.conn, XdgSurface.Request{ .destroy = .{} }) catch |e| {
+            log.err(.platform, "Failed to destroy xdg_surface {any}", .{e});
+        };
+        self.state.surface.send(wl.conn, WlSurface.Request{ .destroy = .{} }) catch |e| {
+            log.err(.platform, "Failed to destroy wl_surface {any}", .{e});
+        };
+
+        wl.conn.unregisterProxy(self.state.xdg_toplevel.obj_id);
+        wl.conn.unregisterProxy(self.state.xdg_surface.obj_id);
+        wl.conn.unregisterProxy(self.state.surface.obj_id);
+
+        gpa.free(self.events.data);
         gpa.destroy(self);
     }
 
@@ -101,351 +189,86 @@ pub const Window = struct {
     }
 
     fn pushEvent(self: *Window, event: Event) void {
-        self.events[self.event_tail % 64] = event;
-        self.event_tail += 1;
+        self.events.push(event);
     }
 
     fn popEvent(self: *Window) ?Event {
-        if (self.event_head == self.event_tail) return null;
-        const event = self.events[self.event_head % 64];
-        self.event_head += 1;
-        return event;
+        self.events.popFront();
     }
 };
 
 pub fn createWindow(config: WindowConfig) !*Window {
-    surface_id = conn.ids.alloc();
-    try compositor_proxy.send(WlCompositor.Request{ .create_surface = .{
-        .new_id = surface_id,
-    } });
-    surface_proxy = .{
-        .obj_id = surface_id,
-        .conn = conn,
-        .on_event = onSurfaceEvent,
-    };
-    try conn.registerProxy(WlSurface, &surface_proxy);
-
-    xdg_surface.obj_id = conn.ids.alloc();
-    try xdg_wm_base_proxy.send(XdgWmBase.Request{ .get_xdg_surface = .{
-        .id = xdg_surface.obj_id,
-        .surface = surface_id,
-    } });
-    xdg_surface_proxy = .{
-        .obj_id = xdg_surface.obj_id,
-        .conn = conn,
-        .on_event = onXdgSurfaceEvent,
-    };
-    try conn.registerProxy(XdgSurface, &xdg_surface_proxy);
-
-    xdg_toplevel.obj_id = conn.ids.alloc();
-    try xdg_surface_proxy.send(XdgSurface.Request{ .get_toplevel = .{
-        .id = xdg_toplevel.obj_id,
-    } });
-    xdg_toplevel_proxy = .{
-        .obj_id = xdg_toplevel.obj_id,
-        .conn = conn,
-        .on_event = onXdgToplevelEvent,
-    };
-    try conn.registerProxy(XdgToplevel, &xdg_toplevel_proxy);
-    try xdg_toplevel_proxy.send(XdgToplevel.Request{ .set_title = .{
-        .title = config.title,
-    } });
-
-    try surface_proxy.send(WlSurface.Request{ .commit = .{} });
-
-    try conn.drain(xdg_surface.obj_id);
-
-    try xdg_surface_proxy.send(XdgSurface.Request{ .ack_configure = .{
-        .serial = xdg_surface_serial,
-    } });
-
-    try surface_proxy.send(WlSurface.Request{ .commit = .{} });
-
     const window = try gpa.create(Window);
     const events = try gpa.alloc(Event, 64);
-    log.debug(.platform, "events len: {d}", .{events.len});
-    window.* = .{
-        .width = config.width,
-        .height = config.height,
-        .surface_id = surface_id,
-        .xdg_surface_id = xdg_surface.obj_id,
-        .xdg_toplevel_id = xdg_toplevel.obj_id,
-        .events = events,
-    };
+    window.state = .{};
 
-    return window;
-}
-
-pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
-    gpa = alloc;
-    conn = try WlConnection.init(gpa, io, env);
-    display_proxy = .{
-        .conn = conn,
-        .obj_id = display_id,
-        .on_event = onDisplayEvent,
-    };
-    try conn.registerProxy(WlDisplay, &display_proxy);
-
-    const registry_id = conn.ids.alloc();
-    log.debug(.platform, "registry id: {d}", .{registry_id});
-    registry_proxy = .{
-        .obj_id = registry_id,
-        .conn = conn,
-        .on_event = onRegistryEvent,
-    };
-    try conn.registerProxy(WlRegistry, &registry_proxy);
-    try display_proxy.send(.{ .get_registry = .{ .registry = registry_id } });
-
-    const cb_id = conn.ids.alloc();
-    log.debug(.platform, "callback id: {d}", .{cb_id});
-    try display_proxy.send(.{ .sync = .{ .callback = cb_id } });
-    try conn.drain(cb_id);
-
-    log.info(
-        .platform,
-        "Used globals enumerated:\n compositor: {d}\n xdg_wm_base: {d}\n seat: {d}\n output: {d}",
-        .{ compositor.name, xdg_wm_base.name, seat.name, output.name },
+    window.state.surface = try wl.conn.allocProxy(
+        WlSurface,
+        &window.state,
+        handlers.onSurfaceEvent,
+    );
+    try wl.compositor.proxy.send(
+        wl.conn,
+        WlCompositor.Request{ .create_surface = .{
+            .new_id = window.state.surface.obj_id,
+        } },
     );
 
-    compositor.obj_id = conn.ids.alloc();
-    try registry_proxy.send(.{ .bind = .{
-        .name = compositor.name,
-        .interface = compositor.interface,
-        .version = compositor.version,
-        .new_id = compositor.obj_id,
-    } });
-    compositor_proxy = .{
-        .obj_id = compositor.obj_id,
-        .conn = conn,
-        .on_event = onCompositorEvent,
-    };
-    try conn.registerProxy(WlCompositor, &compositor_proxy);
-    log.debug(.platform, "Bound COMPOSITOR: {d}", .{compositor.obj_id});
+    window.state.xdg_surface = try wl.conn.allocProxy(
+        XdgSurface,
+        &window.state,
+        handlers.onXdgSurfaceEvent,
+    );
+    try wl.xdg_wm_base.proxy.send(
+        wl.conn,
+        XdgWmBase.Request{ .get_xdg_surface = .{
+            .id = window.state.xdg_surface.obj_id,
+            .surface = window.state.surface.obj_id,
+        } },
+    );
 
-    seat.obj_id = conn.ids.alloc();
-    try registry_proxy.send(.{ .bind = .{
-        .name = seat.name,
-        .interface = seat.interface,
-        .version = seat.version,
-        .new_id = seat.obj_id,
-    } });
-    seat_proxy = .{
-        .obj_id = seat.obj_id,
-        .conn = conn,
-        .on_event = onSeatEvent,
-    };
-    try conn.registerProxy(WlSeat, &seat_proxy);
+    window.state.xdg_toplevel = try wl.conn.allocProxy(
+        XdgToplevel,
+        &window.state,
+        handlers.onXdgToplevelEvent,
+    );
+    try window.state.xdg_surface.send(
+        wl.conn,
+        XdgSurface.Request{ .get_toplevel = .{
+            .id = window.state.xdg_toplevel.obj_id,
+        } },
+    );
 
-    const cb_id2 = conn.ids.alloc();
-    try display_proxy.send(.{ .sync = .{ .callback = cb_id2 } });
-    try conn.drain(cb_id2);
-    log.debug(.platform, "Bound SEAT {d}", .{seat.obj_id});
+    try window.state.xdg_toplevel.send(
+        wl.conn,
+        XdgToplevel.Request{ .set_title = .{
+            .title = config.title,
+        } },
+    );
 
-    if (has_keyboard) {
-        keyboard.obj_id = conn.ids.alloc();
-        try seat_proxy.send(.{ .get_keyboard = .{ .new_id = keyboard.obj_id } });
-        keyboard_proxy = .{
-            .obj_id = keyboard.obj_id,
-            .conn = conn,
-            .on_event = onKeyboardEvent,
-        };
-        try conn.registerProxy(WlKeyboard, &keyboard_proxy);
+    try window.state.surface.send(
+        wl.conn,
+        WlSurface.Request{ .commit = .{} },
+    );
+    try wl.conn.roundTrip();
 
-        log.info(.platform, "Found KEYBOARD: {d}", .{keyboard.obj_id});
-    }
-    if (has_pointer) {
-        pointer.obj_id = conn.ids.alloc();
-        try seat_proxy.send(.{ .get_pointer = .{ .new_id = pointer.obj_id } });
-        pointer_proxy = .{
-            .obj_id = pointer.obj_id,
-            .conn = conn,
-            .on_event = onPointerEvent,
-        };
-        try conn.registerProxy(WlPointer, &pointer_proxy);
+    try window.state.xdg_surface.send(
+        wl.conn,
+        XdgSurface.Request{ .ack_configure = .{
+            .serial = window.state.configure_serial,
+        } },
+    );
 
-        log.info(.platform, "Found MOUSE: {d}", .{pointer.obj_id});
-    }
-    const cb_id3 = conn.ids.alloc();
-    try display_proxy.send(.{ .sync = .{ .callback = cb_id3 } });
-    try conn.drain(cb_id3);
+    try window.state.surface.send(
+        wl.conn,
+        WlSurface.Request{ .commit = .{} },
+    );
 
-    xdg_wm_base.obj_id = conn.ids.alloc();
-    try registry_proxy.send(.{ .bind = .{
-        .name = xdg_wm_base.name,
-        .interface = xdg_wm_base.interface,
-        .version = xdg_wm_base.version,
-        .new_id = xdg_wm_base.obj_id,
-    } });
-    xdg_wm_base_proxy = .{
-        .obj_id = xdg_wm_base.obj_id,
-        .conn = conn,
-        .on_event = onXdgWmBaseEvent,
-    };
-    try conn.registerProxy(XdgWmBase, &xdg_wm_base_proxy);
-    log.info(.platform, "Bound xdg_wm_base: {d}", .{xdg_wm_base.obj_id});
+    window.width = config.width;
+    window.height = config.height;
+    window.events = events;
 
-    output.obj_id = conn.ids.alloc();
-    try registry_proxy.send(.{ .bind = .{
-        .name = output.name,
-        .interface = output.interface,
-        .version = output.version,
-        .new_id = output.obj_id,
-    } });
-    output_proxy = .{
-        .obj_id = output.obj_id,
-        .conn = conn,
-        .on_event = onOutputEvent,
-    };
-    try conn.registerProxy(WlOutput, &output_proxy);
-    log.info(.platform, "Bound Output: {d}", .{output.obj_id});
-
-    const cb_id4 = conn.ids.alloc();
-    try display_proxy.send(.{ .sync = .{ .callback = cb_id4 } });
-    try conn.drain(cb_id4);
-}
-pub fn deinit() void {
-    compositor_proxy.send(.{
-        .release = .{},
-    }) catch |e| {
-        log.err(.platform, "Unable to release the compositor: {any}", .{e});
-    };
-    conn.deinit();
-}
-
-fn onOutputEvent(event: WlOutput.Event) !void {
-    switch (event) {
-        .geometry => |g| {
-            log.info(
-                .platform,
-                "output geometry: {d}x{d} mm, make={s} model={s}",
-                .{ g.physical_width, g.physical_height, g.make, g.model },
-            );
-        },
-        .mode => |m| {
-            output_width = m.width;
-            output_height = m.height;
-            output_refresh = m.refresh;
-            log.info(
-                .platform,
-                "output mode: {d}x{d} @ {d}mHz",
-                .{ m.width, m.height, m.refresh },
-            );
-        },
-        .scale => |s| {
-            output_scale = s.scale;
-            log.info(.platform, "output scale: {d}", .{output_scale});
-        },
-        .name, .description => {},
-        .done => {},
-    }
-}
-fn onSurfaceEvent(event: WlSurface.Event) !void {
-    switch (event) {
-        else => {
-            log.warn(.platform, "WlSurface Events are not handled", .{});
-        },
-    }
-}
-
-fn onXdgToplevelEvent(event: XdgToplevel.Event) !void {
-    switch (event) {
-        else => {
-            log.warn(.platform, "XdgTopLevelEvents are not handled", .{});
-        },
-    }
-}
-fn onXdgSurfaceEvent(event: XdgSurface.Event) !void {
-    switch (event) {
-        .configure => |c| {
-            log.trace(.platform, "XdgSurface CONFIG serial: {d}", .{c.serial});
-            xdg_surface_serial = c.serial;
-        },
-    }
-}
-fn onXdgWmBaseEvent(event: XdgWmBase.Event) !void {
-    switch (event) {
-        .ping => |p| log.trace(.platform, "XdgBase PING serial: {d}", .{p.serial}),
-    }
-}
-
-fn onKeyboardEvent(event: WlKeyboard.Event) !void {
-    switch (event) {
-        .enter => |ent| log.trace(.platform, "KB Enter event serial {d}, surf {d}", .{ ent.serial, ent.surface }),
-        .leave => |l| log.trace(.platform, "KB Leave event serial {d} surf {d}", .{ l.serial, l.surface }),
-        .keymap => |km| log.trace(.platform, "KB Keymap event format {d}", .{km.format}),
-        .key => |k| log.trace(.platform, "KB Key event key {d}", .{k.key}),
-        .modifiers => |mds| log.trace(.platform, "KB Modifiers event group {d}", .{mds.group}),
-        .repeat_info => |ri| log.trace(.platform, "KB Repeat Info event rate {d}", .{ri.rate}),
-    }
-}
-fn onPointerEvent(event: WlPointer.Event) !void {
-    switch (event) {
-        .enter => |ent| log.trace(.platform, "PTR enter event serial {d}, surf {d}", .{ ent.serial, ent.surface }),
-        .leave => |l| log.trace(.platform, "PTR leave event serial {d} surf {d}", .{ l.serial, l.surface }),
-        .button => |b| log.trace(.platform, "PTR event button {d}", .{b.button}),
-        .frame => log.trace(.platform, "PTR frame event", .{}),
-        else => |e| {
-            log.warn(.platform, "PTR event not implemented: {any}", .{e});
-        },
-    }
-}
-
-fn onSeatEvent(event: WlSeat.Event) !void {
-    switch (event) {
-        .capabilities => |c| {
-            log.info(.platform, "Seat capes: {d}", .{c.capes});
-            has_pointer = (c.capes & WlSeatCape.pointer) != 0;
-            has_keyboard = (c.capes & WlSeatCape.keyboard) != 0;
-            // has_touch = (c.capes & SeatCap.touch) != 0;
-        },
-        .name => |s| log.info(.platform, "Seat name: {s}", .{s.name}),
-    }
-}
-fn onDisplayEvent(event: WlDisplay.Event) !void {
-    switch (event) {
-        .err => |e| {
-            log.err(
-                .platform,
-                "wl_display error: obj: {d} code: {d} msg: {s}",
-                .{ e.object_id, e.code, e.msg },
-            );
-            return error.WaylandProtocolError;
-        },
-        .delete_id => {},
-    }
-}
-fn onRegistryEvent(event: WlRegistry.Event) !void {
-    switch (event) {
-        .global => |g| {
-            log.info(
-                .platform,
-                "GLOBAL: {d}  {s}  v:{}",
-                .{ g.name, g.interface, g.version },
-            );
-            if (std.mem.eql(u8, g.interface, "wl_compositor")) {
-                compositor.interface = "wl_compositor";
-                compositor.name = g.name;
-                compositor.version = g.version;
-            } else if (std.mem.eql(u8, g.interface, "xdg_wm_base")) {
-                xdg_wm_base.interface = "xdg_wm_base";
-                xdg_wm_base.name = g.name;
-                xdg_wm_base.version = g.version;
-            } else if (std.mem.eql(u8, g.interface, "wl_seat")) {
-                seat.interface = "wl_seat";
-                seat.name = g.name;
-                seat.version = g.version;
-            } else if (std.mem.eql(u8, g.interface, "wl_output")) {
-                output.interface = "wl_output";
-                output.name = g.name;
-                output.version = g.version;
-            }
-        },
-        .global_remove => {},
-    }
-}
-fn onCompositorEvent(event: WlCompositor.Event) !void {
-    switch (event) {}
-    return;
+    return window;
 }
 
 pub fn setPixelBuffer(window: *Window, pixels: []const u8, width: u32, height: u32) void {
@@ -492,7 +315,7 @@ pub fn getNativeWindowHandle(window: *Window) *anyopaque {
 
 pub fn getWindowScaleFactor(window: *Window) f32 {
     _ = window;
-    return @floatFromInt(output_scale);
+    return @floatFromInt(wl.output_info.scale);
 }
 
 pub fn getDisplays(allocator: std.mem.Allocator) ![]DisplayInfo {
@@ -519,3 +342,21 @@ pub fn getCapabilities() Capabilities {
         .has_clipboard = false,
     };
 }
+
+const RingBuffer = struct {
+    head: usize = 0,
+    tail: usize = 0,
+    max: usize = 64,
+    data: []Event,
+
+    pub fn push(self: *RingBuffer, e: Event) void {
+        self.data[self.event_tail % 64] = e;
+        self.tail += 1;
+    }
+    pub fn popFront(self: *RingBuffer) ?Event {
+        if (self.head == self.tail) return null;
+        const event = self.data[self.head % 64];
+        self.head += 1;
+        return event;
+    }
+};
