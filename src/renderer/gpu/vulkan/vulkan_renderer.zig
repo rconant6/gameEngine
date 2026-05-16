@@ -1,3 +1,8 @@
+const myvk = @import("types.zig");
+const Instance = myvk.Instance;
+const Surface = myvk.Surface;
+const PhysicalDevice = myvk.PhysicalDevice;
+
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
@@ -8,18 +13,48 @@ const Color = rend.Color;
 const ShapeData = rend.ShapeData;
 const Transform = rend.Transform;
 
+const WaylandHandles = struct {
+    display: *anyopaque,
+    surface: *anyopaque,
+};
+
 const Self = @This();
 
 pub const Texture = struct {};
 
-pub fn init(gpa: std.mem.Allocator, io: std.Io, config: RenderConfig) !Self {
-    _ = gpa;
+gpa: Allocator,
+instance: Instance,
+// surface: Surface,
+gpu: PhysicalDevice,
+// device: vk.VkDevice,
+// queue: vk.VkQueue,
+
+pub fn init(
+    alloc: std.mem.Allocator,
+    io: std.Io,
+    config: RenderConfig,
+) !Self {
+    const handles: *WaylandHandles =
+        @as(*WaylandHandles, @ptrCast(@alignCast(config.native_handle)));
+
+    // TODO: Comeback and deal w/ validation layers
+    const instance = try Instance.init();
+    // const surface = try Surface.init();
+    const phys_device = try PhysicalDevice.init(instance.handle);
+
     _ = io;
-    _ = config;
-    return error.NotImplemented;
+    _ = handles;
+
+    return .{
+        .gpa = alloc,
+        .instance = instance,
+        .gpu = phys_device,
+        // .surface = surface,
+    };
 }
+
 pub fn deinit(self: *Self) void {
-    _ = self;
+    self.instance.deinit();
 }
 
 pub fn clear(self: Self) void {
@@ -32,11 +67,9 @@ pub fn setClearColor(self: *Self, color: Color) void {
 
 pub fn beginFrame(self: *Self) !void {
     _ = self;
-    return error.NotImplemented;
 }
 pub fn endFrame(self: *Self) !void {
     _ = self;
-    return error.NotImplemented;
 }
 
 pub fn drawShape(

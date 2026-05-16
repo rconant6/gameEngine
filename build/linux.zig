@@ -11,7 +11,10 @@ pub fn configureModule(
     module.link_libc = true;
     // for ([_][]const u8{ "xkbcommon" }) |lib| module.linkSystemLibrary(lib, .{});
     switch (renderer) {
-        .vulkan => module.linkSystemLibrary("vulkan", .{}),
+        .vulkan => module.linkSystemLibrary("vulkan", .{
+            .preferred_link_mode = .static,
+            .needed = true,
+        }),
         .opengl => @panic("openGL is not implemented"),
         .metal => @panic("Metal is not available on Linux"),
         .cpu => {},

@@ -34,6 +34,11 @@ const WindowConfig = plat.WindowConfig;
 const V2I = @import("math").V2I;
 const log = @import("debug").log;
 
+const WaylandHandles = struct {
+    display: *anyopaque,
+    surface: *anyopaque,
+};
+
 var gpa: Allocator = undefined;
 var wl: *WaylandState = undefined;
 
@@ -309,8 +314,17 @@ pub fn sleep(seconds: f64) void {
     std.time.sleep(@intFromFloat(seconds * std.time.ns_per_s));
 }
 
+/// Caller of this will need to destroy the handles on their end
 pub fn getNativeWindowHandle(window: *Window) *anyopaque {
-    return window;
+    // TODO: clean up error handling
+    const handles = gpa.create(WaylandHandles) catch {
+        @panic("Out of memory getting display and surface handles");
+    };
+    handles.* = .{
+        .display = &wl.display_proxy,
+        .surface = &window.state.surface,
+    };
+    return handles;
 }
 
 pub fn getWindowScaleFactor(window: *Window) f32 {
