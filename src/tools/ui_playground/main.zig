@@ -27,8 +27,9 @@ const screen_h: f32 = @floatFromInt(logical_height);
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
     const io = init.io;
+    const env = init.environ_map;
 
-    var app = try App.init(gpa, io, .{
+    var app = try App.init(gpa, io, env, .{
         .title = "UI Playground",
         .width = @intCast(logical_width),
         .height = @intCast(logical_height),
