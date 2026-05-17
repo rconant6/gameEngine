@@ -313,10 +313,9 @@ pub fn build(b: *std.Build) void {
         .name = "zixelart",
         .root_module = zixelart_module,
     });
-    b.installArtifact(zixelart_exe);
-
+    const install_zixelart = b.addInstallArtifact(zixelart_exe, .{});
     const run_zixelart = b.addRunArtifact(zixelart_exe);
-    run_zixelart.step.dependOn(b.getInstallStep());
+    run_zixelart.step.dependOn(&install_zixelart.step);
     run_zixelart.setCwd(b.path("zig-out/bin"));
     b.step("zixelart", "Run the Pixel Art Editor").dependOn(&run_zixelart.step);
 
@@ -337,10 +336,9 @@ pub fn build(b: *std.Build) void {
         .name = "sceneEdit",
         .root_module = scene_editor_module,
     });
-    b.installArtifact(scene_editor_exe);
-
+    const install_scene_editor = b.addInstallArtifact(scene_editor_exe, .{});
     const run_scene_edit = b.addRunArtifact(scene_editor_exe);
-    run_scene_edit.step.dependOn(b.getInstallStep());
+    run_scene_edit.step.dependOn(&install_scene_editor.step);
     run_scene_edit.setCwd(b.path("zig-out/bin"));
     b.step("sceneEdit", "Run the Scene File Editor").dependOn(&run_scene_edit.step);
 
@@ -389,10 +387,9 @@ pub fn build(b: *std.Build) void {
         .install_subdir = "assets",
     });
     player_exe.step.dependOn(&install_player_assets.step);
-    b.installArtifact(player_exe);
-
+    const install_player = b.addInstallArtifact(player_exe, .{});
     const run_player = b.addRunArtifact(player_exe);
-    run_player.step.dependOn(b.getInstallStep());
+    run_player.step.dependOn(&install_player.step);
     run_player.setCwd(b.path("zig-out/bin"));
     b.step("play", "Run the player").dependOn(&run_player.step);
 
