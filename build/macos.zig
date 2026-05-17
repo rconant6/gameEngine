@@ -20,7 +20,9 @@ pub fn configureModule(
         },
         .opengl => module.linkFramework("OpenGL", .{}),
         .vulkan => {
-            module.linkSystemLibrary("vulkan", .{});
+            module.addSystemIncludePath(
+                .{ .src_path = .{ .owner = b, .sub_path = "/opt/homebrew/Cellar/molten-vk/1.4.1/libexec/include" } },
+            );
             module.linkSystemLibrary("MoltenVK", .{});
         },
         .cpu => {
