@@ -8,25 +8,29 @@ const Self = @This();
 handle: *vk.struct_VkPhysicalDevice_T,
 
 pub fn init(gpa: Allocator, instance: *vk.struct_VkInstance_T) !Self {
-    const device: vk.VkPhysicalDevice = null;
-
-    var deviceCount: u32 = 0;
-    _ = vk.vkEnumeratePhysicalDevices(instance, &deviceCount, null);
-    log.info(.renderer, "Found: {d} devices", .{deviceCount});
-    if (deviceCount == 0) {
-        log.err(.renderer, "No gpu to support Vulkan", .{});
+    var device_count: u32 = 0;
+    _ = vk.vkEnumeratePhysicalDevices(instance, &device_count, null);
+    if (device_count == 0) {
+        log.err(.renderer, "No Vulkan-capable GPU found", .{});
         return error.NoVulkanSupportedDevices;
     }
 
-    // if (vk.vkCreateInstance(&createInfo, null, &instance) == vk.VK_SUCCESS) {
-    //     return .{
-    //         .handle = device.?,
-    //     };
-    // }
+    const devices = try gpa.alloc(vk.VkPhysicalDevice, device_count);
+    defer gpa.free(devices);
+    _ = vk.vkEnumeratePhysicalDevices(instance, &device_count, @ptrCast(devices.ptr));
 
-    return error.VkPhysicalDeviceFailure;
+    var best: vk.VkPhysicalDevice = null;
+    for (devices) |dev| {
+        var props: vk.VkPhysicalDeviceProperties = undefined;
+        vk.vkGetPhysicalDeviceProperties(dev, &props);
+        log.info(.renderer, "GPU: {s}", .{&props.deviceName});
+        if (props.deviceType == vk.VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+            best = dev;
+        }
+        if (best == null) best = dev;
+    }
+
+    return .{ .handle = best.? };
 }
-pub fn deinit(self: *Self) void {
-    _ = self;
-    //
-}
+
+pub fn deinit(_: *Self) void {}

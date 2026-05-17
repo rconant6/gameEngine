@@ -40,7 +40,7 @@ pub fn init(
     // TODO: Comeback and deal w/ validation layers
     const instance = try Instance.init();
     // const surface = try Surface.init();
-    const phys_device = try PhysicalDevice.init(instance.handle);
+    const phys_device = try PhysicalDevice.init(alloc, instance.handle);
 
     _ = io;
     _ = handles;
