@@ -5,17 +5,22 @@ const RendererBackend = parent.RendererBackend;
 
 /// Link Linux-specific libraries onto a module.
 pub fn configureModule(
+    b: *std.Build,
     module: *std.Build.Module,
     renderer: RendererBackend,
 ) void {
     module.link_libc = true;
-    // for ([_][]const u8{ "xkbcommon" }) |lib| module.linkSystemLibrary(lib, .{});
+    module.addIncludePath(b.path("src/platform/linux"));
     switch (renderer) {
-        .vulkan => module.linkSystemLibrary("vulkan", .{
-            .preferred_link_mode = .static,
-            .needed = true,
-        }),
-        .opengl => @panic("openGL is not implemented"),
+        .vulkan => {
+            module.linkSystemLibrary("vulkan", .{});
+            module.linkSystemLibrary("wayland-client", .{});
+            module.addCSourceFile(.{
+                .file = b.path("src/platform/linux/xdg-shell-private.c"),
+                .flags = &.{},
+            });
+        },
+        .opengl => @panic("OpenGL is not currently supported on Linux"),
         .metal => @panic("Metal is not available on Linux"),
         .cpu => {},
     }

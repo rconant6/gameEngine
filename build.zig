@@ -458,7 +458,7 @@ fn configurePlatformModule(
 ) void {
     switch (target.result.os.tag) {
         .macos => macos.configureModule(b, module, target, renderer),
-        .linux => linux.configureModule(module, renderer),
+        .linux => linux.configureModule(b, module, renderer),
         .windows => windows.configureModule(module, renderer),
         else => @panic("Unsupported operating system"),
     }
