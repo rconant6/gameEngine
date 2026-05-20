@@ -15,10 +15,6 @@ pub fn configureModule(
         .vulkan => {
             module.linkSystemLibrary("vulkan", .{});
             module.linkSystemLibrary("wayland-client", .{});
-            module.addCSourceFile(.{
-                .file = b.path("src/platform/linux/xdg-shell-private.c"),
-                .flags = &.{},
-            });
         },
         .opengl => @panic("OpenGL is not currently supported on Linux"),
         .metal => @panic("Metal is not available on Linux"),

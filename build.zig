@@ -260,6 +260,10 @@ pub fn build(b: *std.Build) void {
 
     // Platform-specific: include path for Swift bridge header
     modules[@intFromEnum(M.platform)].addIncludePath(b.path("src/platform/macos/swift/include"));
+    modules[@intFromEnum(M.platform)].addCSourceFile(.{
+        .file = b.path("src/platform/linux/xdg-shell-private.c"),
+        .flags = &.{},
+    });
 
     // Platform linking on modules that need native frameworks
     configurePlatformModule(b, modules[@intFromEnum(M.platform)], target, selected_renderer);
@@ -394,9 +398,13 @@ pub fn build(b: *std.Build) void {
     b.step("play", "Run the player").dependOn(&run_player.step);
 
     // ========================================
-    // Platform-specific linking (Swift runtime on macOS, no-op elsewhere)
+    // Platform-specific linking (Swift runtime on macOS, xdg_ for linux, no-op elsewhere)
     // ========================================
-    linkPlatformLibraries(&.{ engine_lib, zixelart_exe, ui_playground_exe, player_exe, scene_editor_exe }, swift_lib, target);
+    linkPlatformLibraries(
+        &.{ engine_lib, zixelart_exe, ui_playground_exe, player_exe, scene_editor_exe },
+        swift_lib,
+        target,
+    );
 
     // ========================================
     // Clean
@@ -444,6 +452,10 @@ fn linkPlatformLibraries(
     switch (target.result.os.tag) {
         .macos => for (artifacts) |artifact| {
             macos.linkSwiftLibrary(artifact, swift_lib, target);
+        },
+        .linux => for (artifacts) |artifact| {
+            artifact.root_module.linkSystemLibrary("vulkan", .{});
+            artifact.root_module.linkSystemLibrary("wayland-client", .{});
         },
         else => {},
     }
