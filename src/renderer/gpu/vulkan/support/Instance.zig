@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const vk = @import("../c_bridge.zig").c;
 
 const Self = @This();
@@ -8,23 +9,29 @@ pub fn init() !Self {
     var instance: vk.VkInstance = null;
 
     var appInfo: vk.VkApplicationInfo = .{};
-    appInfo.sType = vk.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    appInfo.sType = vk.VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.apiVersion = vk.VK_API_VERSION_1_4;
 
-    const extenstions = [_][*c]const u8{
-        "VK_KHR_surface",
+    const extensions = switch (builtin.os.tag) {
+        .linux => [_][*c]const u8{
+            "VK_KHR_surface",
+            "VK_KHR_wayland_surface",
+        },
+        .macos => [_][*c]const u8{
+            "VK_KHR_surface",
+            "VK_EXT_metal_surface",
+        },
+        else => @compileError("Unsupported platform"),
     };
 
     var createInfo: vk.VkInstanceCreateInfo = .{};
     createInfo.sType = vk.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
-    createInfo.enabledExtensionCount = extenstions.len;
-    createInfo.ppEnabledExtensionNames = &extenstions;
+    createInfo.enabledExtensionCount = extensions.len;
+    createInfo.ppEnabledExtensionNames = &extensions;
 
     if (vk.vkCreateInstance(&createInfo, null, &instance) == vk.VK_SUCCESS) {
-        return .{
-            .handle = instance.?,
-        };
+        return .{ .handle = instance.? };
     }
 
     return error.VkInstanceCreationFailure;

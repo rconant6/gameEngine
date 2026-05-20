@@ -2,6 +2,7 @@ const myvk = @import("types.zig");
 const Instance = myvk.Instance;
 const Surface = myvk.Surface;
 const PhysicalDevice = myvk.PhysicalDevice;
+const Device = myvk.Device;
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -13,47 +14,42 @@ const Color = rend.Color;
 const ShapeData = rend.ShapeData;
 const Transform = rend.Transform;
 
-const WaylandHandles = struct {
-    display: *anyopaque,
-    surface: *anyopaque,
-};
-
 const Self = @This();
 
 pub const Texture = struct {};
 
 gpa: Allocator,
 instance: Instance,
-// surface: Surface,
+surface: Surface,
 gpu: PhysicalDevice,
-// device: vk.VkDevice,
-// queue: vk.VkQueue,
+dev: Device,
 
 pub fn init(
     alloc: std.mem.Allocator,
     io: std.Io,
     config: RenderConfig,
 ) !Self {
-    const handles: *WaylandHandles =
-        @as(*WaylandHandles, @ptrCast(@alignCast(config.native_handle)));
+    const native_handle = config.native_handle orelse return error.MissingNativeHandle;
 
     // TODO: Comeback and deal w/ validation layers
     const instance = try Instance.init();
-    // const surface = try Surface.init();
-    const phys_device = try PhysicalDevice.init(alloc, instance.handle);
-
+    const surface = try Surface.init(instance.handle, native_handle);
+    const phys_device = try PhysicalDevice.init(alloc, instance.handle, surface.handle);
+    const dev = try Device.init(&phys_device);
     _ = io;
-    _ = handles;
 
     return .{
         .gpa = alloc,
         .instance = instance,
+        .surface = surface,
         .gpu = phys_device,
-        // .surface = surface,
+        .dev = dev,
     };
 }
 
 pub fn deinit(self: *Self) void {
+    self.gpu.deinit();
+    self.surface.deinit(self.instance.handle);
     self.instance.deinit();
 }
 
