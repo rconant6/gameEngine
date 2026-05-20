@@ -260,10 +260,12 @@ pub fn build(b: *std.Build) void {
 
     // Platform-specific: include path for Swift bridge header
     modules[@intFromEnum(M.platform)].addIncludePath(b.path("src/platform/macos/swift/include"));
-    modules[@intFromEnum(M.platform)].addCSourceFile(.{
-        .file = b.path("src/platform/linux/xdg-shell-private.c"),
-        .flags = &.{},
-    });
+    if (target.result.os.tag == .linux) {
+        modules[@intFromEnum(M.platform)].addCSourceFile(.{
+            .file = b.path("src/platform/linux/xdg-shell-private.c"),
+            .flags = &.{},
+        });
+    }
 
     // Platform linking on modules that need native frameworks
     configurePlatformModule(b, modules[@intFromEnum(M.platform)], target, selected_renderer);

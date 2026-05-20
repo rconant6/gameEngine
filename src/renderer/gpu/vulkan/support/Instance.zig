@@ -1,4 +1,3 @@
-const builtin = @import("builtin");
 const vk = @import("../c_bridge.zig").c;
 
 const Self = @This();
@@ -12,16 +11,9 @@ pub fn init() !Self {
     appInfo.sType = vk.VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.apiVersion = vk.VK_API_VERSION_1_4;
 
-    const extensions = switch (builtin.os.tag) {
-        .linux => [_][*c]const u8{
-            "VK_KHR_surface",
-            "VK_KHR_wayland_surface",
-        },
-        .macos => [_][*c]const u8{
-            "VK_KHR_surface",
-            "VK_EXT_metal_surface",
-        },
-        else => @compileError("Unsupported platform"),
+    const extensions = [_][*c]const u8{
+        "VK_KHR_surface",
+        "VK_KHR_wayland_surface",
     };
 
     var createInfo: vk.VkInstanceCreateInfo = .{};
