@@ -1,50 +1,21 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const log = @import("debug").log;
 const plat = @import("platform.zig");
 const Capabilities = plat.Capabilities;
 const DisplayInfo = plat.DisplayInfo;
 const Event = plat.Event;
-const KeyModifiers = plat.KeyModifiers;
 const WindowConfig = plat.WindowConfig;
-const V2I = @import("math").V2I;
-const log = @import("debug").log;
-const wl = @import("linux/wayland/listeners.zig");
-const c = wl.c;
+const wl = @import("linux/wayland.zig");
 const WaylandState = wl.WaylandState;
+const WindowState = wl.WindowState;
+const Proxy = wl.Proxy;
+const handlers = wl.handlers;
+const c = wl.c;
 
 var gpa: Allocator = undefined;
-var state: *WaylandState = undefined;
-
-pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
-    gpa = alloc;
-    _ = io;
-    _ = env;
-
-    state = try gpa.create(WaylandState);
-    state.* = .{};
-
-    state.display = c.wl_display_connect(null) orelse
-        return error.WaylandConnectionFailed;
-    state.registry = c.wl_display_get_registry(state.display) orelse
-        return error.WaylandRegistryFailed;
-
-    _ = c.wl_registry_add_listener(
-        state.registry,
-        &wl.RegistryListener,
-        state,
-    );
-
-    // fires the globals, binds xdg_wm_base, seat
-    _ = c.wl_display_roundtrip(state.display);
-    // gets the seat capabilities (2)
-    _ = c.wl_display_roundtrip(state.display);
-
-    return;
-}
-
-pub fn deinit() void {
-    // TODO: break down in the reverse order we made it
-}
+var ws: *WaylandState = undefined;
+var active_window: ?*Window = null;
 
 const WindowHandle = struct {
     display: *anyopaque,
@@ -52,75 +23,125 @@ const WindowHandle = struct {
 };
 
 pub const Window = struct {
-    surface: *c.wl_surface,
-    xdg_surface: *c.xdg_surface,
-    xdg_toplevel: *c.xdg_toplevel,
-    configured: bool = false,
-    should_close: bool = false,
-    width: u32 = 640,
-    height: u32 = 480,
-    events: EventRingBuffer,
-    handle: *WindowHandle,
+    state: WindowState,
 
     pub fn deinit(self: *Window) void {
-        self.events.deinit();
-        gpa.destroy(self.handle);
+        self.state.events.deinit();
+        // TODO: destroy xdg_toplevel, xdg_surface, surface in reverse order
         gpa.destroy(self);
     }
 
     pub fn shouldClose(self: *const Window) bool {
-        return self.should_close;
+        return self.state.should_close;
     }
 
     pub fn swapBuffers(self: *const Window, offset: u32) void {
         _ = self;
         _ = offset;
     }
-
-    fn pushEvent(self: *Window, event: Event) void {
-        self.events.push(event);
-    }
-
-    fn popEvent(self: *Window) ?Event {
-        self.events.popFront();
-    }
 };
 
+pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
+    _ = io;
+    _ = env;
+    gpa = alloc;
+    ws = try alloc.create(WaylandState);
+
+    ws.display = c.wl_display_connect(null) orelse return error.WaylandConnectFailed;
+    log.info(.platform, "Wayland display connected", .{});
+
+    ws.registry = c.wl_display_get_registry(ws.display) orelse return error.WaylandRegistryFailed;
+
+    var reg_proxy = Proxy(wl.WlRegistry){
+        .ptr = @ptrCast(ws.registry),
+        .handler = handlers.onRegistryEvent,
+        .ctx = ws,
+    };
+    reg_proxy.listen();
+    _ = c.wl_display_roundtrip(ws.display); // fills BoundObject.name/version for known globals
+
+    const compositor_raw = c.wl_registry_bind(
+        ws.registry,
+        ws.compositor.name,
+        &c.wl_compositor_interface,
+        @min(ws.compositor.version, 4),
+    ) orelse return error.WaylandBindCompositorFailed;
+    ws.compositor.proxy = .{ .ptr = compositor_raw, .handler = handlers.onCompositorEvent, .ctx = ws };
+    ws.compositor.proxy.listen();
+
+    const xdg_raw = c.wl_registry_bind(
+        ws.registry,
+        ws.xdg_wm_base.name,
+        &c.xdg_wm_base_interface,
+        @min(ws.xdg_wm_base.version, 1),
+    ) orelse return error.WaylandBindXdgFailed;
+    ws.xdg_wm_base.proxy = .{ .ptr = xdg_raw, .handler = handlers.onXdgWmBaseEvent, .ctx = ws };
+    ws.xdg_wm_base.proxy.listen();
+
+    const seat_raw = c.wl_registry_bind(
+        ws.registry,
+        ws.seat.name,
+        &c.wl_seat_interface,
+        @min(ws.seat.version, 5),
+    ) orelse return error.WaylandBindSeatFailed;
+    ws.seat.proxy = .{ .ptr = seat_raw, .handler = handlers.onSeatEvent, .ctx = ws };
+    ws.seat.proxy.listen();
+
+    const output_raw = c.wl_registry_bind(
+        ws.registry,
+        ws.output.name,
+        &c.wl_output_interface,
+        @min(ws.output.version, 2),
+    ) orelse return error.WaylandBindOutputFailed;
+    ws.output.proxy = .{ .ptr = output_raw, .handler = handlers.onOutputEvent, .ctx = ws };
+    ws.output.proxy.listen();
+
+    _ = c.wl_display_roundtrip(ws.display); // fires seat capabilities + output mode/scale
+    log.info(.platform, "Wayland init complete", .{});
+}
+
+pub fn deinit() void {
+    // TODO: destroy bound objects in reverse order
+    c.wl_display_disconnect(ws.display);
+    gpa.destroy(ws);
+}
+
 pub fn createWindow(config: WindowConfig) !*Window {
-    const surface = c.wl_compositor_create_surface(state.compositor) orelse
-        return error.UnableToCreateWLSurface;
-    const xdg_surface = c.xdg_wm_base_get_xdg_surface(state.xdg_wm_base, surface) orelse
-        return error.UnableToCreateXDGSurface;
-    // add a xdg_surface_listener
-    const xdg_toplevel = c.xdg_surface_get_toplevel(xdg_surface) orelse
-        return error.UnableToGetXDGTopLevel;
-    // add a toplevel listener
-    c.xdg_toplevel_set_title(xdg_toplevel, @ptrCast(config.title));
+    const win = try gpa.create(Window);
+    win.state.width = config.width;
+    win.state.height = config.height;
+    win.state.configure_serial = 0;
+    win.state.configured = false;
+    win.state.should_close = false;
+    win.state.surface = .{};
+    win.state.xdg_surface = .{};
+    win.state.xdg_toplevel = .{};
+    win.state.events = try @TypeOf(win.state.events).init(gpa);
+
+    const compositor: *c.wl_compositor = @ptrCast(@alignCast(ws.compositor.proxy.ptr));
+    const surface = c.wl_compositor_create_surface(compositor) orelse return error.SurfaceCreateFailed;
+    win.state.surface.proxy = .{ .ptr = @ptrCast(surface), .handler = handlers.onSurfaceEvent, .ctx = win };
+    win.state.surface.proxy.listen();
+
+    const xdg_base: *c.xdg_wm_base = @ptrCast(@alignCast(ws.xdg_wm_base.proxy.ptr));
+    const xdg_surf = c.xdg_wm_base_get_xdg_surface(xdg_base, surface) orelse return error.XdgSurfaceCreateFailed;
+    win.state.xdg_surface.proxy = .{ .ptr = @ptrCast(xdg_surf), .handler = handlers.onXdgSurfaceEvent, .ctx = win };
+    win.state.xdg_surface.proxy.listen();
+
+    const toplevel = c.xdg_surface_get_toplevel(xdg_surf) orelse return error.ToplevelCreateFailed;
+    win.state.xdg_toplevel.proxy = .{ .ptr = @ptrCast(toplevel), .handler = handlers.onXdgToplevelEvent, .ctx = win };
+    win.state.xdg_toplevel.proxy.listen();
+
+    const title_z = try gpa.dupeZ(u8, config.title);
+    defer gpa.free(title_z);
+    c.xdg_toplevel_set_title(toplevel, title_z.ptr);
+
     c.wl_surface_commit(surface);
-    _ = c.wl_display_roundtrip(state.display);
+    _ = c.wl_display_roundtrip(ws.display); // compositor sends configure, handler stores serial
 
-    const wh = gpa.create(WindowHandle) catch |err| {
-        log.err(.platform, "Unable to get window handle {t}", .{err});
-        return undefined;
-    };
-    wh.* =
-        WindowHandle{
-            .display = @ptrCast(@alignCast(state.display)),
-            .surface = @ptrCast(@alignCast(surface)),
-        };
+    active_window = win;
 
-    const window = try gpa.create(Window);
-    window.* = .{
-        .handle = wh,
-        .surface = surface,
-        .xdg_surface = xdg_surface,
-        .xdg_toplevel = xdg_toplevel,
-        .events = try .init(gpa),
-        .width = config.width,
-        .height = config.height,
-    };
-
-    return window;
+    return win;
 }
 
 pub fn setPixelBuffer(window: *Window, pixels: []const u8, width: u32, height: u32) void {
@@ -136,11 +157,14 @@ pub fn swapBuffers(window: *Window, offset: u32) void {
 }
 
 pub fn pollNextEvent() ?Event {
-    return null;
+    _ = c.wl_display_flush(ws.display);
+    _ = c.wl_display_dispatch_pending(ws.display);
+    return (active_window orelse return null).state.events.popFront();
 }
 
 pub fn waitEvent() Event {
-    return .NullEvent;
+    _ = c.wl_display_dispatch(ws.display);
+    return (active_window orelse return .NullEvent).state.events.popFront() orelse .NullEvent;
 }
 
 pub fn setMouseCursorVisible(window: *Window, visible: bool) void {
@@ -153,38 +177,35 @@ pub fn setMouseCursorLocked(window: *Window, locked: bool) void {
     _ = locked;
 }
 
-// pub fn getTime() f64 {
-//     return @floatFromInt(std.time.milliTimestamp());
-// }
-
-// pub fn sleep(seconds: f64) void {
-//     std.time.sleep(@intFromFloat(seconds * std.time.ns_per_s));
-// }
-
-/// Caller of this will need to destroy the handles on their end
+/// Caller must destroy the returned handle
 pub fn getNativeWindowHandle(window: *Window) *anyopaque {
     const wh = gpa.create(WindowHandle) catch |err| {
-        log.err(.platform, "Unable to get window handle {t}", .{err});
+        log.err(.platform, "Unable to get window handle: {}", .{err});
         return undefined;
     };
-    wh.* =
-        WindowHandle{
-            .display = @ptrCast(@alignCast(state.display)),
-            .surface = @ptrCast(@alignCast(window.surface)),
-        };
-    // return @as(*anyopaque, wh);
+    wh.* = .{
+        .display = @ptrCast(ws.display),
+        .surface = window.state.surface.proxy.ptr,
+    };
     return wh;
 }
 
 pub fn getWindowScaleFactor(window: *Window) f32 {
-    // return c.wl_output_add_listener(state.output, &output_listener, null);
     _ = window;
-    return 1.0;
+    const scale = ws.output_info.scale;
+    return if (scale > 0) @floatFromInt(scale) else 1.0;
 }
 
 pub fn getDisplays(allocator: std.mem.Allocator) ![]DisplayInfo {
-    _ = allocator;
-    return &.{};
+    const displays = try allocator.alloc(DisplayInfo, 1);
+    displays[0] = .{
+        .name = "Wayland Output",
+        .width = @intCast(ws.output_info.width),
+        .height = @intCast(ws.output_info.height),
+        .refresh_rate = @intCast(@divTrunc(ws.output_info.refresh, 1000)),
+        .is_primary = true,
+    };
+    return displays;
 }
 
 pub fn getClipboardText(allocator: std.mem.Allocator) ![]const u8 {
@@ -200,39 +221,9 @@ pub fn setClipboardText(text: []const u8) !void {
 pub fn getCapabilities() Capabilities {
     return .{
         .has_vulkan = true,
-        .has_opengl = true,
+        .has_opengl = false,
         .has_metal = false,
         .has_file_dialogs = false,
         .has_clipboard = false,
     };
 }
-
-const EventRingBuffer = struct {
-    alloc: Allocator,
-    head: usize = 0,
-    tail: usize = 0,
-    max: usize = 64,
-    data: []Event,
-
-    pub fn init(alloc: Allocator) !EventRingBuffer {
-        return .{
-            .alloc = alloc,
-            .data = try alloc.alloc(Event, 64),
-        };
-    }
-
-    pub fn deinit(self: *EventRingBuffer) void {
-        self.alloc.free(self.data);
-    }
-
-    pub fn push(self: *EventRingBuffer, e: Event) void {
-        self.data[self.event_tail % 64] = e;
-        self.tail += 1;
-    }
-    pub fn popFront(self: *EventRingBuffer) ?Event {
-        if (self.head == self.tail) return null;
-        const event = self.data[self.head % 64];
-        self.head += 1;
-        return event;
-    }
-};
