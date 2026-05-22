@@ -1,79 +1,71 @@
-const c = @cImport({
-    @cInclude("wayland-client.h");
-    @cInclude("xdg-shell-client-protocol.h");
-});
-
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const net = std.Io.net;
-
 const plat = @import("platform.zig");
 const Capabilities = plat.Capabilities;
 const DisplayInfo = plat.DisplayInfo;
 const Event = plat.Event;
 const KeyModifiers = plat.KeyModifiers;
 const WindowConfig = plat.WindowConfig;
-
 const V2I = @import("math").V2I;
 const log = @import("debug").log;
+const wl = @import("linux/wayland/listeners.zig");
+const c = wl.c;
+const WaylandState = wl.WaylandState;
 
 var gpa: Allocator = undefined;
-var display: *c.wl_display = undefined;
-var compositor: *c.wl_compositor = undefined;
-var xdg_wm_base: *c.xdg_wm_base = undefined;
-var seat: *c.wl_seat = undefined;
-var output_scale: i32 = 1;
-var registry: c.wl_registry_listener = .{
-    .global = listenerGlobal,
-    .global_remove = listenerGlobalRemove,
-};
-
-fn listenerGlobal(
-    data: ?*anyopaque,
-    wl_registry: ?*c.struct_wl_registry,
-    name: u32,
-    interface: [*c]const u8,
-    version: u32,
-) callconv(.c) void {
-    _ = data;
-    _ = wl_registry;
-    _ = name;
-    _ = interface;
-    _ = version;
-}
-fn listenerGlobalRemove(
-    data: ?*anyopaque,
-    wl_registry: ?*c.struct_wl_registry,
-    name: u32,
-) callconv(.c) void {
-    _ = data;
-    _ = wl_registry;
-    _ = name;
-}
+var state: *WaylandState = undefined;
 
 pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
-    _ = alloc;
+    gpa = alloc;
     _ = io;
     _ = env;
 
-    return error.NoLinuxInit;
-    // return c.init();
+    state = try gpa.create(WaylandState);
+    state.* = .{};
+
+    state.display = c.wl_display_connect(null) orelse
+        return error.WaylandConnectionFailed;
+    state.registry = c.wl_display_get_registry(state.display) orelse
+        return error.WaylandRegistryFailed;
+
+    _ = c.wl_registry_add_listener(
+        state.registry,
+        &wl.RegistryListener,
+        state,
+    );
+
+    // fires the globals, binds xdg_wm_base, seat
+    _ = c.wl_display_roundtrip(state.display);
+    // gets the seat capabilities (2)
+    _ = c.wl_display_roundtrip(state.display);
+
+    return;
 }
 
-pub fn deinit() void {}
+pub fn deinit() void {
+    // TODO: break down in the reverse order we made it
+}
 
-const WindowHandle = struct {};
+const WindowHandle = struct {
+    display: *anyopaque,
+    surface: *anyopaque,
+};
 
 pub const Window = struct {
-    handle: WindowHandle,
-    // state: state.WindowState,
-    width: u32 = 0,
-    height: u32 = 0,
+    surface: *c.wl_surface,
+    xdg_surface: *c.xdg_surface,
+    xdg_toplevel: *c.xdg_toplevel,
+    configured: bool = false,
     should_close: bool = false,
+    width: u32 = 640,
+    height: u32 = 480,
     events: EventRingBuffer,
+    handle: *WindowHandle,
 
     pub fn deinit(self: *Window) void {
-        _ = self;
+        self.events.deinit();
+        gpa.destroy(self.handle);
+        gpa.destroy(self);
     }
 
     pub fn shouldClose(self: *const Window) bool {
@@ -95,8 +87,40 @@ pub const Window = struct {
 };
 
 pub fn createWindow(config: WindowConfig) !*Window {
-    _ = config;
-    return error.WindowNotImplementedYet;
+    const surface = c.wl_compositor_create_surface(state.compositor) orelse
+        return error.UnableToCreateWLSurface;
+    const xdg_surface = c.xdg_wm_base_get_xdg_surface(state.xdg_wm_base, surface) orelse
+        return error.UnableToCreateXDGSurface;
+    // add a xdg_surface_listener
+    const xdg_toplevel = c.xdg_surface_get_toplevel(xdg_surface) orelse
+        return error.UnableToGetXDGTopLevel;
+    // add a toplevel listener
+    c.xdg_toplevel_set_title(xdg_toplevel, @ptrCast(config.title));
+    c.wl_surface_commit(surface);
+    _ = c.wl_display_roundtrip(state.display);
+
+    const wh = gpa.create(WindowHandle) catch |err| {
+        log.err(.platform, "Unable to get window handle {t}", .{err});
+        return undefined;
+    };
+    wh.* =
+        WindowHandle{
+            .display = @ptrCast(@alignCast(state.display)),
+            .surface = @ptrCast(@alignCast(surface)),
+        };
+
+    const window = try gpa.create(Window);
+    window.* = .{
+        .handle = wh,
+        .surface = surface,
+        .xdg_surface = xdg_surface,
+        .xdg_toplevel = xdg_toplevel,
+        .events = try .init(gpa),
+        .width = config.width,
+        .height = config.height,
+    };
+
+    return window;
 }
 
 pub fn setPixelBuffer(window: *Window, pixels: []const u8, width: u32, height: u32) void {
@@ -129,21 +153,31 @@ pub fn setMouseCursorLocked(window: *Window, locked: bool) void {
     _ = locked;
 }
 
-pub fn getTime() f64 {
-    return @floatFromInt(std.time.milliTimestamp());
-}
+// pub fn getTime() f64 {
+//     return @floatFromInt(std.time.milliTimestamp());
+// }
 
-pub fn sleep(seconds: f64) void {
-    std.time.sleep(@intFromFloat(seconds * std.time.ns_per_s));
-}
+// pub fn sleep(seconds: f64) void {
+//     std.time.sleep(@intFromFloat(seconds * std.time.ns_per_s));
+// }
 
 /// Caller of this will need to destroy the handles on their end
 pub fn getNativeWindowHandle(window: *Window) *anyopaque {
-    _ = window;
-    return display;
+    const wh = gpa.create(WindowHandle) catch |err| {
+        log.err(.platform, "Unable to get window handle {t}", .{err});
+        return undefined;
+    };
+    wh.* =
+        WindowHandle{
+            .display = @ptrCast(@alignCast(state.display)),
+            .surface = @ptrCast(@alignCast(window.surface)),
+        };
+    // return @as(*anyopaque, wh);
+    return wh;
 }
 
 pub fn getWindowScaleFactor(window: *Window) f32 {
+    // return c.wl_output_add_listener(state.output, &output_listener, null);
     _ = window;
     return 1.0;
 }

@@ -194,11 +194,13 @@ pub fn setMouseCursorLocked(window: *Window, locked: bool) void {
 }
 
 pub fn getTime() f64 {
-    return PlatformImpl.getTime();
+    return @floatFromInt(std.time.milliTimestamp());
+    // return PlatformImpl.getTime();
 }
 
 pub fn sleep(seconds: f64) void {
-    PlatformImpl.sleep(seconds);
+    std.time.sleep(@intFromFloat(seconds * std.time.ns_per_s));
+    // PlatformImpl.sleep(seconds);
 }
 
 pub fn getNativeWindowHandle(window: *Window) *anyopaque {
