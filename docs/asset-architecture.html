@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asset System Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 2rem 2rem 6rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1 { color: #58a6ff; font-size: 1.8rem; border-bottom: 1px solid #21262d; padding-bottom: 0.5rem; margin-bottom: 0.25rem; }
+  .page-sub { color: #8b949e; font-size: 0.9rem; margin-bottom: 2rem; }
+  h2 { color: #f0883e; font-size: 1.35rem; margin-top: 3rem; margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid #21262d; }
+  h3 { color: #d2a8ff; font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  p, li { margin-bottom: 0.4rem; }
+  code {
+    background: #161b22; padding: 0.15rem 0.4rem; border-radius: 3px;
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.85em; color: #79c0ff;
+  }
+  .mono { font-family: 'SF Mono','Fira Code',monospace; }
+
+  nav {
+    background: #161b22; border: 1px solid #21262d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin-bottom: 2rem;
+  }
+  nav .nav-title { color: #8b949e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: 0.5rem; }
+  nav .nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.3rem 1rem; }
+  nav a { font-size: 0.85rem; display: block; padding: 0.15rem 0; }
+
+  section { scroll-margin-top: 1rem; }
+
+  .card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin: 0.75rem 0;
+  }
+  .card.main   { border-color: #58a6ff; }
+  .card.child  { border-color: #d2a8ff; }
+  .card.leaf   { border-color: #7ee787; }
+  .card.ext    { border-color: #f0883e; border-style: dashed; }
+
+  .card-name {
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem;
+  }
+  .card-name.c-blue   { color: #58a6ff; }
+  .card-name.c-purple { color: #d2a8ff; }
+  .card-name.c-green  { color: #7ee787; }
+  .card-name.c-orange { color: #f0883e; }
+
+  .fields {
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.8rem; line-height: 1.7;
+  }
+  .fn  { color: #d2a8ff; }
+  .ft  { color: #7ee787; }
+  .fp  { color: #79c0ff; }
+  .fc  { color: #8b949e; font-style: italic; }
+  .fl  { color: #484f58; font-family: -apple-system,sans-serif; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-top: 0.4rem; margin-bottom: 0.15rem; }
+
+  .diagram-wrap { margin: 1rem 0; overflow-x: auto; }
+  svg { overflow: visible; }
+  .box { fill: #161b22; stroke: #30363d; stroke-width: 1.5; rx: 8; }
+  .box-main { stroke: #58a6ff; stroke-width: 2; }
+  .box-purple { stroke: #d2a8ff; }
+  .box-green { stroke: #7ee787; }
+  .box-orange { stroke: #f0883e; stroke-dasharray: 5,4; }
+  .hdr { fill: #21262d; rx: 8; }
+  .hdr-clip { fill: #21262d; }
+
+  .t-name   { fill: #58a6ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-purple { fill: #d2a8ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-green  { fill: #7ee787; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-orange { fill: #f0883e; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-field  { fill: #79c0ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-type   { fill: #7ee787; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-fn     { fill: #d2a8ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-dim    { fill: #8b949e; font-family: -apple-system,sans-serif; font-size: 10px; font-style: italic; }
+  .t-sec    { fill: #484f58; font-family: -apple-system,sans-serif; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .line-own  { stroke: #58a6ff; stroke-width: 2; fill: none; }
+  .line-ref  { stroke: #f0883e; stroke-dasharray: 6,4; fill: none; }
+  .line-flow { stroke: #7ee787; stroke-width: 2; fill: none; }
+  .arr-blue   { fill: #58a6ff; }
+  .arr-orange { fill: #f0883e; }
+  .arr-green  { fill: #7ee787; }
+
+  .links { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+  .links a {
+    background: #21262d; border: 1px solid #30363d; border-radius: 2rem;
+    padding: 0.25rem 0.75rem; font-size: 0.75rem; white-space: nowrap;
+  }
+  .links a:hover { border-color: #58a6ff; text-decoration: none; }
+
+  .flow-list { list-style: none; counter-reset: fl; margin: 0.75rem 0; }
+  .flow-list li {
+    counter-increment: fl; position: relative; padding: 0.5rem 0.75rem 0.5rem 2.75rem;
+    background: #161b22; border: 1px solid #21262d; border-radius: 6px; margin: 0.35rem 0;
+  }
+  .flow-list li::before {
+    content: counter(fl); position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+    background: #30363d; color: #8b949e; font-size: 0.7rem; font-weight: 700;
+    width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px;
+  }
+
+  /* byte layout table */
+  .byte-table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; font-size: 0.8rem; }
+  .byte-table th, .byte-table td { padding: 0.35rem 0.6rem; text-align: left; border: 1px solid #21262d; }
+  .byte-table th { background: #161b22; color: #8b949e; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.06em; }
+  .byte-table td { background: #0d1117; font-family: 'SF Mono','Fira Code',monospace; }
+  .byte-table td.offset { color: #d2a8ff; }
+  .byte-table td.type { color: #7ee787; }
+  .byte-table td.desc { color: #c9d1d9; font-family: -apple-system,sans-serif; }
+</style>
+</head>
+<body>
+
+<h1 id="top">Asset System Architecture</h1>
+<p class="page-sub">Complete reference for asset management &mdash; fonts, the ZXL pixel art format, and the loading pipeline</p>
+
+<!-- ============================================================ -->
+<!-- NAV -->
+<!-- ============================================================ -->
+<nav>
+  <div class="nav-title">Jump to section</div>
+  <div class="nav-grid">
+    <a href="#overview">Overview</a>
+    <a href="#asset-manager">AssetManager</a>
+    <a href="#font-manager">FontManager</a>
+    <a href="#font">Font</a>
+    <a href="#ttf-parsing">TrueType Parsing</a>
+    <a href="#glyph-pipeline">Glyph Pipeline</a>
+    <a href="#font-reader">FontReader</a>
+    <a href="#zxl-format">ZXL Format</a>
+    <a href="#zxl-image">ZxlImage</a>
+    <a href="#zxl-io">ZXL Reader / Writer</a>
+    <a href="#scene-assets">Scene Asset Loading</a>
+    <a href="#lifecycle">Asset Lifecycle</a>
+    <a href="#future">Future Asset Types</a>
+  </div>
+</nav>
+
+<!-- ============================================================ -->
+<!-- OVERVIEW -->
+<!-- ============================================================ -->
+<section id="overview">
+<h2>Overview</h2>
+<p>The asset system currently manages <strong>fonts</strong> (TrueType parsing + vector glyph rendering) and defines the <strong>ZXL</strong> pixel art format (for ZixelArt). Assets are loaded lazily, deduplicated by path, and referenced via opaque handles.</p>
+
+<div class="diagram-wrap">
+<svg width="1060" height="480" viewBox="0 0 1060 480">
+  <defs>
+    <marker id="a-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-blue"/></marker>
+    <marker id="a-orange" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-orange"/></marker>
+    <marker id="a-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-green"/></marker>
+  </defs>
+
+  <!-- Layer labels -->
+  <text x="10" y="50" class="t-sec" font-size="10">CONSUMERS</text>
+  <text x="10" y="170" class="t-sec" font-size="10">MANAGEMENT</text>
+  <text x="10" y="300" class="t-sec" font-size="10">DATA</text>
+  <text x="10" y="420" class="t-sec" font-size="10">PARSING</text>
+
+  <!-- Row 1: Consumers -->
+  <rect class="box box-purple" x="130" y="20" width="200" height="55"/>
+  <rect class="hdr" x="130" y="20" width="200" height="26" rx="8"/><rect class="hdr-clip" x="130" y="38" width="200" height="8"/>
+  <text x="230" y="38" text-anchor="middle" class="t-purple">Engine</text>
+  <text x="230" y="58" text-anchor="middle" class="t-dim">owns AssetManager</text>
+
+  <rect class="box box-purple" x="370" y="20" width="200" height="55"/>
+  <rect class="hdr" x="370" y="20" width="200" height="26" rx="8"/><rect class="hdr-clip" x="370" y="38" width="200" height="8"/>
+  <text x="470" y="38" text-anchor="middle" class="t-purple">RenderSys</text>
+  <text x="470" y="58" text-anchor="middle" class="t-dim">getFont() for text rendering</text>
+
+  <rect class="box box-purple" x="610" y="20" width="200" height="55"/>
+  <rect class="hdr" x="610" y="20" width="200" height="26" rx="8"/><rect class="hdr-clip" x="610" y="38" width="200" height="8"/>
+  <text x="710" y="38" text-anchor="middle" class="t-purple">Instantiator</text>
+  <text x="710" y="58" text-anchor="middle" class="t-dim">loads fonts from scene files</text>
+
+  <rect class="box box-purple" x="850" y="20" width="160" height="55"/>
+  <rect class="hdr" x="850" y="20" width="160" height="26" rx="8"/><rect class="hdr-clip" x="850" y="38" width="160" height="8"/>
+  <text x="930" y="38" text-anchor="middle" class="t-purple">ZixelArt</text>
+  <text x="930" y="58" text-anchor="middle" class="t-dim">ZXL read/write</text>
+
+  <!-- Row 2: Management -->
+  <rect class="box box-main" x="250" y="130" width="240" height="55"/>
+  <rect class="hdr" x="250" y="130" width="240" height="26" rx="8"/><rect class="hdr-clip" x="250" y="148" width="240" height="8"/>
+  <text x="370" y="148" text-anchor="middle" class="t-name">AssetManager</text>
+  <text x="370" y="168" text-anchor="middle" class="t-dim">name_to_font map + FontManager</text>
+
+  <rect class="box box-purple" x="540" y="130" width="200" height="55"/>
+  <rect class="hdr" x="540" y="130" width="200" height="26" rx="8"/><rect class="hdr-clip" x="540" y="148" width="200" height="8"/>
+  <text x="640" y="148" text-anchor="middle" class="t-purple">FontManager</text>
+  <text x="640" y="168" text-anchor="middle" class="t-dim">fonts array + path dedup</text>
+
+  <!-- Row 3: Data -->
+  <rect class="box box-green" x="200" y="260" width="180" height="55"/>
+  <rect class="hdr" x="200" y="260" width="180" height="26" rx="8"/><rect class="hdr-clip" x="200" y="278" width="180" height="8"/>
+  <text x="290" y="278" text-anchor="middle" class="t-green">Font</text>
+  <text x="290" y="298" text-anchor="middle" class="t-dim">glyphs, metrics, char map</text>
+
+  <rect class="box box-green" x="420" y="260" width="180" height="55"/>
+  <rect class="hdr" x="420" y="260" width="180" height="26" rx="8"/><rect class="hdr-clip" x="420" y="278" width="180" height="8"/>
+  <text x="510" y="278" text-anchor="middle" class="t-green">FontHandle</text>
+  <text x="510" y="298" text-anchor="middle" class="t-dim">opaque index</text>
+
+  <rect class="box box-green" x="640" y="260" width="180" height="55"/>
+  <rect class="hdr" x="640" y="260" width="180" height="26" rx="8"/><rect class="hdr-clip" x="640" y="278" width="180" height="8"/>
+  <text x="730" y="278" text-anchor="middle" class="t-green">ZxlImage</text>
+  <text x="730" y="298" text-anchor="middle" class="t-dim">palette, frames, pixels</text>
+
+  <!-- Row 4: Parsing -->
+  <rect class="box box-orange" x="130" y="390" width="160" height="55"/>
+  <rect class="hdr" x="130" y="390" width="160" height="26" rx="8"/><rect class="hdr-clip" x="130" y="408" width="160" height="8"/>
+  <text x="210" y="408" text-anchor="middle" class="t-orange">FontReader</text>
+  <text x="210" y="428" text-anchor="middle" class="t-dim">big-endian TTF binary</text>
+
+  <rect class="box box-orange" x="320" y="390" width="160" height="55"/>
+  <rect class="hdr" x="320" y="390" width="160" height="26" rx="8"/><rect class="hdr-clip" x="320" y="408" width="160" height="8"/>
+  <text x="400" y="408" text-anchor="middle" class="t-orange">EarClipper</text>
+  <text x="400" y="428" text-anchor="middle" class="t-dim">glyph triangulation</text>
+
+  <rect class="box box-orange" x="510" y="390" width="160" height="55"/>
+  <rect class="hdr" x="510" y="390" width="160" height="26" rx="8"/><rect class="hdr-clip" x="510" y="408" width="160" height="8"/>
+  <text x="590" y="408" text-anchor="middle" class="t-orange">GlyphBuilder</text>
+  <text x="590" y="428" text-anchor="middle" class="t-dim">filter + build triangles</text>
+
+  <rect class="box box-orange" x="700" y="390" width="160" height="55"/>
+  <rect class="hdr" x="700" y="390" width="160" height="26" rx="8"/><rect class="hdr-clip" x="700" y="408" width="160" height="8"/>
+  <text x="780" y="408" text-anchor="middle" class="t-orange">ZxlReader/Writer</text>
+  <text x="780" y="428" text-anchor="middle" class="t-dim">binary serialize/deser</text>
+
+  <!-- Connections -->
+  <path d="M 230,75 L 230,100 Q 230,120 290,120 L 330,130" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 470,75 L 470,100 Q 470,120 420,120 L 400,130" class="line-ref" marker-end="url(#a-orange)"/>
+  <path d="M 710,75 L 710,100 Q 710,120 500,120 L 460,130" class="line-ref" marker-end="url(#a-orange)"/>
+
+  <path d="M 490,158 L 540,158" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 370,185 L 370,220 Q 370,250 320,250 L 300,260" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 640,185 L 640,220 Q 640,250 550,250 L 520,260" class="line-own" marker-end="url(#a-blue)"/>
+
+  <path d="M 930,75 L 930,220 Q 930,250 800,250 L 760,260" class="line-ref" marker-end="url(#a-orange)"/>
+
+  <path d="M 290,315 L 290,350 Q 290,380 240,380 L 220,390" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 290,315 L 290,350 Q 290,380 370,380 L 390,390" class="line-ref" marker-end="url(#a-orange)"/>
+  <path d="M 290,315 L 290,350 Q 290,380 520,380 L 560,390" class="line-ref" marker-end="url(#a-orange)"/>
+
+  <path d="M 730,315 L 730,350 Q 730,380 760,380 L 770,390" class="line-own" marker-end="url(#a-blue)"/>
+</svg>
+</div>
+
+<h3>File Map</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Asset Management</span>
+    <span class="fp">src/assets/assets.zig</span> <span class="fc">// module root, public exports</span><br>
+    <span class="fp">src/assets/AssetManager.zig</span> <span class="fc">// top-level manager (name &rarr; handle map)</span><br>
+    <span class="fl">Font System</span>
+    <span class="fp">src/assets/font/font_manager.zig</span> <span class="fc">// font array + path dedup</span><br>
+    <span class="fp">src/assets/font/font.zig</span> <span class="fc">// Font struct, TTF parsing</span><br>
+    <span class="fp">src/assets/font/font_data.zig</span> <span class="fc">// TrueType binary format definitions</span><br>
+    <span class="fp">src/assets/font/FontReader.zig</span> <span class="fc">// big-endian binary reader</span><br>
+    <span class="fp">src/assets/font/glyph_builder.zig</span> <span class="fc">// glyph &rarr; triangle conversion</span><br>
+    <span class="fp">src/assets/font/ear_clipping.zig</span> <span class="fc">// polygon triangulation algorithm</span><br>
+    <span class="fp">src/assets/default_orbitron.ttf</span> <span class="fc">// embedded default font</span><br>
+    <span class="fl">ZXL Pixel Art Format</span>
+    <span class="fp">src/zxl/zxl.zig</span> <span class="fc">// module root</span><br>
+    <span class="fp">src/zxl/ZxlImage.zig</span> <span class="fc">// image, palette, frame types</span><br>
+    <span class="fp">src/zxl/ZxlReader.zig</span> <span class="fc">// binary deserialization</span><br>
+    <span class="fp">src/zxl/ZxlWriter.zig</span> <span class="fc">// binary serialization</span><br>
+    <span class="fl">Engine Integration</span>
+    <span class="fp">src/engine/EngineAssets.zig</span> <span class="fc">// engine.getFont() convenience</span><br>
+    <span class="fp">src/scene/instantiator.zig</span> <span class="fc">// loads fonts from scene asset declarations</span>
+  </div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ASSET MANAGER -->
+<!-- ============================================================ -->
+<section id="asset-manager">
+<h2>AssetManager</h2>
+<p>Top-level asset coordinator. Wraps FontManager and adds a name-to-handle registry for scene-declared assets. <code>src/assets/AssetManager.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">AssetManager</div>
+  <div class="fields">
+    <span class="fl">Fields</span>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">fonts</span>: <span class="ft">FontManager</span><br>
+    <span class="fp">name_to_font</span>: <span class="ft">StringHashMap(FontHandle)</span> <span class="fc">// scene asset name &rarr; handle</span><br>
+    <span class="fl">Lifecycle</span>
+    <span class="fn">init</span>(alloc) &rarr; <span class="ft">AssetManager</span> <span class="fc">// loads embedded default Orbitron font</span><br>
+    <span class="fn">deinit</span>()<br>
+    <span class="fl">Font Loading</span>
+    <span class="fn">setFontPath</span>(path) <span class="fc">// set base search directory</span><br>
+    <span class="fn">loadFont</span>(name) &rarr; <span class="ft">FontHandle</span> <span class="fc">// load from font_path/name</span><br>
+    <span class="fn">loadFontFromPath</span>(path) &rarr; <span class="ft">FontHandle</span> <span class="fc">// load from absolute path</span><br>
+    <span class="fl">Font Access</span>
+    <span class="fn">getFontHandle</span>(name) &rarr; <span class="ft">FontHandle</span> <span class="fc">// get cached or load</span><br>
+    <span class="fn">getFont</span>(handle) &rarr; <span class="ft">?*Font</span> <span class="fc">// retrieve by handle</span><br>
+    <span class="fn">getFontByName</span>(name) &rarr; <span class="ft">*const Font</span> <span class="fc">// one-shot name &rarr; Font</span><br>
+    <span class="fl">Scene Integration</span>
+    <span class="fn">registerFontAsset</span>(asset_name, handle) <span class="fc">// bind scene name to handle</span><br>
+    <span class="fn">getFontAssetHandle</span>(asset_name) &rarr; <span class="ft">FontHandle</span> <span class="fc">// lookup by scene name</span>
+  </div>
+</div>
+
+<h3>Two-Level Name Resolution</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">Scene asset name (e.g. "GameFont")</span><br>
+    <span class="fc">&nbsp;&nbsp;&darr; AssetManager.name_to_font</span><br>
+    <span class="fc">FontHandle { id: usize }</span><br>
+    <span class="fc">&nbsp;&nbsp;&darr; FontManager.fonts[handle.id]</span><br>
+    <span class="fc">*Font (parsed TrueType data)</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#font-manager">FontManager</a>
+  <a href="#font">Font</a>
+  <a href="#scene-assets">Scene Asset Loading</a>
+  <a href="#lifecycle">Asset Lifecycle</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- FONT MANAGER -->
+<!-- ============================================================ -->
+<section id="font-manager">
+<h2>FontManager</h2>
+<p>Manages the array of loaded fonts. Deduplicates by normalized path. <code>src/assets/font/font_manager.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">FontManager</div>
+  <div class="fields">
+    <span class="fl">Fields</span>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">fonts</span>: <span class="ft">ArrayList(FontEntry)</span> <span class="fc">// indexed by FontHandle.id</span><br>
+    <span class="fp">path_to_handle</span>: <span class="ft">StringHashMap(FontHandle)</span> <span class="fc">// dedup by path</span><br>
+    <span class="fp">font_path</span>: <span class="ft">[]const u8</span> <span class="fc">// base font search directory</span><br>
+    <span class="fl">Methods</span>
+    <span class="fn">init</span>(alloc) &rarr; <span class="ft">FontManager</span><br>
+    <span class="fn">deinit</span>() <span class="fc">// frees all Font instances</span><br>
+    <span class="fn">setFontPath</span>(path)<br>
+    <span class="fn">loadFont</span>(name) &rarr; <span class="ft">FontHandle</span> <span class="fc">// font_path + "/" + name</span><br>
+    <span class="fn">loadFontFromPath</span>(path) &rarr; <span class="ft">FontHandle</span> <span class="fc">// absolute path, dedup check</span><br>
+    <span class="fn">loadFontFromMemory</span>(name, data) &rarr; <span class="ft">FontHandle</span> <span class="fc">// for embedded fonts</span><br>
+    <span class="fn">getFont</span>(handle) &rarr; <span class="ft">?*Font</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">FontHandle</div>
+  <div class="fields">
+    <span class="fp">id</span>: <span class="ft">usize</span> <span class="fc">// index into FontManager.fonts ArrayList</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">FontEntry</div>
+  <div class="fields">
+    <span class="fp">normalized_path</span>: <span class="ft">[]const u8</span> <span class="fc">// absolute path (or "&lt;embedded:name&gt;" for memory fonts)</span><br>
+    <span class="fp">font</span>: <span class="ft">*Font</span> <span class="fc">// pointer to parsed Font</span>
+  </div>
+</div>
+
+<h3>Deduplication</h3>
+<p>Before loading a font, the manager normalizes the path and checks <code>path_to_handle</code>. If the font is already loaded, the existing handle is returned. Embedded fonts use synthetic paths like <code>&lt;embedded:orbitron&gt;</code>.</p>
+
+<div class="links">
+  <a href="#asset-manager">AssetManager</a>
+  <a href="#font">Font</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- FONT -->
+<!-- ============================================================ -->
+<section id="font">
+<h2>Font</h2>
+<p>A parsed TrueType font. Contains glyph outlines, character mapping, and horizontal metrics. <code>src/assets/font/font.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">Font</div>
+  <div class="fields">
+    <span class="fl">Metadata</span>
+    <span class="fp">alloc</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">units_per_em</span>: <span class="ft">u16</span> <span class="fc">// TrueType design units per em-square</span><br>
+    <span class="fp">ascender</span>: <span class="ft">i16</span> <span class="fc">// distance from baseline to top</span><br>
+    <span class="fp">descender</span>: <span class="ft">i16</span> <span class="fc">// distance from baseline to bottom (negative)</span><br>
+    <span class="fp">line_gap</span>: <span class="ft">i16</span> <span class="fc">// extra vertical spacing between lines</span><br>
+    <span class="fl">Character Mapping</span>
+    <span class="fp">char_to_glyph</span>: <span class="ft">AutoHashMap(u32, u16)</span> <span class="fc">// Unicode codepoint &rarr; glyph index</span><br>
+    <span class="fl">Glyph Metrics</span>
+    <span class="fp">glyph_advance_width</span>: <span class="ft">ArrayList(Hmetric)</span> <span class="fc">// per-glyph width + bearing</span><br>
+    <span class="fl">Glyph Shapes</span>
+    <span class="fp">glyph_shapes</span>: <span class="ft">AutoHashMap(u16, FilteredGlyph)</span> <span class="fc">// glyph index &rarr; outline</span><br>
+    <span class="fp">glyph_triangles</span>: <span class="ft">AutoHashMap(u16, [][3]usize)</span> <span class="fc">// lazy-built triangulation cache</span><br>
+    <span class="fl">Methods</span>
+    <span class="fn">init</span>(alloc, path) &rarr; <span class="ft">Font</span> <span class="fc">// load from TTF file</span><br>
+    <span class="fn">initFromMemory</span>(alloc, data) &rarr; <span class="ft">Font</span> <span class="fc">// load from embedded bytes</span><br>
+    <span class="fn">deinit</span>() <span class="fc">// free all glyph data</span><br>
+    <span class="fn">measureText</span>(text, scale) &rarr; <span class="ft">V2</span> <span class="fc">// calculate text bounding box</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Hmetric</div>
+  <div class="fields">
+    <span class="fp">advance_width</span>: <span class="ft">u16</span> <span class="fc">// horizontal advance in font units</span><br>
+    <span class="fp">lsb</span>: <span class="ft">i16</span> <span class="fc">// left side bearing in font units</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">FilteredGlyph</div>
+  <div class="fields">
+    <span class="fp">points</span>: <span class="ft">[]V2</span> <span class="fc">// normalized coordinates (0.0 &ndash; 1.0 range)</span><br>
+    <span class="fp">contour_ends</span>: <span class="ft">[]u16</span> <span class="fc">// inclusive end index of each contour</span><br>
+    <span class="fp">contour_count</span>: <span class="ft">u16</span><br>
+    <span class="fp">total_points</span>: <span class="ft">u16</span> <span class="fc">// total on-curve points</span>
+  </div>
+</div>
+
+<p>Glyph coordinates are normalized to the 0.0&ndash;1.0 range during parsing (divided by <code>units_per_em</code>). This makes scale-independent rendering straightforward: multiply by desired pixel size.</p>
+
+<div class="links">
+  <a href="#ttf-parsing">TrueType Parsing</a>
+  <a href="#glyph-pipeline">Glyph Pipeline</a>
+  <a href="#font-manager">FontManager</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TTF PARSING -->
+<!-- ============================================================ -->
+<section id="ttf-parsing">
+<h2>TrueType Parsing</h2>
+<p>The Font constructor parses a TrueType (<code>.ttf</code>) binary file. All data is big-endian. <code>src/assets/font/font.zig</code> + <code>src/assets/font/font_data.zig</code></p>
+
+<h3>Tables Read</h3>
+<ol class="flow-list">
+  <li><strong>Font Directory</strong> &mdash; locate all tables by tag (head, hhea, hmtx, maxp, cmap, loca, glyf)</li>
+  <li><strong>head</strong> &mdash; units_per_em, index_to_loc_format (short/long loca offsets), checksum validation</li>
+  <li><strong>maxp</strong> &mdash; num_glyphs (total glyph count)</li>
+  <li><strong>hhea</strong> &mdash; ascender, descender, line_gap, number of horizontal metrics</li>
+  <li><strong>hmtx</strong> &mdash; per-glyph advance_width and left side bearing</li>
+  <li><strong>cmap</strong> &mdash; character-to-glyph mapping (Format 4 subtable, Unicode platform)</li>
+  <li><strong>loca</strong> &mdash; glyph offsets into glyf table (short or long format)</li>
+  <li><strong>glyf</strong> &mdash; glyph outlines (contours, points, flags)</li>
+</ol>
+
+<h3>Key Binary Structures</h3>
+<div class="card ext">
+  <div class="card-name c-orange">Font Directory</div>
+  <div class="fields">
+    <span class="fp">sfnt_version</span>: <span class="ft">u32</span> <span class="fc">// 0x00010000 for TrueType</span><br>
+    <span class="fp">num_tables</span>: <span class="ft">u16</span><br>
+    <span class="fc">Followed by TableEntry[num_tables]: { tag: u32, checksum: u32, offset: u32, length: u32 }</span>
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">HeadTable</div>
+  <div class="fields">
+    <span class="fp">units_per_em</span>: <span class="ft">u16</span> <span class="fc">// design units (typically 1000 or 2048)</span><br>
+    <span class="fp">index_to_loc_format</span>: <span class="ft">i16</span> <span class="fc">// 0 = short (u16), 1 = long (u32)</span><br>
+    <span class="fp">magic_number</span>: <span class="ft">u32</span> <span class="fc">// must be 0x5f0f3cf5</span>
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">CmapFormat4</div>
+  <div class="fields">
+    <span class="fc">Segment-based mapping for BMP characters (U+0000 to U+FFFF)</span><br>
+    <span class="fp">seg_countx2</span>: <span class="ft">u16</span> <span class="fc">// 2 * number of segments</span><br>
+    <span class="fc">Arrays: endCode[], startCode[], idDelta[], idRangeOffset[]</span><br>
+    <span class="fc">For char in [startCode..endCode]: glyph = char + idDelta (or via rangeOffset)</span>
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">GlyphFlag (packed bitfield)</div>
+  <div class="fields">
+    <span class="fp">on_curve</span>: <span class="ft">u1</span> <span class="fc">// 1 = on outline, 0 = control point (quadratic bezier)</span><br>
+    <span class="fp">xShort</span>: <span class="ft">u1</span> <span class="fc">// X delta is 1 byte</span> &nbsp;
+    <span class="fp">yShort</span>: <span class="ft">u1</span> <span class="fc">// Y delta is 1 byte</span><br>
+    <span class="fp">repeat</span>: <span class="ft">u1</span> <span class="fc">// next byte is repeat count</span><br>
+    <span class="fp">x_same_or_pos</span>: <span class="ft">u1</span> &nbsp;
+    <span class="fp">y_same_or_pos</span>: <span class="ft">u1</span>
+  </div>
+</div>
+
+<h3>Parsing Errors</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">HeadTableNotFound, MaxpTableNotFound, HheaTableNotFound, HmtxTableNotFound</span><br>
+    <span class="fc">CmapTableNotFound, GlyfTableNotFound, LocaTableNotFound</span><br>
+    <span class="fc">InvalidTTFMagicNumber, HeadTableCorrupted, NoValidCmapEncoding</span><br>
+    <span class="fc">+ corrupted checksums for each table</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#font">Font</a>
+  <a href="#font-reader">FontReader</a>
+  <a href="#glyph-pipeline">Glyph Pipeline</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- GLYPH PIPELINE -->
+<!-- ============================================================ -->
+<section id="glyph-pipeline">
+<h2>Glyph Pipeline</h2>
+<p>How a character goes from TrueType binary to rendered triangles on screen.</p>
+
+<ol class="flow-list">
+  <li><strong>Parse glyf table</strong> &mdash; extract contour endpoints, point coordinates (delta-encoded), and flags from binary</li>
+  <li><strong>Filter to on-curve points</strong> &mdash; discard quadratic bezier control points, keep only on-curve vertices. Normalize coordinates to 0.0&ndash;1.0 range. Store as <code>FilteredGlyph</code></li>
+  <li><strong>Build triangles</strong> (lazy, on first render) &mdash; <code>glyph_builder.buildTriangles()</code>:
+    <br>&nbsp;&nbsp;a) Remove duplicate consecutive vertices (epsilon &lt; 0.00001)
+    <br>&nbsp;&nbsp;b) Remove collinear points (sin(angle) &lt; 0.01)
+    <br>&nbsp;&nbsp;c) Ear-clip polygon to triangles
+  </li>
+  <li><strong>Cache triangles</strong> &mdash; store in <code>Font.glyph_triangles</code> map for reuse</li>
+  <li><strong>Render</strong> &mdash; <code>text.zig</code> reads triangles, applies position/scale, submits as geometry draw calls</li>
+</ol>
+
+<h3>EarClipper</h3>
+<div class="card ext">
+  <div class="card-name c-orange">EarClipper</div>
+  <div class="fields">
+    <span class="fp">vertices</span>: <span class="ft">[]const Point</span> <span class="fc">// all glyph points</span><br>
+    <span class="fp">polygon</span>: <span class="ft">ArrayList(usize)</span> <span class="fc">// active vertex indices</span><br>
+    <span class="fp">reflex</span>: <span class="ft">ArrayList(VertexClass)</span> <span class="fc">// convex/reflex classification</span><br>
+    <span class="fp">triangles</span>: <span class="ft">ArrayList(Triangle)</span> <span class="fc">// output</span><br>
+    <span class="fp">winding_sign</span>: <span class="ft">f32</span> = -1.0 <span class="fc">// -1=CW, +1=CCW</span><br>
+    <span class="fl">Algorithm</span>
+    <span class="fn">triangulate</span>(contours) &rarr; <span class="ft">[]Triangle</span><br>
+    <span class="fc">1) Classify contours by winding (CW = outer, CCW = holes)</span><br>
+    <span class="fc">2) Bridge holes into outer contour via rightmost vertex</span><br>
+    <span class="fc">3) Iteratively clip ear tips (convex verts with no interior reflex verts)</span><br>
+    <span class="fc">4) Handle concave shapes by adapting winding when remainder flips</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#font">Font (FilteredGlyph)</a>
+  <a href="#ttf-parsing">TrueType Parsing</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- FONT READER -->
+<!-- ============================================================ -->
+<section id="font-reader">
+<h2>FontReader</h2>
+<p>Low-level binary reader for TrueType files. All numbers are big-endian. <code>src/assets/font/FontReader.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">FontReader</div>
+  <div class="fields">
+    <span class="fp">data</span>: <span class="ft">[]const u8</span> <span class="fc">// entire TTF file in memory</span><br>
+    <span class="fp">pos</span>: <span class="ft">usize</span> = 0 <span class="fc">// current read position</span><br>
+    <span class="fl">Read Operations</span>
+    <span class="fn">readStruct</span>(comptime T) &rarr; <span class="ft">T</span> <span class="fc">// read packed struct with endian swap</span><br>
+    <span class="fn">readU8</span>() &rarr; <span class="ft">u8</span><br>
+    <span class="fn">readU16BigEndian</span>() / <span class="fn">readI16BigEndian</span>() &rarr; <span class="ft">u16</span> / <span class="ft">i16</span><br>
+    <span class="fn">readU32BigEndian</span>() / <span class="fn">readI32BigEndian</span>() &rarr; <span class="ft">u32</span> / <span class="ft">i32</span><br>
+    <span class="fn">readU64BigEndian</span>() &rarr; <span class="ft">u64</span><br>
+    <span class="fl">Navigation</span>
+    <span class="fn">seek</span>(offset) <span class="fc">// jump to absolute position</span><br>
+    <span class="fn">rewind</span>(negOffset) <span class="fc">// go back N bytes</span><br>
+    <span class="fn">skip</span>(bytes) <span class="fc">// skip forward</span><br>
+    <span class="fn">remaining</span>() &rarr; <span class="ft">usize</span><br>
+    <span class="fl">Validation</span>
+    <span class="fn">calculateChecksum</span>(offset, length, is_head) &rarr; <span class="ft">u32</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#ttf-parsing">TrueType Parsing</a>
+  <a href="#font">Font</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ZXL FORMAT -->
+<!-- ============================================================ -->
+<section id="zxl-format">
+<h2>ZXL Format</h2>
+<p>The engine's custom pixel art format for ZixelArt. Palette-indexed, multi-frame, compact binary. <code>src/zxl/</code></p>
+
+<h3>Binary Layout</h3>
+<table class="byte-table">
+  <tr><th>Offset</th><th>Size</th><th>Type</th><th>Description</th></tr>
+  <tr><td class="offset">0</td><td>4</td><td class="type">u8[4]</td><td class="desc">Magic: "ZXL\x00"</td></tr>
+  <tr><td class="offset">4</td><td>1</td><td class="type">u8</td><td class="desc">Version (currently 1)</td></tr>
+  <tr><td class="offset">5</td><td>1</td><td class="type">u8</td><td class="desc">Flags (reserved)</td></tr>
+  <tr><td class="offset">6</td><td>2</td><td class="type">u16 LE</td><td class="desc">Frame count</td></tr>
+  <tr><td class="offset">8</td><td>2</td><td class="type">u16 LE</td><td class="desc">Canvas width</td></tr>
+  <tr><td class="offset">10</td><td>2</td><td class="type">u16 LE</td><td class="desc">Canvas height</td></tr>
+  <tr><td class="offset">12</td><td>1</td><td class="type">u8</td><td class="desc">Palette size (0 = 256)</td></tr>
+  <tr><td class="offset">13</td><td>3</td><td class="type">u8[3]</td><td class="desc">Reserved (zeroed)</td></tr>
+  <tr><td class="offset">16</td><td>N&times;4</td><td class="type">Rgba[N]</td><td class="desc">Palette colors (R,G,B,A per entry)</td></tr>
+  <tr><td class="offset">16+N&times;4</td><td>var</td><td class="type">Frame[]</td><td class="desc">Frame data (see below)</td></tr>
+</table>
+
+<h3>Frame Layout</h3>
+<table class="byte-table">
+  <tr><th>Field</th><th>Size</th><th>Type</th><th>Description</th></tr>
+  <tr><td class="offset">name_len</td><td>1</td><td class="type">u8</td><td class="desc">Length of frame name</td></tr>
+  <tr><td class="offset">name</td><td>name_len</td><td class="type">u8[]</td><td class="desc">Frame name (UTF-8)</td></tr>
+  <tr><td class="offset">duration_ms</td><td>2</td><td class="type">u16 LE</td><td class="desc">Animation frame duration</td></tr>
+  <tr><td class="offset">origin_x</td><td>2</td><td class="type">i16 LE</td><td class="desc">Sprite pivot X</td></tr>
+  <tr><td class="offset">origin_y</td><td>2</td><td class="type">i16 LE</td><td class="desc">Sprite pivot Y</td></tr>
+  <tr><td class="offset">reserved</td><td>1</td><td class="type">u8</td><td class="desc">Reserved</td></tr>
+  <tr><td class="offset">pixels</td><td>W&times;H</td><td class="type">u8[]</td><td class="desc">Palette indices (row-major)</td></tr>
+</table>
+
+<p><strong>Design notes:</strong> All multi-byte values are little-endian. Palette index 0 is always transparent by convention. Max 256 colors per image. Frame pixels are palette indices, not raw RGBA &mdash; very compact for pixel art.</p>
+
+<div class="links">
+  <a href="#zxl-image">ZxlImage</a>
+  <a href="#zxl-io">Reader / Writer</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ZXL IMAGE -->
+<!-- ============================================================ -->
+<section id="zxl-image">
+<h2>ZxlImage</h2>
+<p>In-memory representation of a ZXL pixel art image. <code>src/zxl/ZxlImage.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">ZxlImage</div>
+  <div class="fields">
+    <span class="fp">gpa</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">name</span>: <span class="ft">[]u8</span><br>
+    <span class="fp">frames</span>: <span class="ft">ArrayList(ZxlFrame)</span><br>
+    <span class="fp">palette</span>: <span class="ft">ZxlPalette</span><br>
+    <span class="fl">Methods</span>
+    <span class="fn">init</span>(alloc, name) &rarr; <span class="ft">ZxlImage</span><br>
+    <span class="fn">deinit</span>()<br>
+    <span class="fn">addFrame</span>(name, width, height, pixels, duration_ms, origin_x, origin_y)<br>
+    <span class="fn">getFrame</span>(index) &rarr; <span class="ft">?*const ZxlFrame</span><br>
+    <span class="fn">getFrameByName</span>(name) &rarr; <span class="ft">?*const ZxlFrame</span><br>
+    <span class="fn">toRgbaBuffer</span>(frame_index) &rarr; <span class="ft">[]u8</span> <span class="fc">// expand palette indices to RGBA bytes</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">ZxlPalette</div>
+  <div class="fields">
+    <span class="fp">colors</span>: <span class="ft">[256]Rgba</span> <span class="fc">// fixed-size color table</span><br>
+    <span class="fp">count</span>: <span class="ft">u8</span> = 1 <span class="fc">// actual count (min 1 for transparent at index 0)</span><br>
+    <span class="fl">Methods</span>
+    <span class="fn">addColor</span>(rgba) &rarr; <span class="ft">u8</span> <span class="fc">// returns palette index (0 if full)</span><br>
+    <span class="fn">findColor</span>(rgba) &rarr; <span class="ft">?u8</span> <span class="fc">// search for existing color</span><br>
+    <span class="fn">getColor</span>(index) &rarr; <span class="ft">Rgba</span> <span class="fc">// returns clear if out of bounds</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">ZxlFrame</div>
+  <div class="fields">
+    <span class="fp">name</span>: <span class="ft">[]const u8</span> <span class="fc">// allocated</span><br>
+    <span class="fp">pixels</span>: <span class="ft">[]u8</span> <span class="fc">// palette indices, width * height</span><br>
+    <span class="fp">width</span> / <span class="fp">height</span>: <span class="ft">u16</span><br>
+    <span class="fp">duration_ms</span>: <span class="ft">u16</span> <span class="fc">// for animation</span><br>
+    <span class="fp">origin_x</span> / <span class="fp">origin_y</span>: <span class="ft">i16</span> <span class="fc">// sprite pivot point</span><br>
+    <span class="fl">Methods</span>
+    <span class="fn">getPixel</span>(x, y) &rarr; <span class="ft">u8</span> <span class="fc">// palette index at (x, y)</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Rgba</div>
+  <div class="fields">
+    <span class="fp">r</span>, <span class="fp">g</span>, <span class="fp">b</span>, <span class="fp">a</span>: <span class="ft">u8</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#zxl-format">ZXL Format</a>
+  <a href="#zxl-io">Reader / Writer</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ZXL IO -->
+<!-- ============================================================ -->
+<section id="zxl-io">
+<h2>ZXL Reader / Writer</h2>
+<p>Binary serialization and deserialization for the ZXL format. <code>src/zxl/ZxlReader.zig</code> + <code>src/zxl/ZxlWriter.zig</code></p>
+
+<div class="card leaf">
+  <div class="card-name c-green">ZxlReader</div>
+  <div class="fields">
+    <span class="fn">fromBytes</span>(alloc, data) &rarr; <span class="ft">ZxlImage</span> <span class="fc">// deserialize from byte slice</span><br>
+    <span class="fn">fromFile</span>(alloc, path) &rarr; <span class="ft">ZxlImage</span> <span class="fc">// read file + deserialize</span>
+  </div>
+</div>
+
+<div class="card leaf">
+  <div class="card-name c-green">ZxlWriter</div>
+  <div class="fields">
+    <span class="fn">toBytes</span>(alloc, image) &rarr; <span class="ft">[]u8</span> <span class="fc">// serialize to byte slice</span><br>
+    <span class="fn">toFile</span>(alloc, image, path) <span class="fc">// serialize + write to disk</span>
+  </div>
+</div>
+
+<h3>Reader Flow</h3>
+<ol class="flow-list">
+  <li>Validate magic bytes ("ZXL\x00") and version (must be 1)</li>
+  <li>Read header: frame count, canvas dimensions, palette size</li>
+  <li>Read palette: N &times; 4 bytes (RGBA per color)</li>
+  <li>For each frame: read name (length-prefixed), duration, origin, then pixel data (W&times;H palette indices)</li>
+  <li>Return populated ZxlImage</li>
+</ol>
+
+<h3>Writer Flow</h3>
+<ol class="flow-list">
+  <li>Write magic, version, flags</li>
+  <li>Write frame count, canvas dimensions, palette size</li>
+  <li>Write palette colors</li>
+  <li>For each frame: write name (length-prefixed), duration, origin, pixel data</li>
+</ol>
+
+<h3>Errors</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">InvalidMagic</span> <span class="fc">// wrong file signature</span><br>
+    <span class="ft">UnsupportedVersion</span> <span class="fc">// version != 1</span><br>
+    <span class="ft">UnexpectedEof</span> <span class="fc">// file truncated</span><br>
+    <span class="ft">InvalidPixelData</span> <span class="fc">// frame pixel count != width * height</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#zxl-image">ZxlImage</a>
+  <a href="#zxl-format">ZXL Format</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SCENE ASSET LOADING -->
+<!-- ============================================================ -->
+<section id="scene-assets">
+<h2>Scene Asset Loading</h2>
+<p>How assets declared in <code>.scene</code> files get loaded into the AssetManager. <code>src/scene/instantiator.zig</code></p>
+
+<h3>Scene File Declaration</h3>
+<div class="card" style="border-color: #21262d; font-family: 'SF Mono',monospace; font-size: 0.8rem; line-height: 1.8;">
+  <span style="color:#f0883e">[GameFont:asset font]</span><br>
+  &nbsp;&nbsp;<span style="color:#79c0ff">filename</span>:<span style="color:#d2a8ff">string</span> <span style="color:#7ee787">"orbitron.ttf"</span><br><br>
+  <span style="color:#f0883e">[TitleFont:asset font]</span><br>
+  &nbsp;&nbsp;<span style="color:#79c0ff">abs_path</span>:<span style="color:#d2a8ff">string</span> <span style="color:#7ee787">"/usr/share/fonts/title.ttf"</span>
+</div>
+
+<h3>Loading Flow</h3>
+<ol class="flow-list">
+  <li>Instantiator encounters <code>AssetDeclaration</code> with type <code>.font</code></li>
+  <li>Extract properties: <code>filename</code>, <code>path</code>, or <code>abs_path</code></li>
+  <li>Load via one of three methods:
+    <br>&nbsp;&nbsp;a) <code>abs_path</code> &rarr; <code>AssetManager.loadFontFromPath(abs_path)</code>
+    <br>&nbsp;&nbsp;b) <code>filename</code> + <code>path</code> &rarr; <code>loadFontFromPath(path/filename)</code>
+    <br>&nbsp;&nbsp;c) <code>filename</code> only &rarr; <code>loadFont(filename)</code> (uses base font_path)
+  </li>
+  <li><code>AssetManager.registerFontAsset(asset_name, handle)</code> &mdash; bind scene name to handle</li>
+  <li>Later, <code>Text</code> components reference fonts by handle: <code>font_asset: FontHandle</code></li>
+</ol>
+
+<h3>AST Types</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">AssetDeclaration</span> { name, asset_type: <span class="ft">AssetType</span>, properties: <span class="ft">?[]Property</span> }<br>
+    <span class="ft">AssetType</span> = enum { font } <span class="fc">// + texture, audio, shader, sprite, material, mesh planned</span><br>
+    <span class="ft">Property</span> { name, type_annotation, value }<br>
+    <span class="ft">Value</span> = number | string | color | bool | vector | assetRef | array
+  </div>
+</div>
+
+<div class="links">
+  <a href="#asset-manager">AssetManager</a>
+  <a href="#font-manager">FontManager</a>
+  <a href="#lifecycle">Asset Lifecycle</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ASSET LIFECYCLE -->
+<!-- ============================================================ -->
+<section id="lifecycle">
+<h2>Asset Lifecycle</h2>
+<p>Complete flow from build time to shutdown.</p>
+
+<h3>1. Build Time</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">@embedFile("default_orbitron.ttf") compiled into executable</span><br>
+    <span class="fc">Asset module linked with math + renderer dependencies</span>
+  </div>
+</div>
+
+<h3>2. Engine Initialization</h3>
+<ol class="flow-list">
+  <li><code>AssetManager.init(allocator)</code></li>
+  <li><code>FontManager.init()</code> with base path "assets/fonts/"</li>
+  <li>Load embedded Orbitron from memory &rarr; registered as "__default__"</li>
+  <li>Default FontHandle always available</li>
+</ol>
+
+<h3>3. Scene Load Time</h3>
+<ol class="flow-list">
+  <li><code>SceneManager.loadScene(name, path)</code> &rarr; parse .scene file to AST</li>
+  <li><code>Instantiator.instantiate(scene_file)</code> walks declarations</li>
+  <li>For each <code>AssetDeclaration</code>: load TTF, parse tables, build glyph shapes</li>
+  <li>Register in <code>name_to_font</code> map by scene asset name</li>
+  <li>For each <code>EntityDeclaration</code> with <code>Text</code> component: store FontHandle reference</li>
+</ol>
+
+<h3>4. Runtime Rendering</h3>
+<ol class="flow-list">
+  <li>RenderSys queries <code>Transform + Text</code></li>
+  <li>Retrieve Font via <code>AssetManager.getFont(text.font_asset)</code></li>
+  <li>For each character: map to glyph &rarr; lazy-triangulate &rarr; cache &rarr; draw</li>
+  <li>Advance cursor by <code>advance_width * scale</code></li>
+</ol>
+
+<h3>5. Shutdown</h3>
+<ol class="flow-list">
+  <li><code>AssetManager.deinit()</code></li>
+  <li><code>FontManager.deinit()</code> &mdash; for each Font: free glyph_shapes, glyph_triangles, char_to_glyph, advance_widths</li>
+  <li>Free path_to_handle and name_to_font hashmaps</li>
+</ol>
+
+<div class="links">
+  <a href="#asset-manager">AssetManager</a>
+  <a href="#font">Font</a>
+  <a href="#scene-assets">Scene Loading</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- FUTURE ASSET TYPES -->
+<!-- ============================================================ -->
+<section id="future">
+<h2>Future Asset Types</h2>
+<p>Planned extensions following the same FontManager/FontHandle pattern.</p>
+
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Planned (marked in code as TODO)</span>
+    <span class="ft">texture</span> <span class="fc">// 2D images for sprites (PNG, ZXL)</span><br>
+    <span class="ft">audio</span> <span class="fc">// sound effects and music</span><br>
+    <span class="ft">shader</span> <span class="fc">// custom shader programs</span><br>
+    <span class="ft">sprite</span> <span class="fc">// sprite sheet definitions (atlas + frame rects)</span><br>
+    <span class="ft">material</span> <span class="fc">// material / appearance data</span><br>
+    <span class="ft">mesh</span> <span class="fc">// 3D model data (far future)</span><br>
+    <span class="fl">Expected Pattern</span>
+    <span class="fc">ZxlManager + ZxlHandle &mdash; same as FontManager + FontHandle</span><br>
+    <span class="fc">AssetManager gains zxl_manager field + name_to_zxl map</span><br>
+    <span class="fc">Scene format gains AssetType.zxl for .scene file declarations</span><br>
+    <span class="fc">Instantiator gains instantiateZxl() handler</span>
+  </div>
+</div>
+
+<h3>Current Limitations</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">Fonts only &mdash; no sprite/texture/audio assets yet</span><br>
+    <span class="fc">No async loading &mdash; all synchronous on main thread</span><br>
+    <span class="fc">No hot-reload &mdash; assets loaded once, immutable</span><br>
+    <span class="fc">No resource pooling &mdash; each load is independent</span><br>
+    <span class="fc">Single-threaded &mdash; not thread-safe for concurrent loads</span><br>
+    <span class="fc">Glyph triangles computed per-Font instance (not shared across same font at different sizes)</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#zxl-format">ZXL Format</a>
+  <a href="#asset-manager">AssetManager</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- BACK TO TOP -->
+<!-- ============================================================ -->
+<p style="margin-top: 3rem; text-align: center;">
+  <a href="#top" style="color: #484f58; font-size: 0.85rem;">&uarr; back to top</a>
+</p>
+
+</body>
+</html>

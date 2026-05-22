@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux Platform Layer — Wayland + Vulkan Handoff Plan</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #e8e6e3;
+            background: #1a1a1a;
+            padding: 20px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #f7931e;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #f7931e;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #f7931e;
+            font-size: 1.6em;
+            margin-top: 36px;
+            margin-bottom: 12px;
+            border-left: 4px solid #f7931e;
+            padding-left: 12px;
+        }
+
+        h3 {
+            color: #ffb347;
+            font-size: 1.2em;
+            margin-top: 22px;
+            margin-bottom: 8px;
+        }
+
+        h4 {
+            color: #ffd699;
+            font-size: 1.05em;
+            margin-top: 18px;
+            margin-bottom: 6px;
+        }
+
+        p, li { margin-bottom: 8px; }
+
+        ul, ol {
+            padding-left: 30px;
+            margin-bottom: 12px;
+        }
+
+        code {
+            background: #2a2a2a;
+            color: #ffd699;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.92em;
+        }
+
+        pre {
+            background: #2a2a2a;
+            border-left: 3px solid #f7931e;
+            padding: 12px 16px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0 16px 0;
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: #e8e6e3;
+        }
+
+        .intro {
+            font-style: italic;
+            color: #b8b8b8;
+            margin-bottom: 30px;
+            margin-top: 12px;
+        }
+
+        .phase {
+            background: #232323;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 18px 22px;
+            margin-bottom: 28px;
+        }
+
+        .phase h2 {
+            margin-top: 0;
+            border-left: none;
+            padding-left: 0;
+        }
+
+        .phase-label {
+            display: inline-block;
+            background: #f7931e;
+            color: #1a1a1a;
+            font-weight: bold;
+            font-size: 0.78em;
+            padding: 2px 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .checklist {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .checklist li {
+            padding: 5px 0 5px 32px;
+            position: relative;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .checklist li:last-child { border-bottom: none; }
+
+        .checklist li input[type="checkbox"] {
+            position: absolute;
+            left: 4px;
+            top: 8px;
+            accent-color: #f7931e;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .checklist li.done {
+            color: #666;
+            text-decoration: line-through;
+        }
+
+        .note {
+            background: #2a2520;
+            border-left: 3px solid #ffb347;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.95em;
+        }
+
+        .principle {
+            background: #1f2a1f;
+            border-left: 3px solid #4caf50;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+
+        .why {
+            background: #1f1f2e;
+            border-left: 3px solid #6495ed;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.95em;
+        }
+
+        .gotcha {
+            background: #2e1f1f;
+            border-left: 3px solid #e74c3c;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.95em;
+        }
+
+        .file-tree {
+            background: #2a2a2a;
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.92em;
+            margin: 10px 0;
+            line-height: 1.7;
+        }
+
+        .file-tree .new    { color: #4caf50; }
+        .file-tree .port   { color: #6495ed; }
+        .file-tree .keep   { color: #888; }
+        .file-tree .delete { color: #e74c3c; text-decoration: line-through; }
+        .file-tree .ref    { color: #ffb347; }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 8px 0 14px 0;
+            font-size: 0.88em;
+        }
+
+        .legend span { display: flex; align-items: center; gap: 6px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .dot-new    { background: #4caf50; }
+        .dot-port   { background: #6495ed; }
+        .dot-keep   { background: #888; }
+        .dot-delete { background: #e74c3c; }
+        .dot-ref    { background: #ffb347; }
+
+        .diagram {
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 14px 0;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.82em;
+            line-height: 1.6;
+            overflow-x: auto;
+            color: #e8e6e3;
+            white-space: pre;
+        }
+
+        .toc {
+            background: #232323;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 14px 22px;
+            margin-bottom: 30px;
+        }
+        .toc h3 { margin-top: 0; color: #f7931e; }
+        .toc ol { margin-bottom: 0; }
+        .toc a { color: #ffb347; text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+
+        .handoff {
+            background: #1a2a1a;
+            border: 2px solid #4caf50;
+            border-radius: 6px;
+            padding: 14px 18px;
+            margin: 14px 0;
+        }
+        .handoff h3 { color: #4caf50; margin-top: 0; }
+
+        .sub-checklist {
+            list-style: none;
+            padding-left: 20px;
+            margin-top: 4px;
+        }
+        .sub-checklist li {
+            padding: 3px 0 3px 28px;
+            border-bottom: none;
+            font-size: 0.93em;
+            color: #b8b8b8;
+        }
+        .sub-checklist li input[type="checkbox"] {
+            position: absolute;
+            left: 4px;
+            top: 6px;
+            accent-color: #f7931e;
+            width: 14px;
+            height: 14px;
+        }
+
+        .tag {
+            display: inline-block;
+            font-size: 0.75em;
+            padding: 1px 7px;
+            border-radius: 8px;
+            margin-left: 6px;
+            vertical-align: middle;
+            font-weight: bold;
+        }
+        .tag-new  { background: #1f2a1f; color: #4caf50; border: 1px solid #4caf50; }
+        .tag-port { background: #1f1f2e; color: #6495ed; border: 1px solid #6495ed; }
+        .tag-keep { background: #2a2a2a; color: #888;    border: 1px solid #555; }
+        .tag-del  { background: #2e1f1f; color: #e74c3c; border: 1px solid #e74c3c; }
+    </style>
+</head>
+<body>
+
+<h1>Linux Platform Layer — Wayland + Vulkan Handoff</h1>
+<p class="intro">
+    Clean-slate rebuild of <code>linux.zig</code> and the entire
+    <code>platform/linux/wayland/</code> layer. Uses libwayland for the
+    connection, surface objects, and event loop — but replaces all C listener
+    structs with a comptime <code>Proxy(T)</code> dispatcher. Ends at the
+    renderer handoff: <code>getNativeWindowHandle()</code> returning a real
+    <code>wl_display*</code> and <code>wl_surface*</code> for Vulkan.
+</p>
+
+<div class="toc">
+    <h3>Phases</h3>
+    <ol>
+        <li><a href="#phase0">Phase 0 — Cleanup</a></li>
+        <li><a href="#phase1">Phase 1 — Protocol Types</a> &nbsp;<code>wl.zig</code> <code>xdg.zig</code> <code>interfaces.zig</code></li>
+        <li><a href="#phase2">Phase 2 — Proxy Dispatcher</a> &nbsp;<code>proxy.zig</code></li>
+        <li><a href="#phase3">Phase 3 — State</a> &nbsp;<code>state.zig</code></li>
+        <li><a href="#phase4">Phase 4 — Handlers</a> &nbsp;<code>handlers.zig</code></li>
+        <li><a href="#phase5">Phase 5 — Platform API</a> &nbsp;<code>linux.zig</code></li>
+        <li><a href="#handoff">Renderer Handoff</a></li>
+    </ol>
+</div>
+
+<div class="principle">
+    <strong>Why this architecture?</strong> libwayland is kept for three things only:
+    connect the socket, create surfaces Vulkan can use, and run the dispatch loop.
+    Everything above that — typed events, single handler per interface, comptime
+    decode — is your own layer, identical in shape to the old wire approach.
+    <code>wl_proxy_add_dispatcher</code> is the seam between them.
+</div>
+
+<!-- FILE TREE -->
+<h2>File Layout</h2>
+
+<div class="legend">
+    <span><span class="dot dot-new"></span> new</span>
+    <span><span class="dot dot-port"></span> port from _oldWireWayland</span>
+    <span><span class="dot dot-keep"></span> keep as-is</span>
+    <span><span class="dot dot-delete"></span> delete</span>
+    <span><span class="dot dot-ref"></span> reference only, do not touch</span>
+</div>
+
+<div class="file-tree">
+src/platform/
+  <span class="new">linux.zig</span>                              ← REWRITE — platform API, init, event loop
+  linux/
+    wayland/
+      <span class="keep">c.zig</span>                            ← keep (wayland-client.h, xdg-shell-client-protocol.h)
+      <span class="keep">consts.zig</span>                       ← keep (interface name strings)
+      <span class="port">wl.zig</span>                           ← PORT — typed WL event unions
+      <span class="port">xdg.zig</span>                          ← PORT — typed XDG event unions
+      <span class="port">interfaces.zig</span>                   ← PORT — re-export hub
+      <span class="new">proxy.zig</span>                        ← NEW  — Proxy(T) + wl_proxy_add_dispatcher
+      <span class="port">state.zig</span>                        ← PORT/ADAPT — WaylandState, WindowState, BoundObject
+      <span class="port">handlers.zig</span>                     ← PORT/ADAPT — typed on_event functions
+      <span class="delete">listeners.zig</span>                    ← DELETE — replaced entirely
+      _oldWireWayland/                       ← REFERENCE ONLY, do not touch
+        handlers.zig
+        interfaces.zig
+        state.zig
+        wire.zig
+        wl.zig
+        xdg.zig
+</div>
+
+<div class="diagram">
+  linux.zig (platform API)
+      │  init / deinit / createWindow / pollNextEvent / getNativeWindowHandle
+      │
+  handlers.zig  ←── typed on_event functions, one per interface
+      │              WlRegistry.Event / WlSeat.Event / XdgSurface.Event / etc.
+      │
+  proxy.zig     ←── Proxy(T): wl_proxy_add_dispatcher + comptime decodeArgs
+      │              decodes wl_argument[] → T.Event → on_event(event, ctx)
+      │
+  state.zig     ←── WaylandState / WindowState / BoundObject(T)
+      │
+  interfaces    ←── wl.zig + xdg.zig: typed Event unions (no Request unions needed)
+      │
+  c.zig         ←── libwayland C bindings (socket, surfaces, event loop, IDs)
+      │
+  COMPOSITOR    ←── Wayland compositor (Sway, Mutter, etc.)
+</div>
+
+
+<!-- PHASE 0 -->
+<div class="phase" id="phase0">
+    <div class="phase-label">Phase 0</div>
+    <h2>Cleanup</h2>
+    <p>Clear the slate before building.</p>
+    <ul class="checklist">
+        <li><input type="checkbox"> Delete <code>listeners.zig</code></li>
+        <li><input type="checkbox"> Wipe <code>linux.zig</code> — keep the file, remove all content</li>
+        <li><input type="checkbox"> Verify <code>_oldWireWayland/</code> is untouched (reference only)</li>
+        <li><input type="checkbox"> Confirm build fails cleanly (expected — nothing wired up yet)</li>
+    </ul>
+</div>
+
+
+<!-- PHASE 1 -->
+<div class="phase" id="phase1">
+    <div class="phase-label">Phase 1</div>
+    <h2>Protocol Types <span class="tag tag-port">port</span></h2>
+    <p>
+        Pure data — no logic, no imports from libwayland. Port the Event unions
+        from <code>_oldWireWayland/wl.zig</code> and <code>xdg.zig</code>.
+        Request unions are <strong>not needed</strong> — requests go through the
+        C API directly.
+    </p>
+
+    <h3>wl.zig</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>WlFixed</code> packed struct + <code>toF32</code></li>
+        <li><input type="checkbox"> <code>WlArray</code> struct (<code>len: usize</code>, <code>data: []const u8</code>)</li>
+        <li><input type="checkbox"> <code>WlDisplay.Event</code> — <code>err</code>, <code>delete_id</code></li>
+        <li><input type="checkbox"> <code>WlRegistry.Event</code> — <code>global</code>, <code>global_remove</code></li>
+        <li><input type="checkbox"> <code>WlCompositor.Event</code> — empty union</li>
+        <li><input type="checkbox"> <code>WlSeat.Event</code> — <code>capabilities</code>, <code>name</code></li>
+        <li><input type="checkbox"> <code>WlSeatCape</code> — pointer / keyboard / touch bitmasks</li>
+        <li><input type="checkbox"> <code>WlPointer.Event</code> — enter, leave, motion, button, axis, frame, axis_source, axis_stop, axis_discrete, axis_value120, axis_relative_direction</li>
+        <li><input type="checkbox"> <code>WlKeyboard.Event</code> — keymap, enter, leave, key, modifiers, repeat_info</li>
+        <li><input type="checkbox"> <code>WlSurface.Event</code> — enter, leave, preferred_buffer_scale, preferred_buffer_transform</li>
+        <li><input type="checkbox"> <code>WlOutput.Event</code> — geometry, mode, done, scale, name, description</li>
+        <li><input type="checkbox"> Comptime opcode ordering asserts for each Event union</li>
+    </ul>
+
+    <h3>xdg.zig</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>XdgWmBase.Event</code> — <code>ping</code></li>
+        <li><input type="checkbox"> <code>XdgSurface.Event</code> — <code>configure</code></li>
+        <li><input type="checkbox"> <code>XdgToplevel.Event</code> — configure, close, configure_bounds, wm_capabilities</li>
+        <li><input type="checkbox"> Comptime opcode ordering asserts</li>
+    </ul>
+
+    <h3>interfaces.zig</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> Re-export all types from <code>wl.zig</code> and <code>xdg.zig</code></li>
+    </ul>
+
+    <div class="note">
+        <strong>Note:</strong> Keep the comptime ordering asserts from the old wire.
+        They document the spec and catch silent opcode bugs. If they fire, the
+        interface is out of sync with the protocol — not a build quirk.
+    </div>
+</div>
+
+
+<!-- PHASE 2 -->
+<div class="phase" id="phase2">
+    <div class="phase-label">Phase 2</div>
+    <h2>Proxy Dispatcher <span class="tag tag-new">new</span></h2>
+    <p>
+        The core of the new approach. Replaces the event-handling half of
+        <code>wire.zig</code>. libwayland reads the socket and hands you a
+        <code>wl_argument[]</code> array — this layer decodes it into a typed
+        Zig event union and calls your handler.
+    </p>
+
+    <h3>Proxy(T) struct</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> Generic over interface type <code>T</code> (e.g. <code>WlSeat</code>, <code>XdgSurface</code>)</li>
+        <li><input type="checkbox"> Field: <code>ctx: *anyopaque</code> — pointer to WaylandState or WindowState</li>
+        <li><input type="checkbox"> Field: <code>on_event: *const fn(T.Event, *anyopaque) anyerror!void</code></li>
+        <li><input type="checkbox"> Method: <code>register(proxy: *c.wl_proxy) void</code> — calls <code>c.wl_proxy_add_dispatcher</code></li>
+    </ul>
+
+    <div class="note">
+        <strong>Memory:</strong> The <code>Proxy(T)</code> struct must live in stable
+        heap memory — libwayland stores a pointer to it as the
+        <code>implementation</code> argument. Store proxy instances directly inside
+        <code>WaylandState</code> or <code>WindowState</code>, which are
+        heap-allocated. Never store on the stack.
+    </div>
+
+    <h3>C dispatch function</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> One static <code>callconv(.c)</code> function per <code>Proxy(T)</code> instantiation</li>
+        <li><input type="checkbox"> Signature: <code>(impl: ?*const anyopaque, target: ?*anyopaque, opcode: u32, msg: ?*const c.wl_message, args: ?[*]c.wl_argument) c_int</code></li>
+        <li><input type="checkbox"> Cast <code>impl</code> → <code>*Proxy(T)</code>, call <code>decodeArgs</code>, call <code>on_event</code></li>
+        <li><input type="checkbox"> Return <code>0</code> on success, <code>-1</code> on error</li>
+    </ul>
+
+    <h3>decodeArgs — comptime decoder</h3>
+    <p>Same structure as old <code>parseEvent</code> in <code>wire.zig</code>, just reading from <code>wl_argument[]</code> instead of raw bytes.</p>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>inline for</code> over <code>T.Event</code> union fields, match <code>opcode</code> index</li>
+        <li><input type="checkbox"> <code>inline for</code> over that variant's struct fields — map Zig type → <code>wl_argument</code> field:</li>
+    </ul>
+    <ul class="sub-checklist">
+        <li><input type="checkbox"> <code>u32</code> → <code>args[i].u</code></li>
+        <li><input type="checkbox"> <code>i32</code> → <code>args[i].i</code></li>
+        <li><input type="checkbox"> <code>[]const u8</code> → <code>std.mem.span(args[i].s)</code></li>
+        <li><input type="checkbox"> <code>WlFixed</code> → <code>@bitCast(args[i].u)</code></li>
+        <li><input type="checkbox"> <code>WlArray</code> → read from <code>args[i].a</code> (<code>wl_array</code>: <code>.size</code>, <code>.data</code>)</li>
+        <li><input type="checkbox"> <code>i32</code> fd (keyboard keymap) → <code>args[i].h</code></li>
+        <li><input type="checkbox"> Empty struct (e.g. <code>close</code>, <code>frame</code>) → no args consumed, construct <code>.{}</code></li>
+    </ul>
+
+    <div class="gotcha">
+        <strong>Pointer cast:</strong> <code>wl_proxy_add_dispatcher</code> takes
+        <code>*c.wl_proxy</code>, but libwayland hands you typed pointers
+        (<code>*c.wl_registry</code>, <code>*c.wl_seat</code>, etc.). All Wayland
+        objects ARE <code>wl_proxy</code> internally. Use <code>@ptrCast</code> —
+        this is intentional in libwayland's design, not a hack.
+    </div>
+</div>
+
+
+<!-- PHASE 3 -->
+<div class="phase" id="phase3">
+    <div class="phase-label">Phase 3</div>
+    <h2>State <span class="tag tag-port">port / adapt</span></h2>
+    <p>Port <code>_oldWireWayland/state.zig</code>. Main difference: <code>BoundObject(T)</code> now holds a C handle alongside the Proxy.</p>
+
+    <h3>BoundObject(T)</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>name: u32</code> — registry global name, filled during registry scan roundtrip</li>
+        <li><input type="checkbox"> <code>version: u32</code> — filled during registry scan</li>
+        <li><input type="checkbox"> <code>proxy: Proxy(T)</code> — filled after bind + register</li>
+    </ul>
+
+    <h3>WaylandState</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>display: *c.wl_display</code></li>
+        <li><input type="checkbox"> <code>registry: *c.wl_registry</code></li>
+        <li><input type="checkbox"> <code>compositor: ?*c.wl_compositor</code></li>
+        <li><input type="checkbox"> <code>xdg_wm_base: ?*c.xdg_wm_base</code></li>
+        <li><input type="checkbox"> <code>seat: ?*c.wl_seat</code></li>
+        <li><input type="checkbox"> <code>output: ?*c.wl_output</code></li>
+        <li><input type="checkbox"> <code>registry_proxy: Proxy(WlRegistry)</code></li>
+        <li><input type="checkbox"> <code>compositor_info: BoundObject(WlCompositor)</code></li>
+        <li><input type="checkbox"> <code>seat_info: BoundObject(WlSeat)</code></li>
+        <li><input type="checkbox"> <code>xdg_wm_base_info: BoundObject(XdgWmBase)</code></li>
+        <li><input type="checkbox"> <code>output_info_bound: BoundObject(WlOutput)</code></li>
+        <li><input type="checkbox"> <code>has_pointer: bool</code></li>
+        <li><input type="checkbox"> <code>has_keyboard: bool</code></li>
+        <li><input type="checkbox"> <code>output_info: OutputInfo</code></li>
+    </ul>
+
+    <h3>OutputInfo</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>width: i32</code>, <code>height: i32</code>, <code>refresh: i32</code>, <code>scale: i32</code></li>
+    </ul>
+
+    <h3>WindowState</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>surface: *c.wl_surface</code></li>
+        <li><input type="checkbox"> <code>xdg_surface: *c.xdg_surface</code></li>
+        <li><input type="checkbox"> <code>xdg_toplevel: *c.xdg_toplevel</code></li>
+        <li><input type="checkbox"> <code>xdg_surface_proxy: Proxy(XdgSurface)</code></li>
+        <li><input type="checkbox"> <code>xdg_toplevel_proxy: Proxy(XdgToplevel)</code></li>
+        <li><input type="checkbox"> <code>configure_serial: u32</code></li>
+        <li><input type="checkbox"> <code>configured: bool</code></li>
+        <li><input type="checkbox"> <code>should_close: bool</code></li>
+        <li><input type="checkbox"> <code>width: u32</code>, <code>height: u32</code></li>
+        <li><input type="checkbox"> <code>events: EventRingBuffer</code></li>
+    </ul>
+</div>
+
+
+<!-- PHASE 4 -->
+<div class="phase" id="phase4">
+    <div class="phase-label">Phase 4</div>
+    <h2>Handlers <span class="tag tag-port">port / adapt</span></h2>
+    <p>
+        Port <code>_oldWireWayland/handlers.zig</code>. The typed switch logic is
+        identical. The only adaptation: responses to compositor events (ping, ack)
+        now call the C API instead of sending over the wire.
+    </p>
+
+    <h3>State-level handlers (ctx = *WaylandState)</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>onRegistryEvent</code> — fills <code>xxx_info.name</code> + <code>xxx_info.version</code> for each known interface string</li>
+        <li><input type="checkbox"> <code>onCompositorEvent</code> — empty (no compositor events)</li>
+        <li><input type="checkbox"> <code>onSeatEvent</code> — sets <code>has_pointer</code> / <code>has_keyboard</code> from capability bitmask; logs seat name</li>
+        <li><input type="checkbox"> <code>onOutputEvent</code> — fills <code>output_info</code> (geometry, mode, scale)</li>
+        <li><input type="checkbox"> <code>onXdgWmBaseEvent</code> — ping → call <code>c.xdg_wm_base_pong(state.xdg_wm_base, serial)</code></li>
+        <li><input type="checkbox"> <code>onPointerEvent</code> — translate to engine <code>Event</code> and push to window event queue</li>
+        <li><input type="checkbox"> <code>onKeyboardEvent</code> — translate to engine <code>Event</code> and push to window event queue</li>
+    </ul>
+
+    <h3>Window-level handlers (ctx = *WindowState)</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>onXdgSurfaceEvent</code> — configure → store serial, call <code>c.xdg_surface_ack_configure(win.xdg_surface, serial)</code>, set <code>configured = true</code></li>
+        <li><input type="checkbox"> <code>onXdgToplevelEvent</code>:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> configure → update <code>width</code> / <code>height</code> if non-zero</li>
+                <li><input type="checkbox"> close → set <code>should_close = true</code></li>
+                <li><input type="checkbox"> configure_bounds → log or ignore</li>
+                <li><input type="checkbox"> wm_capabilities → log or ignore</li>
+            </ul>
+        </li>
+    </ul>
+
+    <div class="note">
+        <strong>Event routing:</strong> Pointer and keyboard handlers need access to
+        the active window's event queue. Pass the window pointer via <code>ctx</code>,
+        or store a pointer to the current focused window in <code>WaylandState</code>.
+    </div>
+</div>
+
+
+<!-- PHASE 5 -->
+<div class="phase" id="phase5">
+    <div class="phase-label">Phase 5</div>
+    <h2>Platform API — linux.zig <span class="tag tag-new">rewrite</span></h2>
+    <p>
+        The top layer. Orchestrates init, window creation, the event loop, and
+        exposes the platform API that the rest of the engine calls. This file is
+        pure policy — no Wayland wire knowledge lives here.
+    </p>
+
+    <h3>init()</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>wl_display_connect(null)</code> → store in <code>state.display</code></li>
+        <li><input type="checkbox"> <code>wl_display_get_registry(display)</code> → store in <code>state.registry</code></li>
+        <li><input type="checkbox"> Create <code>state.registry_proxy</code> with <code>ctx = state</code>, <code>on_event = handlers.onRegistryEvent</code></li>
+        <li><input type="checkbox"> <code>registry_proxy.register(@ptrCast(state.registry))</code></li>
+        <li><input type="checkbox"> <code>wl_display_roundtrip</code> — fires registry globals, fills <code>xxx_info.name/version</code></li>
+        <li><input type="checkbox"> Bind compositor: <code>wl_registry_bind</code> → <code>state.compositor</code>, create + register <code>compositor_info.proxy</code></li>
+        <li><input type="checkbox"> Bind xdg_wm_base: same pattern → <code>state.xdg_wm_base</code>, register proxy with <code>onXdgWmBaseEvent</code></li>
+        <li><input type="checkbox"> Bind seat: same → <code>state.seat</code>, register proxy with <code>onSeatEvent</code></li>
+        <li><input type="checkbox"> Bind output: same → <code>state.output</code>, register proxy with <code>onOutputEvent</code></li>
+        <li><input type="checkbox"> <code>wl_display_roundtrip</code> — fires seat capabilities, output mode/scale</li>
+    </ul>
+
+    <h3>deinit()</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> Destroy objects in reverse creation order</li>
+        <li><input type="checkbox"> <code>wl_display_disconnect(state.display)</code> last</li>
+    </ul>
+
+    <h3>createWindow(config)</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>wl_compositor_create_surface(state.compositor)</code> → <code>win.surface</code></li>
+        <li><input type="checkbox"> <code>xdg_wm_base_get_xdg_surface(state.xdg_wm_base, surface)</code> → <code>win.xdg_surface</code></li>
+        <li><input type="checkbox"> <code>xdg_surface_get_toplevel(xdg_surface)</code> → <code>win.xdg_toplevel</code></li>
+        <li><input type="checkbox"> Create + register <code>win.xdg_surface_proxy</code> with <code>onXdgSurfaceEvent</code>, ctx = win</li>
+        <li><input type="checkbox"> Create + register <code>win.xdg_toplevel_proxy</code> with <code>onXdgToplevelEvent</code>, ctx = win</li>
+        <li><input type="checkbox"> <code>xdg_toplevel_set_title</code></li>
+        <li><input type="checkbox"> <code>wl_surface_commit</code></li>
+        <li><input type="checkbox"> <code>wl_display_roundtrip</code> — compositor sends configure, handler acks it</li>
+        <li><input type="checkbox"> Return <code>*Window</code> (wraps WindowState + exposes platform Window API)</li>
+    </ul>
+
+    <h3>Event Loop</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>pollNextEvent()</code> — <code>wl_display_dispatch_pending</code> then pop from window event queue</li>
+        <li><input type="checkbox"> <code>waitEvent()</code> — <code>wl_display_dispatch</code> (blocks) then pop</li>
+    </ul>
+
+    <h3>Platform API stubs + implementations</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>shouldClose(window)</code> → <code>win.should_close</code></li>
+        <li><input type="checkbox"> <code>getWindowScaleFactor(window)</code> → <code>state.output_info.scale</code></li>
+        <li><input type="checkbox"> <code>getDisplays(allocator)</code> → populate from <code>state.output_info</code></li>
+        <li><input type="checkbox"> <code>setMouseCursorVisible</code> / <code>setMouseCursorLocked</code> — stub ok for now</li>
+        <li><input type="checkbox"> <code>swapBuffers</code> — stub (Vulkan owns presentation)</li>
+        <li><input type="checkbox"> <code>getClipboardText</code> / <code>setClipboardText</code> — return <code>error.NotImplemented</code></li>
+        <li><input type="checkbox"> <code>getCapabilities()</code> — return <code>has_vulkan: true</code></li>
+    </ul>
+</div>
+
+
+<!-- RENDERER HANDOFF -->
+<div class="handoff" id="handoff">
+    <h3>Renderer Handoff Point</h3>
+    <p>
+        This is where the platform layer ends and the renderer begins.
+        <code>getNativeWindowHandle()</code> must return a heap-allocated struct
+        containing two pointers Vulkan needs:
+    </p>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>WindowHandle.display: *anyopaque</code> — cast from <code>*c.wl_display</code></li>
+        <li><input type="checkbox"> <code>WindowHandle.surface: *anyopaque</code> — cast from <code>*c.wl_surface</code></li>
+        <li><input type="checkbox"> Caller allocates, caller destroys — document this in the function signature</li>
+        <li><input type="checkbox"> Vulkan side uses these as <code>VkWaylandSurfaceCreateInfoKHR.display</code> and <code>.surface</code></li>
+    </ul>
+    <p style="margin-top:10px; color: #b8b8b8; font-size:0.93em;">
+        Once this function returns valid pointers and the window is configured,
+        the renderer can create a <code>VkSurfaceKHR</code> and take over.
+        The platform layer's job is done.
+    </p>
+</div>
+
+
+<h2>EventRingBuffer</h2>
+<p>Already exists in the old <code>linux.zig</code> — carry it forward unchanged. Lives in <code>linux.zig</code> or its own file.</p>
+<ul class="checklist">
+    <li><input type="checkbox"> Fixed-capacity ring buffer (64 events)</li>
+    <li><input type="checkbox"> <code>push(event: Event) void</code></li>
+    <li><input type="checkbox"> <code>popFront() ?Event</code></li>
+    <li><input type="checkbox"> Fix the <code>self.event_tail</code> typo from old code (<code>self.tail</code>)</li>
+</ul>
+
+
+<h2>Out of Scope (for now)</h2>
+<ul>
+    <li>Pointer / keyboard → full xkbcommon keymap processing</li>
+    <li>Cursor surface (custom cursor image)</li>
+    <li>Multi-window support</li>
+    <li>wl_shm / software rendering path</li>
+    <li>Clipboard (wl_data_device)</li>
+    <li>Drag and drop</li>
+    <li>High-DPI / fractional scaling protocol</li>
+    <li>Touch input</li>
+</ul>
+
+<div class="principle" style="margin-top: 30px;">
+    <strong>Reference:</strong> <code>_oldWireWayland/</code> stays forever.
+    It documents what libwayland is doing underneath — same opcode-indexed dispatch,
+    same type-based decode, same handler-per-interface pattern. The only thing that
+    changed is who reads the socket.
+</div>
+
+<script>
+    // Persist checkbox state in localStorage
+    document.querySelectorAll('input[type="checkbox"]').forEach((cb, i) => {
+        const key = 'linux-platform-plan-cb-' + i;
+        cb.checked = localStorage.getItem(key) === 'true';
+        cb.addEventListener('change', () => {
+            localStorage.setItem(key, cb.checked);
+            const li = cb.closest('li');
+            if (li) li.classList.toggle('done', cb.checked);
+        });
+        // Apply done class on load
+        if (cb.checked) {
+            const li = cb.closest('li');
+            if (li) li.classList.add('done');
+        }
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZixelArt Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 2rem 2rem 6rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1 { color: #58a6ff; font-size: 1.8rem; border-bottom: 1px solid #21262d; padding-bottom: 0.5rem; margin-bottom: 0.25rem; }
+  .page-sub { color: #8b949e; font-size: 0.9rem; margin-bottom: 2rem; }
+  h2 { color: #f0883e; font-size: 1.35rem; margin-top: 3rem; margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid #21262d; }
+  h3 { color: #d2a8ff; font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  p, li { margin-bottom: 0.4rem; }
+  code {
+    background: #161b22; padding: 0.15rem 0.4rem; border-radius: 3px;
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.85em; color: #79c0ff;
+  }
+
+  nav {
+    background: #161b22; border: 1px solid #21262d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin-bottom: 2rem;
+  }
+  nav .nav-title { color: #8b949e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: 0.5rem; }
+  nav .nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.3rem 1rem; }
+  nav a { font-size: 0.85rem; display: block; padding: 0.15rem 0; }
+  section { scroll-margin-top: 1rem; }
+
+  .card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin: 0.75rem 0;
+  }
+  .card.main   { border-color: #58a6ff; }
+  .card.child  { border-color: #d2a8ff; }
+  .card.leaf   { border-color: #7ee787; }
+  .card.ext    { border-color: #f0883e; border-style: dashed; }
+  .card-name { font-family: 'SF Mono','Fira Code',monospace; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .card-name.c-blue   { color: #58a6ff; }
+  .card-name.c-purple { color: #d2a8ff; }
+  .card-name.c-green  { color: #7ee787; }
+  .card-name.c-orange { color: #f0883e; }
+  .fields { font-family: 'SF Mono','Fira Code',monospace; font-size: 0.8rem; line-height: 1.7; }
+  .fn  { color: #d2a8ff; }
+  .ft  { color: #7ee787; }
+  .fp  { color: #79c0ff; }
+  .fc  { color: #8b949e; font-style: italic; }
+  .fl  { color: #484f58; font-family: -apple-system,sans-serif; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-top: 0.4rem; margin-bottom: 0.15rem; }
+
+  .links { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+  .links a {
+    background: #21262d; border: 1px solid #30363d; border-radius: 2rem;
+    padding: 0.25rem 0.75rem; font-size: 0.75rem; white-space: nowrap;
+  }
+  .links a:hover { border-color: #58a6ff; text-decoration: none; }
+
+  .flow-list { list-style: none; counter-reset: fl; margin: 0.75rem 0; }
+  .flow-list li {
+    counter-increment: fl; position: relative; padding: 0.5rem 0.75rem 0.5rem 2.75rem;
+    background: #161b22; border: 1px solid #21262d; border-radius: 6px; margin: 0.35rem 0;
+  }
+  .flow-list li::before {
+    content: counter(fl); position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+    background: #30363d; color: #8b949e; font-size: 0.7rem; font-weight: 700;
+    width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px;
+  }
+
+  .diagram-wrap { margin: 1rem 0; overflow-x: auto; }
+  svg { overflow: visible; }
+  .box { fill: #161b22; stroke: #30363d; stroke-width: 1.5; rx: 8; }
+  .box-main { stroke: #58a6ff; stroke-width: 2; }
+  .box-purple { stroke: #d2a8ff; }
+  .box-green { stroke: #7ee787; }
+  .box-orange { stroke: #f0883e; stroke-dasharray: 5,4; }
+  .hdr { fill: #21262d; rx: 8; }
+  .hdr-clip { fill: #21262d; }
+  .t-name   { fill: #58a6ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-purple { fill: #d2a8ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-green  { fill: #7ee787; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-orange { fill: #f0883e; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-field  { fill: #79c0ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-type   { fill: #7ee787; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-fn     { fill: #d2a8ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-dim    { fill: #8b949e; font-family: -apple-system,sans-serif; font-size: 10px; font-style: italic; }
+  .t-sec    { fill: #484f58; font-family: -apple-system,sans-serif; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+  .line-own  { stroke: #58a6ff; stroke-width: 2; fill: none; }
+  .line-ref  { stroke: #f0883e; stroke-dasharray: 6,4; fill: none; }
+  .line-flow { stroke: #7ee787; stroke-width: 2; fill: none; }
+  .arr-blue   { fill: #58a6ff; }
+  .arr-orange { fill: #f0883e; }
+  .arr-green  { fill: #7ee787; }
+
+  /* screen layout diagram */
+  .screen-region { stroke: #30363d; stroke-width: 1; rx: 4; }
+
+  /* tool color swatches */
+  .tool-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: middle; margin-right: 4px; border: 1px solid #30363d; }
+</style>
+</head>
+<body>
+
+<h1 id="top">ZixelArt Architecture</h1>
+<p class="page-sub">Pixel art editor &mdash; complete system map with every struct, method, and data flow</p>
+
+<nav>
+  <div class="nav-title">Jump to system</div>
+  <div class="nav-grid">
+    <a href="#macro">Macro Overview</a>
+    <a href="#main-loop">Main Loop</a>
+    <a href="#app">App (shared tool)</a>
+    <a href="#canvas">Canvas</a>
+    <a href="#state">ZixelState</a>
+    <a href="#tools">Tool System</a>
+    <a href="#tool-impls">Tool Implementations</a>
+    <a href="#commands">Commands &amp; History</a>
+    <a href="#layout">Screen Layout</a>
+    <a href="#palette">Palette</a>
+    <a href="#color-panel">Color Panel</a>
+    <a href="#color-slider">Color Sliders</a>
+    <a href="#toolbar">Toolbar</a>
+    <a href="#infobar">Info Bar</a>
+    <a href="#data-flow">Data Flow</a>
+    <a href="#memory">Memory</a>
+  </div>
+</nav>
+
+<!-- ============================================================ -->
+<!-- MACRO -->
+<!-- ============================================================ -->
+<section id="macro">
+<h2>Macro Overview</h2>
+
+<div class="diagram-wrap">
+<svg width="1060" height="520" viewBox="0 0 1060 520">
+  <defs>
+    <marker id="a-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-blue"/></marker>
+    <marker id="a-orange" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-orange"/></marker>
+    <marker id="a-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-green"/></marker>
+  </defs>
+
+  <!-- main.zig -->
+  <rect class="box box-main" x="380" y="10" width="300" height="55"/>
+  <rect class="hdr" x="380" y="10" width="300" height="26" rx="8"/><rect class="hdr-clip" x="380" y="24" width="300" height="12"/>
+  <text x="530" y="26" text-anchor="middle" class="t-name">main.zig</text>
+  <text x="530" y="50" text-anchor="middle" class="t-dim">entry point, main loop, event dispatch</text>
+
+  <!-- Row 2: App / State / Canvas -->
+  <rect class="box box-purple" x="30" y="115" width="200" height="55"/>
+  <rect class="hdr" x="30" y="115" width="200" height="26" rx="8"/><rect class="hdr-clip" x="30" y="129" width="200" height="12"/>
+  <text x="130" y="131" text-anchor="middle" class="t-purple">App</text>
+  <text x="130" y="155" text-anchor="middle" class="t-dim">window, renderer, input</text>
+
+  <rect class="box box-purple" x="270" y="115" width="200" height="55"/>
+  <rect class="hdr" x="270" y="115" width="200" height="26" rx="8"/><rect class="hdr-clip" x="270" y="129" width="200" height="12"/>
+  <text x="370" y="131" text-anchor="middle" class="t-purple">ZixelState</text>
+  <text x="370" y="155" text-anchor="middle" class="t-dim">active tool, color, cursor</text>
+
+  <rect class="box box-main" x="510" y="115" width="200" height="55"/>
+  <rect class="hdr" x="510" y="115" width="200" height="26" rx="8"/><rect class="hdr-clip" x="510" y="129" width="200" height="12"/>
+  <text x="610" y="131" text-anchor="middle" class="t-name">Canvas</text>
+  <text x="610" y="155" text-anchor="middle" class="t-dim">pixel grid + history</text>
+
+  <rect class="box box-purple" x="750" y="115" width="200" height="55"/>
+  <rect class="hdr" x="750" y="115" width="200" height="26" rx="8"/><rect class="hdr-clip" x="750" y="129" width="200" height="12"/>
+  <text x="850" y="131" text-anchor="middle" class="t-purple">UILayer</text>
+  <text x="850" y="155" text-anchor="middle" class="t-dim">5 views, widget tree</text>
+
+  <!-- Row 3: Tool System / Commands -->
+  <rect class="box" x="380" y="225" width="200" height="55" style="stroke:#7ee787;"/>
+  <rect class="hdr" x="380" y="225" width="200" height="26" rx="8"/><rect class="hdr-clip" x="380" y="239" width="200" height="12"/>
+  <text x="480" y="241" text-anchor="middle" class="t-green">ToolDispatcher</text>
+  <text x="480" y="265" text-anchor="middle" class="t-dim">begin / update / commit / cancel</text>
+
+  <rect class="box" x="640" y="225" width="200" height="55" style="stroke:#7ee787;"/>
+  <rect class="hdr" x="640" y="225" width="200" height="26" rx="8"/><rect class="hdr-clip" x="640" y="239" width="200" height="12"/>
+  <text x="740" y="241" text-anchor="middle" class="t-green">CommandHistory</text>
+  <text x="740" y="265" text-anchor="middle" class="t-dim">undo / redo stack</text>
+
+  <!-- Row 4: Tool Implementations -->
+  <rect class="box box-orange" x="120" y="335" width="130" height="45"/>
+  <text x="185" y="362" text-anchor="middle" class="t-orange" font-size="11">PencilTool</text>
+
+  <rect class="box box-orange" x="260" y="335" width="130" height="45"/>
+  <text x="325" y="362" text-anchor="middle" class="t-orange" font-size="11">EraserTool</text>
+
+  <rect class="box box-orange" x="400" y="335" width="130" height="45"/>
+  <text x="465" y="362" text-anchor="middle" class="t-orange" font-size="11">FillTool</text>
+
+  <rect class="box box-orange" x="540" y="335" width="130" height="45"/>
+  <text x="605" y="362" text-anchor="middle" class="t-orange" font-size="11">LineTool</text>
+
+  <rect class="box box-orange" x="680" y="335" width="130" height="45"/>
+  <text x="745" y="362" text-anchor="middle" class="t-orange" font-size="11">PickerTool</text>
+
+  <!-- Row 5: UI Components -->
+  <rect class="box" x="30" y="430" width="140" height="45" style="stroke:#7ee787;"/>
+  <text x="100" y="457" text-anchor="middle" class="t-green" font-size="11">Toolbar</text>
+
+  <rect class="box" x="180" y="430" width="140" height="45" style="stroke:#7ee787;"/>
+  <text x="250" y="457" text-anchor="middle" class="t-green" font-size="11">Palette</text>
+
+  <rect class="box" x="330" y="430" width="140" height="45" style="stroke:#7ee787;"/>
+  <text x="400" y="457" text-anchor="middle" class="t-green" font-size="11">ColorPanel</text>
+
+  <rect class="box" x="480" y="430" width="140" height="45" style="stroke:#7ee787;"/>
+  <text x="550" y="457" text-anchor="middle" class="t-green" font-size="11">ColorSlider</text>
+
+  <rect class="box" x="630" y="430" width="140" height="45" style="stroke:#7ee787;"/>
+  <text x="700" y="457" text-anchor="middle" class="t-green" font-size="11">InfoBar</text>
+
+  <!-- Connections -->
+  <path d="M 430,65 L 130,115" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 480,65 L 370,115" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 560,65 L 610,115" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 630,65 L 850,115" class="line-own" marker-end="url(#a-blue)"/>
+
+  <path d="M 610,170 L 520,225" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 650,170 L 720,225" class="line-own" marker-end="url(#a-blue)"/>
+
+  <path d="M 480,280 L 480,335" class="line-ref" marker-end="url(#a-orange)"/>
+  <text x="490" y="310" class="t-dim" font-size="9">dispatches to</text>
+
+  <path d="M 850,170 L 850,400 Q 850,425 830,425 L 770,430" class="line-ref" marker-end="url(#a-orange)"/>
+
+  <!-- layer labels -->
+  <text x="10" y="40" class="t-sec" font-size="10">ENTRY</text>
+  <text x="10" y="145" class="t-sec" font-size="10">CORE</text>
+  <text x="10" y="255" class="t-sec" font-size="10">DISPATCH</text>
+  <text x="10" y="362" class="t-sec" font-size="10">TOOLS</text>
+  <text x="10" y="457" class="t-sec" font-size="10">UI VIEWS</text>
+</svg>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MAIN LOOP -->
+<!-- ============================================================ -->
+<section id="main-loop">
+<h2>Main Loop</h2>
+<p><code>src/tools/zixelart/main.zig</code> &mdash; the frame-by-frame heartbeat</p>
+
+<ol class="flow-list">
+  <li><strong>app.beginFrame()</strong> &mdash; poll OS events, clear input frame states</li>
+  <li><strong>Keyboard input</strong> &mdash; Esc: quit | C: clear canvas | Cmd+Z: undo | Cmd+Shift+Z: redo</li>
+  <li><strong>screenToCanvas()</strong> &mdash; convert mouse screen position to canvas grid coords, or null if outside</li>
+  <li><strong>Mouse dispatch</strong> &mdash; left button pressed &rarr; <code>canvas.onMouseDown()</code> | dragged &rarr; <code>onMouseDrag()</code> | released &rarr; <code>onMouseUp()</code></li>
+  <li><strong>Render canvas</strong> &mdash; iterate <code>canvas.pixels[]</code>, draw each PixelCell via <code>renderer.drawGeometry()</code></li>
+  <li><strong>UI update</strong> &mdash; <code>ui_layer.update()</code> with mouse state</li>
+  <li><strong>Poll UI</strong> &mdash; check toolbar tool selection, palette color selection, RGB/HSV slider changes</li>
+  <li><strong>Sync state</strong> &mdash; update <code>ZixelState.active_tool</code>, <code>active_color</code>, sync sliders bidirectionally</li>
+  <li><strong>UI render + app.endFrame()</strong> &mdash; draw widgets, present frame</li>
+</ol>
+
+<h3>Constants</h3>
+<div class="card">
+  <div class="fields">
+    <span class="fp">logical_width</span>: <span class="ft">1920</span> &nbsp;
+    <span class="fp">logical_height</span>: <span class="ft">1088</span> &nbsp;
+    <span class="fp">pixel_count</span>: <span class="ft">64</span> <span class="fc">// 64x64 art grid</span>
+  </div>
+</div>
+
+<h3>Key Helper Functions</h3>
+<div class="card child">
+  <div class="fields">
+    <span class="fn">screenToCanvas</span>(canvas, screen_x: i32, screen_y: i32) &rarr; <span class="ft">?struct{ x: usize, y: usize }</span><br>
+    <span class="fc">Bounds check &rarr; subtract offsets &rarr; divide by pixel_size &rarr; null if out of grid</span><br><br>
+    <span class="fn">syncRgbSliders</span>(layer, color) <span class="fc">// push Color.rgba to slider_r/g/b</span><br>
+    <span class="fn">syncHsvSliders</span>(layer, color) <span class="fc">// push Color.hsva to slider_h/s/v</span><br>
+    <span class="fn">syncSlidersToColor</span>(layer, color) <span class="fc">// sync both RGB and HSV</span><br>
+    <span class="fn">setSliderVal</span>(layer, view, id, val) <span class="fc">// low-level slider state write</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#app">App</a>
+  <a href="#canvas">Canvas</a>
+  <a href="#state">ZixelState</a>
+  <a href="#tools">Tool dispatch</a>
+  <a href="#data-flow">Full data flow</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- APP -->
+<!-- ============================================================ -->
+<section id="app">
+<h2>App (Shared Tool Module)</h2>
+<p><code>src/tools/app.zig</code> &mdash; shared by ZixelArt, UI Playground, and future tools</p>
+
+<div class="card main">
+  <div class="card-name c-blue">App</div>
+  <div class="fields">
+    <span class="fl">Fields</span>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">window</span>: <span class="ft">*plat.Window</span><br>
+    <span class="fp">kb</span>: <span class="ft">*const plat.Keyboard</span><br>
+    <span class="fp">mouse</span>: <span class="ft">*const plat.Mouse</span><br>
+    <span class="fp">renderer</span>: <span class="ft">rend.Renderer</span><br>
+    <span class="fp">logical_width</span> / <span class="fp">logical_height</span>: <span class="ft">u32</span><br>
+    <span class="fl">Methods</span>
+    <span class="fn">init</span>(allocator, config: AppConfig) &rarr; <span class="ft">!App</span> <span class="fc">// logger + platform + window + renderer</span><br>
+    <span class="fn">deinit</span>(self)<br>
+    <span class="fn">isRunning</span>(self) &rarr; <span class="ft">bool</span> <span class="fc">// !window.shouldClose()</span><br>
+    <span class="fn">beginFrame</span>(self) <span class="fc">// clearInputStates + pollEvent + renderer.beginFrame</span><br>
+    <span class="fn">endFrame</span>(self) <span class="fc">// renderer.endFrame</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">AppConfig</div>
+  <div class="fields">
+    <span class="fp">title</span>: <span class="ft">[]const u8</span> <span class="fc">// required</span> &nbsp;
+    <span class="fp">width</span>: <span class="ft">u32</span> = 1024 &nbsp;
+    <span class="fp">height</span>: <span class="ft">u32</span> = 768 &nbsp;
+    <span class="fp">resizable</span>: <span class="ft">bool</span> = true
+  </div>
+</div>
+
+<div class="links">
+  <a href="#main-loop">Main loop (consumer)</a>
+  <a href="#canvas">Canvas (uses renderer)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- CANVAS -->
+<!-- ============================================================ -->
+<section id="canvas">
+<h2>Canvas</h2>
+<p><code>src/tools/zixelart/Canvas.zig</code> &mdash; the pixel grid, tool dispatch entry point, and history owner</p>
+
+<div class="card main">
+  <div class="card-name c-blue">Canvas</div>
+  <div class="fields">
+    <span class="fl">Memory</span>
+    <span class="fp">child_allocator</span>: <span class="ft">Allocator</span> <span class="fc">// GPA from main</span><br>
+    <span class="fp">arena</span>: <span class="ft">ArenaAllocator</span><br>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span> <span class="fc">// arena.allocator(), used for all canvas data</span><br>
+    <span class="fl">Dimensions</span>
+    <span class="fp">width</span> / <span class="fp">height</span>: <span class="ft">usize</span> <span class="fc">// screen region size</span><br>
+    <span class="fp">pixel_count</span>: <span class="ft">usize</span> <span class="fc">// grid size (64)</span><br>
+    <span class="fp">pixel_size</span>: <span class="ft">usize</span> <span class="fc">// screen pixels per art pixel</span><br>
+    <span class="fp">x_offset</span> / <span class="fp">y_offset</span>: <span class="ft">usize</span><br>
+    <span class="fl">Pixel Data</span>
+    <span class="fp">blank_color</span>: <span class="ft">Color</span> = Colors.CLEAR<br>
+    <span class="fp">pixels</span>: <span class="ft">[]PixelCell</span> <span class="fc">// flat array, len = pixel_count^2, row-major</span><br>
+    <span class="fl">Tool Infrastructure</span>
+    <span class="fp">changes</span>: <span class="ft">ArrayList(PixelChange)</span> <span class="fc">// active stroke changes</span><br>
+    <span class="fp">history</span>: <span class="ft">CommandHistory(ToolCommand)</span><br>
+    <span class="fp">dispatcher</span>: <span class="ft">ToolDispatcher</span><br>
+    <span class="fl">Public Methods</span>
+    <span class="fn">init</span>(alloc, region, pixel_count) &rarr; <span class="ft">!*Canvas</span><br>
+    <span class="fn">deinit</span>(self)<br>
+    <span class="fn">setPixel</span>(state) <span class="fc">// pixels[y*w+x].color = active_color</span><br>
+    <span class="fn">clearPixel</span>(state) <span class="fc">// pixels[y*w+x].color = blank_color</span><br>
+    <span class="fn">clear</span>(self) <span class="fc">// all pixels &rarr; blank_color</span><br>
+    <span class="fn">cancel</span>(self) <span class="fc">// restore all changes to old_color</span><br>
+    <span class="fl">Mouse Event Entry Points</span>
+    <span class="fn">onMouseDown</span>(tool, x, y, color) <span class="fc">// &rarr; dispatcher.begin()</span><br>
+    <span class="fn">onMouseDrag</span>(tool, x, y, color) <span class="fc">// &rarr; dispatcher.update()</span><br>
+    <span class="fn">onMouseUp</span>(tool) <span class="fc">// &rarr; dispatcher.commit() &rarr; history.push()</span><br>
+    <span class="fn">onCancel</span>(tool) <span class="fc">// &rarr; dispatcher.cancel()</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">PixelCell</div>
+  <div class="fields">
+    <span class="fp">shape</span>: <span class="ft">ShapeData</span> <span class="fc">// RectangleScreen for rendering (reconstructed on init, discarded on save)</span><br>
+    <span class="fp">color</span>: <span class="ft">Color</span> <span class="fc">// the actual art data</span>
+  </div>
+</div>
+
+<p style="margin-top:0.5rem; font-size: 0.85rem; color: #8b949e;">Indexing: <code>pixels[y * pixel_count + x]</code> &mdash; row-major, top-left origin.</p>
+
+<div class="links">
+  <a href="#tools">ToolDispatcher</a>
+  <a href="#commands">Commands / History</a>
+  <a href="#main-loop">Main loop (renders pixels)</a>
+  <a href="#layout">Layout (region)</a>
+  <a href="#memory">Memory (arena)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- STATE -->
+<!-- ============================================================ -->
+<section id="state">
+<h2>ZixelState</h2>
+<p><code>src/tools/zixelart/ZixelState.zig</code> &mdash; shared mutable state passed to UI builders and main loop</p>
+
+<div class="card child">
+  <div class="card-name c-purple">ZixelState</div>
+  <div class="fields">
+    <span class="fp">canvas</span>: <span class="ft">*Canvas</span><br>
+    <span class="fp">bg_color</span>: <span class="ft">Color</span><br>
+    <span class="fp">active_color</span>: <span class="ft">Color</span> = Colors.MAGENTA<br>
+    <span class="fp">active_color_name</span>: <span class="ft">[]const u8</span><br>
+    <span class="fp">active_tool</span>: <span class="ft">Tool</span><br>
+    <span class="fp">cursor_x</span>: <span class="ft">?usize</span> = null <span class="fc">// canvas grid coord, null when off canvas</span><br>
+    <span class="fp">cursor_y</span>: <span class="ft">?usize</span> = null<br>
+    <span class="fp">buf</span>: <span class="ft">*[256]u8</span> <span class="fc">// scratch buffer for text formatting</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#main-loop">Main loop (owns + mutates)</a>
+  <a href="#toolbar">Toolbar (reads active_tool)</a>
+  <a href="#color-panel">ColorPanel (reads active_color)</a>
+  <a href="#infobar">InfoBar (reads everything)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TOOL SYSTEM -->
+<!-- ============================================================ -->
+<section id="tools">
+<h2>Tool System</h2>
+<p><code>src/tools/zixelart/tool.zig</code> + <code>ToolFns.zig</code> &mdash; enum dispatch via function pointer table</p>
+
+<div class="card child">
+  <div class="card-name c-purple">Tool (enum)</div>
+  <div class="fields">
+    <span class="ft">pencil</span> | <span class="ft">erase</span> | <span class="ft">fill</span> | <span class="ft">picker</span> | <span class="ft">line</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">ToolFns</div>
+  <div class="fields">
+    <span class="fp">beginFn</span>: <span class="ft">*const fn(*Canvas, usize, usize, Color) void</span><br>
+    <span class="fp">updateFn</span>: <span class="ft">*const fn(*Canvas, usize, usize, Color) void</span><br>
+    <span class="fp">commitFn</span>: <span class="ft">*const fn(*Canvas) ?ToolCommand</span><br>
+    <span class="fp">previewFn</span>: <span class="ft">*const fn(*Canvas, RenderContext) void</span><br>
+    <span class="fp">cancelFn</span>: <span class="ft">*const fn(*Canvas) void</span>
+  </div>
+</div>
+
+<div class="card leaf">
+  <div class="card-name c-green">ToolDispatcher</div>
+  <div class="fields">
+    <span class="fp">tools</span>: <span class="ft">EnumArray(Tool, ToolFns)</span><br>
+    <span class="fl">Methods (delegate to active tool's fn pointers)</span>
+    <span class="fn">init</span>() <span class="fc">// registers all 5 tools</span><br>
+    <span class="fn">begin</span>(tool, canvas, x, y, color)<br>
+    <span class="fn">update</span>(tool, canvas, x, y, color)<br>
+    <span class="fn">commit</span>(tool, canvas) &rarr; <span class="ft">?ToolCommand</span><br>
+    <span class="fn">preview</span>(tool, canvas, ctx)<br>
+    <span class="fn">cancel</span>(tool, canvas)
+  </div>
+</div>
+
+<div class="links">
+  <a href="#tool-impls">Tool implementations</a>
+  <a href="#canvas">Canvas (owns dispatcher)</a>
+  <a href="#commands">ToolCommand (commit output)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TOOL IMPLEMENTATIONS -->
+<!-- ============================================================ -->
+<section id="tool-impls">
+<h2>Tool Implementations</h2>
+<p><code>src/tools/zixelart/tools/</code> &mdash; each tool exports <code>fns() &rarr; ToolFns</code></p>
+
+<div class="card ext">
+  <div class="card-name c-orange">PencilTool</div>
+  <div class="fields">
+    <span class="fn">begin</span>: set pixel color, record PixelChange<br>
+    <span class="fn">update</span>: skip if pixel already in changes (no duplicates per stroke), else begin()<br>
+    <span class="fn">commit</span>: duplicate changes &rarr; ToolCommand{ kind: .pencil }<br>
+    <span class="fn">preview</span>: no-op &nbsp; <span class="fn">cancel</span>: canvas.cancel() + clear changes
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">EraserTool</div>
+  <div class="fields">
+    <span class="fn">begin</span>: set pixel to <span class="fp">canvas.blank_color</span> (ignores color param), record change<br>
+    <span class="fn">update</span>: skip duplicates, else begin()<br>
+    <span class="fn">commit</span>: ToolCommand{ kind: .erase }<br>
+    <span class="fn">preview</span>: no-op &nbsp; <span class="fn">cancel</span>: canvas.cancel()
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">FillTool</div>
+  <div class="fields">
+    <span class="fn">begin</span>: flood-fill from (x, y)<br>
+    <span class="fc">&nbsp;&nbsp;Stack-based BFS, capacity 1024. Check target_color != fill color. Push 4 neighbors.</span><br>
+    <span class="fn">update</span>: no-op (fill only on click)<br>
+    <span class="fn">commit</span>: ToolCommand{ kind: .fill }<br>
+    <span class="fn">preview</span>: no-op &nbsp; <span class="fn">cancel</span>: canvas.cancel()
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">LineTool</div>
+  <div class="fields">
+    <span class="fn">begin</span>: set start pixel, record change<br>
+    <span class="fn">update</span>: restore all previous pixels &rarr; clear changes &rarr; <strong>Bresenham line</strong> from start to current<br>
+    <span class="fc">&nbsp;&nbsp;isize math, dx/dy/sx/sy, error accumulation, records each pixel</span><br>
+    <span class="fn">commit</span>: ToolCommand{ kind: .line }<br>
+    <span class="fn">preview</span>: no-op &nbsp; <span class="fn">cancel</span>: canvas.cancel()
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">PickerTool</div>
+  <div class="fields">
+    <span class="fn">begin</span> / <span class="fn">update</span> / <span class="fn">preview</span> / <span class="fn">cancel</span>: all no-op<br>
+    <span class="fn">commit</span>: returns null (no canvas modification)<br>
+    <span class="fc">Color picking is handled in main.zig by reading pixel color into state</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#tools">ToolDispatcher</a>
+  <a href="#commands">PixelChange / ToolCommand</a>
+  <a href="#canvas">Canvas (pixel data)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- COMMANDS -->
+<!-- ============================================================ -->
+<section id="commands">
+<h2>Commands &amp; History</h2>
+<p><code>src/tools/zixelart/commands.zig</code> + <code>CommandHistory.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">PixelChange</div>
+  <div class="fields">
+    <span class="fp">x</span>: <span class="ft">usize</span> &nbsp;
+    <span class="fp">y</span>: <span class="ft">usize</span> &nbsp;
+    <span class="fp">old_color</span>: <span class="ft">?Color</span> &nbsp;
+    <span class="fp">new_color</span>: <span class="ft">?Color</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">ToolCommand</div>
+  <div class="fields">
+    <span class="fp">kind</span>: <span class="ft">Tool</span> <span class="fc">// which tool produced this</span><br>
+    <span class="fp">pixels</span>: <span class="ft">[]PixelChange</span> <span class="fc">// all changes in one stroke</span><br>
+    <span class="fn">undo</span>(self, canvas) <span class="fc">// restore old_color for each pixel</span><br>
+    <span class="fn">redo</span>(self, canvas) <span class="fc">// restore new_color for each pixel</span>
+  </div>
+</div>
+
+<div class="card leaf">
+  <div class="card-name c-green">CommandHistory(T)</div>
+  <div class="fields">
+    <span class="fc">Generic over command type (T = ToolCommand)</span><br>
+    <span class="fp">cmds</span>: <span class="ft">ArrayList(T)</span> &nbsp;
+    <span class="fp">cursor</span>: <span class="ft">usize</span> <span class="fc">// position in stack</span><br>
+    <span class="fl">Methods</span>
+    <span class="fn">push</span>(cmd) <span class="fc">// truncates redo stack at cursor, appends</span><br>
+    <span class="fn">undo</span>() &rarr; <span class="ft">?T</span> <span class="fc">// decrement cursor, return cmd</span><br>
+    <span class="fn">redo</span>() &rarr; <span class="ft">?T</span> <span class="fc">// return cmd at cursor, increment</span><br>
+    <span class="fn">canUndo</span>() / <span class="fn">canRedo</span>() &rarr; <span class="ft">bool</span>
+  </div>
+</div>
+
+<h3>Undo/Redo Flow</h3>
+<ol class="flow-list">
+  <li>Tool stroke completes &rarr; <code>commit()</code> returns <code>ToolCommand</code> with all <code>PixelChange</code>s</li>
+  <li><code>history.push(cmd)</code> &mdash; appends to stack, truncates any redo future</li>
+  <li>Cmd+Z &rarr; <code>history.undo()</code> &rarr; <code>cmd.undo(canvas)</code> restores <code>old_color</code> per pixel</li>
+  <li>Cmd+Shift+Z &rarr; <code>history.redo()</code> &rarr; <code>cmd.redo(canvas)</code> restores <code>new_color</code> per pixel</li>
+</ol>
+
+<div class="links">
+  <a href="#tools">ToolDispatcher (produces commands)</a>
+  <a href="#canvas">Canvas (owns history)</a>
+  <a href="#main-loop">Main loop (Cmd+Z / Cmd+Shift+Z)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- LAYOUT -->
+<!-- ============================================================ -->
+<section id="layout">
+<h2>Screen Layout</h2>
+<p><code>src/tools/zixelart/Layout.zig</code> &mdash; hardcoded regions for 1920x1088</p>
+
+<div class="diagram-wrap">
+<svg width="768" height="440" viewBox="0 0 768 440">
+  <!-- Screen outline -->
+  <rect x="1" y="1" width="766" height="434" rx="6" fill="none" stroke="#30363d" stroke-width="2"/>
+
+  <!-- Toolbar -->
+  <rect class="screen-region" x="4" y="4" width="96" height="398" fill="#1a1525" rx="4"/>
+  <text x="52" y="200" text-anchor="middle" fill="#d2a8ff" font-size="11" font-weight="600">Toolbar</text>
+  <text x="52" y="214" text-anchor="middle" class="t-dim" font-size="9">240 x 1048</text>
+
+  <!-- Canvas area -->
+  <rect class="screen-region" x="104" y="4" width="440" height="398" fill="#111820" rx="4"/>
+  <rect x="145" y="15" width="360" height="376" rx="4" fill="none" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="325" y="200" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="700">Canvas 64x64</text>
+  <text x="325" y="218" text-anchor="middle" class="t-dim" font-size="10">pixel_size = region / 64</text>
+  <text x="325" y="234" text-anchor="middle" class="t-dim" font-size="10">centered in canvas area</text>
+
+  <!-- Right panel -->
+  <rect class="screen-region" x="548" y="4" width="216" height="128" fill="#1a1520" rx="4"/>
+  <text x="656" y="55" text-anchor="middle" fill="#7ee787" font-size="11" font-weight="600">Palette</text>
+  <text x="656" y="69" text-anchor="middle" class="t-dim" font-size="9">8x8 color grid</text>
+  <text x="656" y="83" text-anchor="middle" class="t-dim" font-size="9">300 x 300</text>
+
+  <rect class="screen-region" x="548" y="136" width="216" height="110" fill="#1a1520" rx="4"/>
+  <text x="656" y="180" text-anchor="middle" fill="#7ee787" font-size="11" font-weight="600">Color Panel</text>
+  <text x="656" y="196" text-anchor="middle" class="t-dim" font-size="9">active color preview</text>
+
+  <rect class="screen-region" x="548" y="250" width="216" height="152" fill="#1a1520" rx="4"/>
+  <text x="656" y="310" text-anchor="middle" fill="#7ee787" font-size="11" font-weight="600">Color Sliders</text>
+  <text x="656" y="326" text-anchor="middle" class="t-dim" font-size="9">R G B + H S V</text>
+
+  <!-- Info bar -->
+  <rect class="screen-region" x="4" y="406" width="760" height="26" fill="#151520" rx="4"/>
+  <text x="384" y="423" text-anchor="middle" fill="#7ee787" font-size="10" font-weight="600">Info Bar</text>
+  <text x="80" y="423" text-anchor="middle" class="t-dim" font-size="8">tool name</text>
+  <text x="200" y="423" text-anchor="middle" class="t-dim" font-size="8">color name</text>
+  <text x="520" y="423" text-anchor="middle" class="t-dim" font-size="8">64x64 | 100%</text>
+  <text x="680" y="423" text-anchor="middle" class="t-dim" font-size="8">[X, Y]</text>
+</svg>
+</div>
+
+<div class="card">
+  <div class="card-name c-purple" style="color:#d2a8ff;">Layout Constants</div>
+  <div class="fields">
+    <span class="fp">screen_width</span>: <span class="ft">1920</span> &nbsp;
+    <span class="fp">screen_height</span>: <span class="ft">1088</span> &nbsp;
+    <span class="fp">info_bar_height</span>: <span class="ft">40</span><br>
+    <span class="fp">toolbar_width</span>: <span class="ft">240</span> &nbsp;
+    <span class="fp">right_panel_width</span>: <span class="ft">300</span> &nbsp;
+    <span class="fp">canvas_size</span>: <span class="ft">1048</span><br>
+    <span class="fp">canvas_x_offset</span>: <span class="ft">286</span> <span class="fc">// toolbar + centering</span> &nbsp;
+    <span class="fp">pixel_size</span>: <span class="ft">16.375</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Region</div>
+  <div class="fields">
+    <span class="fp">x</span>: <span class="ft">f32</span> &nbsp; <span class="fp">y</span>: <span class="ft">f32</span> &nbsp; <span class="fp">width</span>: <span class="ft">f32</span> &nbsp; <span class="fp">height</span>: <span class="ft">f32</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#canvas">Canvas (uses canvas region)</a>
+  <a href="#toolbar">Toolbar</a>
+  <a href="#palette">Palette</a>
+  <a href="#infobar">Info Bar</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- PALETTE -->
+<!-- ============================================================ -->
+<section id="palette">
+<h2>Palette</h2>
+<p><code>src/tools/zixelart/Palette.zig</code> &mdash; 8x8 color grid (64 colors)</p>
+
+<div class="card leaf">
+  <div class="card-name c-green">Palette</div>
+  <div class="fields">
+    <span class="fl">Constants</span>
+    <span class="fp">palette_size</span>: <span class="ft">64</span> &nbsp;
+    <span class="fp">cols</span>: <span class="ft">8</span> &nbsp;
+    <span class="fp">rows</span>: <span class="ft">8</span> &nbsp;
+    <span class="fp">swatch_size</span>: <span class="ft">32</span>px<br>
+    <span class="fl">Data</span>
+    <span class="fp">colors</span>: <span class="ft">[64]Color</span> <span class="fc">// 8 hues x 8 brightness levels</span><br>
+    <span class="fc">Columns: Red, Orange, Yellow, Green, Cyan, Blue, Purple, Gray</span><br>
+    <span class="fc">Rows: brightest (BASE_*_1) to darkest (BASE_*_8)</span><br>
+    <span class="fp">color_ids</span>: <span class="ft">[64][]const u8</span> <span class="fc">// comptime: "pal_00" .. "pal_63"</span><br>
+    <span class="fl">UI</span>
+    <span class="fn">buildTree</span>(arena, state) &rarr; <span class="ft">*WidgetNode</span><br>
+    <span class="fc">64 Chicklet widgets in Grid(8 cols), Panel background CHARCOAL</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#main-loop">Main loop (polls selection)</a>
+  <a href="#state">ZixelState (updates active_color)</a>
+  <a href="#color-slider">Sliders (synced on pick)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- COLOR PANEL -->
+<!-- ============================================================ -->
+<section id="color-panel">
+<h2>Color Panel</h2>
+<p><code>src/tools/zixelart/ColorPanel.zig</code> &mdash; visual preview of active color</p>
+
+<div class="card leaf">
+  <div class="card-name c-green">ColorPanel</div>
+  <div class="fields">
+    <span class="fn">buildTree</span>(arena, state) &rarr; <span class="ft">*WidgetNode</span><br>
+    <span class="fc">Single ColorRect widget: state.active_color fill, BLACK border (width 2)</span><br>
+    <span class="fc">Non-interactive (display only)</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#state">ZixelState (reads active_color)</a>
+  <a href="#palette">Palette</a>
+  <a href="#color-slider">Sliders</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- COLOR SLIDER -->
+<!-- ============================================================ -->
+<section id="color-slider">
+<h2>Color Sliders</h2>
+<p><code>src/tools/zixelart/ColorSlider.zig</code> &mdash; RGB + HSV sliders for fine color control</p>
+
+<div class="card leaf">
+  <div class="card-name c-green">ColorSlider</div>
+  <div class="fields">
+    <span class="fn">buildTree</span>(arena, state) &rarr; <span class="ft">*WidgetNode</span><br>
+    <span class="fl">RGB Sliders</span>
+    <span class="fp">slider_r</span> <span class="fc">(RED label, RED fill)</span> &nbsp;
+    <span class="fp">slider_g</span> <span class="fc">(GREEN)</span> &nbsp;
+    <span class="fp">slider_b</span> <span class="fc">(BLUE)</span><br>
+    <span class="fc">Range: 0.0 - 1.0 (mapped to 0-255)</span><br>
+    <span class="fl">HSV Sliders</span>
+    <span class="fp">slider_h</span> <span class="fc">(hue)</span> &nbsp;
+    <span class="fp">slider_s</span> <span class="fc">(saturation)</span> &nbsp;
+    <span class="fp">slider_v</span> <span class="fc">(brightness)</span><br>
+    <span class="fc">Range: 0.0 - 1.0 (H mapped to 0-360 degrees)</span><br>
+    <span class="fl">Sync Behavior (in main.zig)</span>
+    <span class="fc">RGB change &rarr; build Color.initRgba() &rarr; sync HSV sliders</span><br>
+    <span class="fc">HSV change &rarr; build Color.initHsva() &rarr; sync RGB sliders</span><br>
+    <span class="fc">Palette pick &rarr; sync both RGB and HSV</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#main-loop">Main loop (polls + syncs)</a>
+  <a href="#state">ZixelState (updates active_color)</a>
+  <a href="#palette">Palette (triggers sync)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TOOLBAR -->
+<!-- ============================================================ -->
+<section id="toolbar">
+<h2>Toolbar</h2>
+<p><code>src/tools/zixelart/ToolBar.zig</code> &mdash; tool selection buttons</p>
+
+<div class="card leaf">
+  <div class="card-name c-green">ToolBar</div>
+  <div class="fields">
+    <span class="fn">buildTree</span>(arena, state) &rarr; <span class="ft">*WidgetNode</span><br>
+    <span class="fl">Tool Buttons (75x75 Chicklets + Label)</span>
+    <span class="fp">ck_pencil</span> &mdash; <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f0c040;border:1px solid #30363d;vertical-align:middle;"></span> PENCIL_YELLOW<br>
+    <span class="fp">ck_eraser</span> &mdash; <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#e87090;border:1px solid #30363d;vertical-align:middle;"></span> TULIP_PINK<br>
+    <span class="fp">ck_fill</span> &mdash; <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#40b8d0;border:1px solid #30363d;vertical-align:middle;"></span> OCEAN_SHALLOW<br>
+    <span class="fp">ck_line</span> &mdash; <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#40d870;border:1px solid #30363d;vertical-align:middle;"></span> EMERALD<br>
+    <span class="fp">ck_picker</span> &mdash; <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#b080e0;border:1px solid #30363d;vertical-align:middle;"></span> LAVENDER_FLOWER<br>
+    <span class="fl">Layout</span>
+    <span class="fc">VStack (spacing 30), Panel background CHARCOAL</span><br>
+    <span class="fc">is_selected reflects state.active_tool match</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#tools">Tool enum</a>
+  <a href="#state">ZixelState (active_tool)</a>
+  <a href="#main-loop">Main loop (polls selection)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- INFOBAR -->
+<!-- ============================================================ -->
+<section id="infobar">
+<h2>Info Bar</h2>
+<p><code>src/tools/zixelart/InfoBar.zig</code> &mdash; bottom status strip</p>
+
+<div class="card leaf">
+  <div class="card-name c-green">InfoBar</div>
+  <div class="fields">
+    <span class="fn">buildTree</span>(arena, state) &rarr; <span class="ft">*WidgetNode</span><br>
+    <span class="fl">Contents (left to right)</span>
+    <span class="fc">Active tool name (uppercase, scale 24)</span><br>
+    <span class="fc">Active color name (uppercase, tinted with active_color)</span><br>
+    <span class="fc">Spacer</span><br>
+    <span class="fc">"64x64" canvas dimensions</span><br>
+    <span class="fc">"100%" zoom level</span><br>
+    <span class="fc">Spacer</span><br>
+    <span class="fc">"[X, Y]" cursor coordinates (from state.cursor_x/y, bufPrint into state.buf)</span><br>
+    <span class="fl">Layout</span>
+    <span class="fc">HStack (spacing 40), Panel background CHARCOAL, non-interactive</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#state">ZixelState (reads all fields)</a>
+  <a href="#layout">Layout (info_bar region)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DATA FLOW -->
+<!-- ============================================================ -->
+<section id="data-flow">
+<h2>Data Flow</h2>
+
+<h3>Tool Execution</h3>
+<ol class="flow-list">
+  <li>Mouse pressed on canvas &rarr; <code>canvas.onMouseDown(active_tool, x, y, color)</code></li>
+  <li>Dispatcher calls tool's <code>beginFn(canvas, x, y, color)</code></li>
+  <li>Tool modifies <code>canvas.pixels[].color</code>, appends to <code>canvas.changes</code></li>
+  <li>Mouse dragged &rarr; <code>onMouseDrag</code> &rarr; tool's <code>updateFn</code> (may skip duplicates)</li>
+  <li>Mouse released &rarr; <code>onMouseUp</code> &rarr; tool's <code>commitFn</code> &rarr; returns <code>?ToolCommand</code></li>
+  <li>ToolCommand pushed to <code>canvas.history</code></li>
+</ol>
+
+<h3>Color Selection</h3>
+<ol class="flow-list">
+  <li><strong>Palette click</strong> &rarr; main.zig polls <code>color_ids[]</code> from UILayer &rarr; sets <code>state.active_color</code> &rarr; <code>syncSlidersToColor()</code></li>
+  <li><strong>RGB slider change</strong> &rarr; build <code>Color.initRgba(r*255, g*255, b*255, 255)</code> &rarr; sets <code>state.active_color</code> &rarr; <code>syncHsvSliders()</code></li>
+  <li><strong>HSV slider change</strong> &rarr; build <code>Color.initHsva(h*360, s, v, 1)</code> &rarr; sets <code>state.active_color</code> &rarr; <code>syncRgbSliders()</code></li>
+</ol>
+
+<h3>Render Pipeline</h3>
+<ol class="flow-list">
+  <li><code>app.beginFrame()</code> &mdash; poll events, start GPU frame</li>
+  <li>Iterate <code>canvas.pixels[]</code> &rarr; <code>renderer.drawGeometry(cell.shape, null, cell.color, BLACK, 1.0, ctx)</code></li>
+  <li><code>ui_layer.render()</code> &mdash; all widget trees drawn</li>
+  <li><code>app.endFrame()</code> &mdash; flush to GPU, present</li>
+</ol>
+
+<div class="links">
+  <a href="#main-loop">Main loop</a>
+  <a href="#tools">Tool system</a>
+  <a href="#commands">History</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MEMORY -->
+<!-- ============================================================ -->
+<section id="memory">
+<h2>Memory</h2>
+
+<div class="card">
+  <div class="card-name c-purple" style="color:#d2a8ff;">Allocation Strategy</div>
+  <div class="fields">
+    <span class="fl">GeneralPurposeAllocator (main.zig)</span>
+    <span class="fc">Top-level: App, Canvas pointer, UILayer, ZixelState.buf</span><br>
+    <span class="fl">Canvas ArenaAllocator</span>
+    <span class="fc">All canvas internals: pixels[], changes ArrayList, history commands</span><br>
+    <span class="fc">Single deinit() frees everything</span><br>
+    <span class="fl">UILayer Arena</span>
+    <span class="fc">Widget trees rebuilt each frame via buildTree() functions</span><br>
+    <span class="fc">Arena per view, reset each frame</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#canvas">Canvas (arena owner)</a>
+  <a href="#app">App (GPA consumer)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- BACK TO TOP -->
+<!-- ============================================================ -->
+<p style="margin-top: 3rem; text-align: center;">
+  <a href="#top" style="color: #484f58; font-size: 0.85rem;">&uarr; back to top</a>
+</p>
+
+</body>
+</html>

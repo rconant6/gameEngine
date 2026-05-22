@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engine API Layers & Demo Philosophy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #e0e0e0;
+            background: #1a1a1a;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #242424;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            color: #60a5fa;
+            border-bottom: 3px solid #3b82f6;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #93c5fd;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #2d2d2d;
+            border-left: 4px solid #3b82f6;
+        }
+
+        h3 {
+            color: #60a5fa;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+
+        .vision-box {
+            background: #2d2d2d;
+            border-left: 4px solid #10b981;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .layer {
+            background: #1f1f1f;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 6px;
+            border-left: 3px solid #8b5cf6;
+        }
+
+        .layer-title {
+            color: #a78bfa;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .code-block {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0;
+            border: 1px solid #3b82f6;
+        }
+
+        .code-block code {
+            color: #93c5fd;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.95em;
+        }
+
+        .demo-example {
+            background: #1f2937;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            border-left: 3px solid #f59e0b;
+        }
+
+        .demo-title {
+            color: #fbbf24;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        ul, ol {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+
+        .philosophy {
+            background: #1e293b;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 6px;
+            border-left: 4px solid #06b6d4;
+        }
+
+        .philosophy-title {
+            color: #22d3ee;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .tech-debt-note {
+            background: #451a03;
+            border-left: 4px solid #f97316;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .tech-debt-note strong {
+            color: #fb923c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Engine API Layers & Packaged Demos Philosophy</h1>
+
+        <div class="vision-box">
+            <h3>The Vision</h3>
+            <p><strong>Shitty versions right now at all levels, but legit overtime.</strong></p>
+            <p>Build an engine with progressive API layers that serve everyone from complete beginners to senior Zig engineers who want full control. Each layer gets better and better over time. Ship the engine with packaged demo games and exposed source code - a cool thing to learn how to do!</p>
+        </div>
+
+        <h2>🎯 Core Philosophy</h2>
+
+        <div class="philosophy">
+            <div class="philosophy-title">Progressive Disclosure of Complexity</div>
+            <p>Don't force beginners to understand the entire engine. Don't block experts from accessing low-level details. Provide layers that meet users where they are.</p>
+        </div>
+
+        <div class="philosophy">
+            <div class="philosophy-title">Learn By Example</div>
+            <p>Ship real, working games alongside the engine. Expose the source. Let developers run them, play with them, break them, and learn from them.</p>
+        </div>
+
+        <div class="philosophy">
+            <div class="philosophy-title">Iterative Excellence</div>
+            <p>Start with working implementations at each layer. Improve them over time. Version 1 doesn't need to be perfect - it needs to be functional and teachable.</p>
+        </div>
+
+        <h2>📚 API Layer Progression</h2>
+
+        <div class="layer">
+            <div class="layer-title">Layer 1: Absolute Beginner ("Just Make It Work")</div>
+            <p><strong>Target User:</strong> New to Zig, new to game dev, just wants to see something on screen</p>
+
+            <div class="code-block">
+                <code>const engine = @import("game_engine");
+
+pub fn main() !void {
+    var game = try engine.init("My First Game");
+    defer game.deinit();
+
+    try game.run();
+}</code>
+            </div>
+
+            <p><strong>What This Hides:</strong></p>
+            <ul>
+                <li>Memory allocation strategies</li>
+                <li>Render loop details</li>
+                <li>ECS setup and registration</li>
+                <li>Window creation and event polling</li>
+                <li>Resource loading</li>
+            </ul>
+
+            <p><strong>What This Provides:</strong></p>
+            <ul>
+                <li>Default game loop</li>
+                <li>Basic rendering</li>
+                <li>Window with reasonable defaults</li>
+                <li>Automatic cleanup</li>
+            </ul>
+        </div>
+
+        <div class="layer">
+            <div class="layer-title">Layer 2: Guided Control ("Configure The Basics")</div>
+            <p><strong>Target User:</strong> Comfortable with Zig basics, wants to customize window, configure settings</p>
+
+            <div class="code-block">
+                <code>const engine = @import("game_engine");
+
+pub fn main() !void {
+    var game = try engine.init(.{
+        .title = "My Platformer",
+        .width = 1280,
+        .height = 720,
+        .target_fps = 60,
+        .allocator = std.heap.page_allocator,
+    });
+    defer game.deinit();
+
+    try game.addSystem(myUpdateSystem);
+    try game.addSystem(myRenderSystem);
+
+    try game.run();
+}</code>
+            </div>
+
+            <p><strong>What This Exposes:</strong></p>
+            <ul>
+                <li>Configuration options</li>
+                <li>Custom system registration</li>
+                <li>Allocator choice</li>
+                <li>Basic customization hooks</li>
+            </ul>
+        </div>
+
+        <div class="layer">
+            <div class="layer-title">Layer 3: Loop Control ("I'll Handle The Loop")</div>
+            <p><strong>Target User:</strong> Wants control over game loop timing, update/render separation</p>
+
+            <div class="code-block">
+                <code>const engine = @import("game_engine");
+
+pub fn main() !void {
+    var game = try engine.create(.{ /* config */ });
+    defer game.deinit();
+
+    try game.setup();
+
+    while (game.isRunning()) {
+        try game.pollEvents();
+        try game.update(game.getDeltaTime());
+        try game.render();
+    }
+}</code>
+            </div>
+
+            <p><strong>What This Exposes:</strong></p>
+            <ul>
+                <li>Manual game loop control</li>
+                <li>Event polling</li>
+                <li>Delta time access</li>
+                <li>Separate update/render calls</li>
+            </ul>
+        </div>
+
+        <div class="layer">
+            <div class="layer-title">Layer 4: Full Engine Control ("I Know What I'm Doing")</div>
+            <p><strong>Target User:</strong> Senior Zig dev, wants full control of memory, systems, threading</p>
+
+            <div class="code-block">
+                <code>const engine = @import("game_engine");
+const std = @import("std");
+
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+
+    var window = try engine.Window.create(gpa.allocator(), .{
+        .title = "Custom Game",
+        .width = 1920,
+        .height = 1080,
+    });
+    defer window.destroy();
+
+    var world = try engine.ECS.World.init(gpa.allocator());
+    defer world.deinit();
+
+    var renderer = try engine.Renderer.init(gpa.allocator(), window);
+    defer renderer.deinit();
+
+    // Full manual control of everything
+    while (window.isOpen()) {
+        window.pollEvents();
+
+        // Custom delta time calculation
+        const dt = myCustomTimingLogic();
+
+        // Manual system execution
+        try myPhysicsSystem(&world, dt);
+        try myGameLogicSystem(&world, dt);
+
+        renderer.beginFrame();
+        try myRenderSystem(&world, &renderer);
+        renderer.endFrame();
+    }
+}</code>
+            </div>
+
+            <p><strong>What This Exposes:</strong></p>
+            <ul>
+                <li>Direct component access</li>
+                <li>Manual memory management</li>
+                <li>Custom render pipelines</li>
+                <li>Threading control</li>
+                <li>Everything - no training wheels</li>
+            </ul>
+        </div>
+
+        <h2>🎮 Packaged Demo Games</h2>
+
+        <div class="demo-example">
+            <div class="demo-title">$ zig build run</div>
+            <p>Default demo showing UI elements, input handling, basic rendering</p>
+        </div>
+
+        <div class="demo-example">
+            <div class="demo-title">$ zig build run-pong</div>
+            <p>Classic Pong - demonstrates:</p>
+            <ul>
+                <li>Ball physics and collision</li>
+                <li>Input handling (keyboard)</li>
+                <li>Score tracking</li>
+                <li>Simple AI opponent</li>
+                <li><strong>Uses Layer 2 API</strong></li>
+            </ul>
+        </div>
+
+        <div class="demo-example">
+            <div class="demo-title">$ zig build run-platformer</div>
+            <p>Simple platformer - demonstrates:</p>
+            <ul>
+                <li>Gravity and jumping</li>
+                <li>Tile-based collision</li>
+                <li>Camera following</li>
+                <li>Sprite animation</li>
+                <li><strong>Uses Layer 3 API</strong></li>
+            </ul>
+        </div>
+
+        <div class="demo-example">
+            <div class="demo-title">$ zig build run-shooter</div>
+            <p>Top-down shooter - demonstrates:</p>
+            <ul>
+                <li>Entity spawning/despawning</li>
+                <li>Projectile systems</li>
+                <li>Particle effects</li>
+                <li>Wave management</li>
+                <li><strong>Uses Layer 3 API</strong></li>
+            </ul>
+        </div>
+
+        <div class="demo-example">
+            <div class="demo-title">$ zig build run-advanced</div>
+            <p>Advanced demo - demonstrates:</p>
+            <ul>
+                <li>Custom render pipeline</li>
+                <li>Advanced memory patterns</li>
+                <li>Multi-threaded systems</li>
+                <li>Complex ECS usage</li>
+                <li><strong>Uses Layer 4 API</strong></li>
+            </ul>
+        </div>
+
+        <h2>📦 Demo Game Philosophy</h2>
+
+        <div class="philosophy">
+            <div class="philosophy-title">Source Code Exposure</div>
+            <ul>
+                <li>All demo games live in <code>examples/</code> directory</li>
+                <li>Fully documented source code</li>
+                <li>Clear comments explaining WHY, not just WHAT</li>
+                <li>Encourage users to modify and break them</li>
+            </ul>
+        </div>
+
+        <div class="philosophy">
+            <div class="philosophy-title">Progressive Complexity</div>
+            <ul>
+                <li>Pong: ~200 lines, 1 system, basic collision</li>
+                <li>Platformer: ~500 lines, 3-4 systems, intermediate</li>
+                <li>Shooter: ~800 lines, 5-6 systems, entity management</li>
+                <li>Advanced: ~1500+ lines, custom everything</li>
+            </ul>
+        </div>
+
+        <div class="philosophy">
+            <div class="philosophy-title">Real Games, Not Toys</div>
+            <ul>
+                <li>Actually fun to play (even if simple)</li>
+                <li>Complete game loop (start, play, win/lose, restart)</li>
+                <li>Polished enough to be satisfying</li>
+                <li>Demonstrate best practices</li>
+            </ul>
+        </div>
+
+        <h2>🛠️ Build System Integration</h2>
+
+        <div class="code-block">
+            <code>// build.zig snippet
+
+// Default demo
+const run_cmd = b.addRunArtifact(exe);
+const run_step = b.step("run", "Run the default demo");
+run_step.dependOn(&run_cmd.step);
+
+// Pong demo
+const pong = b.addExecutable(.{
+    .name = "pong",
+    .root_source_file = .{ .path = "examples/pong/main.zig" },
+    .target = target,
+    .optimize = optimize,
+});
+pong.addModule("game_engine", engine_module);
+const run_pong = b.addRunArtifact(pong);
+const run_pong_step = b.step("run-pong", "Run the Pong demo");
+run_pong_step.dependOn(&run_pong.step);
+
+// Platformer demo
+const platformer = b.addExecutable(.{
+    .name = "platformer",
+    .root_source_file = .{ .path = "examples/platformer/main.zig" },
+    .target = target,
+    .optimize = optimize,
+});
+platformer.addModule("game_engine", engine_module);
+const run_platformer = b.addRunArtifact(platformer);
+const run_platformer_step = b.step("run-platformer", "Run the Platformer demo");
+run_platformer_step.dependOn(&run_platformer.step);</code>
+        </div>
+
+        <h2>📖 Documentation Strategy</h2>
+
+        <div class="philosophy">
+            <div class="philosophy-title">Learning Path Documentation</div>
+            <ul>
+                <li><strong>Getting Started:</strong> "Run Pong in 5 minutes"</li>
+                <li><strong>Tutorial 1:</strong> "Modify Pong to add power-ups" (Layer 2)</li>
+                <li><strong>Tutorial 2:</strong> "Build a simple game from scratch" (Layer 2-3)</li>
+                <li><strong>Tutorial 3:</strong> "Optimize your game loop" (Layer 3-4)</li>
+                <li><strong>Advanced:</strong> "Custom render pipeline" (Layer 4)</li>
+            </ul>
+        </div>
+
+        <div class="philosophy">
+            <div class="philosophy-title">API Reference By Layer</div>
+            <ul>
+                <li>Clearly mark which API layer each function belongs to</li>
+                <li>Show simpler alternatives for advanced functions</li>
+                <li>Link to demo code that uses each API</li>
+            </ul>
+        </div>
+
+        <h2>🚧 Implementation Notes</h2>
+
+        <div class="tech-debt-note">
+            <p><strong>Current Status:</strong> VISION PHASE - NOT IMPLEMENTED YET</p>
+            <p>This is future work. Right now we're focused on getting the logger working properly with the existing engine structure.</p>
+            <p><strong>Why Document Now?</strong> We know where the tech debt is. We know how we want to evolve the API. Writing this down now means we won't forget the vision when we're ready to implement it.</p>
+        </div>
+
+        <h3>Technical Challenges To Solve Later</h3>
+        <ul>
+            <li><strong>Wrapper Implementation:</strong> How do high-level APIs wrap low-level without performance cost?</li>
+            <li><strong>Memory Management:</strong> Who owns what at each layer? Clear ownership rules needed.</li>
+            <li><strong>Error Handling:</strong> Layer 1 might hide errors; Layer 4 exposes everything. How to balance?</li>
+            <li><strong>Build System:</strong> How to package demos efficiently? Asset management?</li>
+            <li><strong>Documentation Generation:</strong> Auto-generate API docs that clearly show layers?</li>
+        </ul>
+
+        <h3>Open Questions</h3>
+        <ul>
+            <li>Should Layer 1 have a config-free version? (<code>engine.justRun()</code>?)</li>
+            <li>How to handle save/load at different layers?</li>
+            <li>Should there be a Layer 0 for absolute beginners? (GUI builder?)</li>
+            <li>How do we version the API as layers evolve?</li>
+            <li>Asset pipeline - same progressive disclosure model?</li>
+        </ul>
+
+        <h2>✅ Success Criteria</h2>
+
+        <div class="philosophy">
+            <div class="philosophy-title">We'll Know This Works When:</div>
+            <ul>
+                <li>A complete beginner can run <code>zig build run-pong</code> and see Pong in 30 seconds</li>
+                <li>That same beginner can read pong/main.zig and understand 80% of it</li>
+                <li>An intermediate developer can customize Pong in an hour</li>
+                <li>A senior developer can build a custom game with Layer 4 and not feel constrained</li>
+                <li>Each demo game is actually fun to play for at least 2-3 minutes</li>
+                <li>Users can transition smoothly between layers as they learn</li>
+            </ul>
+        </div>
+
+        <h2>🎯 Next Steps (When Ready)</h2>
+
+        <ol>
+            <li><strong>Finish Current Roadmap First</strong> - Get logger working, stabilize core systems</li>
+            <li><strong>Design Layer 1 API</strong> - Start with the simplest possible wrapper</li>
+            <li><strong>Build Pong Demo</strong> - First real test of Layer 2 API</li>
+            <li><strong>Iterate Based On Feedback</strong> - Does it feel good? Is it learnable?</li>
+            <li><strong>Expand Demo Library</strong> - Add platformer, shooter, etc.</li>
+            <li><strong>Documentation Sprint</strong> - Write tutorials using the demos</li>
+            <li><strong>Polish Each Layer</strong> - Make them production-ready, one at a time</li>
+        </ol>
+
+        <div class="vision-box" style="margin-top: 40px;">
+            <h3>Remember</h3>
+            <p><strong>Shitty versions right now at all levels, but legit overtime.</strong></p>
+            <p>Every great engine started somewhere. Unity's early APIs were rough. Unreal evolved through multiple major rewrites. Our job isn't to build the perfect engine on day one - it's to build something that works, teaches well, and improves iteratively.</p>
+            <p>The demos will be simple at first. The APIs will have rough edges. The documentation will grow over time. And that's perfectly fine. Ship it, learn from it, make it better.</p>
+        </div>
+
+    </div>
+</body>
+</html>

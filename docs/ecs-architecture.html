@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECS System Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 2rem 2rem 6rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1 { color: #58a6ff; font-size: 1.8rem; border-bottom: 1px solid #21262d; padding-bottom: 0.5rem; margin-bottom: 0.25rem; }
+  .page-sub { color: #8b949e; font-size: 0.9rem; margin-bottom: 2rem; }
+  h2 { color: #f0883e; font-size: 1.35rem; margin-top: 3rem; margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid #21262d; }
+  h3 { color: #d2a8ff; font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  p, li { margin-bottom: 0.4rem; }
+  code {
+    background: #161b22; padding: 0.15rem 0.4rem; border-radius: 3px;
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.85em; color: #79c0ff;
+  }
+  .mono { font-family: 'SF Mono','Fira Code',monospace; }
+
+  nav {
+    background: #161b22; border: 1px solid #21262d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin-bottom: 2rem;
+  }
+  nav .nav-title { color: #8b949e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: 0.5rem; }
+  nav .nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.3rem 1rem; }
+  nav a { font-size: 0.85rem; display: block; padding: 0.15rem 0; }
+
+  section { scroll-margin-top: 1rem; }
+
+  .card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin: 0.75rem 0;
+  }
+  .card.main   { border-color: #58a6ff; }
+  .card.child  { border-color: #d2a8ff; }
+  .card.leaf   { border-color: #7ee787; }
+  .card.ext    { border-color: #f0883e; border-style: dashed; }
+
+  .card-name {
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem;
+  }
+  .card-name.c-blue   { color: #58a6ff; }
+  .card-name.c-purple { color: #d2a8ff; }
+  .card-name.c-green  { color: #7ee787; }
+  .card-name.c-orange { color: #f0883e; }
+
+  .fields {
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.8rem; line-height: 1.7;
+  }
+  .fn  { color: #d2a8ff; }
+  .ft  { color: #7ee787; }
+  .fp  { color: #79c0ff; }
+  .fc  { color: #8b949e; font-style: italic; }
+  .fl  { color: #484f58; font-family: -apple-system,sans-serif; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-top: 0.4rem; margin-bottom: 0.15rem; }
+
+  .diagram-wrap { margin: 1rem 0; overflow-x: auto; }
+  svg { overflow: visible; }
+  .box { fill: #161b22; stroke: #30363d; stroke-width: 1.5; rx: 8; }
+  .box-main { stroke: #58a6ff; stroke-width: 2; }
+  .box-purple { stroke: #d2a8ff; }
+  .box-green { stroke: #7ee787; }
+  .box-orange { stroke: #f0883e; stroke-dasharray: 5,4; }
+  .hdr { fill: #21262d; rx: 8; }
+  .hdr-clip { fill: #21262d; }
+
+  .t-name   { fill: #58a6ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-purple { fill: #d2a8ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-green  { fill: #7ee787; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-orange { fill: #f0883e; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-field  { fill: #79c0ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-type   { fill: #7ee787; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-fn     { fill: #d2a8ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-dim    { fill: #8b949e; font-family: -apple-system,sans-serif; font-size: 10px; font-style: italic; }
+  .t-sec    { fill: #484f58; font-family: -apple-system,sans-serif; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .line-own  { stroke: #58a6ff; stroke-width: 2; fill: none; }
+  .line-ref  { stroke: #f0883e; stroke-dasharray: 6,4; fill: none; }
+  .line-flow { stroke: #7ee787; stroke-width: 2; fill: none; }
+  .arr-blue   { fill: #58a6ff; }
+  .arr-orange { fill: #f0883e; }
+  .arr-green  { fill: #7ee787; }
+
+  .links { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+  .links a {
+    background: #21262d; border: 1px solid #30363d; border-radius: 2rem;
+    padding: 0.25rem 0.75rem; font-size: 0.75rem; white-space: nowrap;
+  }
+  .links a:hover { border-color: #58a6ff; text-decoration: none; }
+
+  .flow-list { list-style: none; counter-reset: fl; margin: 0.75rem 0; }
+  .flow-list li {
+    counter-increment: fl; position: relative; padding: 0.5rem 0.75rem 0.5rem 2.75rem;
+    background: #161b22; border: 1px solid #21262d; border-radius: 6px; margin: 0.35rem 0;
+  }
+  .flow-list li::before {
+    content: counter(fl); position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+    background: #30363d; color: #8b949e; font-size: 0.7rem; font-weight: 700;
+    width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px;
+  }
+</style>
+</head>
+<body>
+
+<h1 id="top">ECS System Architecture</h1>
+<p class="page-sub">Complete reference for the Entity Component System &mdash; storage, queries, systems, actions, scenes, and registries</p>
+
+<!-- ============================================================ -->
+<!-- NAV -->
+<!-- ============================================================ -->
+<nav>
+  <div class="nav-title">Jump to section</div>
+  <div class="nav-grid">
+    <a href="#overview">Overview</a>
+    <a href="#world">World</a>
+    <a href="#entity">Entity</a>
+    <a href="#storage">ComponentStorage</a>
+    <a href="#query">Query</a>
+    <a href="#components">Components</a>
+    <a href="#tags">Tags &amp; Markers</a>
+    <a href="#camera">Camera System</a>
+    <a href="#colliders">Colliders</a>
+    <a href="#systems">Systems</a>
+    <a href="#actions">Action System</a>
+    <a href="#triggers">Triggers</a>
+    <a href="#scene-runtime">Scene Runtime</a>
+    <a href="#instantiator">Instantiator</a>
+    <a href="#registries">Registries</a>
+    <a href="#lifecycle">Entity Lifecycle</a>
+    <a href="#data-flow">Data Flow</a>
+  </div>
+</nav>
+
+<!-- ============================================================ -->
+<!-- OVERVIEW -->
+<!-- ============================================================ -->
+<section id="overview">
+<h2>Overview</h2>
+<p>A custom ECS built on <strong>sparse-dense array storage</strong> for O(1) add/remove/lookup and cache-friendly iteration. Type-erased storages allow the World to hold any component type. Queries are built at comptime with generic tuples.</p>
+
+<div class="diagram-wrap">
+<svg width="1060" height="520" viewBox="0 0 1060 520">
+  <defs>
+    <marker id="a-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-blue"/></marker>
+    <marker id="a-orange" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-orange"/></marker>
+    <marker id="a-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-green"/></marker>
+  </defs>
+
+  <!-- Layer labels -->
+  <text x="10" y="50" class="t-sec" font-size="10">ORCHESTRATION</text>
+  <text x="10" y="170" class="t-sec" font-size="10">CORE ECS</text>
+  <text x="10" y="310" class="t-sec" font-size="10">GAME LOGIC</text>
+  <text x="10" y="440" class="t-sec" font-size="10">SCENE &amp; REGISTRY</text>
+
+  <!-- Row 1: Engine -->
+  <rect class="box box-main" x="380" y="20" width="300" height="55"/>
+  <rect class="hdr" x="380" y="20" width="300" height="26" rx="8"/><rect class="hdr-clip" x="380" y="38" width="300" height="8"/>
+  <text x="530" y="38" text-anchor="middle" class="t-name">Engine</text>
+  <text x="530" y="58" text-anchor="middle" class="t-dim">owns World, runs systems each frame</text>
+
+  <!-- Row 2: Core ECS -->
+  <rect class="box box-main" x="130" y="130" width="220" height="55"/>
+  <rect class="hdr" x="130" y="130" width="220" height="26" rx="8"/><rect class="hdr-clip" x="130" y="148" width="220" height="8"/>
+  <text x="240" y="148" text-anchor="middle" class="t-name">World</text>
+  <text x="240" y="168" text-anchor="middle" class="t-dim">entities, storages, queries</text>
+
+  <rect class="box box-purple" x="390" y="130" width="200" height="55"/>
+  <rect class="hdr" x="390" y="130" width="200" height="26" rx="8"/><rect class="hdr-clip" x="390" y="148" width="200" height="8"/>
+  <text x="490" y="148" text-anchor="middle" class="t-purple">ComponentStorage(T)</text>
+  <text x="490" y="168" text-anchor="middle" class="t-dim">sparse-dense arrays</text>
+
+  <rect class="box box-purple" x="630" y="130" width="160" height="55"/>
+  <rect class="hdr" x="630" y="130" width="160" height="26" rx="8"/><rect class="hdr-clip" x="630" y="148" width="160" height="8"/>
+  <text x="710" y="148" text-anchor="middle" class="t-purple">Query(T...)</text>
+  <text x="710" y="168" text-anchor="middle" class="t-dim">comptime multi-storage iter</text>
+
+  <rect class="box box-purple" x="830" y="130" width="160" height="55"/>
+  <rect class="hdr" x="830" y="130" width="160" height="26" rx="8"/><rect class="hdr-clip" x="830" y="148" width="160" height="8"/>
+  <text x="910" y="148" text-anchor="middle" class="t-purple">Components</text>
+  <text x="910" y="168" text-anchor="middle" class="t-dim">Transform, Sprite, ...</text>
+
+  <!-- Row 3: Game Logic Systems -->
+  <rect class="box box-green" x="80" y="270" width="160" height="55"/>
+  <rect class="hdr" x="80" y="270" width="160" height="26" rx="8"/><rect class="hdr-clip" x="80" y="288" width="160" height="8"/>
+  <text x="160" y="288" text-anchor="middle" class="t-green">MovementSys</text>
+  <text x="160" y="308" text-anchor="middle" class="t-dim">Transform + Velocity</text>
+
+  <rect class="box box-green" x="270" y="270" width="160" height="55"/>
+  <rect class="hdr" x="270" y="270" width="160" height="26" rx="8"/><rect class="hdr-clip" x="270" y="288" width="160" height="8"/>
+  <text x="350" y="288" text-anchor="middle" class="t-green">CollisionSys</text>
+  <text x="350" y="308" text-anchor="middle" class="t-dim">Transform + Collider</text>
+
+  <rect class="box box-green" x="460" y="270" width="160" height="55"/>
+  <rect class="hdr" x="460" y="270" width="160" height="26" rx="8"/><rect class="hdr-clip" x="460" y="288" width="160" height="8"/>
+  <text x="540" y="288" text-anchor="middle" class="t-green">ActionSys</text>
+  <text x="540" y="308" text-anchor="middle" class="t-dim">triggers &rarr; queue &rarr; exec</text>
+
+  <rect class="box box-green" x="650" y="270" width="160" height="55"/>
+  <rect class="hdr" x="650" y="270" width="160" height="26" rx="8"/><rect class="hdr-clip" x="650" y="288" width="160" height="8"/>
+  <text x="730" y="288" text-anchor="middle" class="t-green">RenderSys</text>
+  <text x="730" y="308" text-anchor="middle" class="t-dim">Sprite + Text + UI</text>
+
+  <rect class="box box-green" x="840" y="270" width="160" height="55"/>
+  <rect class="hdr" x="840" y="270" width="160" height="26" rx="8"/><rect class="hdr-clip" x="840" y="288" width="160" height="8"/>
+  <text x="920" y="288" text-anchor="middle" class="t-green">CameraSys</text>
+  <text x="920" y="308" text-anchor="middle" class="t-dim">spring-damper tracking</text>
+
+  <!-- Row 4: Scene & Registry -->
+  <rect class="box box-orange" x="130" y="400" width="200" height="55"/>
+  <rect class="hdr" x="130" y="400" width="200" height="26" rx="8"/><rect class="hdr-clip" x="130" y="418" width="200" height="8"/>
+  <text x="230" y="418" text-anchor="middle" class="t-orange">SceneManager</text>
+  <text x="230" y="438" text-anchor="middle" class="t-dim">load, activate, switch scenes</text>
+
+  <rect class="box box-orange" x="370" y="400" width="200" height="55"/>
+  <rect class="hdr" x="370" y="400" width="200" height="26" rx="8"/><rect class="hdr-clip" x="370" y="418" width="200" height="8"/>
+  <text x="470" y="418" text-anchor="middle" class="t-orange">Instantiator</text>
+  <text x="470" y="438" text-anchor="middle" class="t-dim">AST &rarr; entities + components</text>
+
+  <rect class="box box-orange" x="610" y="400" width="200" height="55"/>
+  <rect class="hdr" x="610" y="400" width="200" height="26" rx="8"/><rect class="hdr-clip" x="610" y="418" width="200" height="8"/>
+  <text x="710" y="418" text-anchor="middle" class="t-orange">TemplateManager</text>
+  <text x="710" y="438" text-anchor="middle" class="t-dim">reusable entity blueprints</text>
+
+  <rect class="box box-orange" x="850" y="400" width="160" height="55"/>
+  <rect class="hdr" x="850" y="400" width="160" height="26" rx="8"/><rect class="hdr-clip" x="850" y="418" width="160" height="8"/>
+  <text x="930" y="418" text-anchor="middle" class="t-orange">Registries</text>
+  <text x="930" y="438" text-anchor="middle" class="t-dim">comptime type unions</text>
+
+  <!-- Connections -->
+  <path d="M 480,75 L 480,100 Q 480,120 400,120 L 290,130" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 530,75 L 530,100 Q 530,120 530,125 L 490,130" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 580,75 L 580,100 Q 580,120 650,120 L 680,130" class="line-ref" marker-end="url(#a-orange)"/>
+
+  <path d="M 350,160 L 390,160" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 590,160 L 630,160" class="line-ref" marker-end="url(#a-orange)"/>
+  <path d="M 790,160 L 830,160" class="line-ref" marker-end="url(#a-orange)"/>
+
+  <path d="M 240,185 L 240,230 Q 240,260 200,260 L 180,270" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 240,185 L 240,230 Q 240,260 320,260 L 340,270" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 490,185 L 490,230 Q 490,260 540,260 L 540,270" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 490,185 L 490,240 Q 490,260 660,260 L 700,270" class="line-ref" marker-end="url(#a-orange)"/>
+  <path d="M 490,185 L 490,240 Q 490,260 830,260 L 890,270" class="line-ref" marker-end="url(#a-orange)"/>
+
+  <path d="M 240,185 L 240,360 Q 240,390 240,400" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 330,430 L 370,430" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 570,430 L 610,430" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 810,430 L 850,430" class="line-ref" marker-end="url(#a-orange)"/>
+</svg>
+</div>
+
+<h3>File Map</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Core ECS</span>
+    <span class="fp">src/ecs/World.zig</span> <span class="fc">// entity + component management, queries</span><br>
+    <span class="fp">src/ecs/Entity.zig</span> <span class="fc">// simple ID wrapper</span><br>
+    <span class="fp">src/ecs/ComponentStorage.zig</span> <span class="fc">// sparse-dense generic storage</span><br>
+    <span class="fp">src/ecs/Query.zig</span> <span class="fc">// comptime multi-component query iterator</span><br>
+    <span class="fp">src/ecs/Components.zig</span> <span class="fc">// all component type definitions</span><br>
+    <span class="fp">src/ecs/Tag.zig</span> <span class="fc">// tag component with pattern matching</span><br>
+    <span class="fp">src/ecs/Camera.zig</span> <span class="fc">// camera helpers (operate on World + Entity)</span><br>
+    <span class="fp">src/ecs/CameraTracking.zig</span> <span class="fc">// tracking mode + spring-damper config</span><br>
+    <span class="fp">src/ecs/collider.zig</span> <span class="fc">// collider shape definitions</span><br>
+    <span class="fp">src/ecs/CollisionDetection.zig</span> <span class="fc">// collision event struct</span><br>
+    <span class="fl">Systems</span>
+    <span class="fp">src/systems/Systems.zig</span> <span class="fc">// central export</span><br>
+    <span class="fp">src/systems/MovementSys.zig</span> <span class="fc">// position += velocity * dt</span><br>
+    <span class="fp">src/systems/PhysicsSys.zig</span> <span class="fc">// stub</span><br>
+    <span class="fp">src/systems/CollisionDetectionSys.zig</span> <span class="fc">// O(n&sup2;) pair testing</span><br>
+    <span class="fp">src/systems/CameraTrackingSys.zig</span> <span class="fc">// spring-damper follow</span><br>
+    <span class="fp">src/systems/LifetimeSys.zig</span> <span class="fc">// timed entity destruction</span><br>
+    <span class="fp">src/systems/RenderSys.zig</span> <span class="fc">// sprite, text, UI rendering</span><br>
+    <span class="fp">src/systems/ActionSys.zig</span> <span class="fc">// trigger processing + action execution</span><br>
+    <span class="fl">Action System</span>
+    <span class="fp">src/action/Action.zig</span> <span class="fc">// action type union</span><br>
+    <span class="fp">src/action/ActionQueue.zig</span> <span class="fc">// priority queue</span><br>
+    <span class="fp">src/action/ActionExecutor.zig</span> <span class="fc">// execute queued actions on World</span><br>
+    <span class="fp">src/action/ActionSystem.zig</span> <span class="fc">// trigger registry + queue</span><br>
+    <span class="fp">src/action/ActionBindings.zig</span> <span class="fc">// generic trigger component builder</span><br>
+    <span class="fp">src/action/Triggers.zig</span> <span class="fc">// input + collision trigger handlers</span><br>
+    <span class="fl">Scene Runtime</span>
+    <span class="fp">src/scene/manager.zig</span> <span class="fc">// scene load/activate/switch</span><br>
+    <span class="fp">src/scene/instantiator.zig</span> <span class="fc">// AST &rarr; entities</span><br>
+    <span class="fp">src/scene/templates.zig</span> <span class="fc">// reusable entity blueprints</span><br>
+    <span class="fp">src/scene/loader.zig</span> <span class="fc">// file I/O for scenes + templates</span><br>
+    <span class="fl">Registries</span>
+    <span class="fp">src/registry/component_registry.zig</span> <span class="fc">// ComponentData union</span><br>
+    <span class="fp">src/registry/shape_registry.zig</span> <span class="fc">// ShapeData union</span><br>
+    <span class="fp">src/registry/collider_shape_registry.zig</span> <span class="fc">// ColliderData union</span>
+  </div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- WORLD -->
+<!-- ============================================================ -->
+<section id="world">
+<h2>World</h2>
+<p>Central container for all entities and components. Manages the entity ID counter, a map of type-erased component storages, and provides the query API. <code>src/ecs/World.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">World</div>
+  <div class="fields">
+    <span class="fl">Fields</span>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">next_entity_id</span>: <span class="ft">usize</span> <span class="fc">// starts at 1 (0 is reserved)</span><br>
+    <span class="fp">component_storages</span>: <span class="ft">StringHashMap(StorageInterface)</span> <span class="fc">// type name &rarr; storage</span><br>
+    <span class="fp">template_manager</span>: <span class="ft">*TemplateManager</span> <span class="fc">// set by engine on init</span><br>
+    <span class="fl">Entity Operations</span>
+    <span class="fn">createEntity</span>() &rarr; <span class="ft">Entity</span> <span class="fc">// increments next_entity_id</span><br>
+    <span class="fn">destroyEntity</span>(entity) <span class="fc">// removes from all storages</span><br>
+    <span class="fn">createEntityFromTemplate</span>(name, offset) &rarr; <span class="ft">Entity</span><br>
+    <span class="fl">Component Operations</span>
+    <span class="fn">addComponent</span>(entity, T, value) <span class="fc">// auto-registers type if first use</span><br>
+    <span class="fn">removeComponent</span>(entity, T) <span class="fc">// calls deinit if component has one</span><br>
+    <span class="fn">hasComponent</span>(entity, T) &rarr; <span class="ft">bool</span><br>
+    <span class="fn">getComponent</span>(entity, T) &rarr; <span class="ft">?*const T</span> <span class="fc">// read-only</span><br>
+    <span class="fn">getComponentMut</span>(entity, T) &rarr; <span class="ft">?*T</span> <span class="fc">// mutable</span><br>
+    <span class="fl">Queries</span>
+    <span class="fn">query</span>(.{T1, T2, ...}) &rarr; <span class="ft">Query</span> <span class="fc">// auto-registers missing types</span><br>
+    <span class="fl">Tag Lookup</span>
+    <span class="fn">findEntityByTag</span>(tag) &rarr; <span class="ft">?Entity</span> <span class="fc">// first match</span><br>
+    <span class="fn">findEntitiesByTag</span>(tag) &rarr; <span class="ft">[]Entity</span> <span class="fc">// all matches</span><br>
+    <span class="fn">findEntitiesByPattern</span>(pattern) &rarr; <span class="ft">[]Entity</span> <span class="fc">// wildcard: "enemy*"</span><br>
+    <span class="fl">Internal</span>
+    <span class="fn">registerComponent</span>(T) <span class="fc">// creates ComponentStorage(T)</span><br>
+    <span class="fn">getStorage</span>(T) <span class="fc">// get type-erased storage</span>
+  </div>
+</div>
+
+<h3>Type Erasure</h3>
+<p>The World stores all component storages in a single <code>StringHashMap</code> keyed by type name. Each storage is wrapped in a <code>StorageInterface</code> with a VTable for type-erased operations (remove, has, destroy). This allows the World to iterate all storages when destroying an entity without knowing concrete types.</p>
+
+<div class="links">
+  <a href="#entity">Entity</a>
+  <a href="#storage">ComponentStorage</a>
+  <a href="#query">Query</a>
+  <a href="#components">Components</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ENTITY -->
+<!-- ============================================================ -->
+<section id="entity">
+<h2>Entity</h2>
+<p>A simple value type &mdash; just an ID. No methods, no inheritance. <code>src/ecs/Entity.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">Entity</div>
+  <div class="fields">
+    <span class="fp">id</span>: <span class="ft">usize</span> <span class="fc">// monotonically increasing, 0 is reserved/unused</span>
+  </div>
+</div>
+
+<p>Entities are created by the World and are just indices into sparse arrays. They have no data of their own &mdash; all data lives in components.</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- COMPONENT STORAGE -->
+<!-- ============================================================ -->
+<section id="storage">
+<h2>ComponentStorage(T)</h2>
+<p>Generic sparse-dense array: O(1) add, remove, and lookup. Cache-friendly iteration over the packed dense array. <code>src/ecs/ComponentStorage.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">ComponentStorage(T)</div>
+  <div class="fields">
+    <span class="fl">Data Structure</span>
+    <span class="fp">sparse</span>: <span class="ft">ArrayList(?usize)</span> <span class="fc">// entity_id &rarr; dense_index (null if absent)</span><br>
+    <span class="fp">dense</span>: <span class="ft">ArrayList(T)</span> <span class="fc">// packed component data (no gaps)</span><br>
+    <span class="fp">entities</span>: <span class="ft">ArrayList(usize)</span> <span class="fc">// dense_index &rarr; entity_id (parallel to dense)</span><br>
+    <span class="fp">gpa</span>: <span class="ft">Allocator</span><br>
+    <span class="fl">Operations</span>
+    <span class="fn">init</span>(alloc) <span class="fc">// initial sparse capacity: 1024</span><br>
+    <span class="fn">add</span>(entity_id, component) <span class="fc">// resizes sparse if needed</span><br>
+    <span class="fn">remove</span>(entity_id) <span class="fc">// swaps with last, calls deinit if defined</span><br>
+    <span class="fn">get</span>(entity_id) &rarr; <span class="ft">?*const T</span><br>
+    <span class="fn">getMut</span>(entity_id) &rarr; <span class="ft">?*T</span><br>
+    <span class="fn">set</span>(entity_id, component) <span class="fc">// add or update</span><br>
+    <span class="fn">has</span>(entity_id) &rarr; <span class="ft">bool</span><br>
+    <span class="fn">clear</span>() <span class="fc">// reset all</span><br>
+    <span class="fn">iterator</span>() &rarr; yields <span class="ft">Entry { entity_id, *const T }</span>
+  </div>
+</div>
+
+<h3>Sparse-Dense Mechanics</h3>
+<div class="diagram-wrap">
+<svg width="700" height="200" viewBox="0 0 700 200">
+  <!-- Sparse Array -->
+  <text x="20" y="20" class="t-sec" font-size="10">SPARSE (entity_id &rarr; dense_index)</text>
+  <rect x="20" y="30" width="50" height="30" fill="#161b22" stroke="#30363d" rx="3"/>
+  <text x="45" y="50" text-anchor="middle" class="t-field">null</text>
+  <text x="45" y="72" text-anchor="middle" class="t-dim">id:0</text>
+
+  <rect x="80" y="30" width="50" height="30" fill="#161b22" stroke="#58a6ff" rx="3"/>
+  <text x="105" y="50" text-anchor="middle" class="t-field">0</text>
+  <text x="105" y="72" text-anchor="middle" class="t-dim">id:1</text>
+
+  <rect x="140" y="30" width="50" height="30" fill="#161b22" stroke="#30363d" rx="3"/>
+  <text x="165" y="50" text-anchor="middle" class="t-field">null</text>
+  <text x="165" y="72" text-anchor="middle" class="t-dim">id:2</text>
+
+  <rect x="200" y="30" width="50" height="30" fill="#161b22" stroke="#58a6ff" rx="3"/>
+  <text x="225" y="50" text-anchor="middle" class="t-field">2</text>
+  <text x="225" y="72" text-anchor="middle" class="t-dim">id:3</text>
+
+  <rect x="260" y="30" width="50" height="30" fill="#161b22" stroke="#58a6ff" rx="3"/>
+  <text x="285" y="50" text-anchor="middle" class="t-field">1</text>
+  <text x="285" y="72" text-anchor="middle" class="t-dim">id:4</text>
+
+  <rect x="320" y="30" width="50" height="30" fill="#161b22" stroke="#30363d" rx="3"/>
+  <text x="345" y="50" text-anchor="middle" class="t-field">...</text>
+
+  <!-- Dense Array -->
+  <text x="20" y="110" class="t-sec" font-size="10">DENSE (packed component data)</text>
+  <rect x="20" y="120" width="100" height="30" fill="#161b22" stroke="#7ee787" rx="3"/>
+  <text x="70" y="140" text-anchor="middle" class="t-type">Component</text>
+  <text x="70" y="162" text-anchor="middle" class="t-dim">[0] entity 1</text>
+
+  <rect x="130" y="120" width="100" height="30" fill="#161b22" stroke="#7ee787" rx="3"/>
+  <text x="180" y="140" text-anchor="middle" class="t-type">Component</text>
+  <text x="180" y="162" text-anchor="middle" class="t-dim">[1] entity 4</text>
+
+  <rect x="240" y="120" width="100" height="30" fill="#161b22" stroke="#7ee787" rx="3"/>
+  <text x="290" y="140" text-anchor="middle" class="t-type">Component</text>
+  <text x="290" y="162" text-anchor="middle" class="t-dim">[2] entity 3</text>
+
+  <!-- Arrows -->
+  <path d="M 105,60 L 70,120" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 285,60 L 180,120" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 225,60 L 290,120" class="line-own" marker-end="url(#a-blue)"/>
+
+  <!-- Notes -->
+  <rect x="420" y="30" width="260" height="130" rx="8" fill="#0d1f0d" stroke="#238636"/>
+  <text x="440" y="55" fill="#7ee787" font-size="12" font-weight="600">Key Properties</text>
+  <text x="440" y="75" class="t-dim" font-size="11">O(1) add, remove, lookup via sparse</text>
+  <text x="440" y="93" class="t-dim" font-size="11">Dense array is always packed (no gaps)</text>
+  <text x="440" y="111" class="t-dim" font-size="11">Iteration = linear scan of dense array</text>
+  <text x="440" y="129" class="t-dim" font-size="11">Remove swaps with last element</text>
+  <text x="440" y="147" class="t-dim" font-size="11">Sparse grows on demand (initial: 1024)</text>
+</svg>
+</div>
+
+<div class="links">
+  <a href="#world">World</a>
+  <a href="#query">Query</a>
+  <a href="#components">Components</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- QUERY -->
+<!-- ============================================================ -->
+<section id="query">
+<h2>Query</h2>
+<p>Comptime-generated iterator that efficiently finds entities matching a set of component types. <code>src/ecs/Query.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">Query(ComponentTypes...)</div>
+  <div class="fields">
+    <span class="fp">storages</span>: <span class="ft">ComponentTypes</span> <span class="fc">// tuple of storage pointers</span><br>
+    <span class="fp">primary_index</span>: <span class="ft">usize</span> <span class="fc">// index of primary storage (index 0)</span><br>
+    <span class="fp">current_index</span>: <span class="ft">usize</span> <span class="fc">// iteration position</span><br>
+    <span class="fl">Iteration</span>
+    <span class="fn">next</span>() &rarr; <span class="ft">?Entry</span><br>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Query Entry</div>
+  <div class="fields">
+    <span class="fp">entity</span>: <span class="ft">Entity</span><br>
+    <span class="fp">components</span>: <span class="ft">ComponentPointers</span> <span class="fc">// tuple of *T pointers</span><br>
+    <span class="fn">get</span>(comptime index) &rarr; <span class="ft">*T</span> <span class="fc">// get component by tuple index</span>
+  </div>
+</div>
+
+<h3>Query Algorithm</h3>
+<ol class="flow-list">
+  <li>Iterate the primary storage's dense array (first component type)</li>
+  <li>For each entity_id in primary storage, check that <strong>all</strong> other storages also have that entity</li>
+  <li>If all match, return an Entry with mutable component pointers</li>
+  <li>If any storage doesn't have the entity, skip and continue</li>
+</ol>
+
+<h3>Usage Pattern</h3>
+<div class="card" style="border-color: #21262d; font-family: 'SF Mono',monospace; font-size: 0.8rem; line-height: 1.8;">
+  <span style="color:#d2a8ff">var</span> query = world.<span style="color:#d2a8ff">query</span>(.{ *Transform, *Velocity });<br>
+  <span style="color:#d2a8ff">while</span> (query.<span style="color:#d2a8ff">next</span>()) |entry| {<br>
+  &nbsp;&nbsp;<span style="color:#d2a8ff">const</span> transform = entry.<span style="color:#d2a8ff">get</span>(0); <span style="color:#8b949e">// *Transform</span><br>
+  &nbsp;&nbsp;<span style="color:#d2a8ff">const</span> velocity = entry.<span style="color:#d2a8ff">get</span>(1); <span style="color:#8b949e">// *Velocity</span><br>
+  &nbsp;&nbsp;transform.position = transform.position.<span style="color:#d2a8ff">add</span>(velocity.linear.<span style="color:#d2a8ff">mul</span>(dt));<br>
+  }
+</div>
+
+<div class="links">
+  <a href="#storage">ComponentStorage</a>
+  <a href="#systems">Systems (use queries)</a>
+  <a href="#world">World.query()</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- COMPONENTS -->
+<!-- ============================================================ -->
+<section id="components">
+<h2>Components</h2>
+<p>All component types defined in <code>src/ecs/Components.zig</code>. Registered at comptime via <a href="#registries">ComponentRegistry</a>.</p>
+
+<h3>Spatial</h3>
+<div class="card child">
+  <div class="card-name c-purple">Transform</div>
+  <div class="fields">
+    <span class="fp">position</span>: <span class="ft">V2</span> = .ZERO &nbsp;
+    <span class="fp">rotation</span>: <span class="ft">f32</span> = 0 &nbsp;
+    <span class="fp">scale</span>: <span class="ft">f32</span> = 1
+  </div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">Velocity</div>
+  <div class="fields">
+    <span class="fp">linear</span>: <span class="ft">V2</span> &nbsp;
+    <span class="fp">angular</span>: <span class="ft">f32</span>
+  </div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">Physics</div>
+  <div class="fields">
+    <span class="fp">mass</span>: <span class="ft">f32</span> &nbsp;
+    <span class="fp">friction</span>: <span class="ft">f32</span>
+  </div>
+</div>
+
+<h3>Rendering</h3>
+<div class="card child">
+  <div class="card-name c-purple">Sprite</div>
+  <div class="fields">
+    <span class="fp">geometry</span>: <span class="ft">?ShapeData</span> <span class="fc">// Circle | Rectangle | Triangle | Line | Polygon (world/screen)</span><br>
+    <span class="fp">fill_color</span>: <span class="ft">?Color</span> &nbsp;
+    <span class="fp">stroke_color</span>: <span class="ft">?Color</span> &nbsp;
+    <span class="fp">stroke_width</span>: <span class="ft">f32</span> = 1 &nbsp;
+    <span class="fp">visible</span>: <span class="ft">bool</span> = true
+  </div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">Text</div>
+  <div class="fields">
+    <span class="fp">text</span>: <span class="ft">[]const u8</span> &nbsp;
+    <span class="fp">font_asset</span>: <span class="ft">FontHandle</span> &nbsp;
+    <span class="fp">size</span>: <span class="ft">f32</span> &nbsp;
+    <span class="fp">text_color</span>: <span class="ft">Color</span>
+  </div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">RenderLayer</div>
+  <div class="fields"><span class="fp">z_order</span>: <span class="ft">i32</span> = 0</div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">UIElement</div>
+  <div class="fields">
+    <span class="fp">anchor</span>: <span class="ft">ScreenAnchor</span> <span class="fc">// TopLeft..BottomRight (9 positions)</span> &nbsp;
+    <span class="fp">offset</span>: <span class="ft">V2</span>
+  </div>
+</div>
+
+<h3>Physics &amp; Collision</h3>
+<div class="card child">
+  <div class="card-name c-purple">Collider</div>
+  <div class="fields">
+    <span class="fp">collider</span>: <span class="ft">ColliderData</span> <span class="fc">// CircleCollider { origin, radius } | RectangleCollider { center, half_w, half_h }</span>
+  </div>
+</div>
+
+<h3>Gameplay</h3>
+<div class="card child">
+  <div class="card-name c-purple">Lifetime</div>
+  <div class="fields"><span class="fp">remaining</span>: <span class="ft">f32</span> <span class="fc">// seconds until entity gets Destroy marker</span></div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">Health</div>
+  <div class="fields"><span class="fp">remaining</span>: <span class="ft">i32</span></div>
+</div>
+
+<h3>Action Trigger Components</h3>
+<div class="card child">
+  <div class="card-name c-purple">OnInput / OnCollision</div>
+  <div class="fields">
+    <span class="ft">ActionBindings(TriggerType)</span> wrapping <span class="fp">triggers</span>: <span class="ft">[]TriggerType</span><br>
+    <span class="fn">hasTriggers</span>() &rarr; <span class="ft">bool</span> &nbsp; <span class="fn">deinit</span>(gpa)<br>
+    <span class="fc">See <a href="#triggers">Triggers</a> for InputTrigger / CollisionTrigger details</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#tags">Tags &amp; Markers</a>
+  <a href="#camera">Camera</a>
+  <a href="#colliders">Colliders</a>
+  <a href="#registries">ComponentRegistry</a>
+  <a href="#systems">Systems</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TAGS & MARKERS -->
+<!-- ============================================================ -->
+<section id="tags">
+<h2>Tags &amp; Markers</h2>
+<p>Lightweight identification and lifecycle components.</p>
+
+<div class="card child">
+  <div class="card-name c-purple">Tag</div>
+  <div class="fields">
+    <span class="fp">tags</span>: <span class="ft">[]const u8</span> <span class="fc">// space or comma separated: "player, hero"</span><br>
+    <span class="fn">hasTag</span>(tag) &rarr; <span class="ft">bool</span> <span class="fc">// exact substring match</span><br>
+    <span class="fn">matchesPattern</span>(pattern) &rarr; <span class="ft">bool</span> <span class="fc">// "enemy*" (prefix), "*_boss" (suffix), or exact</span>
+  </div>
+</div>
+
+<h3>Zero-Size Marker Components</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">ScreenSpace</span> <span class="fc">// marks entity for screen-space rendering (UI)</span><br>
+    <span class="ft">Destroy</span> <span class="fc">// marks entity for destruction (LifetimeSys adds this)</span><br>
+    <span class="ft">ActiveCamera</span> <span class="fc">// marks the active camera entity</span><br>
+    <span class="ft">MinimapCamera</span> <span class="fc">// marks a minimap camera entity</span>
+  </div>
+</div>
+
+<p>Marker components are dummy structs with no fields. Adding them to an entity is like setting a boolean flag &mdash; systems query for their presence to filter entities.</p>
+
+<div class="links">
+  <a href="#components">Components</a>
+  <a href="#triggers">CollisionTrigger (tag matching)</a>
+  <a href="#world">World.findEntityByTag</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- CAMERA SYSTEM -->
+<!-- ============================================================ -->
+<section id="camera">
+<h2>Camera System</h2>
+<p>Camera is an entity with <code>Camera</code> + <code>Transform</code> + <code>ActiveCamera</code> components. Helper functions operate on World + Entity. <code>src/ecs/Camera.zig</code> + <code>src/ecs/CameraTracking.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">Camera (component)</div>
+  <div class="fields">
+    <span class="fp">ortho_size</span>: <span class="ft">f32</span> <span class="fc">// vertical half-height of view</span><br>
+    <span class="fp">viewport</span>: <span class="ft">Rect(WorldPoint)</span><br>
+    <span class="fp">priority</span>: <span class="ft">i32</span> &nbsp;
+    <span class="fp">rotation</span>: <span class="ft">f32</span> = 0 &nbsp;
+    <span class="fp">background</span>: <span class="ft">?Color</span><br>
+    <span class="fl">Static Helpers (operate on World + Entity)</span>
+    <span class="fn">setPosition</span> / <span class="fn">getPosition</span> / <span class="fn">translate</span><br>
+    <span class="fn">setOrthoSize</span> / <span class="fn">getOrthoSize</span><br>
+    <span class="fn">zoom</span>(factor) / <span class="fn">smoothZoom</span>(delta) <span class="fc">// with min/max limits</span><br>
+    <span class="fn">getViewBounds</span>() &rarr; <span class="ft">Rect</span><br>
+    <span class="fn">enableCameraTracking</span> / <span class="fn">disableCameraTracking</span><br>
+    <span class="fn">setTrackingTarget</span>(target_entity)<br>
+    <span class="fn">setCameraFollowStiffness</span>(x, y) / <span class="fn">setCameraFollowDamping</span>(x, y)
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">CameraTracking (component)</div>
+  <div class="fields">
+    <span class="fp">target</span>: <span class="ft">?Entity</span> <span class="fc">// entity to follow</span><br>
+    <span class="fp">target_offset</span>: <span class="ft">V2</span> <span class="fc">// offset from target</span><br>
+    <span class="fp">mode</span>: <span class="ft">TrackingMode</span> <span class="fc">// packed bools (see below)</span><br>
+    <span class="fp">follow_stiffness</span> / <span class="fp">follow_damping</span>: <span class="ft">V2</span> <span class="fc">// spring-damper params</span><br>
+    <span class="fp">lead_distance</span> / <span class="fp">lead_smoothing</span> / <span class="fp">lead_speed_threshold</span><br>
+    <span class="fp">current_lead_offset</span>: <span class="ft">V2</span><br>
+    <span class="fp">velocity_tracker</span> / <span class="fp">last_target_position</span>: <span class="ft">V2</span>
+  </div>
+</div>
+
+<div class="card" style="border-color: #21262d;">
+  <div class="card-name" style="color: #8b949e;">TrackingMode (packed struct)</div>
+  <div class="fields">
+    <span class="fp">enabled</span>, <span class="fp">immediate</span>, <span class="fp">smooth</span>: <span class="ft">bool</span><br>
+    <span class="fp">lead_horizontal</span>, <span class="fp">lead_vertical</span>, <span class="fp">predict_motion</span>: <span class="ft">bool</span><br>
+    <span class="fp">lock_x</span>, <span class="fp">lock_y</span>: <span class="ft">bool</span><br>
+    <span class="fp">use_deadzone</span>, <span class="fp">auto_zoom</span>, <span class="fp">enable_shake</span>: <span class="ft">bool</span>
+  </div>
+</div>
+
+<h3>CameraTrackingSys (spring-damper)</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">Queries CameraTracking + ActiveCamera</span><br>
+    <span class="fc">Immediate mode: snap camera to target + offset</span><br>
+    <span class="fc">Smooth mode: spring_force = displacement * stiffness</span><br>
+    <span class="fc">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; damping_force = velocity * damping</span><br>
+    <span class="fc">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; acceleration = spring_force - damping_force</span><br>
+    <span class="fc">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; velocity += acceleration * dt</span><br>
+    <span class="fc">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; position += velocity * dt</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#components">Components</a>
+  <a href="#systems">CameraTrackingSys</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- COLLIDERS -->
+<!-- ============================================================ -->
+<section id="colliders">
+<h2>Colliders</h2>
+<p>Collision shapes and detection. <code>src/ecs/collider.zig</code> + <code>src/ecs/CollisionDetection.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">CircleCollider</div>
+  <div class="fields">
+    <span class="fp">origin</span>: <span class="ft">V2</span> <span class="fc">// offset from entity position</span> &nbsp;
+    <span class="fp">radius</span>: <span class="ft">f32</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">RectangleCollider</div>
+  <div class="fields">
+    <span class="fp">center</span>: <span class="ft">V2</span> <span class="fc">// offset from entity position</span> &nbsp;
+    <span class="fp">half_width</span>: <span class="ft">f32</span> &nbsp;
+    <span class="fp">half_height</span>: <span class="ft">f32</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Collision (event)</div>
+  <div class="fields">
+    <span class="fp">entity_a</span> / <span class="fp">entity_b</span>: <span class="ft">Entity</span><br>
+    <span class="fp">point</span>: <span class="ft">V2</span> <span class="fc">// collision point</span> &nbsp;
+    <span class="fp">normal</span>: <span class="ft">V2</span> <span class="fc">// collision normal</span><br>
+    <span class="fp">penetration</span>: <span class="ft">f32</span> <span class="fc">// overlap depth</span> &nbsp;
+    <span class="fp">actions_fired</span>: <span class="ft">bool</span>
+  </div>
+</div>
+
+<h3>Collision Detection (CollisionDetectionSys)</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">Queries all entities with Transform + Collider</span><br>
+    <span class="fc">Tests all pairs: O(n&sup2;) brute force</span><br>
+    <span class="fc">Dispatch by shape type combination:</span><br>
+    &nbsp;&nbsp;<span class="fn">collideCircleCircle</span>() <span class="fc">// distance vs sum of radii</span><br>
+    &nbsp;&nbsp;<span class="fn">collideCircleRectangle</span>() <span class="fc">// closest point on rect</span><br>
+    &nbsp;&nbsp;<span class="fn">collideRectangleRectangle</span>() <span class="fc">// AABB overlap</span><br>
+    <span class="fc">Produces: Collision { point, normal, penetration }</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#components">Collider component</a>
+  <a href="#systems">CollisionDetectionSys</a>
+  <a href="#triggers">CollisionTrigger</a>
+  <a href="#registries">ColliderRegistry</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SYSTEMS -->
+<!-- ============================================================ -->
+<section id="systems">
+<h2>Systems</h2>
+<p>Pure functions called by the engine each frame. Each system queries specific component combinations and operates on them. <code>src/systems/</code></p>
+
+<p>Execution order (per frame):</p>
+<ol class="flow-list">
+  <li><strong>ActionSys</strong> &mdash; process input/collision triggers, execute queued actions</li>
+  <li><strong>PhysicsSys</strong> &mdash; apply forces, update velocities <span class="fc">(stub)</span></li>
+  <li><strong>MovementSys</strong> &mdash; <code>position += velocity * dt</code></li>
+  <li><strong>CollisionDetectionSys</strong> &mdash; detect overlaps, populate collision events</li>
+  <li><strong>CameraTrackingSys</strong> &mdash; spring-damper follow target entity</li>
+  <li><strong>LifetimeSys</strong> &mdash; decrement timers, mark expired entities with <code>Destroy</code></li>
+  <li><strong>RenderSys</strong> &mdash; draw world-space sprites/text, then screen-space UI</li>
+</ol>
+
+<div class="card leaf">
+  <div class="card-name c-green">ActionSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(world, action_system, trigger_ctx)<br>
+    <span class="fc">1) Process all registered trigger systems (input, collision)</span><br>
+    <span class="fc">2) Execute queued actions via ActionExecutor</span><br>
+    <span class="fc">3) Clear queue for next frame</span>
+  </div>
+</div>
+<div class="card leaf">
+  <div class="card-name c-green">MovementSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(world, dt, debugger)<br>
+    Query: <span class="ft">Transform + Velocity</span><br>
+    <span class="fc">transform.position += velocity.linear * dt</span><br>
+    <span class="fc">transform.rotation += velocity.angular * dt</span><br>
+    <span class="fc">Debug: draws velocity vectors</span>
+  </div>
+</div>
+<div class="card leaf">
+  <div class="card-name c-green">PhysicsSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(world, dt) <span class="fc">// stub &mdash; not yet implemented</span>
+  </div>
+</div>
+<div class="card leaf">
+  <div class="card-name c-green">CollisionDetectionSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(world, collision_events, debugger)<br>
+    Query: <span class="ft">Transform + Collider</span> (all pairs, O(n&sup2;))<br>
+    <span class="fc">Circle-Circle, Circle-Rect, Rect-Rect dispatch</span><br>
+    <span class="fc">Populates Collision events with point, normal, penetration</span>
+  </div>
+</div>
+<div class="card leaf">
+  <div class="card-name c-green">CameraTrackingSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(world, dt)<br>
+    Query: <span class="ft">CameraTracking + ActiveCamera</span><br>
+    <span class="fc">Immediate: snap to target &nbsp; Smooth: spring-damper physics</span>
+  </div>
+</div>
+<div class="card leaf">
+  <div class="card-name c-green">LifetimeSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(world, dt)<br>
+    Query: <span class="ft">Lifetime</span> &rarr; decrement remaining, add <span class="ft">Destroy</span> if &le; 0<br>
+    Cleanup: query <span class="ft">Destroy</span> &rarr; <span class="fn">destroyEntity</span>()
+  </div>
+</div>
+<div class="card leaf">
+  <div class="card-name c-green">RenderSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(renderer, world, assets, camera, dt, debugger, w, h)<br>
+    <span class="fc">Pass 1 (world):</span> Query <span class="ft">Transform + Sprite</span> &rarr; <span class="fn">drawGeometry</span><br>
+    <span class="fc">Pass 2 (world):</span> Query <span class="ft">Transform + Text</span> &rarr; <span class="fn">drawText</span><br>
+    <span class="fc">Pass 3 (screen):</span> Query <span class="ft">UIElement + Sprite</span> &rarr; anchor-positioned drawing
+  </div>
+</div>
+
+<div class="card leaf">
+  <div class="card-name c-green">debugEntityInfoSystem</div>
+  <div class="fields">
+    <span class="fc">Draws entity ID, component indicators, and tags as overlays</span><br>
+    <span class="fc">Conditionally compiled &mdash; zero cost in release builds</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#query">Query</a>
+  <a href="#components">Components</a>
+  <a href="#actions">Action System</a>
+  <a href="#camera">Camera</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ACTION SYSTEM -->
+<!-- ============================================================ -->
+<section id="actions">
+<h2>Action System</h2>
+<p>Event-driven gameplay: triggers fire &rarr; actions queue &rarr; executor modifies world. <code>src/action/</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">ActionSystem</div>
+  <div class="fields">
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">action_queue</span>: <span class="ft">ActionQueue</span><br>
+    <span class="fp">trigger_systems</span>: <span class="ft">ArrayList(TriggerSystem)</span><br>
+    <span class="fl">Methods</span>
+    <span class="fn">init</span>(alloc) <span class="fc">// registers collision + input triggers</span><br>
+    <span class="fn">deinit</span>()<br>
+    <span class="fn">registerTrigger</span>(trigger_system) <span class="fc">// extensible</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Action</div>
+  <div class="fields">
+    <span class="fp">action_type</span>: <span class="ft">ActionType</span> <span class="fc">// union:</span><br>
+    &nbsp;&nbsp;<span class="ft">destroy_self</span> | <span class="ft">destroy_other</span> |<br>
+    &nbsp;&nbsp;<span class="ft">spawn_entity</span>{ template_name, offset } |<br>
+    &nbsp;&nbsp;<span class="ft">set_velocity</span>{ target, velocity } |<br>
+    &nbsp;&nbsp;<span class="ft">debug_print</span>: <span class="ft">[]const u8</span> |<br>
+    &nbsp;&nbsp;<span class="ft">play_sound</span>: <span class="ft">[]const u8</span><br>
+    <span class="fp">priority</span>: <span class="ft">i32</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">ActionQueue</div>
+  <div class="fields">
+    <span class="fp">actions</span>: <span class="ft">ArrayList(QueuedAction)</span><br>
+    <span class="fn">append</span>(action, context) &nbsp; <span class="fn">sortByPriority</span>() &nbsp; <span class="fn">clear</span>()
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">ActionContext</div>
+  <div class="fields">
+    <span class="fp">self_ent</span>: <span class="ft">Entity</span> &nbsp;
+    <span class="fp">other_ent</span>: <span class="ft">?Entity</span> &nbsp;
+    <span class="fp">collision_loc</span>: <span class="ft">?V2</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">ActionExecutor</div>
+  <div class="fields">
+    <span class="fn">executeActions</span>(world, action_queue)<br>
+    <span class="fc">Sorts by priority, then for each:</span><br>
+    <span class="fc">&nbsp;&nbsp;destroy_self &rarr; add Destroy to self</span><br>
+    <span class="fc">&nbsp;&nbsp;destroy_other &rarr; add Destroy to other</span><br>
+    <span class="fc">&nbsp;&nbsp;spawn_entity &rarr; createEntityFromTemplate at collision_loc</span><br>
+    <span class="fc">&nbsp;&nbsp;set_velocity &rarr; set velocity on target entity</span><br>
+    <span class="fc">&nbsp;&nbsp;debug_print &rarr; log message</span><br>
+    <span class="fc">&nbsp;&nbsp;play_sound &rarr; play audio (stub)</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#triggers">Triggers</a>
+  <a href="#systems">ActionSys</a>
+  <a href="#components">OnInput / OnCollision</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TRIGGERS -->
+<!-- ============================================================ -->
+<section id="triggers">
+<h2>Triggers</h2>
+<p>Event sources that fire actions. <code>src/action/Triggers.zig</code> + <code>src/action/ActionBindings.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">TriggerSystem</div>
+  <div class="fields">
+    <span class="fp">sys</span>: <span class="ft">*anyopaque</span> <span class="fc">// opaque state pointer</span><br>
+    <span class="fp">processFn</span>: <span class="ft">fn(ptr, world, ctx) !void</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">TriggerContext</div>
+  <div class="fields">
+    <span class="fp">collision_events</span>: <span class="ft">?[]Collision</span><br>
+    <span class="fp">input</span>: <span class="ft">?*const Input</span><br>
+    <span class="fp">delta_time</span>: <span class="ft">?f32</span><br>
+    <span class="fp">action_queue</span>: <span class="ft">*ActionQueue</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">CollisionTrigger</div>
+  <div class="fields">
+    <span class="fp">other_tag_pattern</span>: <span class="ft">[]const u8</span> <span class="fc">// pattern match against other entity's Tag</span><br>
+    <span class="fp">actions</span>: <span class="ft">[]const Action</span><br>
+    <span class="fl">Process Flow</span>
+    <span class="fc">For each collision event &rarr; check both entities for OnCollision component</span><br>
+    <span class="fc">&rarr; match other_tag_pattern against other entity's tags</span><br>
+    <span class="fc">&rarr; enqueue actions with ActionContext (self, other, collision_loc)</span><br>
+    <span class="fc">&rarr; set actions_fired flag to prevent re-firing</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">InputTrigger</div>
+  <div class="fields">
+    <span class="fp">input</span>: <span class="ft">union { key: KeyCode, mouse: MouseButton }</span><br>
+    <span class="fp">actions</span>: <span class="ft">[]const Action</span><br>
+    <span class="fl">Process Flow</span>
+    <span class="fc">Query entities with OnInput &rarr; check if key/button isPressed</span><br>
+    <span class="fc">&rarr; enqueue actions with entity as self</span>
+  </div>
+</div>
+
+<h3>ActionBindings(TriggerType)</h3>
+<p>Generic component builder. <code>OnCollision = ActionBindings(CollisionTrigger)</code>, <code>OnInput = ActionBindings(InputTrigger)</code>.</p>
+
+<div class="links">
+  <a href="#actions">ActionSystem</a>
+  <a href="#components">OnInput / OnCollision</a>
+  <a href="#tags">Tag (pattern matching)</a>
+  <a href="#colliders">Collision events</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SCENE RUNTIME -->
+<!-- ============================================================ -->
+<section id="scene-runtime">
+<h2>Scene Runtime</h2>
+<p>Loads declarative <code>.scene</code> files, manages active scene, creates entities. <code>src/scene/</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">SceneManager</div>
+  <div class="fields">
+    <span class="fp">scenes</span>: <span class="ft">StringHashMap(*SceneFile)</span><br>
+    <span class="fp">scene_file_paths</span>: <span class="ft">StringHashMap([]const u8)</span><br>
+    <span class="fp">active_scene_name</span>: <span class="ft">?[]const u8</span><br>
+    <span class="fn">loadScene</span>(name, file_path) <span class="fc">// parses from assets/scenes/</span><br>
+    <span class="fn">unloadScene</span>(name) <span class="fc">// can't unload active</span><br>
+    <span class="fn">reloadActiveScene</span>()<br>
+    <span class="fn">setActiveScene</span>(name)<br>
+    <span class="fn">getActiveScene</span>() &rarr; <span class="ft">?*const SceneFile</span><br>
+    <span class="fn">getScene</span>(name) &rarr; <span class="ft">?*const SceneFile</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">TemplateManager</div>
+  <div class="fields">
+    <span class="fp">templates</span>: <span class="ft">StringHashMap(Template)</span> <span class="fc">// lowercase name &rarr; template</span><br>
+    <span class="fp">template_files</span>: <span class="ft">ArrayList(*SceneFile)</span><br>
+    <span class="fp">instantiator</span>: <span class="ft">*Instantiator</span><br>
+    <span class="fn">loadTemplateFile</span>(name) <span class="fc">// from assets/templates/</span><br>
+    <span class="fn">loadTemplatesFromDirectory</span>(path)<br>
+    <span class="fn">instantiate</span>(name, position) &rarr; <span class="ft">Entity</span> <span class="fc">// runtime spawning</span><br>
+    <span class="fn">hasTemplate</span> / <span class="fn">getTemplate</span>
+  </div>
+</div>
+
+<h3>Loading Pipeline</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fn">loadSceneFile</span>(alloc, name) <span class="fc">// assets/scenes/{name}.scene</span><br>
+    <span class="fn">loadTemplateFile</span>(alloc, name) <span class="fc">// assets/templates/{name}.template</span><br>
+    <span class="fc">File &rarr; Lexer &rarr; Parser &rarr; SceneFile (AST)</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#instantiator">Instantiator</a>
+  <a href="#world">World</a>
+  <a href="#registries">Registries</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- INSTANTIATOR -->
+<!-- ============================================================ -->
+<section id="instantiator">
+<h2>Instantiator</h2>
+<p>Walks scene AST and creates entities with components. The bridge between declarative scene files and the runtime ECS. <code>src/scene/instantiator.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">Instantiator</div>
+  <div class="fields">
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">world</span>: <span class="ft">*World</span><br>
+    <span class="fp">assets</span>: <span class="ft">*AssetManager</span><br>
+    <span class="fp">last_instantiated_entities</span>: <span class="ft">ArrayList(Entity)</span><br>
+    <span class="fp">in_screen_space</span>: <span class="ft">bool</span> = false<br>
+    <span class="fl">Public API</span>
+    <span class="fn">instantiate</span>(scene_file) <span class="fc">// process all declarations</span><br>
+    <span class="fn">clearLastInstantiated</span>(world) <span class="fc">// destroy previous entities</span><br>
+    <span class="fl">Declaration Handlers</span>
+    <span class="fn">instantiateScene</span>(scene_decl) <span class="fc">// recursive for nested scenes</span><br>
+    <span class="fn">instantiateEntity</span>(entity_decl) <span class="fc">// create entity + add components</span><br>
+    <span class="fn">instantiateAsset</span>(asset_decl) <span class="fc">// load font assets</span><br>
+    <span class="fn">addComponent</span>(entity, comp_decl) <span class="fc">// build + attach component</span><br>
+    <span class="fl">Component Builders</span>
+    <span class="fn">buildGenericComponent</span>(T, comp) <span class="fc">// extract fields from properties</span><br>
+    <span class="fn">buildSpriteComponent</span>(ShapeT, sprite) <span class="fc">// geometry + colors</span><br>
+    <span class="fn">buildPolygonSprite</span>(sprite) <span class="fc">// special: polygon with points array</span><br>
+    <span class="fn">buildColliderComponent</span>(ShapeT, collider) <span class="fc">// collider shape</span><br>
+    <span class="fn">buildTriggerComponent</span>(CompT, TrigT, comp) <span class="fc">// OnCollision / OnInput</span><br>
+    <span class="fn">buildTrigger</span>(TrigT, block) / <span class="fn">buildAction</span>(block) <span class="fc">// nested blocks</span>
+  </div>
+</div>
+
+<h3>Value Extraction</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fn">extractValueForType</span>(T, value) &rarr; <span class="ft">?T</span><br>
+    <span class="fc">Handles: f32, i32, u32, bool, []const u8 (strings)</span><br>
+    <span class="fc">Handles: V2 (from vec2), V3 (from vec3)</span><br>
+    <span class="fc">Handles: Color (from hex u32), enum (from string)</span><br>
+    <span class="fc">Handles: arrays (from Value.array)</span><br>
+    <span class="fc">Type-safe with detailed error messages on mismatch</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#scene-runtime">SceneManager / TemplateManager</a>
+  <a href="#world">World</a>
+  <a href="#components">Components</a>
+  <a href="#registries">Registries</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- REGISTRIES -->
+<!-- ============================================================ -->
+<section id="registries">
+<h2>Registries</h2>
+<p>Comptime metaprogramming: introspect structs &rarr; generate tagged unions for type-safe polymorphism. <code>src/registry/</code></p>
+
+<div class="card ext">
+  <div class="card-name c-orange">ComponentRegistry</div>
+  <div class="fields">
+    Introspects <span class="ft">Components</span> at comptime &rarr; generates <span class="ft">ComponentData</span> union<br>
+    <span class="fn">getComponentIndex</span>(name) &rarr; <span class="ft">?usize</span><br>
+    <span class="fn">getComponentType</span>(name) &rarr; <span class="ft">?type</span><br>
+    <span class="fn">createComponentUnion</span>(T, value) &rarr; <span class="ft">ComponentData</span>
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">ShapeRegistry</div>
+  <div class="fields">
+    All shape types &times; coordinate spaces (World + Screen) = <span class="ft">ShapeData</span> union<br>
+    <span class="fc">Circle, Rectangle, Triangle, Line, Polygon &times; WorldPoint/ScreenPoint</span><br>
+    <span class="fn">getShapeIndex</span>(name, coord_space) &nbsp; <span class="fn">getShapeType</span>(name)<br>
+    <span class="fn">createShapeUnion</span>(T, shape) &rarr; <span class="ft">ShapeData</span>
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">ColliderRegistry</div>
+  <div class="fields">
+    Generates <span class="ft">ColliderData</span> union: <span class="ft">CircleCollider | RectangleCollider</span><br>
+    <span class="fn">getColliderIndex</span>(name) &nbsp; <span class="fn">getColliderType</span>(name)<br>
+    <span class="fn">createColliderUnion</span>(T, shape) &rarr; <span class="ft">ColliderData</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#components">Components</a>
+  <a href="#colliders">Colliders</a>
+  <a href="#instantiator">Instantiator (consumer)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ENTITY LIFECYCLE -->
+<!-- ============================================================ -->
+<section id="lifecycle">
+<h2>Entity Lifecycle</h2>
+<p>How entities are born, live, and die in the ECS.</p>
+
+<h3>Creation</h3>
+<ol class="flow-list">
+  <li><code>world.createEntity()</code> &rarr; increment <code>next_entity_id</code>, return <code>Entity{ .id = id }</code></li>
+  <li><code>world.addComponent(entity, T, value)</code> &rarr; auto-register type if first use, add to <code>ComponentStorage(T)</code></li>
+  <li>Repeat for each component the entity needs</li>
+</ol>
+
+<h3>From Template</h3>
+<ol class="flow-list">
+  <li><code>world.createEntityFromTemplate(name, offset)</code></li>
+  <li>TemplateManager looks up template by lowercase name</li>
+  <li>Instantiator creates entity and adds all components from template definition</li>
+  <li>Transform.position gets the offset added</li>
+</ol>
+
+<h3>From Scene File</h3>
+<ol class="flow-list">
+  <li><code>instantiator.instantiate(scene_file)</code> walks the AST</li>
+  <li>For each entity declaration: create entity + build components from properties</li>
+  <li>For each asset declaration: load fonts (and eventually textures, audio)</li>
+  <li>For each scene declaration: recursively instantiate nested scenes</li>
+</ol>
+
+<h3>Destruction</h3>
+<ol class="flow-list">
+  <li>Entity gets <code>Destroy</code> marker component (via LifetimeSys, ActionExecutor, or manual)</li>
+  <li>LifetimeSys cleanup pass: query <code>Destroy</code> &rarr; call <code>world.destroyEntity(entity)</code></li>
+  <li><code>destroyEntity</code> iterates <strong>all</strong> storages, removes entity from each</li>
+  <li>Each <code>ComponentStorage.remove()</code> calls <code>deinit()</code> if the component type has one (with or without allocator param)</li>
+  <li>Swap-with-last in dense array to maintain packing</li>
+</ol>
+
+<div class="links">
+  <a href="#world">World</a>
+  <a href="#storage">ComponentStorage</a>
+  <a href="#scene-runtime">Scene / Templates</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DATA FLOW -->
+<!-- ============================================================ -->
+<section id="data-flow">
+<h2>Data Flow</h2>
+<p>Key data paths through the ECS during a frame.</p>
+
+<h3>Query Flow</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">world.query(.{Transform, Velocity})</span><br>
+    <span class="fc">&rarr; Register component types if needed</span><br>
+    <span class="fc">&rarr; Get storages for each type from component_storages map</span><br>
+    <span class="fc">&rarr; Create Query with storage tuple</span><br>
+    <span class="fc">&rarr; Iterate: primary_storage.dense &rarr; check other storages &rarr; yield mutable pointers</span>
+  </div>
+</div>
+
+<h3>Collision &rarr; Action Flow</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">CollisionDetectionSys: query(Transform, Collider) &rarr; test pairs &rarr; Collision events</span><br>
+    <span class="fc">&darr;</span><br>
+    <span class="fc">CollisionTrigger.process(): for each Collision &rarr; match entity tags &rarr; enqueue Actions</span><br>
+    <span class="fc">&darr;</span><br>
+    <span class="fc">ActionExecutor: sort by priority &rarr; execute (destroy, spawn, set_velocity...)</span>
+  </div>
+</div>
+
+<h3>Input &rarr; Action Flow</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">Platform events &rarr; Input state (isPressed/isDown/isReleased)</span><br>
+    <span class="fc">&darr;</span><br>
+    <span class="fc">InputTrigger.process(): query(OnInput) &rarr; check input state &rarr; enqueue Actions</span><br>
+    <span class="fc">&darr;</span><br>
+    <span class="fc">ActionExecutor: execute queued actions on World</span>
+  </div>
+</div>
+
+<h3>Scene Loading Flow</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">.scene file on disk</span><br>
+    <span class="fc">&darr; loader.loadSceneFile()</span><br>
+    <span class="fc">Lexer &rarr; tokens &rarr; Parser &rarr; SceneFile (AST)</span><br>
+    <span class="fc">&darr; instantiator.instantiate()</span><br>
+    <span class="fc">Walk declarations: entities &rarr; createEntity + buildComponent + addComponent</span><br>
+    <span class="fc">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; assets &rarr; loadFont, register handle</span><br>
+    <span class="fc">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; scenes &rarr; recurse</span><br>
+    <span class="fc">&darr;</span><br>
+    <span class="fc">Entities live in World, ready for systems to process</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#world">World</a>
+  <a href="#query">Query</a>
+  <a href="#actions">Action System</a>
+  <a href="#systems">Systems</a>
+  <a href="#instantiator">Instantiator</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- BACK TO TOP -->
+<!-- ============================================================ -->
+<p style="margin-top: 3rem; text-align: center;">
+  <a href="#top" style="color: #484f58; font-size: 0.85rem;">&uarr; back to top</a>
+</p>
+
+</body>
+</html>

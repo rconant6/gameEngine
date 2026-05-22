@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZXL Format & Asset Pipeline - Phase 1</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 2rem;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  h1 {
+    color: #58a6ff;
+    font-size: 1.8rem;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid #21262d;
+    padding-bottom: 0.75rem;
+  }
+  .subtitle {
+    color: #8b949e;
+    font-size: 0.9rem;
+    margin-bottom: 2rem;
+  }
+  h2 {
+    color: #f0883e;
+    font-size: 1.25rem;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid #21262d;
+  }
+  h3 {
+    color: #d2a8ff;
+    font-size: 1rem;
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Decision pills */
+  .decisions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .pill {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 2rem;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.8rem;
+    color: #7ee787;
+  }
+
+  /* Binary format diagram */
+  .format-box {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 1.25rem;
+    margin: 1rem 0;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.8rem;
+    line-height: 1.8;
+    overflow-x: auto;
+  }
+  .format-box .section-label {
+    color: #f0883e;
+    font-weight: 600;
+  }
+  .format-box .field {
+    color: #c9d1d9;
+  }
+  .format-box .type {
+    color: #7ee787;
+  }
+  .format-box .comment {
+    color: #8b949e;
+  }
+
+  /* Checklist */
+  .checklist {
+    list-style: none;
+    margin: 0.5rem 0;
+  }
+  .checklist li {
+    position: relative;
+    padding: 0.6rem 0.75rem 0.6rem 2.5rem;
+    margin: 0.3rem 0;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .checklist li:hover {
+    border-color: #58a6ff;
+    background: #1a2030;
+  }
+  .checklist li.checked {
+    opacity: 0.5;
+    text-decoration: line-through;
+    border-color: #21262d;
+  }
+  .checklist li.checked::before {
+    content: "\2713";
+    color: #7ee787;
+  }
+  .checklist li::before {
+    content: "";
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    border: 2px solid #30363d;
+    border-radius: 4px;
+    text-align: center;
+    line-height: 16px;
+    font-size: 12px;
+    font-weight: bold;
+  }
+  .checklist li.checked::before {
+    border-color: #7ee787;
+    background: #0d1117;
+  }
+  .step-num {
+    display: inline-block;
+    background: #30363d;
+    color: #8b949e;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.45rem;
+    border-radius: 3px;
+    margin-right: 0.4rem;
+  }
+  .checklist li.checked .step-num {
+    background: #1a2030;
+  }
+
+  /* Sub-items */
+  .sub {
+    margin-left: 2rem;
+    font-size: 0.85rem;
+  }
+  .sub li {
+    background: #0d1117;
+    border-color: #21262d;
+  }
+
+  /* File tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.75rem 0;
+    font-size: 0.85rem;
+  }
+  th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    background: #161b22;
+    border: 1px solid #21262d;
+    color: #8b949e;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  td {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #21262d;
+  }
+  td:first-child {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8rem;
+    color: #79c0ff;
+    white-space: nowrap;
+  }
+
+  /* Data structure cards */
+  .struct-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin: 0.75rem 0;
+  }
+  .struct-name {
+    color: #d2a8ff;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+  }
+  .struct-fields {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    color: #c9d1d9;
+  }
+  .struct-fields .fname { color: #79c0ff; }
+  .struct-fields .ftype { color: #7ee787; }
+  .struct-fields .fcomment { color: #8b949e; }
+  .struct-fields .ffn { color: #d2a8ff; }
+
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1.5rem 0;
+    font-size: 0.85rem;
+  }
+  .flow-node {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    text-align: center;
+  }
+  .flow-node.tool { border-color: #d2a8ff; color: #d2a8ff; }
+  .flow-node.file { border-color: #7ee787; color: #7ee787; }
+  .flow-node.system { border-color: #f0883e; color: #f0883e; }
+  .flow-node.gpu { border-color: #58a6ff; color: #58a6ff; }
+  .flow-arrow { color: #30363d; font-size: 1.2rem; }
+
+  /* Verification */
+  .verify {
+    background: #0d1f0d;
+    border: 1px solid #238636;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+  }
+  .verify h3 { color: #7ee787; margin-top: 0; }
+  .verify code {
+    background: #161b22;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    color: #79c0ff;
+  }
+  .verify ol {
+    margin-left: 1.25rem;
+    margin-top: 0.5rem;
+  }
+  .verify li { margin: 0.3rem 0; }
+
+  /* Future phases */
+  .future {
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+    color: #8b949e;
+    font-size: 0.85rem;
+  }
+  .future strong { color: #58a6ff; }
+
+  .note {
+    font-size: 0.8rem;
+    color: #8b949e;
+    font-style: italic;
+    margin-top: 0.25rem;
+  }
+
+  /* Scene format example */
+  .scene-example {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin: 0.75rem 0;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.8rem;
+    line-height: 1.8;
+  }
+  .scene-example .tag { color: #f0883e; }
+  .scene-example .prop { color: #79c0ff; }
+  .scene-example .val { color: #7ee787; }
+  .scene-example .typ { color: #d2a8ff; }
+</style>
+</head>
+<body>
+
+<h1>ZXL Format & Asset Pipeline</h1>
+<p class="subtitle">Phase 1 &mdash; Format module, ZixelArt save/load, asset system wiring</p>
+
+<div class="decisions">
+  <span class="pill">Colors: raw [4]u8</span>
+  <span class="pill">Save path: hardcoded "output.zxl"</span>
+  <span class="pill">Palette-indexed, max 255 colors</span>
+  <span class="pill">Multi-frame per file</span>
+  <span class="pill">No compression</span>
+  <span class="pill">Includes asset wiring</span>
+</div>
+
+<!-- ========== PIPELINE FLOW ========== -->
+<h2>Pipeline Flow</h2>
+<div class="flow">
+  <div class="flow-node tool">ZixelArt<br><small>draw/edit</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-node file">.zxl file<br><small>palette + pixels</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-node system">Asset System<br><small>ZxlManager</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-node system">TextureSprite<br><small>ECS component</small></div>
+  <span class="flow-arrow">&rarr;</span>
+  <div class="flow-node gpu">Renderer<br><small>Phase 2</small></div>
+</div>
+
+<!-- ========== BINARY FORMAT ========== -->
+<h2>Binary Format</h2>
+
+<div class="format-box">
+<span class="section-label">HEADER</span> <span class="comment">(16 bytes, fixed)</span>
+  <span class="field">[0..3]</span>   magic         <span class="type">[4]u8</span>    <span class="comment">= "ZXL\0"</span>
+  <span class="field">[4]</span>      version       <span class="type">u8</span>       <span class="comment">= 1</span>
+  <span class="field">[5]</span>      flags         <span class="type">u8</span>       <span class="comment">= 0 (reserved)</span>
+  <span class="field">[6..7]</span>   frame_count   <span class="type">u16 LE</span>
+  <span class="field">[8..9]</span>   canvas_width  <span class="type">u16 LE</span>
+  <span class="field">[10..11]</span> canvas_height <span class="type">u16 LE</span>
+  <span class="field">[12]</span>     palette_size  <span class="type">u8</span>       <span class="comment">1-255 (0 = 256)</span>
+  <span class="field">[13..15]</span> reserved      <span class="type">[3]u8</span>    <span class="comment">= 0</span>
+
+<span class="section-label">PALETTE</span> <span class="comment">(palette_size * 4 bytes)</span>
+  Per entry: <span class="type">[r, g, b, a]</span>  <span class="comment">index 0 = transparent</span>
+
+<span class="section-label">FRAMES</span> <span class="comment">(one per frame, variable size)</span>
+  Per frame:
+    <span class="field">name_len</span>     <span class="type">u8</span>
+    <span class="field">name</span>         <span class="type">[name_len]u8</span>   <span class="comment">e.g. "walk_01"</span>
+    <span class="field">duration_ms</span>  <span class="type">u16 LE</span>        <span class="comment">0 = static</span>
+    <span class="field">origin_x</span>     <span class="type">i16 LE</span>        <span class="comment">pivot point</span>
+    <span class="field">origin_y</span>     <span class="type">i16 LE</span>
+    <span class="field">reserved</span>     <span class="type">u8</span>            <span class="comment">= 0</span>
+    <span class="field">pixels</span>       <span class="type">[w*h]u8</span>       <span class="comment">palette indices, row-major</span>
+</div>
+<p class="note">64x64, 32 colors, 1 frame ~ 4.25 KB. No compression needed.</p>
+
+<!-- ========== DATA STRUCTURES ========== -->
+<h2>Data Structures</h2>
+
+<div class="struct-card">
+  <div class="struct-name">ZxlPalette</div>
+  <div class="struct-fields">
+    <span class="fname">colors</span>: <span class="ftype">[256][4]u8</span> <span class="fcomment">// RGBA, index 0 = transparent</span><br>
+    <span class="fname">count</span>: <span class="ftype">u8</span><br>
+    <br>
+    <span class="ffn">getColor</span>(index) &rarr; <span class="ftype">[4]u8</span><br>
+    <span class="ffn">findColor</span>(rgba) &rarr; <span class="ftype">?u8</span> <span class="fcomment">// reverse lookup</span><br>
+    <span class="ffn">addColor</span>(rgba) &rarr; <span class="ftype">?u8</span> <span class="fcomment">// returns index or null if full</span>
+  </div>
+</div>
+
+<div class="struct-card">
+  <div class="struct-name">ZxlFrame</div>
+  <div class="struct-fields">
+    <span class="fname">name</span>: <span class="ftype">[]const u8</span> <span class="fcomment">// allocated</span><br>
+    <span class="fname">duration_ms</span>: <span class="ftype">u16</span><br>
+    <span class="fname">origin_x</span>: <span class="ftype">i16</span> &nbsp; <span class="fname">origin_y</span>: <span class="ftype">i16</span><br>
+    <span class="fname">pixels</span>: <span class="ftype">[]u8</span> <span class="fcomment">// palette indices, len = w * h</span><br>
+    <br>
+    <span class="ffn">getPixel</span>(x, y, width) &rarr; <span class="ftype">u8</span><br>
+    <span class="ffn">setPixel</span>(x, y, width, index)
+  </div>
+</div>
+
+<div class="struct-card">
+  <div class="struct-name">ZxlImage</div>
+  <div class="struct-fields">
+    <span class="fname">allocator</span>: <span class="ftype">Allocator</span><br>
+    <span class="fname">version</span>: <span class="ftype">u8</span> &nbsp; <span class="fname">width</span>: <span class="ftype">u16</span> &nbsp; <span class="fname">height</span>: <span class="ftype">u16</span><br>
+    <span class="fname">palette</span>: <span class="ftype">ZxlPalette</span><br>
+    <span class="fname">frames</span>: <span class="ftype">[]ZxlFrame</span><br>
+    <br>
+    <span class="ffn">init</span> / <span class="ffn">deinit</span> / <span class="ffn">addFrame</span> / <span class="ffn">getFrame</span> / <span class="ffn">getFrameByIndex</span><br>
+    <span class="ffn">toRgbaBuffer</span>(frame_index) &rarr; <span class="ftype">[]u8</span> <span class="fcomment">// expand palette for GPU</span><br>
+    <span class="ffn">toRgbaBufferWithPalette</span>(frame_index, alt_palette) &rarr; <span class="ftype">[]u8</span> <span class="fcomment">// palette swap</span>
+  </div>
+</div>
+
+<div class="struct-card">
+  <div class="struct-name">TextureSprite <span class="fcomment">// new ECS component</span></div>
+  <div class="struct-fields">
+    <span class="fname">zxl_handle</span>: <span class="ftype">ZxlHandle</span><br>
+    <span class="fname">frame_name</span>: <span class="ftype">?[]const u8</span> = null<br>
+    <span class="fname">frame_index</span>: <span class="ftype">u16</span> = 0<br>
+    <span class="fname">tint</span>: <span class="ftype">?Color</span> = null<br>
+    <span class="fname">flip_x</span>: <span class="ftype">bool</span> = false &nbsp; <span class="fname">flip_y</span>: <span class="ftype">bool</span> = false<br>
+    <span class="fname">visible</span>: <span class="ftype">bool</span> = true
+  </div>
+</div>
+
+<!-- ========== FILES ========== -->
+<h2>Files</h2>
+
+<h3>New</h3>
+<table>
+  <tr><th>Path</th><th>Purpose</th></tr>
+  <tr><td>src/zxl/zxl.zig</td><td>Module root, re-exports</td></tr>
+  <tr><td>src/zxl/ZxlImage.zig</td><td>ZxlImage, ZxlFrame, ZxlPalette structs</td></tr>
+  <tr><td>src/zxl/ZxlReader.zig</td><td>Binary deserializer (fromBytes, fromFile)</td></tr>
+  <tr><td>src/zxl/ZxlWriter.zig</td><td>Binary serializer (toBytes, toFile)</td></tr>
+  <tr><td>src/assets/zxl/zxl_manager.zig</td><td>ZxlHandle + ZxlManager (follows FontManager)</td></tr>
+  <tr><td>src/tools/zixelart/zxl_export.zig</td><td>Canvas &harr; ZxlImage conversion</td></tr>
+</table>
+
+<h3>Modified</h3>
+<table>
+  <tr><th>Path</th><th>Change</th></tr>
+  <tr><td>build.zig</td><td>Add zxl to M enum, module_defs, wire deps</td></tr>
+  <tr><td>src/assets/AssetManager.zig</td><td>Add ZxlManager field, load/get methods</td></tr>
+  <tr><td>src/assets/assets.zig</td><td>Re-export ZxlHandle, ZxlManager</td></tr>
+  <tr><td>src/ecs/Components.zig</td><td>Add TextureSprite component</td></tr>
+  <tr><td>src/scene-format/ast.zig</td><td>Add zxl to AssetType enum</td></tr>
+  <tr><td>src/Engine.zig</td><td>Re-export zxl types</td></tr>
+</table>
+
+<!-- ========== SCENE FORMAT ========== -->
+<h2>Scene Format</h2>
+<div class="scene-example">
+<span class="tag">[PlayerArt:asset zxl]</span>
+  <span class="prop">filename</span>:<span class="typ">string</span> <span class="val">"player.zxl"</span>
+
+<span class="tag">[Player:entity]</span>
+  <span class="tag">[Transform]</span>
+    <span class="prop">position</span>:<span class="typ">vec2</span> <span class="val">{0.0, 0.0}</span>
+  <span class="tag">[Sprite:zxl]</span>
+    <span class="prop">asset</span>:<span class="typ">asset</span> <span class="val">PlayerArt</span>
+    <span class="prop">frame</span>:<span class="typ">string</span> <span class="val">"idle_01"</span>
+</div>
+
+<!-- ========== IMPLEMENTATION CHECKLIST ========== -->
+<h2>Implementation Checklist</h2>
+
+<ul class="checklist" id="checklist">
+  <li onclick="this.classList.toggle('checked')">
+    <span class="step-num">1</span>
+    ZxlImage + ZxlPalette + ZxlFrame structs &mdash; create <code>src/zxl/ZxlImage.zig</code> and <code>src/zxl/zxl.zig</code>
+  </li>
+  <li onclick="this.classList.toggle('checked')">
+    <span class="step-num">2</span>
+    ZxlWriter &mdash; serialize ZxlImage &rarr; bytes matching binary layout
+  </li>
+  <li onclick="this.classList.toggle('checked')">
+    <span class="step-num">3</span>
+    ZxlReader &mdash; deserialize bytes &rarr; ZxlImage, validate magic/version/bounds
+  </li>
+  <li onclick="this.classList.toggle('checked')">
+    <span class="step-num">4</span>
+    Build system &mdash; add <code>zxl</code> to M enum + module_defs, wire into zixelart/assets/engine
+  </li>
+  <li onclick="this.classList.toggle('checked')">
+    <span class="step-num">5</span>
+    Canvas &harr; ZxlImage conversion &mdash; <code>canvasToZxlImage</code> and <code>zxlImageToCanvas</code>
+  </li>
+  <li onclick="this.classList.toggle('checked')">
+    <span class="step-num">6</span>
+    ZixelArt save/load &mdash; Ctrl+S / Ctrl+O with hardcoded <code>"output.zxl"</code>
+  </li>
+  <li onclick="this.classList.toggle('checked')">
+    <span class="step-num">7</span>
+    Asset system &mdash; ZxlManager, extend AssetManager + assets.zig
+  </li>
+  <li onclick="this.classList.toggle('checked')">
+    <span class="step-num">8</span>
+    TextureSprite component + scene format &mdash; Components.zig, ast.zig, Engine.zig
+  </li>
+  <li onclick="this.classList.toggle('checked')">
+    <span class="step-num">9</span>
+    Tests &mdash; round-trip, palette ops, canvas conversion
+  </li>
+</ul>
+
+<!-- ========== VERIFICATION ========== -->
+<div class="verify">
+  <h3>Verification</h3>
+  <ol>
+    <li><code>zig build</code> &mdash; no errors</li>
+    <li><code>zig build test</code> &mdash; round-trip and palette tests pass</li>
+    <li><code>zig build zixelart</code> &rarr; draw &rarr; Ctrl+S &rarr; close &rarr; reopen &rarr; Ctrl+O &rarr; identical</li>
+    <li><code>xxd output.zxl | head</code> &mdash; verify ZXL\0 magic, palette count, file size ~4KB</li>
+  </ol>
+</div>
+
+<!-- ========== FUTURE ========== -->
+<div class="future">
+  <strong>Phase 2:</strong> Metal texture pipeline (shaders, GPU upload, textured quads, RenderSys)<br>
+  <strong>Phase 3:</strong> Animation system (AnimatedSprite, AnimationSys, multi-frame editing)<br>
+  <strong>Phase 4:</strong> ZixelArt eats its own dogfood (tool icons as .zxl)<br>
+  <strong>Phase 5:</strong> Palette swapping, atlas packing, sprite batching
+</div>
+
+</body>
+</html>

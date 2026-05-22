@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ecosystem Architecture — The Full Picture</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #e0e0e0;
+            background: #1a1a1a;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #242424;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            color: #60a5fa;
+            border-bottom: 3px solid #3b82f6;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #93c5fd;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #2d2d2d;
+            border-left: 4px solid #3b82f6;
+        }
+
+        h3 {
+            color: #60a5fa;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+
+        p { margin: 10px 0; }
+
+        ul, ol { margin-left: 20px; margin-top: 10px; }
+        li { margin: 8px 0; }
+
+        .vision-box {
+            background: #2d2d2d;
+            border-left: 4px solid #10b981;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .vision-box h3 { color: #34d399; margin-top: 0; }
+
+        .north-star {
+            background: #1e1b4b;
+            border-left: 4px solid #818cf8;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-size: 1.05em;
+        }
+
+        .north-star strong { color: #a5b4fc; }
+
+        .code-block {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 15px 0;
+            border: 1px solid #3b82f6;
+        }
+
+        .code-block code {
+            color: #93c5fd;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9em;
+            white-space: pre;
+            display: block;
+        }
+
+        .layer-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin: 20px 0;
+        }
+
+        .stack-layer {
+            padding: 14px 20px;
+            border-radius: 4px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .stack-layer .label {
+            font-weight: bold;
+            min-width: 180px;
+            font-size: 0.95em;
+        }
+
+        .stack-layer .desc {
+            font-size: 0.9em;
+            color: #9ca3af;
+        }
+
+        .layer-app      { background: #1e3a5f; border-left: 4px solid #3b82f6; }
+        .layer-ui       { background: #1e3a2f; border-left: 4px solid #10b981; }
+        .layer-tools    { background: #2d1f3d; border-left: 4px solid #8b5cf6; }
+        .layer-engine   { background: #3d2a1f; border-left: 4px solid #f59e0b; }
+        .layer-renderer { background: #1f2937; border-left: 4px solid #06b6d4; }
+        .layer-platform { background: #1f1f1f; border-left: 4px solid #6b7280; }
+        .layer-runtime  { background: #3d1f1f; border-left: 4px solid #ef4444; }
+
+        .label-app      { color: #60a5fa; }
+        .label-ui       { color: #34d399; }
+        .label-tools    { color: #a78bfa; }
+        .label-engine   { color: #fbbf24; }
+        .label-renderer { color: #22d3ee; }
+        .label-platform { color: #9ca3af; }
+        .label-runtime  { color: #f87171; }
+
+        .philosophy {
+            background: #1e293b;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 6px;
+            border-left: 4px solid #06b6d4;
+        }
+
+        .philosophy-title { color: #22d3ee; font-weight: bold; margin-bottom: 10px; }
+
+        .rub-box {
+            background: #2d1a00;
+            border-left: 4px solid #f97316;
+            padding: 15px 20px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .rub-box strong { color: #fb923c; }
+
+        .decision-box {
+            background: #1a2d1a;
+            border-left: 4px solid #22c55e;
+            padding: 15px 20px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+
+        .decision-box strong { color: #4ade80; }
+
+        .section-divider {
+            border: none;
+            border-top: 1px solid #374151;
+            margin: 40px 0;
+        }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .card {
+            background: #1f1f1f;
+            border-radius: 6px;
+            padding: 20px;
+            border: 1px solid #374151;
+        }
+
+        .card h3 { margin-top: 0; }
+
+        .card.blue  { border-top: 3px solid #3b82f6; }
+        .card.green { border-top: 3px solid #10b981; }
+        .card.purple{ border-top: 3px solid #8b5cf6; }
+        .card.amber { border-top: 3px solid #f59e0b; }
+        .card.red   { border-top: 3px solid #ef4444; }
+        .card.cyan  { border-top: 3px solid #06b6d4; }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-right: 6px;
+        }
+
+        .tag-devapp  { background: #1e3a5f; color: #60a5fa; }
+        .tag-runtime { background: #3d1f1f; color: #f87171; }
+        .tag-shared  { background: #1f2937; color: #9ca3af; }
+        .tag-todo    { background: #2d1a00; color: #fb923c; }
+        .tag-done    { background: #1a2d1a; color: #4ade80; }
+
+        .flow-arrow {
+            text-align: center;
+            color: #4b5563;
+            font-size: 1.4em;
+            margin: 4px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.9em;
+        }
+
+        th {
+            background: #2d2d2d;
+            color: #93c5fd;
+            padding: 10px 14px;
+            text-align: left;
+            border-bottom: 2px solid #3b82f6;
+        }
+
+        td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #374151;
+            vertical-align: top;
+        }
+
+        tr:hover td { background: #2a2a2a; }
+
+        .badge {
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 10px;
+            font-size: 0.78em;
+            font-weight: bold;
+        }
+
+        .badge-done    { background: #166534; color: #86efac; }
+        .badge-wip     { background: #92400e; color: #fcd34d; }
+        .badge-planned { background: #1e1b4b; color: #a5b4fc; }
+        .badge-future  { background: #1f1f1f; color: #6b7280; border: 1px solid #374151; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <p style="margin-bottom: 20px;"><a href="index.html" style="color: #3b82f6; font-size: 0.9em;">← Back to docs</a></p>
+    <h1>🛠️ Ecosystem Architecture — The Full Picture</h1>
+
+    <div class="north-star">
+        <strong>North Star:</strong> Click an app. Build your art, design your game, click Publish.
+        Walk away with an executable that runs on your target platform.
+        Easy enough for a motivated teenager to make their first game.
+        Powerful enough for the person who built it to keep going deeper.
+    </div>
+
+    <div class="vision-box">
+        <h3>How We Got Here</h3>
+        <p>Started with Asteroids — felt the raw pain of doing everything by hand. Built ZixelArt to solve the pixel art problem. ZixelArt needed a color system, so that got built. The color system needed a UI, and now the UI needs a real framework. Each layer was justified by the pain of the layer below it. No speculative abstraction — earned every piece.</p>
+        <p style="margin-top: 12px;">The destination has finally become clear: <strong>a Unity-inspired dev suite</strong> where the editor and the runtime are separate things that communicate through a defined contract. You build in the DevApp. You ship the GameRuntime.</p>
+    </div>
+
+    <hr class="section-divider">
+
+    <h2>🏗️ The Full Stack</h2>
+
+    <p>Two distinct products share a common foundation:</p>
+
+    <div class="two-col" style="margin-top: 24px;">
+        <div class="card blue">
+            <h3>🖥️ DevApp</h3>
+            <p style="color: #9ca3af; font-size: 0.9em;">The authoring environment. What <em>you</em> use to build games.</p>
+            <ul style="margin-top: 12px;">
+                <li>Hosts all tools (ZixelArt, GameEditor, Exporter…)</li>
+                <li>Owns ProjectState — the shared asset registry</li>
+                <li>Runs on: Platform + Renderer + UI</li>
+                <li>Uses engine only for preview/simulation</li>
+            </ul>
+        </div>
+        <div class="card red">
+            <h3>🎮 GameRuntime</h3>
+            <p style="color: #9ca3af; font-size: 0.9em;">The shipped player. What the <em>game maker's players</em> run.</p>
+            <ul style="margin-top: 12px;">
+                <li>Standalone executable, no dev tools</li>
+                <li>Consumes what DevApp produced (assets, scenes)</li>
+                <li>Runs on: Platform + Renderer + Engine</li>
+                <li>Knows nothing about DevApp or editors</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="layer-stack" style="margin-top: 30px;">
+
+        <div class="stack-layer layer-app">
+            <span class="label label-app">DevApp <span class="tag tag-devapp">authoring only</span></span>
+            <span class="desc">Tool host, tool switching, ProjectState, shared services (asset loader, file watcher). The "Unity Editor" equivalent. Owns the window lifecycle and routes input to the active tool.</span>
+        </div>
+
+        <div class="flow-arrow">↕</div>
+
+        <div class="stack-layer layer-tools">
+            <span class="label label-tools">Tools <span class="tag tag-devapp">authoring only</span></span>
+            <span class="desc">ZixelArt (pixel editor), GameEditor (scene/entity editor), Exporter (build pipeline). Each tool owns its own state and UITree. Tools communicate only through ProjectState — never directly with each other.</span>
+        </div>
+
+        <div class="flow-arrow">↕</div>
+
+        <div class="stack-layer layer-ui">
+            <span class="label label-ui">src/ui <span class="tag tag-devapp">authoring only</span></span>
+            <span class="desc">Node tree, layout engine, input dispatch, command queue. Comptime-generic over app state — zero cost, full type safety. Immediate mode traversal with tree structure for routing.</span>
+        </div>
+
+        <div class="flow-arrow">↕</div>
+
+        <div class="stack-layer layer-engine">
+            <span class="label label-engine">src/engine <span class="tag tag-runtime">runtime primary</span></span>
+            <span class="desc">Game loop, entity system, physics, audio. Ships inside the exported game executable. DevApp uses it only for in-editor preview/simulation. The two products share code but diverge at the boundary.</span>
+        </div>
+
+        <div class="flow-arrow">↕</div>
+
+        <div class="stack-layer layer-renderer">
+            <span class="label label-renderer">src/renderer <span class="tag tag-shared">shared</span></span>
+            <span class="desc">Draw calls, GPU state, shader pipeline, RenderContext (including default font). The single convergence point — everything above resolves to draw calls here. Knows nothing about UI, tools, or game state.</span>
+        </div>
+
+        <div class="flow-arrow">↕</div>
+
+        <div class="stack-layer layer-platform">
+            <span class="label label-platform">src/platform <span class="tag tag-shared">shared</span></span>
+            <span class="desc">Window, input (raw + semantic transitions), file system, timing. Provides InputFrame with just_pressed/just_released/held per button. Both DevApp and GameRuntime start here.</span>
+        </div>
+
+    </div>
+
+    <div style="margin-top: 16px; padding: 14px 20px; background: #1f1f1f; border-radius: 4px; border: 1px dashed #374151; font-size: 0.9em; color: #6b7280;">
+        <strong style="color: #9ca3af;">The contract between DevApp and GameRuntime</strong> is the asset/data format — what ZixelArt writes out, what the scene editor serializes, what the exporter packages. Both sides agree on the format. Neither leaks into the other.
+    </div>
+
+    <hr class="section-divider">
+
+    <h2>📐 The UI System — src/ui</h2>
+
+    <p>The UI system is the piece that makes building tools not painful. Standalone — zero engine deps. Three layers built on top of each other. <a href="ui_framework.html" style="color: #60a5fa;">Full design doc →</a></p>
+
+    <h3>Three Layers</h3>
+
+    <div class="two-col">
+        <div class="decision-box">
+            <strong>Layer 1 — Layout (current work)</strong><br>
+            <span style="font-size: 0.9em; color: #9ca3af;">Box / Sizing / Resolver. Pure math, zero deps. Describe a tree, get back a flat list of named rects. src/ui/main.zig is the API spec — if it compiles with no renderer import, the layer is correct.</span>
+        </div>
+        <div class="decision-box">
+            <strong>Layer 2 — Widgets</strong><br>
+            <span style="font-size: 0.9em; color: #9ca3af;">ui.button(), ui.panel(), ui.label(). Takes a ResolvedTree + input state, returns bool/value. Knows about renderer (to draw states). Does not know about tool state.</span>
+        </div>
+        <div class="decision-box">
+            <strong>Layer 3 — Behavior</strong><br>
+            <span style="font-size: 0.9em; color: #9ca3af;">Per-tool. SaveButton knows what save means in zixelart. ColorSwatch knows it mutates active_color. Built on Layer 2. This is where tool logic lives.</span>
+        </div>
+        <div class="decision-box">
+            <strong>Platform as peer, not layer</strong><br>
+            <span style="font-size: 0.9em; color: #9ca3af;">Platform supplies raw input (mouse x/y, buttons) and window size. Flows DOWN through all layers. Never owns them. Renderer receives draw calls from Layer 2 — flows UP. Both are infrastructure, not layers.</span>
+        </div>
+    </div>
+
+    <h3>The data flow</h3>
+
+    <div class="code-block"><code>describe (Box tree)
+    → resolve (Resolver: measure + place passes)
+    → []ResolvedNode { name, rect }
+    → Layer 2 widgets consume rects + input → draw + return bool
+    → Layer 3 behavior consumes bool → does the thing
+
+Platform feeds window size into resolve().
+Platform feeds mouse/keys into Layer 2/3.
+Renderer receives draw calls from Layer 2.</code></div>
+
+    <h3>File structure</h3>
+
+    <div class="code-block"><code>src/ui/
+    ui.zig        ← public surface, re-exports everything
+    main.zig      ← API design surface / living spec (imports ui only)
+    Sizing.zig    ← fixed(n) / grow / fit
+    Box.zig       ← leaf / vstack / hstack + Config
+    Resolver.zig  ← measure pass + place pass → ResolvedTree
+    Rect.zig      ← 2D rect math (exists, stable)
+    Node.zig      ← vtable widget node (exists, used by zixelart today)
+    UITree.zig    ← flat node tree driver (exists, used by zixelart today)
+    Event.zig     ← input event types (exists)
+    Layout.zig    ← anchor/split helpers (exists)</code></div>
+
+    <h3>What zixelart looks like after migration</h3>
+
+    <div class="code-block"><code>// Layer 1 — describe
+var root = Box.vstack(.{ .w = .grow, .h = .grow }, &.{
+    Box.leaf(.{ .name = "ToolBar",  .w = .fixed(48), .h = .grow }),
+    Box.leaf(.{ .name = "Canvas",   .w = .grow,      .h = .grow }),
+    Box.leaf(.{ .name = "Palette",  .w = .fixed(200),.h = .grow }),
+    Box.leaf(.{ .name = "InfoBar",  .w = .grow,      .h = .fixed(24) }),
+});
+const resolved = root.resolve(screen_rect);
+
+// Layer 2 — widgets draw themselves
+ui.panel("ToolBar",  resolved, renderer, ctx, Colors.CHARCOAL);
+ui.panel("Palette",  resolved, renderer, ctx, Colors.DARK_GRAY);
+ui.panel("InfoBar",  resolved, renderer, ctx, Colors.CHARCOAL);
+
+// Layer 3 — behavior wired per button
+if (ui.button("PencilTool", resolved, input)) state.active_tool = .pencil;
+if (ui.button("EraserTool", resolved, input)) state.active_tool = .eraser;</code></div>
+
+    <hr class="section-divider">
+
+    <h2>🗂️ State Hierarchy</h2>
+
+    <p>One source of truth at each level. Tools communicate through ProjectState, not directly with each other.</p>
+
+    <div class="code-block"><code>ProjectState  ← DevApp owns. All tools can read. The asset registry.
+    name: []const u8           // "MyAsteroidGame"
+    sprites: []SpriteAsset     // what ZixelArt produces
+    scenes:  []Scene           // what GameEditor produces
+    config:  GameConfig        // resolution, title, target platform, controls
+
+    └── ZixelState   ← ZixelArt owns. Private working state.
+    └── EditorState  ← GameEditor owns. Private working state.
+    └── ...
+
+// Tools write to ProjectState on save.
+// Tools read from ProjectState on open.
+// Tools never call into each other directly.</code></div>
+
+    <hr class="section-divider">
+
+    <h2>🗃️ Source Layout — Where Things Live</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Path</th>
+                <th>Owns</th>
+                <th>Used By</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>src/platform/</code></td>
+                <td>Window, input, file system, timing, InputFrame</td>
+                <td>Everyone</td>
+                <td><span class="badge badge-wip">WIP</span></td>
+            </tr>
+            <tr>
+                <td><code>src/renderer/</code></td>
+                <td>Draw calls, GPU, shaders, RenderContext+font, color system</td>
+                <td>Everyone</td>
+                <td><span class="badge badge-wip">WIP</span></td>
+            </tr>
+            <tr>
+                <td><code>src/ui/</code></td>
+                <td>Layer 1: Sizing/Box/Resolver (in progress). Layer 2: widgets (next). Existing: Node, UITree, Rect, Event, Layout helpers.</td>
+                <td>All tools</td>
+                <td><span class="badge badge-wip">WIP</span></td>
+            </tr>
+            <tr>
+                <td><code>src/tools/uitest/</code></td>
+                <td>Visual layout playground. Consumes ResolvedTree, draws each node as a colored rect. Proof that Layer 1 works.</td>
+                <td>Dev only</td>
+                <td><span class="badge badge-wip">WIP</span></td>
+            </tr>
+            <tr>
+                <td><code>src/engine/</code></td>
+                <td>Game loop, entities, physics, audio</td>
+                <td>GameRuntime, Editor preview</td>
+                <td><span class="badge badge-wip">WIP</span></td>
+            </tr>
+            <tr>
+                <td><code>src/app/</code></td>
+                <td>DevApp shell, tool switching, ProjectState, shared services</td>
+                <td>DevApp only</td>
+                <td><span class="badge badge-planned">Planned</span></td>
+            </tr>
+            <tr>
+                <td><code>src/tools/zixelart/</code></td>
+                <td>ZixelState, pixel canvas, palette, harmony strips, history</td>
+                <td>DevApp</td>
+                <td><span class="badge badge-wip">WIP</span></td>
+            </tr>
+            <tr>
+                <td><code>src/tools/editor/</code></td>
+                <td>EditorState, scene graph, entity inspector, tilemap</td>
+                <td>DevApp</td>
+                <td><span class="badge badge-future">Future</span></td>
+            </tr>
+            <tr>
+                <td><code>src/tools/exporter/</code></td>
+                <td>Build pipeline, asset packaging, platform target</td>
+                <td>DevApp</td>
+                <td><span class="badge badge-future">Future</span></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <hr class="section-divider">
+
+    <h2>🚦 Known Rub Points</h2>
+
+    <div class="rub-box">
+        <strong>Platform input gap</strong> — currently exposes <code>isPressed</code> (level-triggered). UI system needs <code>just_pressed</code> / <code>just_released</code> transitions and eventually <code>double_click</code>. Platform layer needs to compute and expose these. Not hard, but required before the UI event system can be built properly.
+    </div>
+
+    <div class="rub-box">
+        <strong>Font in RenderContext</strong> — currently threaded as a separate parameter through every render call. Should move into RenderContext as <code>default_font</code>. Eliminates the separate parameter from every on_render signature.
+    </div>
+
+    <div class="rub-box">
+        <strong>Re-entrant tree mutation</strong> — callbacks can't modify the tree while it's being traversed. Deferred command queue solves this, but needs to be designed before the first dynamic node (modal, tooltip, context menu) is needed.
+    </div>
+
+    <div class="rub-box">
+        <strong>App is currently ambiguous</strong> — <code>src/app/App</code> is currently "a thin game loop wrapper." It needs to split into: DevApp shell (tool host) and a minimal runtime bootstrap that GameRuntime uses. These are different things wearing the same name right now.
+    </div>
+
+    <hr class="section-divider">
+
+    <h2>🗺️ Build Order</h2>
+
+    <p>Each step is justified by concrete pain from the step before it. <a href="ui_framework.html" style="color: #60a5fa;">See UI Framework doc</a> for Layer 1 detail.</p>
+
+    <ol style="margin-left: 24px;">
+        <li style="margin: 14px 0;">
+            <strong style="color: #34d399;">UI Layer 1 — Layout engine</strong> — Sizing, Box, Resolver. Pure math, zero deps. src/ui/main.zig compiles with no renderer import. uitest visualizes resolved rects. <span class="badge badge-wip">In Progress</span>
+        </li>
+        <li style="margin: 14px 0;">
+            <strong style="color: #34d399;">UI Layer 2 — Widgets</strong> — button(), panel(), label(). Built on Layer 1 + renderer. Returns bool/value, no tool knowledge. <span class="badge badge-planned">Next</span>
+        </li>
+        <li style="margin: 14px 0;">
+            <strong style="color: #60a5fa;">ZixelArt migration</strong> — retrofit zixelart panels onto the real UI framework. Validate against real pain. Layer 3 behavior wired per-widget. <span class="badge badge-planned">Soon</span>
+        </li>
+        <li style="margin: 14px 0;">
+            <strong style="color: #60a5fa;">RenderContext font</strong> — move default_font into RenderContext. Clean up all call sites. <span class="badge badge-planned">Soon</span>
+        </li>
+        <li style="margin: 14px 0;">
+            <strong style="color: #a78bfa;">src/app DevApp shell</strong> — tool switching, ProjectState, shared services. ZixelArt becomes the first registered tool. <span class="badge badge-future">Later</span>
+        </li>
+        <li style="margin: 14px 0;">
+            <strong style="color: #a78bfa;">ZEditor tool</strong> — scene/entity editor, uses engine for preview. Second tool in the DevApp. <span class="badge badge-future">Later</span>
+        </li>
+        <li style="margin: 14px 0;">
+            <strong style="color: #f87171;">Exporter</strong> — build pipeline, platform targets, produces the standalone GameRuntime executable. The "Publish" button. <span class="badge badge-future">Later</span>
+        </li>
+    </ol>
+
+    <hr class="section-divider">
+
+    <h2>🎯 The End-to-End Flow</h2>
+
+    <div class="code-block"><code>Developer opens DevApp
+    │
+    ├── opens ZixelArt
+    │   ├── draws sprites using palette + harmony system
+    │   ├── saves → writes SpriteAsset to ProjectState
+    │
+    ├── opens GameEditor
+    │   ├── places sprites in scenes
+    │   ├── configures entities, physics, controls
+    │   ├── previews using GameRuntime (sandboxed, in-editor)
+    │   ├── saves → writes Scene to ProjectState
+    │
+    ├── clicks Publish
+    │   ├── Exporter reads ProjectState
+    │   ├── packages: assets + scenes + config + GameRuntime binary
+    │   ├── compiles for target platform (mac, windows, wasm)
+    │   └── outputs: MyGame.app / MyGame.exe / MyGame.html
+    │
+    └── hands it to a 16-year-old
+        └── it runs</code></div>
+
+    <div class="north-star" style="margin-top: 30px;">
+        <strong>The philosophy that got us here:</strong> Feel the pain first, then abstract. Every layer in this stack was earned by the friction of the layer below it. No speculative architecture — just the minimum needed to solve the real problem in front of you, designed to extend cleanly when the next real problem shows up.
+    </div>
+
+</div>
+</body>
+</html>

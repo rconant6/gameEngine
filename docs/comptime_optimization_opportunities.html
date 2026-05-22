@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comptime Optimization Opportunities - Game Engine</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #e8e6e3;
+            background: #1a1a1a;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #f7931e;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #f7931e;
+            padding-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1.1em;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #61afef;
+            font-size: 1.8em;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            padding-left: 10px;
+            border-left: 5px solid #61afef;
+        }
+
+        h3 {
+            color: #98c379;
+            font-size: 1.4em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        h4 {
+            color: #c678dd;
+            font-size: 1.2em;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .card {
+            background: #252525;
+            border-left: 4px solid #61afef;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .card.high-priority {
+            border-left-color: #e06c75;
+        }
+
+        .card.medium-priority {
+            border-left-color: #e5c07b;
+        }
+
+        .card.low-priority {
+            border-left-color: #56b6c2;
+        }
+
+        .card.excellent {
+            border-left-color: #98c379;
+            background: #1e2a1e;
+        }
+
+        .file-path {
+            background: #1a1a1a;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #61afef;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+
+        .badge.high-impact {
+            background: #e06c75;
+            color: #fff;
+        }
+
+        .badge.medium-impact {
+            background: #e5c07b;
+            color: #1a1a1a;
+        }
+
+        .badge.low-impact {
+            background: #56b6c2;
+            color: #fff;
+        }
+
+        .badge.high-effort {
+            background: #c678dd;
+            color: #fff;
+        }
+
+        .badge.medium-effort {
+            background: #98c379;
+            color: #1a1a1a;
+        }
+
+        .badge.low-effort {
+            background: #61afef;
+            color: #fff;
+        }
+
+        .badge.excellent {
+            background: #98c379;
+            color: #1a1a1a;
+        }
+
+        code {
+            background: #1a1a1a;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #98c379;
+        }
+
+        pre {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 15px 0;
+            border: 1px solid #333;
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: #e8e6e3;
+        }
+
+        .benefit {
+            background: #1e2a1e;
+            padding: 12px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 3px solid #98c379;
+        }
+
+        .benefit strong {
+            color: #98c379;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: #252525;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+
+        th {
+            background: #1a1a1a;
+            color: #f7931e;
+            font-weight: bold;
+        }
+
+        tr:hover {
+            background: #2a2a2a;
+        }
+
+        .toc {
+            background: #252525;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+
+        .toc ul {
+            list-style-position: inside;
+            padding-left: 20px;
+        }
+
+        .toc li {
+            margin: 8px 0;
+        }
+
+        .toc a {
+            color: #61afef;
+            text-decoration: none;
+        }
+
+        .toc a:hover {
+            color: #f7931e;
+            text-decoration: underline;
+        }
+
+        .observation {
+            background: #2a2520;
+            border-left: 4px solid #f7931e;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .observation strong {
+            color: #f7931e;
+        }
+
+        hr {
+            border: none;
+            border-top: 2px solid #333;
+            margin: 40px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Comptime Optimization Opportunities</h1>
+    <p class="subtitle">Game Engine Codebase Analysis - Comprehensive Scan</p>
+
+    <div class="toc">
+        <h3>Table of Contents</h3>
+        <ul>
+            <li><a href="#cat1">1. Compile-Time Type Generation (High Impact)</a></li>
+            <li><a href="#cat2">2. Runtime Lookups → Compile-Time (Medium-High Impact)</a></li>
+            <li><a href="#cat3">3. Enum/Union Validation & Switching</a></li>
+            <li><a href="#cat4">4. Compile-Time Constants & Validation</a></li>
+            <li><a href="#cat5">5. Array Sizing & Bounds</a></li>
+            <li><a href="#cat6">6. String Formatting & Constants</a></li>
+            <li><a href="#cat7">7. Type-Dependent Logic Specialization</a></li>
+            <li><a href="#cat8">8. Build Mode Conditionals</a></li>
+            <li><a href="#cat9">9. Query Optimization</a></li>
+            <li><a href="#summary">10. Summary Table & Observations</a></li>
+        </ul>
+    </div>
+
+    <hr>
+
+    <h2 id="cat1">CATEGORY 1: COMPILE-TIME TYPE GENERATION (HIGH IMPACT)</h2>
+
+    <div class="card excellent">
+        <h3>1.1 Component Registry ✅ EXCELLENT</h3>
+        <span class="badge excellent">Already Optimized</span>
+        <div class="file-path">src/registry/component_registry.zig (lines 45-89)</div>
+
+        <h4>Current Pattern:</h4>
+        <p>Uses comptime blocks to build enum and union types from component declarations. Calls <code>@typeInfo()</code> at comptime on Components struct to extract type information with inline loops.</p>
+
+        <div class="benefit">
+            <strong>Status:</strong> This is already excellent comptime usage! Minor improvement: Cache the <code>@typeInfo()</code> results to avoid re-evaluation if accessed multiple times.
+        </div>
+    </div>
+
+    <div class="card excellent">
+        <h3>1.2 Shape Registry Multi-Point Specialization ✅ EXCELLENT</h3>
+        <span class="badge excellent">Already Optimized</span>
+        <div class="file-path">src/registry/shape_registry.zig (lines 53-83)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>pub const shape_types = blk: {
+    const decls = @typeInfo(Shapes).@"struct".decls;
+    const decls_len = decls.len;
+    const point_types_count = point_types.len;  // 2: WorldPoint, ScreenPoint
+    const total_size = decls_len * point_types_count;
+    var types: [total_size]type = undefined;
+    for (decls, 0..) |decl, i| {
+        if (@typeInfo(@TypeOf(@field(Shapes, decl.name))) == .@"fn") {
+            for (point_types, 0..) |point_type, j| {
+                types[i * point_types_count + j] = @field(Shapes, decl.name)(point_type);
+            }
+        }
+    }
+    break :blk types;
+};</code></pre>
+
+        <div class="benefit">
+            <strong>Status:</strong> Already using comptime effectively. The code correctly specializes generic shape functions for different coordinate spaces at compile time.
+        </div>
+    </div>
+
+    <div class="card excellent">
+        <h3>1.3 Collider Shape Registry ✅ EXCELLENT</h3>
+        <span class="badge excellent">Already Optimized</span>
+        <div class="file-path">src/registry/collider_shape_registry.zig (lines 46-62)</div>
+
+        <p>Similar to shape registry - already using comptime effectively for type extraction.</p>
+    </div>
+
+    <hr>
+
+    <h2 id="cat2">CATEGORY 2: RUNTIME LOOKUPS → COMPILE-TIME (MEDIUM-HIGH IMPACT)</h2>
+
+    <div class="card high-priority">
+        <h3>2.1 String-Based Component Lookup 🎯 HIGH PRIORITY</h3>
+        <span class="badge medium-impact">Medium Impact</span>
+        <span class="badge low-effort">Low Effort</span>
+        <div class="file-path">src/registry/component_registry.zig (lines 63-79)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>pub fn getComponentIndex(name: []const u8) ?usize {
+    inline for (component_names, 0..) |comp_name, i| {
+        if (std.mem.eql(u8, name, comp_name)) {
+            return i;
+        }
+    }
+    return null;
+}
+
+pub fn getComponentType(comptime name: []const u8) ?type {
+    inline for (component_names, 0..) |comp_name, i| {
+        if (std.mem.eql(u8, name, comp_name)) {
+            return component_types[i];
+        }
+    }
+    return null;
+}</code></pre>
+
+        <h4>Opportunity:</h4>
+        <ul>
+            <li><code>getComponentIndex()</code> accepts runtime <code>[]const u8</code> and does inline iteration every call</li>
+            <li>Could create a comptime-only version for static lookups</li>
+        </ul>
+
+        <div class="benefit">
+            <strong>Benefit:</strong> Performance (avoids runtime loop), safety (can fail at compile-time with bad strings)
+        </div>
+
+        <h4>Suggested Improvement:</h4>
+        <pre><code>pub fn getComponentTypeComptime(comptime name: []const u8) type {
+    // Fails at compile time if name not found
+    inline for (component_names, 0..) |comp_name, i| {
+        if (std.mem.eql(u8, name, comp_name)) {
+            return component_types[i];
+        }
+    }
+    @compileError("Unknown component: " ++ name);
+}</code></pre>
+    </div>
+
+    <div class="card high-priority">
+        <h3>2.2 Shape Index Lookup by Coordinate Space 🎯 HIGH PRIORITY</h3>
+        <span class="badge medium-impact">Medium Impact</span>
+        <span class="badge low-effort">Low Effort</span>
+        <div class="file-path">src/registry/shape_registry.zig (lines 85-110)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>pub fn getShapeIndex(name: []const u8, coord_space: CoordinateSpace) ?usize {
+    return switch (coord_space) {
+        .WorldSpace => getWorldShapeIndex(name),
+        .ScreenSpace => getScreenShapeIndex(name),
+    };
+}</code></pre>
+
+        <h4>Opportunity:</h4>
+        <ul>
+            <li><code>CoordinateSpace</code> is a known compile-time enum</li>
+            <li>Could create specialized functions: <code>getWorldShapeIndex(comptime name: []const u8)</code> and <code>getScreenShapeIndex(comptime name: []const u8)</code></li>
+        </ul>
+
+        <div class="benefit">
+            <strong>Benefit:</strong> Type safety, compile-time validation of shape names
+        </div>
+    </div>
+
+    <div class="card high-priority">
+        <h3>2.3 Collision Function Name Resolution 🎯 HIGH PRIORITY</h3>
+        <span class="badge high-impact">High Impact</span>
+        <span class="badge medium-effort">Medium Effort</span>
+        <div class="file-path">src/systems/collision_functions.zig (lines 77-107)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>fn tryCallCollision(a: anytype, ta: Transform, b: anytype, tb: Transform) ?CollisionData {
+    const T1 = @TypeOf(a);
+    const T2 = @TypeOf(b);
+    const name1 = comptime stripModulePrefix(@typeName(T1));
+    const name2 = comptime stripModulePrefix(@typeName(T2));
+    const name = "collide" ++ name1 ++ name2;
+
+    if (@hasDecl(@This(), name)) {
+        return @call(.auto, @field(@This(), name), .{ a, ta, b, tb });
+    }
+    // ... reverse lookup ...
+}</code></pre>
+
+        <h4>Opportunity:</h4>
+        <ul>
+            <li>Uses <code>@TypeOf()</code> at runtime to get type names, then constructs function names</li>
+            <li>Could use a comptime-generated dispatch table instead of runtime string construction</li>
+        </ul>
+
+        <div class="benefit">
+            <strong>Benefit:</strong> Performance (no string concatenation at runtime), safety (collision pairs validated at compile-time)
+        </div>
+
+        <h4>Improved Approach:</h4>
+        <pre><code>// Generate collision dispatch table at comptime
+const CollisionDispatchTable = blk: {
+    // Create a mapping of type pairs to collision functions
+    // Validate all pairs have corresponding handlers at comptime
+};</code></pre>
+    </div>
+
+    <hr>
+
+    <h2 id="cat3">CATEGORY 3: ENUM/UNION VALIDATION & SWITCHING</h2>
+
+    <div class="card medium-priority">
+        <h3>3.1 Debug Category Bit-Packing (Minor Enhancement)</h3>
+        <span class="badge low-impact">Low Impact</span>
+        <span class="badge low-effort">Low Effort</span>
+        <div class="file-path">src/debug/DebugDraw.zig (lines 22-125, 198-252)</div>
+
+        <h4>Current Pattern (Excellent!):</h4>
+        <pre><code>fn GenerateDebugCategory(comptime CategoryEnum: type) type {
+    const enum_info = @typeInfo(CategoryEnum).@"enum";
+    const field_count = enum_info.fields.len;
+    const padding_bits = (8 - (field_count % 8)) % 8;
+    // ... dynamically generates packed struct fields ...
+}</code></pre>
+
+        <div class="benefit">
+            <strong>Status:</strong> Already excellent use of comptime to generate optimal packed structs!
+        </div>
+
+        <h4>Minor Opportunity:</h4>
+        <p>The <code>toggleCategory()</code> function uses if-else chains. Could use a comptime-generated helper:</p>
+        <pre><code>pub fn toggleCategoryComptime(self: *DebugDraw, comptime category: DebugCategoryEnum) void {
+    @field(self.visible_categories.bits, @tagName(category)) =
+        !@field(self.visible_categories.bits, @tagName(category));
+}</code></pre>
+    </div>
+
+    <div class="card excellent">
+        <h3>3.2 Input Device Type Validation ✅ EXCELLENT</h3>
+        <span class="badge excellent">Already Optimized</span>
+        <div class="file-path">src/platform/InputDevice.zig (lines 16-62)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>pub fn InputDevice(comptime Device: type) type {
+    const fields = @typeInfo(Device).@"enum".fields;
+
+    comptime {
+        for (fields, 0..) |field, i| {
+            if (field.value != i)
+                @compileError("Enum values must be contiguous starting from 0.");
+        }
+    }
+    // ... creates arrays sized exactly to enum count ...
+    pressed: [count]bool = @splat(false),</code></pre>
+
+        <div class="benefit">
+            <strong>Status:</strong> Excellent! Validates enum contiguity at compile-time and uses exact sizing.
+        </div>
+    </div>
+
+    <div class="card medium-priority">
+        <h3>3.3 Input Type Validation (Enhancement)</h3>
+        <span class="badge medium-impact">Medium Impact</span>
+        <span class="badge low-effort">Low Effort</span>
+        <div class="file-path">src/platform/Input.zig (lines 24-54)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>const SupportedInputTypes = .{ KeyCode, MouseButton };
+
+pub fn validateSupportedType(comptime T: type) void {
+    inline for (SupportedInputTypes) |SupportedType| {
+        if (T == SupportedType) return;
+    }
+    @compileError("Input type " ++ @typeName(T) ++ " not handled in Input");
+}
+
+pub inline fn isDown(self: *const Self, input: anytype) bool {
+    const T = @TypeOf(input);
+    validateSupportedType(T);
+    if (T == KeyCode) return self.keyboard.isDown(input);
+    if (T == MouseButton) return self.mouse.buttons.isDown(input);
+    unreachable;
+}</code></pre>
+
+        <div class="benefit">
+            <strong>Status:</strong> Good runtime type checking with comptime validation.
+        </div>
+
+        <h4>Enhancement Opportunity:</h4>
+        <p>The runtime type switching could be comptime-specialized:</p>
+        <pre><code>pub inline fn isDown(self: *const Self, comptime T: type, input: T) bool {
+    validateSupportedType(T);
+    if (T == KeyCode) return self.keyboard.isDown(input);
+    if (T == MouseButton) return self.mouse.buttons.isDown(input);
+    unreachable;
+}</code></pre>
+        <p>This allows the Zig compiler to eliminate dead code paths per call site.</p>
+    </div>
+
+    <hr>
+
+    <h2 id="cat4">CATEGORY 4: COMPILE-TIME CONSTANTS & VALIDATION</h2>
+
+    <div class="card high-priority">
+        <h3>4.1 Logger Level & Category Defaults 🎯 HIGH PRIORITY</h3>
+        <span class="badge medium-impact">Medium Impact</span>
+        <span class="badge low-effort">Low Effort</span>
+        <div class="file-path">src/debug/log.zig (lines 11-56, 119-148)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>pub const LogLevel = enum(u8) {
+    trace = 0,
+    debug,
+    info,
+    warn,
+    err,
+    fatal,
+
+    pub fn getLevelName(self: LogLevel) []const u8 {
+        return switch (self) {
+            .trace => "TRACE",
+            // ...
+        };
+    }
+
+    pub fn getAnsiColor(self: LogLevel) []const u8 {
+        return switch (self) {
+            .trace => "\x1b[90m", // Gray
+            // ...
+        };
+    }
+};</code></pre>
+
+        <h4>Opportunity:</h4>
+        <ul>
+            <li><code>getLevelName()</code> and <code>getAnsiColor()</code> could be pre-computed into arrays indexed by <code>@intFromEnum()</code></li>
+        </ul>
+
+        <div class="benefit">
+            <strong>Benefit:</strong> Runtime performance (O(1) lookup instead of switch), compile-time correctness (catches missing cases at compile time)
+        </div>
+
+        <h4>Improved Approach:</h4>
+        <pre><code>const LEVEL_NAMES = blk: {
+    @setEvalBranchQuota(10000);
+    var names: [@typeInfo(LogLevel).@"enum".fields.len][]const u8 = undefined;
+    inline for (@typeInfo(LogLevel).@"enum".fields, 0..) |field, i| {
+        names[i] = field.name; // or manually map
+    }
+    break :blk names;
+};
+
+pub fn getLevelName(level: LogLevel) []const u8 {
+    return LEVEL_NAMES[@intFromEnum(level)];
+}</code></pre>
+    </div>
+
+    <div class="card excellent">
+        <h3>4.2 Color Constants Pre-Computation ✅ EXCELLENT</h3>
+        <span class="badge excellent">Already Optimized</span>
+        <div class="file-path">src/renderer/color.zig (lines 26-37, 60-111)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>pub fn initFromHex(comptime str: []const u8) Color {
+    const len = str.len;
+    if ((len != 7 and len != 9) or str[0] != '#')
+        @compileError("Invalid hex color format: expected #RRGGBB or #RRGGBBAA\n");
+    // ...
+}
+
+pub const Colors = struct {
+    pub const RED = Color.init(255, 0, 0, 255);
+    pub const DARK_RED = Color.init(128, 0, 0, 255);
+    // ... 35 colors total ...
+};</code></pre>
+
+        <div class="benefit">
+            <strong>Status:</strong> Excellent! Already using comptime for hex parsing and compile-time color constants.
+        </div>
+    </div>
+
+    <hr>
+
+    <h2 id="cat5">CATEGORY 5: ARRAY SIZING & BOUNDS</h2>
+
+    <div class="card low-priority">
+        <h3>5.1 Component Storage Sparse Array Capacity</h3>
+        <span class="badge low-impact">Low Impact</span>
+        <span class="badge medium-effort">Medium Effort</span>
+        <div class="file-path">src/ecs/ComponentStorage.zig (line 38)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>const DEFAULT_SPARSE_CAPACITY = 1024;</code></pre>
+
+        <h4>Opportunity:</h4>
+        <p>If this could be a comptime parameter to <code>ComponentStorage(T)</code>, different component types could have different optimal capacities:</p>
+        <pre><code>pub fn ComponentStorage(comptime T: type, comptime initial_capacity: usize) type {
+    // ...
+}</code></pre>
+
+        <div class="benefit">
+            <strong>Benefit:</strong> Fine-tune memory usage per component type at compile-time.
+        </div>
+    </div>
+
+    <hr>
+
+    <h2 id="cat6">CATEGORY 6: STRING FORMATTING & CONSTANTS</h2>
+
+    <div class="card excellent">
+        <h3>6.1 Comptime String Formatting ✅ EXCELLENT</h3>
+        <span class="badge excellent">Already Optimized</span>
+        <div class="file-path">src/ecs/Query.zig (lines 17-18, 39, 61)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>pub fn get(self: Entry, comptime index: usize) std.meta.fields(ComponentPointers)[index].type {
+    return @field(self.components, std.fmt.comptimePrint("{d}", .{index}));
+}</code></pre>
+
+        <div class="benefit">
+            <strong>Status:</strong> Already using <code>comptimePrint()</code> for field name generation - excellent!
+        </div>
+    </div>
+
+    <div class="card excellent">
+        <h3>6.2 ANSI Color Codes ✅ EXCELLENT</h3>
+        <span class="badge excellent">Already Optimized</span>
+        <div class="file-path">src/debug/logSink.zig (lines 8-11)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>const reset = "\x1b[0m";
+const bold_white = "\x1b[1;37m";
+const grey = "\x1b[90m";
+const cyan = "\x1b[36m";</code></pre>
+
+        <div class="benefit">
+            <strong>Status:</strong> Already compile-time constants - optimal!
+        </div>
+    </div>
+
+    <hr>
+
+    <h2 id="cat7">CATEGORY 7: TYPE-DEPENDENT LOGIC SPECIALIZATION</h2>
+
+    <div class="card low-priority">
+        <h3>7.1 Shape Generic Point Type Handling</h3>
+        <span class="badge low-impact">Low Impact</span>
+        <span class="badge low-effort">Low Effort</span>
+        <div class="file-path">src/renderer/shapes.zig (lines 9-100)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>pub fn Circle(comptime PointType: type) type {
+    return struct {
+        origin: PointType,
+        radius: f32,
+
+        pub fn getCorners(self: *const @This()) [4]PointType {
+            const XType = @TypeOf(self.center.x);
+            const hw = if (XType == i32) @as(i32, @intFromFloat(self.half_width)) else self.half_width;
+            // ...
+        }
+    };
+}</code></pre>
+
+        <h4>Opportunity:</h4>
+        <p>Lines 86-87 check <code>XType == i32</code> at runtime inside a function. Could be pre-specialized at comptime:</p>
+        <pre><code>pub fn getCorners(self: *const @This()) [4]PointType {
+    if (PointType == V2I) {
+        // int-specialized path
+    } else {
+        // float path
+    }
+}</code></pre>
+        <p>The check happens at comptime based on <code>PointType</code> parameter, so dead code elimination should optimize it, but it could be more explicit.</p>
+    </div>
+
+    <div class="card excellent">
+        <h3>7.2 ComponentStorage Deinit Detection ✅ EXCELLENT</h3>
+        <span class="badge excellent">Already Optimized</span>
+        <div class="file-path">src/ecs/ComponentStorage.zig (lines 83-90)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>if (@hasDecl(T, "deinit")) {
+    const deinit_fn = @typeInfo(@TypeOf(T.deinit)).@"fn";
+    if (deinit_fn.params.len == 1) {
+        self.dense.items[dense_index].deinit();
+    } else if (deinit_fn.params.len == 2) {
+        self.dense.items[dense_index].deinit(self.gpa);
+    }
+}</code></pre>
+
+        <div class="benefit">
+            <strong>Status:</strong> Already using <code>@hasDecl()</code> and <code>@typeInfo()</code> to detect deinit patterns at comptime - excellent!
+        </div>
+    </div>
+
+    <hr>
+
+    <h2 id="cat8">CATEGORY 8: BUILD MODE CONDITIONALS</h2>
+
+    <div class="card excellent">
+        <h3>8.1 Logger Initialization Based on Build Mode ✅ EXCELLENT</h3>
+        <span class="badge excellent">Already Optimized</span>
+        <div class="file-path">src/debug/log.zig (line 140)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>.min_level = if (builtin.mode == .Debug) .trace else .warn,</code></pre>
+
+        <div class="benefit">
+            <strong>Status:</strong> Already using comptime build mode detection - optimal!
+        </div>
+    </div>
+
+    <hr>
+
+    <h2 id="cat9">CATEGORY 9: QUERY OPTIMIZATION</h2>
+
+    <div class="card excellent">
+        <h3>9.1 Query Entry Type Generation ✅ EXCELLENT</h3>
+        <span class="badge excellent">Already Optimized</span>
+        <div class="file-path">src/ecs/Query.zig (lines 5-19, 91-112)</div>
+
+        <h4>Current Pattern:</h4>
+        <pre><code>pub fn Query(comptime ComponentTypes: type) type {
+    return struct {
+        const ComponentPointers = buildComponentPointers(ComponentTypes);
+
+        pub const Entry = struct {
+            entity: Entity,
+            components: ComponentPointers,
+
+            pub fn get(self: Entry, comptime index: usize) std.meta.fields(ComponentPointers)[index].type {
+                return @field(self.components, std.fmt.comptimePrint("{d}", .{index}));
+            }
+        };
+    };
+}
+
+fn buildComponentPointers(comptime StorageTypes: type) type {
+    const storage_fields = std.meta.fields(StorageTypes);
+    var result_fields: [storage_fields.len]std.builtin.Type.StructField = undefined;
+    // ... builds dynamic struct type ...
+}</code></pre>
+
+        <div class="benefit">
+            <strong>Status:</strong> Excellent! This is a sophisticated use of comptime to generate specialized query types for each component combination.
+        </div>
+    </div>
+
+    <hr>
+
+    <h2 id="summary">SUMMARY: PRIORITIZED OPTIMIZATION OPPORTUNITIES</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Opportunity</th>
+                <th>File</th>
+                <th>Impact</th>
+                <th>Effort</th>
+                <th>Priority</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>Comptime-only component lookup functions</td>
+                <td>component_registry.zig</td>
+                <td><span class="badge medium-impact">Medium</span></td>
+                <td><span class="badge low-effort">Low</span></td>
+                <td><span class="badge high-impact">High</span></td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>Collision dispatch table generation</td>
+                <td>collision_functions.zig</td>
+                <td><span class="badge high-impact">High</span></td>
+                <td><span class="badge medium-effort">Medium</span></td>
+                <td><span class="badge high-impact">High</span></td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>Logger level/color lookup arrays</td>
+                <td>log.zig, logSink.zig</td>
+                <td><span class="badge medium-impact">Medium</span></td>
+                <td><span class="badge low-effort">Low</span></td>
+                <td><span class="badge high-impact">High</span></td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td>Input type switching specialization</td>
+                <td>Input.zig</td>
+                <td><span class="badge medium-impact">Medium</span></td>
+                <td><span class="badge low-effort">Low</span></td>
+                <td><span class="badge medium-impact">Medium</span></td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td>Shape lookup specialization</td>
+                <td>shape_registry.zig</td>
+                <td><span class="badge medium-impact">Medium</span></td>
+                <td><span class="badge low-effort">Low</span></td>
+                <td><span class="badge medium-impact">Medium</span></td>
+            </tr>
+            <tr>
+                <td>6</td>
+                <td>Debug category toggle helper</td>
+                <td>DebugDraw.zig</td>
+                <td><span class="badge low-impact">Low</span></td>
+                <td><span class="badge low-effort">Low</span></td>
+                <td><span class="badge low-impact">Low</span></td>
+            </tr>
+            <tr>
+                <td>7</td>
+                <td>Component storage capacity parameter</td>
+                <td>ComponentStorage.zig</td>
+                <td><span class="badge low-impact">Low</span></td>
+                <td><span class="badge medium-effort">Medium</span></td>
+                <td><span class="badge low-impact">Low</span></td>
+            </tr>
+            <tr>
+                <td>8</td>
+                <td>Shape point-type explicit specialization</td>
+                <td>shapes.zig</td>
+                <td><span class="badge low-impact">Low</span></td>
+                <td><span class="badge low-effort">Low</span></td>
+                <td><span class="badge low-impact">Low</span></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <hr>
+
+    <h2>KEY OBSERVATIONS</h2>
+
+    <div class="observation">
+        <strong>1. Already Well-Optimized:</strong> Your codebase demonstrates strong understanding of comptime! The registries, query system, and type generation are sophisticated and show excellent use of Zig's compile-time features.
+    </div>
+
+    <div class="observation">
+        <strong>2. Biggest Wins:</strong> Collision function dispatch (#2) and logger lookups (#3) offer the best performance/safety improvements with reasonable effort. These eliminate runtime string operations and enable compile-time validation.
+    </div>
+
+    <div class="observation">
+        <strong>3. Safety Improvements:</strong> Moving runtime string-based lookups to comptime catches errors at compile-time rather than runtime. Invalid component names, shape names, or collision pairs will fail during compilation, not during gameplay.
+    </div>
+
+    <div class="observation">
+        <strong>4. Performance Wins:</strong> Pre-computed lookup arrays and specialized dispatch eliminate runtime loops and branching. Instead of switch statements that must be evaluated at runtime, array lookups provide O(1) access with no branches.
+    </div>
+
+    <div class="observation">
+        <strong>5. Code Clarity:</strong> Some improvements would make intent more explicit (e.g., marking functions as comptime-only). This serves as documentation that certain operations are meant to be compile-time validated.
+    </div>
+
+    <div class="observation">
+        <strong>6. Learning from @src() Pattern:</strong> The default comptime parameter pattern you discovered (<code>comptime src: SourceLocation = @src()</code>) is powerful and can be applied elsewhere. Any time you want call-site information captured, this pattern works perfectly.
+    </div>
+
+    <hr>
+
+    <footer style="text-align: center; margin-top: 40px; color: #666; font-size: 0.9em;">
+        <p>Generated: 2026-01-25</p>
+        <p>All file paths are relative to: <code>/Users/randy/Developer/zig/gameEngine/</code></p>
+    </footer>
+</body>
+</html>

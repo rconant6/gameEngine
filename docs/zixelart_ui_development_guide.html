@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zixelart UI Development Guide</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #e0e0e0;
+            background: #1a1a1a;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #242424;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            color: #f472b6;
+            border-bottom: 3px solid #ec4899;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+
+        h2 {
+            color: #f9a8d4;
+            margin-top: 50px;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #2d2d2d;
+            border-left: 4px solid #ec4899;
+        }
+
+        h3 {
+            color: #f472b6;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+
+        h4 {
+            color: #a78bfa;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .overview-box {
+            background: #2d2d2d;
+            border-left: 4px solid #10b981;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .phase-box {
+            background: #1e293b;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 6px;
+            border-left: 4px solid #06b6d4;
+        }
+
+        .phase-title {
+            color: #22d3ee;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+
+        .task-box {
+            background: #1f2937;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 6px;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .task-title {
+            color: #60a5fa;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .file-box {
+            background: #1f1f1f;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 6px;
+            border-left: 3px solid #8b5cf6;
+        }
+
+        .file-title {
+            color: #a78bfa;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+
+        .constant-box {
+            background: #1a2332;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 6px;
+            border-left: 3px solid #22d3ee;
+        }
+
+        .constant-title {
+            color: #22d3ee;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .warning-box {
+            background: #451a03;
+            border-left: 4px solid #f97316;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .warning-box strong {
+            color: #fb923c;
+        }
+
+        .success-box {
+            background: #052e16;
+            border-left: 4px solid #22c55e;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .success-box strong {
+            color: #4ade80;
+        }
+
+        .layout-diagram {
+            background: #0d1117;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.4;
+            color: #7ee787;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #1f1f1f;
+        }
+
+        th {
+            background: #2d2d2d;
+            color: #f472b6;
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid #ec4899;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #333;
+        }
+
+        tr:hover {
+            background: #2a2a2a;
+        }
+
+        code {
+            background: #1f1f1f;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "Fira Code", "Consolas", monospace;
+            color: #7ee787;
+        }
+
+        ul, ol {
+            margin: 15px 0 15px 30px;
+        }
+
+        li {
+            margin: 8px 0;
+        }
+
+        .checklist {
+            list-style: none;
+            margin-left: 0;
+        }
+
+        .checklist li {
+            padding: 8px 0 8px 30px;
+            position: relative;
+        }
+
+        .checklist li::before {
+            content: "[ ]";
+            position: absolute;
+            left: 0;
+            color: #6b7280;
+            font-family: monospace;
+        }
+
+        .step-number {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            background: #ec4899;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .dependency-arrow {
+            color: #6b7280;
+            margin: 0 10px;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid #333;
+            margin: 30px 0;
+        }
+
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 800px) {
+            .grid-2col {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Zixelart UI Development Guide</h1>
+
+        <div class="overview-box">
+            <strong>Goal:</strong> Build a complete pixel art editor UI with tool bar, canvas, palette, shades panel, preview, and info bar using the existing rendering system with hardcoded layout values.
+            <br><br>
+            <strong>Current State:</strong> Canvas rendering works, palette data structure exists, need to add screen-space text and wire up the full UI layout.
+            <br><br>
+            <strong>End State:</strong> Functional editor with clickable tools, color selection, and real-time info display.
+        </div>
+
+        <h2>Target Layout</h2>
+
+        <div class="layout-diagram">
+┌──────────┬──────────────────────────────────────┬─────────────┐
+│          │                                      │   PALETTE   │
+│  TOOLS   │                                      │   (8x8)     │
+│          │                                      │  64 colors  │
+│  PENCIL  │                                      │             │
+│  ERASER  │            CANVAS                    ├─────────────┤
+│  FILL    │            (64x64)                   │   SHADES    │
+│  PICKER  │                                      │  5 swatches │
+│  LINE    │         ~1000px square               │  (vertical) │
+│          │                                      ├─────────────┤
+│   80px   │                                      │   PREVIEW   │
+│          │                                      │  (64x64 1:1)│
+├──────────┴──────────────────────────────────────┴─────────────┤
+│ INFO BAR: [32, 48]  ██ SAPPHIRE  PENCIL              40px     │
+└───────────────────────────────────────────────────────────────┘
+                           1920px total
+        </div>
+
+        <h2>Layout Constants</h2>
+
+        <div class="constant-box">
+            <div class="constant-title">Screen Dimensions</div>
+            <table>
+                <tr><th>Constant</th><th>Value</th><th>Notes</th></tr>
+                <tr><td><code>SCREEN_WIDTH</code></td><td>1920</td><td>Total logical width</td></tr>
+                <tr><td><code>SCREEN_HEIGHT</code></td><td>1088</td><td>Total logical height</td></tr>
+                <tr><td><code>INFO_BAR_HEIGHT</code></td><td>40</td><td>Bottom info bar</td></tr>
+                <tr><td><code>TOOLBAR_WIDTH</code></td><td>80</td><td>Left tool panel</td></tr>
+                <tr><td><code>RIGHT_PANEL_WIDTH</code></td><td>300</td><td>Right side panels</td></tr>
+            </table>
+        </div>
+
+        <div class="constant-box">
+            <div class="constant-title">Derived Dimensions</div>
+            <table>
+                <tr><th>Constant</th><th>Calculation</th><th>Value</th></tr>
+                <tr><td><code>CONTENT_HEIGHT</code></td><td>SCREEN_HEIGHT - INFO_BAR_HEIGHT</td><td>1048</td></tr>
+                <tr><td><code>CANVAS_AREA_WIDTH</code></td><td>SCREEN_WIDTH - TOOLBAR_WIDTH - RIGHT_PANEL_WIDTH</td><td>1540</td></tr>
+                <tr><td><code>CANVAS_SIZE</code></td><td>min(CANVAS_AREA_WIDTH, CONTENT_HEIGHT)</td><td>1048</td></tr>
+                <tr><td><code>CANVAS_X_OFFSET</code></td><td>TOOLBAR_WIDTH + (CANVAS_AREA_WIDTH - CANVAS_SIZE) / 2</td><td>326</td></tr>
+                <tr><td><code>PIXEL_SIZE</code></td><td>CANVAS_SIZE / 64</td><td>~16</td></tr>
+            </table>
+        </div>
+
+        <div class="constant-box">
+            <div class="constant-title">Right Panel Sections</div>
+            <table>
+                <tr><th>Section</th><th>Y Start</th><th>Height</th></tr>
+                <tr><td>Palette</td><td>0</td><td>400 (8 rows × 50px swatches)</td></tr>
+                <tr><td>Shades</td><td>400</td><td>300 (5 swatches × 60px)</td></tr>
+                <tr><td>Preview</td><td>700</td><td>348 (remaining space)</td></tr>
+            </table>
+        </div>
+
+        <h2>Phase 0: Prerequisites</h2>
+
+        <div class="phase-box">
+            <div class="phase-title">Add Screen-Space Text Rendering</div>
+            <p>Before building the UI, you need <code>drawText</code> to work in screen coordinates (like <code>RectangleScreen</code>).</p>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 0.1: Add drawTextScreen to text.zig</div>
+            <p><strong>File:</strong> <code>src/renderer/text.zig</code></p>
+            <p><strong>Goal:</strong> Create a screen-space variant of <code>drawText</code></p>
+            <br>
+            <h4>Steps:</h4>
+            <ol>
+                <li>Copy the existing <code>drawText</code> function signature</li>
+                <li>Change <code>position: WorldPoint</code> to <code>position: ScreenPoint</code></li>
+                <li>Name it <code>drawTextScreen</code></li>
+                <li>Inside, use <code>Triangle(ScreenPoint)</code> instead of <code>Triangle(WorldPoint)</code></li>
+                <li>The glyph building logic stays the same - just different coordinate type</li>
+            </ol>
+            <br>
+            <h4>Function Signature:</h4>
+            <p><code>pub fn drawTextScreen(renderer, font, text, position: ScreenPoint, scale, color, ctx) void</code></p>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 0.2: Expose drawTextScreen in Renderer</div>
+            <p><strong>File:</strong> <code>src/renderer/renderer.zig</code></p>
+            <p><strong>Goal:</strong> Add a <code>drawTextScreen</code> method that calls the new function</p>
+            <br>
+            <h4>Steps:</h4>
+            <ol>
+                <li>Find the existing <code>drawText</code> method in <code>Renderer</code> struct (~line 133)</li>
+                <li>Add a parallel method <code>drawTextScreen</code> below it</li>
+                <li>Call <code>text_module.drawTextScreen(...)</code></li>
+            </ol>
+        </div>
+
+        <div class="success-box">
+            <strong>Checkpoint:</strong> You can now render text at screen pixel coordinates like <code>{.x = 100, .y = 50}</code>
+        </div>
+
+        <hr>
+
+        <h2>Phase 1: Layout Structure</h2>
+
+        <div class="phase-box">
+            <div class="phase-title">Create UI Layout File</div>
+            <p>Define all the layout constants and region boundaries in one place.</p>
+        </div>
+
+        <div class="file-box">
+            <div class="file-title">src/tools/zixelart/Layout.zig</div>
+            <p><strong>Purpose:</strong> Single source of truth for all UI positions and sizes</p>
+            <br>
+            <h4>Contents:</h4>
+            <ul>
+                <li>Screen dimension constants</li>
+                <li>Region structs with x, y, width, height</li>
+                <li>Helper functions: <code>getToolbarRegion()</code>, <code>getPaletteRegion()</code>, etc.</li>
+                <li>Hit-test helpers: <code>isInToolbar(x, y)</code>, <code>isInPalette(x, y)</code>, etc.</li>
+            </ul>
+            <br>
+            <h4>Regions to Define:</h4>
+            <ul class="checklist">
+                <li><code>toolbar</code> - x: 0, y: 40, w: 80, h: 1048</li>
+                <li><code>canvas</code> - x: 326, y: 40, w: 1048, h: 1048</li>
+                <li><code>palette</code> - x: 1620, y: 40+648, w: 300, h: 400</li>
+                <li><code>shades</code> - x: 1620, y: 40+348, w: 300, h: 300</li>
+                <li><code>preview</code> - x: 1620, y: 40, w: 300, h: 348</li>
+                <li><code>info_bar</code> - x: 0, y: 0, w: 1920, h: 40</li>
+            </ul>
+            <br>
+            <div class="warning-box">
+                <strong>Note:</strong> Y coordinates are from bottom (0) to top (1088) in your coordinate system. Adjust accordingly. The info bar is at the BOTTOM (y: 0), and content grows upward.
+            </div>
+        </div>
+
+        <hr>
+
+        <h2>Phase 2: Info Bar</h2>
+
+        <div class="phase-box">
+            <div class="phase-title">Render the Bottom Info Bar</div>
+            <p>Start with the simplest UI element - static text display.</p>
+        </div>
+
+        <div class="file-box">
+            <div class="file-title">src/tools/zixelart/InfoBar.zig</div>
+            <p><strong>Purpose:</strong> Render cursor position, active color, and tool name</p>
+            <br>
+            <h4>Struct Fields:</h4>
+            <ul>
+                <li><code>region: Layout.Region</code> - bounds from Layout.zig</li>
+            </ul>
+            <br>
+            <h4>Functions:</h4>
+            <table>
+                <tr><th>Function</th><th>Purpose</th></tr>
+                <tr><td><code>init()</code></td><td>Create with region from Layout</td></tr>
+                <tr><td><code>render(renderer, font, state, ctx)</code></td><td>Draw background rect + text</td></tr>
+            </table>
+            <br>
+            <h4>Render Steps:</h4>
+            <ol>
+                <li>Draw background rectangle (dark gray, full width, 40px tall)</li>
+                <li>Draw cursor position text: <code>"[{}, {}]"</code> at x: 20</li>
+                <li>Draw color swatch (small filled rect) at x: 150</li>
+                <li>Draw color name text at x: 190</li>
+                <li>Draw tool name text at x: 450</li>
+            </ol>
+            <br>
+            <h4>Data Needed from ZixelState:</h4>
+            <ul>
+                <li><code>cursor_x: ?usize</code> - current canvas X (null if not hovering)</li>
+                <li><code>cursor_y: ?usize</code> - current canvas Y</li>
+                <li><code>active_color: Color</code> - currently selected color</li>
+                <li><code>active_color_name: []const u8</code> - color name (or "Custom")</li>
+                <li><code>active_tool: Tool</code> - current tool enum</li>
+            </ul>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 2.1: Update ZixelState</div>
+            <p><strong>File:</strong> <code>src/tools/zixelart/ZixelState.zig</code></p>
+            <br>
+            <h4>Add Fields:</h4>
+            <ul>
+                <li><code>cursor_x: ?usize = null</code></li>
+                <li><code>cursor_y: ?usize = null</code></li>
+                <li><code>active_color_name: []const u8 = "SAPPHIRE"</code></li>
+                <li><code>active_tool: Tool = .pencil</code></li>
+            </ul>
+            <br>
+            <h4>Add Tool Enum:</h4>
+            <p>Define <code>pub const Tool = enum { pencil, eraser, fill, picker, line };</code></p>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 2.2: Wire Up in main.zig</div>
+            <p><strong>File:</strong> <code>src/tools/zixelart/main.zig</code></p>
+            <br>
+            <h4>In Game Loop:</h4>
+            <ol>
+                <li>Update <code>state.cursor_x/y</code> from mouse position (use screenToCanvas)</li>
+                <li>Set to <code>null</code> if mouse is outside canvas</li>
+                <li>Create InfoBar instance</li>
+                <li>Call <code>info_bar.render()</code> after canvas render</li>
+            </ol>
+        </div>
+
+        <div class="success-box">
+            <strong>Checkpoint:</strong> You see a dark bar at the bottom showing "[32, 48] SAPPHIRE PENCIL" that updates as you move the mouse over the canvas.
+        </div>
+
+        <hr>
+
+        <h2>Phase 3: Tool Bar</h2>
+
+        <div class="phase-box">
+            <div class="phase-title">Render and Handle Tool Selection</div>
+            <p>Vertical list of 5 text labels with click handling.</p>
+        </div>
+
+        <div class="file-box">
+            <div class="file-title">src/tools/zixelart/ToolBar.zig</div>
+            <p><strong>Purpose:</strong> Display tools and handle selection</p>
+            <br>
+            <h4>Constants:</h4>
+            <ul>
+                <li><code>TOOL_HEIGHT = 40</code> - height per tool button</li>
+                <li><code>TOOL_PADDING = 10</code> - padding inside each button</li>
+                <li><code>tools = [_]Tool{ .pencil, .eraser, .fill, .picker, .line }</code></li>
+            </ul>
+            <br>
+            <h4>Functions:</h4>
+            <table>
+                <tr><th>Function</th><th>Purpose</th></tr>
+                <tr><td><code>init()</code></td><td>Create with region from Layout</td></tr>
+                <tr><td><code>render(renderer, font, active_tool, ctx)</code></td><td>Draw all tool buttons</td></tr>
+                <tr><td><code>handleClick(screen_x, screen_y) ?Tool</code></td><td>Return tool if clicked, null otherwise</td></tr>
+            </table>
+            <br>
+            <h4>Render Steps (for each tool):</h4>
+            <ol>
+                <li>Calculate Y position: <code>CONTENT_HEIGHT - (index + 1) * TOOL_HEIGHT</code></li>
+                <li>Draw background rect (highlight if active, darker if not)</li>
+                <li>Draw tool name text centered in the button</li>
+            </ol>
+            <br>
+            <h4>Tool Names:</h4>
+            <table>
+                <tr><th>Enum</th><th>Display Text</th></tr>
+                <tr><td><code>.pencil</code></td><td>"PENCIL"</td></tr>
+                <tr><td><code>.eraser</code></td><td>"ERASER"</td></tr>
+                <tr><td><code>.fill</code></td><td>"FILL"</td></tr>
+                <tr><td><code>.picker</code></td><td>"PICKER"</td></tr>
+                <tr><td><code>.line</code></td><td>"LINE"</td></tr>
+            </table>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 3.1: Implement handleClick</div>
+            <br>
+            <h4>Logic:</h4>
+            <ol>
+                <li>Check if x is within toolbar bounds (0 to 80)</li>
+                <li>Check if y is within content area (40 to 1088)</li>
+                <li>Calculate which tool index: <code>(CONTENT_HEIGHT - y) / TOOL_HEIGHT</code></li>
+                <li>If index < 5, return <code>tools[index]</code></li>
+                <li>Otherwise return <code>null</code></li>
+            </ol>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 3.2: Wire Up in main.zig</div>
+            <br>
+            <h4>On Mouse Click:</h4>
+            <ol>
+                <li>First check <code>toolbar.handleClick(screen_x, screen_y)</code></li>
+                <li>If returns a tool, update <code>state.active_tool</code></li>
+                <li>Otherwise, continue with existing canvas click logic</li>
+            </ol>
+        </div>
+
+        <div class="success-box">
+            <strong>Checkpoint:</strong> You see 5 tool labels on the left. Clicking them updates the info bar to show the selected tool. The active tool is highlighted.
+        </div>
+
+        <hr>
+
+        <h2>Phase 4: Color Palette</h2>
+
+        <div class="phase-box">
+            <div class="phase-title">Render 64-Color Grid with Selection</div>
+            <p>8x8 grid of color swatches in the right panel.</p>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 4.1: Update Palette.zig</div>
+            <p><strong>File:</strong> <code>src/tools/zixelart/Palette.zig</code></p>
+            <br>
+            <h4>Replace Current Implementation:</h4>
+            <p>The current Palette uses generated gradients. Replace with the Crayola 64 or a curated set.</p>
+            <br>
+            <h4>New Struct Fields:</h4>
+            <ul>
+                <li><code>colors: [64]Color</code> - the palette colors</li>
+                <li><code>names: [64][]const u8</code> - color names for info bar</li>
+                <li><code>region: Layout.Region</code> - bounds from Layout</li>
+                <li><code>swatch_size: usize</code> - calculated: region.width / 8</li>
+            </ul>
+            <br>
+            <h4>Init Options (pick one):</h4>
+            <ul>
+                <li><strong>Option A:</strong> Use Crayola 64 - <code>Colors.CRAYOLA_*</code></li>
+                <li><strong>Option B:</strong> Use Library queries - <code>Library.getHueToneSat()</code></li>
+                <li><strong>Option C:</strong> Hardcode a pixel-art friendly palette</li>
+            </ul>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 4.2: Add Palette Rendering</div>
+            <br>
+            <h4>Function: <code>render(renderer, selected_index, ctx)</code></h4>
+            <ol>
+                <li>Draw panel background (slightly lighter than app background)</li>
+                <li>For each color (0..64):
+                    <ul>
+                        <li>Calculate grid position: <code>col = i % 8</code>, <code>row = i / 8</code></li>
+                        <li>Calculate screen position from region + grid position</li>
+                        <li>Draw filled rectangle with color</li>
+                        <li>If selected, draw thicker/brighter border</li>
+                        <li>Otherwise draw thin dark border</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 4.3: Add Click Handling</div>
+            <br>
+            <h4>Function: <code>handleClick(screen_x, screen_y) ?usize</code></h4>
+            <ol>
+                <li>Check if click is within palette region</li>
+                <li>Calculate local coordinates: <code>local_x = screen_x - region.x</code></li>
+                <li>Calculate grid cell: <code>col = local_x / swatch_size</code></li>
+                <li>Calculate index: <code>row * 8 + col</code></li>
+                <li>Return index if valid (< 64), null otherwise</li>
+            </ol>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 4.4: Update ZixelState</div>
+            <br>
+            <h4>Add Field:</h4>
+            <ul>
+                <li><code>selected_palette_index: usize = 0</code></li>
+            </ul>
+            <br>
+            <h4>Update on Palette Click:</h4>
+            <ol>
+                <li>Set <code>state.selected_palette_index</code></li>
+                <li>Set <code>state.active_color = palette.colors[index]</code></li>
+                <li>Set <code>state.active_color_name = palette.names[index]</code></li>
+            </ol>
+        </div>
+
+        <div class="success-box">
+            <strong>Checkpoint:</strong> You see an 8x8 color grid on the right. Clicking a color selects it (highlighted border), updates the info bar, and drawing uses that color.
+        </div>
+
+        <hr>
+
+        <h2>Phase 5: Tints &amp; Shades Panel</h2>
+
+        <div class="phase-box">
+            <div class="phase-title">Auto-Generated Tints and Shades from Active Color</div>
+            <p>10 vertical swatches: 5 tints (lighter) + 5 shades (darker) of the current color.</p>
+        </div>
+
+        <div class="file-box">
+            <div class="file-title">src/tools/zixelart/TintShadePanel.zig</div>
+            <p><strong>Purpose:</strong> Show lighter and darker variations for easy shading</p>
+            <br>
+            <h4>Struct Fields:</h4>
+            <ul>
+                <li><code>region: Layout.Region</code></li>
+                <li><code>swatch_height: usize</code> - region.height / 10</li>
+            </ul>
+            <br>
+            <h4>Functions:</h4>
+            <table>
+                <tr><th>Function</th><th>Purpose</th></tr>
+                <tr><td><code>getTints(base_color) [5]Color</code></td><td>Generate 5 tints using <code>gen.tints()</code></td></tr>
+                <tr><td><code>getShades(base_color) [5]Color</code></td><td>Generate 5 shades using <code>gen.shades()</code></td></tr>
+                <tr><td><code>render(renderer, base_color, ctx)</code></td><td>Draw 10 vertical swatches</td></tr>
+                <tr><td><code>handleClick(screen_x, screen_y, base_color) ?Color</code></td><td>Return clicked tint/shade color</td></tr>
+            </table>
+            <br>
+            <h4>Color Generation:</h4>
+            <ul>
+                <li><code>gen.tints(base_color, 5)</code> - ramp from base toward white (lighter)</li>
+                <li><code>gen.shades(base_color, 5)</code> - ramp from base toward black (darker)</li>
+            </ul>
+            <br>
+            <h4>Layout (top to bottom):</h4>
+            <ol>
+                <li>Tint 5 (lightest)</li>
+                <li>Tint 4</li>
+                <li>Tint 3</li>
+                <li>Tint 2</li>
+                <li>Tint 1</li>
+                <li>Shade 1</li>
+                <li>Shade 2</li>
+                <li>Shade 3</li>
+                <li>Shade 4</li>
+                <li>Shade 5 (darkest)</li>
+            </ol>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 5.1: Implement Rendering</div>
+            <br>
+            <h4>Render Steps:</h4>
+            <ol>
+                <li>Call <code>getTints(state.active_color)</code> to get 5 tint colors</li>
+                <li>Call <code>getShades(state.active_color)</code> to get 5 shade colors</li>
+                <li>For each of the 10 swatches (0..10):
+                    <ul>
+                        <li>Use tints[4-i] for i=0..4, shades[i-5] for i=5..9</li>
+                        <li>Calculate Y: <code>region.y + region.height - (i + 1) * swatch_height</code></li>
+                        <li>Draw filled rectangle spanning full width</li>
+                        <li>Draw subtle border between swatches</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 5.2: Wire Up Click Handling</div>
+            <br>
+            <h4>On Tint/Shade Click:</h4>
+            <ol>
+                <li>Get the clicked tint or shade color</li>
+                <li>Set as <code>state.active_color</code></li>
+                <li>Set <code>state.active_color_name = "Custom"</code> (or snap to library name)</li>
+                <li><strong>Do NOT</strong> change <code>selected_palette_index</code> - tints/shades are temporary</li>
+            </ol>
+        </div>
+
+        <div class="success-box">
+            <strong>Checkpoint:</strong> When you select a palette color, 5 tints (top) and 5 shades (bottom) appear. Clicking any swatch lets you draw with it. The palette selection stays the same.
+        </div>
+
+        <hr>
+
+        <h2>Phase 6: Preview Panel</h2>
+
+        <div class="phase-box">
+            <div class="phase-title">1:1 Scale Canvas Preview</div>
+            <p>Shows what your pixel art looks like at actual 64x64 pixel size.</p>
+        </div>
+
+        <div class="file-box">
+            <div class="file-title">src/tools/zixelart/Preview.zig</div>
+            <p><strong>Purpose:</strong> Render a tiny version of the canvas at true pixel scale</p>
+            <br>
+            <h4>Struct Fields:</h4>
+            <ul>
+                <li><code>region: Layout.Region</code></li>
+            </ul>
+            <br>
+            <h4>Functions:</h4>
+            <table>
+                <tr><th>Function</th><th>Purpose</th></tr>
+                <tr><td><code>render(renderer, canvas, ctx)</code></td><td>Draw 64x64 preview centered in region</td></tr>
+            </table>
+            <br>
+            <h4>Render Steps:</h4>
+            <ol>
+                <li>Draw panel background</li>
+                <li>Calculate centered position for 64x64 preview:
+                    <ul>
+                        <li><code>preview_x = region.x + (region.width - 64) / 2</code></li>
+                        <li><code>preview_y = region.y + (region.height - 64) / 2</code></li>
+                    </ul>
+                </li>
+                <li>Draw border around preview area</li>
+                <li>For each canvas pixel:
+                    <ul>
+                        <li>Draw 1x1 screen pixel at <code>(preview_x + px, preview_y + py)</code></li>
+                        <li>Color from <code>canvas.pixels[py * 64 + px].color</code></li>
+                    </ul>
+                </li>
+            </ol>
+            <br>
+            <div class="warning-box">
+                <strong>Performance Note:</strong> Drawing 4096 individual 1x1 rectangles might be slow. If so, consider:
+                <ul>
+                    <li>Batching into a texture (future optimization)</li>
+                    <li>Only updating when canvas changes</li>
+                    <li>Drawing at 2x scale (128x128) for now</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="success-box">
+            <strong>Checkpoint:</strong> You see a tiny 64x64 pixel preview of your art in the bottom-right. It updates in real-time as you draw.
+        </div>
+
+        <hr>
+
+        <h2>Phase 7: Canvas Integration</h2>
+
+        <div class="phase-box">
+            <div class="phase-title">Relocate Canvas and Wire Everything Together</div>
+            <p>Move the canvas to its new position and connect all UI pieces.</p>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 7.1: Update Canvas.zig</div>
+            <br>
+            <h4>Changes:</h4>
+            <ul>
+                <li>Accept <code>x_offset</code> and <code>y_offset</code> in init</li>
+                <li>Or accept a <code>Layout.Region</code> directly</li>
+                <li>Update pixel position calculations to use new offsets</li>
+            </ul>
+            <br>
+            <h4>New Init Signature:</h4>
+            <p><code>pub fn init(allocator, region: Layout.Region, pixel_count: usize) !*Canvas</code></p>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 7.2: Update main.zig Click Handling</div>
+            <br>
+            <h4>Click Priority Order:</h4>
+            <ol>
+                <li>Check toolbar - if hit, change tool</li>
+                <li>Check palette - if hit, change color</li>
+                <li>Check shades - if hit, change color</li>
+                <li>Check canvas - if hit, apply current tool</li>
+                <li>Preview - no interaction (display only)</li>
+            </ol>
+            <br>
+            <h4>Tool Behavior on Canvas Click:</h4>
+            <table>
+                <tr><th>Tool</th><th>Action</th></tr>
+                <tr><td>Pencil</td><td>Set pixel to active color</td></tr>
+                <tr><td>Eraser</td><td>Set pixel to background color (LIGHT_GRAY)</td></tr>
+                <tr><td>Fill</td><td>Flood fill from click point (future)</td></tr>
+                <tr><td>Picker</td><td>Set active color from clicked pixel</td></tr>
+                <tr><td>Line</td><td>Line drawing (future - needs start/end state)</td></tr>
+            </table>
+        </div>
+
+        <div class="task-box">
+            <div class="task-title">Task 7.3: Render Order in main.zig</div>
+            <br>
+            <h4>Render Sequence:</h4>
+            <ol>
+                <li>Clear screen with app background color</li>
+                <li>Render canvas (largest, in center)</li>
+                <li>Render toolbar (left side)</li>
+                <li>Render palette (right top)</li>
+                <li>Render shades panel (right middle)</li>
+                <li>Render preview (right bottom)</li>
+                <li>Render info bar (bottom, on top of everything)</li>
+            </ol>
+        </div>
+
+        <div class="success-box">
+            <strong>Final Checkpoint:</strong> Full working UI! You can:
+            <ul>
+                <li>Select tools from the toolbar</li>
+                <li>Pick colors from the palette</li>
+                <li>Use shades for quick variations</li>
+                <li>Draw on the canvas with selected tool/color</li>
+                <li>See real-time preview and cursor info</li>
+            </ul>
+        </div>
+
+        <hr>
+
+        <h2>File Summary</h2>
+
+        <div class="table-container">
+            <table>
+                <tr>
+                    <th>File</th>
+                    <th>New/Modified</th>
+                    <th>Purpose</th>
+                </tr>
+                <tr>
+                    <td><code>src/renderer/text.zig</code></td>
+                    <td>Modified</td>
+                    <td>Add <code>drawTextScreen</code></td>
+                </tr>
+                <tr>
+                    <td><code>src/renderer/renderer.zig</code></td>
+                    <td>Modified</td>
+                    <td>Expose <code>drawTextScreen</code> method</td>
+                </tr>
+                <tr>
+                    <td><code>src/tools/zixelart/Layout.zig</code></td>
+                    <td>New</td>
+                    <td>All layout constants and regions</td>
+                </tr>
+                <tr>
+                    <td><code>src/tools/zixelart/InfoBar.zig</code></td>
+                    <td>New</td>
+                    <td>Bottom info bar rendering</td>
+                </tr>
+                <tr>
+                    <td><code>src/tools/zixelart/ToolBar.zig</code></td>
+                    <td>New</td>
+                    <td>Left tool panel</td>
+                </tr>
+                <tr>
+                    <td><code>src/tools/zixelart/Palette.zig</code></td>
+                    <td>Rewrite</td>
+                    <td>64-color grid with selection</td>
+                </tr>
+                <tr>
+                    <td><code>src/tools/zixelart/ShadesPanel.zig</code></td>
+                    <td>New</td>
+                    <td>Auto-generated shade swatches</td>
+                </tr>
+                <tr>
+                    <td><code>src/tools/zixelart/Preview.zig</code></td>
+                    <td>New</td>
+                    <td>1:1 scale canvas preview</td>
+                </tr>
+                <tr>
+                    <td><code>src/tools/zixelart/ZixelState.zig</code></td>
+                    <td>Modified</td>
+                    <td>Add cursor, tool, palette state</td>
+                </tr>
+                <tr>
+                    <td><code>src/tools/zixelart/Canvas.zig</code></td>
+                    <td>Modified</td>
+                    <td>Accept region-based positioning</td>
+                </tr>
+                <tr>
+                    <td><code>src/tools/zixelart/main.zig</code></td>
+                    <td>Modified</td>
+                    <td>Wire up all UI components</td>
+                </tr>
+            </table>
+        </div>
+
+        <hr>
+
+        <h2>Quick Reference: Coordinate System</h2>
+
+        <div class="warning-box">
+            <strong>Remember:</strong> Your coordinate system has Y=0 at the BOTTOM, Y=1088 at the TOP.
+            <br><br>
+            <ul>
+                <li>Info bar is at Y: 0-40 (bottom)</li>
+                <li>Content area is Y: 40-1088 (above info bar)</li>
+                <li>When stacking UI elements from top, calculate: <code>SCREEN_HEIGHT - element_top - element_height</code></li>
+            </ul>
+        </div>
+
+        <div class="layout-diagram">
+Y=1088 ┌────────────────────────────────────────┐ TOP
+       │  Toolbar   │   Canvas    │  Palette   │
+       │            │             │            │
+       │            │             ├────────────┤
+       │            │             │  Shades    │
+       │            │             ├────────────┤
+       │            │             │  Preview   │
+Y=40   ├────────────┴─────────────┴────────────┤
+       │              Info Bar                 │
+Y=0    └────────────────────────────────────────┘ BOTTOM
+       X=0                                   X=1920
+        </div>
+
+        <hr>
+
+        <h2>Estimated Time</h2>
+
+        <div class="table-container">
+            <table>
+                <tr><th>Phase</th><th>Estimate</th><th>Complexity</th></tr>
+                <tr><td>Phase 0: Screen text</td><td>15-30 min</td><td>Low (copy/paste + type change)</td></tr>
+                <tr><td>Phase 1: Layout.zig</td><td>20-30 min</td><td>Low (just constants)</td></tr>
+                <tr><td>Phase 2: Info bar</td><td>30-45 min</td><td>Medium (first UI render)</td></tr>
+                <tr><td>Phase 3: Tool bar</td><td>30-45 min</td><td>Medium (click handling)</td></tr>
+                <tr><td>Phase 4: Palette</td><td>45-60 min</td><td>Medium (grid math)</td></tr>
+                <tr><td>Phase 5: Shades</td><td>30-45 min</td><td>Low (reuse palette pattern)</td></tr>
+                <tr><td>Phase 6: Preview</td><td>30-45 min</td><td>Medium (performance?)</td></tr>
+                <tr><td>Phase 7: Integration</td><td>45-60 min</td><td>Medium (wiring)</td></tr>
+                <tr><td><strong>Total</strong></td><td><strong>4-6 hours</strong></td><td></td></tr>
+            </table>
+        </div>
+
+        <hr>
+
+        <div class="overview-box">
+            <strong>Good luck tonight!</strong> Start with Phase 0 (screen-space text) since everything else depends on it. Then work through phases in order - each builds on the previous.
+        </div>
+
+    </div>
+</body>
+</html>

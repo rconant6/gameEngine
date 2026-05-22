@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Renderer System Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 2rem 2rem 6rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1 { color: #58a6ff; font-size: 1.8rem; border-bottom: 1px solid #21262d; padding-bottom: 0.5rem; margin-bottom: 0.25rem; }
+  .page-sub { color: #8b949e; font-size: 0.9rem; margin-bottom: 2rem; }
+  h2 { color: #f0883e; font-size: 1.35rem; margin-top: 3rem; margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid #21262d; }
+  h3 { color: #d2a8ff; font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  p, li { margin-bottom: 0.4rem; }
+  code {
+    background: #161b22; padding: 0.15rem 0.4rem; border-radius: 3px;
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.85em; color: #79c0ff;
+  }
+  .mono { font-family: 'SF Mono','Fira Code',monospace; }
+
+  /* ---- NAV ---- */
+  nav {
+    background: #161b22; border: 1px solid #21262d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin-bottom: 2rem;
+  }
+  nav .nav-title { color: #8b949e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: 0.5rem; }
+  nav .nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.3rem 1rem; }
+  nav a { font-size: 0.85rem; display: block; padding: 0.15rem 0; }
+
+  /* ---- SECTION ---- */
+  section { scroll-margin-top: 1rem; }
+
+  /* ---- STRUCT CARD ---- */
+  .card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin: 0.75rem 0;
+  }
+  .card.main   { border-color: #58a6ff; }
+  .card.child  { border-color: #d2a8ff; }
+  .card.leaf   { border-color: #7ee787; }
+  .card.ext    { border-color: #f0883e; border-style: dashed; }
+
+  .card-name {
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem;
+  }
+  .card-name.c-blue   { color: #58a6ff; }
+  .card-name.c-purple { color: #d2a8ff; }
+  .card-name.c-green  { color: #7ee787; }
+  .card-name.c-orange { color: #f0883e; }
+
+  .fields {
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.8rem; line-height: 1.7;
+  }
+  .fn  { color: #d2a8ff; }
+  .ft  { color: #7ee787; }
+  .fp  { color: #79c0ff; }
+  .fc  { color: #8b949e; font-style: italic; }
+  .fl  { color: #484f58; font-family: -apple-system,sans-serif; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-top: 0.4rem; margin-bottom: 0.15rem; }
+
+  /* ---- SVG diagrams ---- */
+  .diagram-wrap { margin: 1rem 0; overflow-x: auto; }
+  svg { overflow: visible; }
+  .box { fill: #161b22; stroke: #30363d; stroke-width: 1.5; rx: 8; }
+  .box-main { stroke: #58a6ff; stroke-width: 2; }
+  .box-purple { stroke: #d2a8ff; }
+  .box-green { stroke: #7ee787; }
+  .box-orange { stroke: #f0883e; stroke-dasharray: 5,4; }
+  .hdr { fill: #21262d; rx: 8; }
+  .hdr-clip { fill: #21262d; }
+
+  .t-name   { fill: #58a6ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-purple { fill: #d2a8ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-green  { fill: #7ee787; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-orange { fill: #f0883e; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-field  { fill: #79c0ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-type   { fill: #7ee787; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-fn     { fill: #d2a8ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-dim    { fill: #8b949e; font-family: -apple-system,sans-serif; font-size: 10px; font-style: italic; }
+  .t-sec    { fill: #484f58; font-family: -apple-system,sans-serif; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .line-own  { stroke: #58a6ff; stroke-width: 2; fill: none; }
+  .line-ref  { stroke: #f0883e; stroke-dasharray: 6,4; fill: none; }
+  .line-flow { stroke: #7ee787; stroke-width: 2; fill: none; }
+  .arr-blue   { fill: #58a6ff; }
+  .arr-orange { fill: #f0883e; }
+  .arr-green  { fill: #7ee787; }
+
+  /* ---- LINK PILLS ---- */
+  .links { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+  .links a {
+    background: #21262d; border: 1px solid #30363d; border-radius: 2rem;
+    padding: 0.25rem 0.75rem; font-size: 0.75rem; white-space: nowrap;
+  }
+  .links a:hover { border-color: #58a6ff; text-decoration: none; }
+
+  /* ---- FLOW LIST ---- */
+  .flow-list { list-style: none; counter-reset: fl; margin: 0.75rem 0; }
+  .flow-list li {
+    counter-increment: fl; position: relative; padding: 0.5rem 0.75rem 0.5rem 2.75rem;
+    background: #161b22; border: 1px solid #21262d; border-radius: 6px; margin: 0.35rem 0;
+  }
+  .flow-list li::before {
+    content: counter(fl); position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+    background: #30363d; color: #8b949e; font-size: 0.7rem; font-weight: 700;
+    width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px;
+  }
+
+  /* ---- TABLE ---- */
+  table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; font-size: 0.85rem; }
+  th, td { padding: 0.5rem 0.75rem; text-align: left; border: 1px solid #21262d; }
+  th { background: #161b22; color: #8b949e; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.06em; }
+  td { background: #0d1117; font-family: 'SF Mono','Fira Code',monospace; font-size: 0.8rem; }
+  td.num { text-align: right; color: #d2a8ff; }
+</style>
+</head>
+<body>
+
+<h1 id="top">Renderer System Architecture</h1>
+<p class="page-sub">Complete reference for the rendering pipeline &mdash; from high-level API to Metal GPU shaders</p>
+
+<!-- ============================================================ -->
+<!-- NAV -->
+<!-- ============================================================ -->
+<nav>
+  <div class="nav-title">Jump to section</div>
+  <div class="nav-grid">
+    <a href="#overview">Overview</a>
+    <a href="#pipeline">Frame Pipeline</a>
+    <a href="#renderer-api">Renderer API</a>
+    <a href="#render-context">RenderContext</a>
+    <a href="#shapes">Shapes</a>
+    <a href="#coords">Coordinate Spaces</a>
+    <a href="#text">Text Rendering</a>
+    <a href="#triangulation">Triangulation</a>
+    <a href="#metal-renderer">MetalRenderer</a>
+    <a href="#geometry-batch">GeometryBatch</a>
+    <a href="#texture-batch">TextureBatch</a>
+    <a href="#metal-types">Metal Types &amp; Bridge</a>
+    <a href="#shaders">Shaders</a>
+    <a href="#color">Color System</a>
+    <a href="#vertex-budget">Vertex Budget</a>
+  </div>
+</nav>
+
+<!-- ============================================================ -->
+<!-- OVERVIEW -->
+<!-- ============================================================ -->
+<section id="overview">
+<h2>Overview</h2>
+<p>The renderer is a multi-backend abstraction layer. Currently only the Metal backend is active (macOS). Vulkan and OpenGL are stubs. A legacy CPU software renderer exists but is disabled.</p>
+
+<div class="diagram-wrap">
+<svg width="1060" height="480" viewBox="0 0 1060 480">
+  <defs>
+    <marker id="a-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-blue"/></marker>
+    <marker id="a-orange" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-orange"/></marker>
+    <marker id="a-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-green"/></marker>
+  </defs>
+
+  <!-- Layer labels -->
+  <text x="10" y="45" class="t-sec" font-size="10">GAME CODE</text>
+  <text x="10" y="165" class="t-sec" font-size="10">ABSTRACTION</text>
+  <text x="10" y="295" class="t-sec" font-size="10">BACKEND</text>
+  <text x="10" y="420" class="t-sec" font-size="10">GPU</text>
+
+  <!-- Row 1: Game / Systems -->
+  <rect class="box box-purple" x="180" y="20" width="220" height="55"/>
+  <rect class="hdr" x="180" y="20" width="220" height="26" rx="8"/><rect class="hdr-clip" x="180" y="38" width="220" height="8"/>
+  <text x="290" y="38" text-anchor="middle" class="t-purple">RenderSys</text>
+  <text x="290" y="58" text-anchor="middle" class="t-dim">queries Sprite + Text + UIElement</text>
+
+  <rect class="box box-purple" x="440" y="20" width="220" height="55"/>
+  <rect class="hdr" x="440" y="20" width="220" height="26" rx="8"/><rect class="hdr-clip" x="440" y="38" width="220" height="8"/>
+  <text x="550" y="38" text-anchor="middle" class="t-purple">Engine</text>
+  <text x="550" y="58" text-anchor="middle" class="t-dim">calls beginFrame / endFrame</text>
+
+  <rect class="box box-purple" x="700" y="20" width="220" height="55"/>
+  <rect class="hdr" x="700" y="20" width="220" height="26" rx="8"/><rect class="hdr-clip" x="700" y="38" width="220" height="8"/>
+  <text x="810" y="38" text-anchor="middle" class="t-purple">UI System</text>
+  <text x="810" y="58" text-anchor="middle" class="t-dim">draws widgets</text>
+
+  <!-- Row 2: Renderer API + helpers -->
+  <rect class="box box-main" x="310" y="120" width="260" height="55"/>
+  <rect class="hdr" x="310" y="120" width="260" height="26" rx="8"/><rect class="hdr-clip" x="310" y="138" width="260" height="8"/>
+  <text x="440" y="138" text-anchor="middle" class="t-name">Renderer</text>
+  <text x="440" y="158" text-anchor="middle" class="t-dim">drawGeometry / drawText / drawTextScreen</text>
+
+  <rect class="box" x="130" y="120" width="150" height="55" style="stroke:#7ee787;"/>
+  <rect class="hdr" x="130" y="120" width="150" height="26" rx="8"/><rect class="hdr-clip" x="130" y="138" width="150" height="8"/>
+  <text x="205" y="138" text-anchor="middle" class="t-green">RenderContext</text>
+  <text x="205" y="158" text-anchor="middle" class="t-dim">camera, viewport, time</text>
+
+  <rect class="box" x="600" y="120" width="150" height="55" style="stroke:#7ee787;"/>
+  <rect class="hdr" x="600" y="120" width="150" height="26" rx="8"/><rect class="hdr-clip" x="600" y="138" width="150" height="8"/>
+  <text x="675" y="138" text-anchor="middle" class="t-green">Shapes</text>
+  <text x="675" y="158" text-anchor="middle" class="t-dim">Circle, Rect, Polygon...</text>
+
+  <rect class="box" x="780" y="120" width="150" height="55" style="stroke:#7ee787;"/>
+  <rect class="hdr" x="780" y="120" width="150" height="26" rx="8"/><rect class="hdr-clip" x="780" y="138" width="150" height="8"/>
+  <text x="855" y="138" text-anchor="middle" class="t-green">Text</text>
+  <text x="855" y="158" text-anchor="middle" class="t-dim">glyph &rarr; triangles</text>
+
+  <!-- Row 3: Metal backend -->
+  <rect class="box box-orange" x="200" y="260" width="240" height="55"/>
+  <rect class="hdr" x="200" y="260" width="240" height="26" rx="8"/><rect class="hdr-clip" x="200" y="278" width="240" height="8"/>
+  <text x="320" y="278" text-anchor="middle" class="t-orange">MetalRenderer</text>
+  <text x="320" y="298" text-anchor="middle" class="t-dim">device, command queue, pipeline</text>
+
+  <rect class="box box-orange" x="480" y="260" width="200" height="55"/>
+  <rect class="hdr" x="480" y="260" width="200" height="26" rx="8"/><rect class="hdr-clip" x="480" y="278" width="200" height="8"/>
+  <text x="580" y="278" text-anchor="middle" class="t-orange">GeometryBatch</text>
+  <text x="580" y="298" text-anchor="middle" class="t-dim">vertices + draw calls</text>
+
+  <rect class="box box-orange" x="720" y="260" width="200" height="55"/>
+  <rect class="hdr" x="720" y="260" width="200" height="26" rx="8"/><rect class="hdr-clip" x="720" y="278" width="200" height="8"/>
+  <text x="820" y="278" text-anchor="middle" class="t-orange">TextureBatch</text>
+  <text x="820" y="298" text-anchor="middle" class="t-dim">textured quads</text>
+
+  <!-- Row 4: GPU -->
+  <rect class="box" x="200" y="390" width="200" height="55" style="stroke:#484f58;"/>
+  <rect class="hdr" x="200" y="390" width="200" height="26" rx="8"/><rect class="hdr-clip" x="200" y="408" width="200" height="8"/>
+  <text x="300" y="408" text-anchor="middle" class="t-dim" font-size="12" font-style="normal">MetalBridge (Swift)</text>
+  <text x="300" y="428" text-anchor="middle" class="t-dim">C-callable Metal API wrappers</text>
+
+  <rect class="box" x="440" y="390" width="200" height="55" style="stroke:#484f58;"/>
+  <rect class="hdr" x="440" y="390" width="200" height="26" rx="8"/><rect class="hdr-clip" x="440" y="408" width="200" height="8"/>
+  <text x="540" y="408" text-anchor="middle" class="t-dim" font-size="12" font-style="normal">shaders.metal</text>
+  <text x="540" y="428" text-anchor="middle" class="t-dim">vertex + fragment programs</text>
+
+  <rect class="box" x="680" y="390" width="200" height="55" style="stroke:#484f58;"/>
+  <rect class="hdr" x="680" y="390" width="200" height="26" rx="8"/><rect class="hdr-clip" x="680" y="408" width="200" height="8"/>
+  <text x="780" y="408" text-anchor="middle" class="t-dim" font-size="12" font-style="normal">Metal Framework</text>
+  <text x="780" y="428" text-anchor="middle" class="t-dim">Apple GPU driver</text>
+
+  <!-- Connections -->
+  <path d="M 290,75 L 290,100 Q 290,112 310,112 L 380,120" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 550,75 L 550,100 Q 550,112 510,112 L 480,120" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 810,75 L 810,100 Q 810,112 750,112 L 520,120" class="line-own" marker-end="url(#a-blue)"/>
+
+  <path d="M 440,175 L 440,220 Q 440,250 380,250 L 340,260" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 440,175 L 440,220 Q 440,250 510,250 L 550,260" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 440,175 L 440,220 Q 440,250 640,250 L 760,260" class="line-ref" marker-end="url(#a-orange)"/>
+
+  <path d="M 320,315 L 320,350 Q 320,380 310,380 L 300,390" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 320,315 L 320,350 Q 320,380 440,380 L 500,390" class="line-ref" marker-end="url(#a-orange)"/>
+
+  <path d="M 400,418 L 440,418" class="line-ref" marker-end="url(#a-orange)"/>
+  <path d="M 640,418 L 680,418" class="line-ref" marker-end="url(#a-orange)"/>
+</svg>
+</div>
+
+<h3>File Map</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Abstraction Layer</span>
+    <span class="fp">src/renderer/renderer.zig</span> <span class="fc">// module root, backend dispatch</span><br>
+    <span class="fp">src/renderer/RenderContext.zig</span> <span class="fc">// camera, viewport, timing state</span><br>
+    <span class="fp">src/renderer/shapes.zig</span> <span class="fc">// generic shape types</span><br>
+    <span class="fp">src/renderer/geometry_utils.zig</span> <span class="fc">// transforms, coord conversions</span><br>
+    <span class="fp">src/renderer/text.zig</span> <span class="fc">// font glyph &rarr; triangle rendering</span><br>
+    <span class="fp">src/renderer/triangulation.zig</span> <span class="fc">// monotone polygon partition</span><br>
+    <span class="fp">src/renderer/color.zig</span> <span class="fc">// Color, Colors library, math</span><br>
+    <span class="fl">Metal Backend</span>
+    <span class="fp">src/renderer/gpu/metal/MetalRenderer.zig</span> <span class="fc">// GPU renderer implementation</span><br>
+    <span class="fp">src/renderer/gpu/metal/GeometryBatch.zig</span> <span class="fc">// shape &rarr; vertex batching</span><br>
+    <span class="fp">src/renderer/gpu/metal/texture_batch.zig</span> <span class="fc">// textured quad batching</span><br>
+    <span class="fp">src/renderer/gpu/metal/metal_types.zig</span> <span class="fc">// Vertex, enums, opaque handles</span><br>
+    <span class="fp">src/renderer/gpu/metal/metal_bridge.zig</span> <span class="fc">// Zig wrappers for Swift extern fns</span><br>
+    <span class="fl">Platform / GPU</span>
+    <span class="fp">src/platform/macos/swift/MetalBridge.swift</span> <span class="fc">// @_cdecl Metal API bindings</span><br>
+    <span class="fp">src/platform/macos/swift/shaders.metal</span> <span class="fc">// vertex + fragment shaders</span>
+  </div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- FRAME PIPELINE -->
+<!-- ============================================================ -->
+<section id="pipeline">
+<h2>Frame Pipeline</h2>
+<p>Every frame follows this exact sequence. The engine orchestrates; systems submit draw calls; the backend batches and flushes to the GPU.</p>
+
+<ol class="flow-list">
+  <li><code>renderer.beginFrame()</code> &mdash; clear geometry batch, get next <code>CAMetalDrawable</code>, create <code>MTLCommandBuffer</code></li>
+  <li><strong>RenderSys</strong> queries <code>Transform + Sprite</code> &rarr; calls <code>drawGeometry()</code> for each visible entity in world space</li>
+  <li><strong>RenderSys</strong> queries <code>Transform + Text</code> &rarr; calls <code>drawText()</code> for each text entity</li>
+  <li><strong>RenderSys</strong> queries <code>UIElement + Sprite</code> &rarr; calls <code>drawGeometry()</code> with screen-space anchoring</li>
+  <li><strong>DebugDraw</strong> submits overlay geometry (collision bounds, velocity arrows, camera frustums)</li>
+  <li><code>renderer.endFrame()</code> &rarr; <code>flushBatch()</code>: copy vertices to GPU buffer, create render pass, issue all draw calls, present drawable, commit command buffer</li>
+</ol>
+
+<h3>Batch Flush Detail</h3>
+<ol class="flow-list">
+  <li>Copy <code>GeometryBatch.vertices</code> into shared <code>MTLBuffer</code> (12MB max)</li>
+  <li>Create <code>MTLRenderPassDescriptor</code> with color attachment (clear color, load: clear, store: store)</li>
+  <li>Create <code>MTLRenderCommandEncoder</code> from command buffer + render pass</li>
+  <li>Set geometry pipeline state on encoder</li>
+  <li>Bind vertex buffer at index 0</li>
+  <li>For each <code>DrawCall</code>: issue <code>drawPrimitives(type, start, count)</code></li>
+  <li>End encoding, present drawable, commit command buffer</li>
+</ol>
+
+<div class="links">
+  <a href="#renderer-api">Renderer API</a>
+  <a href="#geometry-batch">GeometryBatch</a>
+  <a href="#metal-renderer">MetalRenderer</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- RENDERER API -->
+<!-- ============================================================ -->
+<section id="renderer-api">
+<h2>Renderer API</h2>
+<p>Platform-agnostic interface. Delegates to the active backend (selected at compile time via <code>-Drenderer=metal</code>). <code>src/renderer/renderer.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">Renderer</div>
+  <div class="fields">
+    <span class="fl">Fields</span>
+    <span class="fp">backend</span>: <span class="ft">BackendImpl</span> <span class="fc">// MetalRenderer | Vulkan(stub) | OpenGL(stub)</span><br>
+    <span class="fp">width</span> / <span class="fp">height</span>: <span class="ft">u32</span><br>
+    <span class="fl">Lifecycle</span>
+    <span class="fn">init</span>(alloc, config) &rarr; <span class="ft">Renderer</span><br>
+    <span class="fn">deinit</span>()<br>
+    <span class="fn">resize</span>(width, height)<br>
+    <span class="fl">Frame</span>
+    <span class="fn">beginFrame</span>() &nbsp; <span class="fn">endFrame</span>() &nbsp; <span class="fn">clear</span>() &nbsp; <span class="fn">setClearColor</span>(color)<br>
+    <span class="fl">Drawing</span>
+    <span class="fn">drawGeometry</span>(shape_data, transform, fill_color, stroke_color, stroke_width, ctx)<br>
+    <span class="fn">drawText</span>(font, text, position, scale, color, ctx) <span class="fc">// world space</span><br>
+    <span class="fn">drawTextScreen</span>(font, text, position, scale, color, ctx) <span class="fc">// screen space</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">RendererConfig</div>
+  <div class="fields">
+    <span class="fp">width</span> / <span class="fp">height</span>: <span class="ft">u32</span><br>
+    <span class="fp">native_handle</span>: <span class="ft">?*anyopaque</span> = null <span class="fc">// platform window handle</span><br>
+    <span class="fp">enable_validation</span>: <span class="ft">bool</span> = false<br>
+    <span class="fp">vsync</span>: <span class="ft">bool</span> = true
+  </div>
+</div>
+
+<h3>Backend Selection (build.zig)</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">RendererBackend</span> = enum { cpu, metal, vulkan, opengl }<br>
+    Default: <span class="ft">metal</span> on macOS, <span class="ft">vulkan</span> elsewhere<br>
+    Set via: <code>zig build -Drenderer=metal</code><br>
+    Injected as <span class="fp">build_options.backend</span> at comptime
+  </div>
+</div>
+
+<div class="links">
+  <a href="#render-context">RenderContext</a>
+  <a href="#shapes">Shapes</a>
+  <a href="#metal-renderer">MetalRenderer</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- RENDER CONTEXT -->
+<!-- ============================================================ -->
+<section id="render-context">
+<h2>RenderContext</h2>
+<p>Passed to every draw call. Carries camera state, viewport dimensions, and timing. <code>src/renderer/RenderContext.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">RenderContext</div>
+  <div class="fields">
+    <span class="fl">Viewport</span>
+    <span class="fp">width</span> / <span class="fp">height</span>: <span class="ft">u32</span><br>
+    <span class="fl">Camera</span>
+    <span class="fp">camera_loc</span>: <span class="ft">WorldPoint</span> <span class="fc">// camera position in world</span><br>
+    <span class="fp">ortho_size</span>: <span class="ft">f32</span> <span class="fc">// vertical half-height of view</span><br>
+    <span class="fl">Display</span>
+    <span class="fp">scale_factor</span>: <span class="ft">f32</span> = 1.0 <span class="fc">// DPI / Retina scaling</span><br>
+    <span class="fl">Timing</span>
+    <span class="fp">frame_number</span>: <span class="ft">u64</span> = 0<br>
+    <span class="fp">time</span>: <span class="ft">f64</span> = 0 <span class="fc">// total elapsed seconds</span><br>
+    <span class="fp">delta_time</span>: <span class="ft">f64</span> = 0 <span class="fc">// frame delta</span><br>
+    <span class="fl">Computed</span>
+    <span class="fn">aspectRatio</span>() &rarr; <span class="ft">f32</span>
+  </div>
+</div>
+
+<p>The RenderSys creates two contexts per frame: one for world-space rendering (with camera) and one for screen-space UI.</p>
+
+<div class="links">
+  <a href="#coords">Coordinate Spaces</a>
+  <a href="#renderer-api">Renderer</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SHAPES -->
+<!-- ============================================================ -->
+<section id="shapes">
+<h2>Shapes</h2>
+<p>Generic shape types parameterized by <code>PointType</code> (either <code>WorldPoint</code> or <code>ScreenPoint</code>). <code>src/renderer/shapes.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">Circle(PointType)</div>
+  <div class="fields">
+    <span class="fp">origin</span>: <span class="ft">PointType</span> &nbsp;
+    <span class="fp">radius</span>: <span class="ft">f32</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Rectangle(PointType)</div>
+  <div class="fields">
+    <span class="fp">center</span>: <span class="ft">PointType</span> &nbsp;
+    <span class="fp">half_height</span>: <span class="ft">f32</span> &nbsp;
+    <span class="fp">half_width</span>: <span class="ft">f32</span><br>
+    <span class="fn">initFromCenter</span> / <span class="fn">initFromTopLeft</span> / <span class="fn">initSquare</span><br>
+    <span class="fn">getWidth</span> / <span class="fn">getHeight</span> / <span class="fn">getCorners</span>() &rarr; <span class="ft">[4]PointType</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Triangle(PointType)</div>
+  <div class="fields">
+    <span class="fp">v0</span>, <span class="fp">v1</span>, <span class="fp">v2</span>: <span class="ft">PointType</span> <span class="fc">// sorted by Y (top to bottom)</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Line(PointType)</div>
+  <div class="fields">
+    <span class="fp">start</span>, <span class="fp">end</span>: <span class="ft">PointType</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Polygon(PointType)</div>
+  <div class="fields">
+    <span class="fp">points</span>: <span class="ft">[]const PointType</span> &nbsp;
+    <span class="fp">center</span>: <span class="ft">PointType</span><br>
+    <span class="fp">triangle_cache</span>: <span class="ft">?[][3]PointType</span> <span class="fc">// lazy triangulation</span><br>
+    <span class="fp">vertex_count</span>: <span class="ft">usize</span><br>
+    <span class="fn">getTriangles</span>() &rarr; <span class="ft">[][3]PointType</span> <span class="fc">// computes on first call, caches</span><br>
+    <span class="fn">deinit</span>()
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Ellipse(PointType)</div>
+  <div class="fields"><span class="fc">Not yet implemented</span></div>
+</div>
+
+<h3>ShapeData Union</h3>
+<p>Generated at comptime by <code>ShapeRegistry</code>. All shape types &times; both coordinate spaces = 12 variants. Stored in <code>Sprite.geometry</code>.</p>
+
+<div class="links">
+  <a href="#geometry-batch">GeometryBatch (renders these)</a>
+  <a href="#triangulation">Triangulation</a>
+  <a href="#coords">Coordinate Spaces</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- COORDINATE SPACES -->
+<!-- ============================================================ -->
+<section id="coords">
+<h2>Coordinate Spaces</h2>
+<p>Three coordinate systems with conversion utilities. <code>src/renderer/geometry_utils.zig</code></p>
+
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">World Space</span>
+    Game coordinates, infinite range, floats. Camera-relative. Y+ is up.<br>
+    <span class="fl">Screen Space</span>
+    Pixel coordinates, (0,0) at top-left, (w,h) at bottom-right. Y+ is down. Used for UI.<br>
+    <span class="fl">Clip Space (NDC)</span>
+    GPU normalized device coordinates, (-1,-1) to (+1,+1). Center is origin. Automatic &mdash; game code never uses this directly.
+  </div>
+</div>
+
+<h3>Conversion Functions</h3>
+<div class="card leaf">
+  <div class="card-name c-green">geometry_utils</div>
+  <div class="fields">
+    <span class="fn">worldToScreen</span>(point, ctx) &rarr; <span class="ft">V2</span><br>
+    <span class="fn">worldToClipSpace</span>(point, ctx) &rarr; <span class="ft">[2]f32</span><br>
+    <span class="fn">screenToClipSpace</span>(screen, ctx) &rarr; <span class="ft">[2]f32</span><br>
+    <span class="fn">screenToWorld</span>(screen, ctx) &rarr; <span class="ft">WorldPoint</span> <span class="fc">// mouse picking</span><br>
+    <span class="fn">worldToScreenPoint</span>(point, ctx) &rarr; <span class="ft">ScreenPoint</span><br>
+    <span class="fn">getAnchorPosition</span>(anchor, ctx) &rarr; <span class="ft">V2</span> <span class="fc">// 9-point screen anchoring for UI</span><br>
+    <span class="fn">colorToFloat</span>(color) &rarr; <span class="ft">[4]f32</span> <span class="fc">// normalize u8 RGBA to [0,1]</span>
+  </div>
+</div>
+
+<h3>World &rarr; Clip Space Math</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">// relative to camera</span><br>
+    relative_x = point.x - camera_loc.x<br>
+    relative_y = point.y - camera_loc.y<br>
+    <span class="fc">// normalize by ortho size and aspect ratio</span><br>
+    clip_x = relative_x / (ortho_size * aspect_ratio)<br>
+    clip_y = relative_y / ortho_size
+  </div>
+</div>
+
+<h3>Transform</h3>
+<div class="card child">
+  <div class="card-name c-purple">Transform (geometry_utils)</div>
+  <div class="fields">
+    <span class="fp">offset</span>: <span class="ft">?WorldPoint</span> = null <span class="fc">// translation</span><br>
+    <span class="fp">rotation</span>: <span class="ft">?f32</span> = null <span class="fc">// radians</span><br>
+    <span class="fp">scale</span>: <span class="ft">?f32</span> = null <span class="fc">// uniform</span><br>
+    <span class="fc">Application order: Scale &rarr; Rotate &rarr; Translate</span>
+  </div>
+</div>
+
+<h3>Screen Anchors</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">TopLeft</span> &nbsp; <span class="ft">TopCenter</span> &nbsp; <span class="ft">TopRight</span><br>
+    <span class="ft">MiddleLeft</span> &nbsp; <span class="ft">MiddleCenter</span> &nbsp; <span class="ft">MiddleRight</span><br>
+    <span class="ft">BottomLeft</span> &nbsp; <span class="ft">BottomCenter</span> &nbsp; <span class="ft">BottomRight</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#render-context">RenderContext</a>
+  <a href="#geometry-batch">GeometryBatch (applies conversions)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TEXT RENDERING -->
+<!-- ============================================================ -->
+<section id="text">
+<h2>Text Rendering</h2>
+<p>Converts font glyphs to triangles and renders them as geometry. No texture atlases &mdash; pure vector rendering. <code>src/renderer/text.zig</code></p>
+
+<div class="card leaf">
+  <div class="card-name c-green">text.zig</div>
+  <div class="fields">
+    <span class="fn">drawText</span>(renderer, font, text, position, scale, color, ctx) <span class="fc">// world space</span><br>
+    <span class="fn">drawTextScreen</span>(renderer, font, text, position, scale, color, ctx) <span class="fc">// screen space</span><br>
+    <span class="fn">drawGlyph</span>(renderer, font, glyph_index, glyph, scale, pos, color, ctx) <span class="fc">// single glyph</span>
+  </div>
+</div>
+
+<h3>Text Rendering Flow</h3>
+<ol class="flow-list">
+  <li>For each character in the text string, look up ASCII value in <code>Font.char_to_glyph</code> map</li>
+  <li>Retrieve <code>FilteredGlyph</code> shape from <code>Font.glyph_shapes</code></li>
+  <li>Lazy-build triangles from glyph outlines (cached in <code>Font.glyph_triangles</code> after first use)</li>
+  <li>For each triangle: apply position, scale, and transform &rarr; call <code>drawGeometry()</code></li>
+  <li>Advance X cursor by glyph's <code>advance_width</code> (scaled to render size)</li>
+</ol>
+
+<p><strong>Y-flip note:</strong> Text rendering flips Y (<code>y = -y * scale + y_pos</code>) because glyph coordinates use math convention (Y+ up) while screen coordinates use graphics convention (Y+ down).</p>
+
+<div class="links">
+  <a href="#renderer-api">Renderer (drawText)</a>
+  <a href="#triangulation">Triangulation (glyph outlines)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TRIANGULATION -->
+<!-- ============================================================ -->
+<section id="triangulation">
+<h2>Triangulation</h2>
+<p>Converts arbitrary polygons to triangles for GPU rendering. Two algorithms: monotone partition (general polygons) and ear clipping (font glyphs).</p>
+
+<h3>Monotone Polygon Partition <span style="color:#8b949e; font-size: 0.85rem; font-weight: 400;">(src/renderer/triangulation.zig)</span></h3>
+<div class="card leaf">
+  <div class="card-name c-green">triangulate()</div>
+  <div class="fields">
+    <span class="fn">triangulate</span>(allocator, points) &rarr; <span class="ft">[][3]Point</span><br>
+    <span class="fc">Returns counter-clockwise oriented triangles</span><br>
+    <span class="fc">Handles degenerate cases (&lt; 3 vertices)</span>
+  </div>
+</div>
+
+<p>Algorithm steps:</p>
+<ol class="flow-list">
+  <li>Classify each vertex as <code>Start</code>, <code>End</code>, <code>Split</code>, <code>Merge</code>, or <code>Regular</code></li>
+  <li>Sort vertices by Y coordinate (sweep-line)</li>
+  <li>Maintain active edge set, generate diagonals to partition into monotone pieces</li>
+  <li>Triangulate each monotone piece with a stack-based algorithm</li>
+</ol>
+
+<h3>Ear Clipping <span style="color:#8b949e; font-size: 0.85rem; font-weight: 400;">(src/assets/font/ear_clipping.zig)</span></h3>
+<div class="card leaf">
+  <div class="card-name c-green">EarClipper</div>
+  <div class="fields">
+    <span class="fn">triangulate</span>(contours) &rarr; <span class="ft">[]Triangle</span><br>
+    <span class="fc">Handles outer contours + holes (bridges holes via rightmost vertex)</span><br>
+    <span class="fc">Classifies vertices as convex/reflex, clips ear tips iteratively</span><br>
+    <span class="fc">Used for font glyph triangulation (complex multi-contour shapes)</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#shapes">Polygon (uses triangulation)</a>
+  <a href="#text">Text (glyph triangulation)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- METAL RENDERER -->
+<!-- ============================================================ -->
+<section id="metal-renderer">
+<h2>MetalRenderer</h2>
+<p>The active GPU backend. Manages Metal device, pipelines, and frame submission. <code>src/renderer/gpu/metal/MetalRenderer.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">MetalRenderer</div>
+  <div class="fields">
+    <span class="fl">Metal Objects</span>
+    <span class="fp">device</span>: <span class="ft">*MTLDevice</span><br>
+    <span class="fp">command_queue</span>: <span class="ft">*MTLCommandQueue</span><br>
+    <span class="fp">layer</span>: <span class="ft">*CAMetalLayer</span><br>
+    <span class="fp">current_drawable</span>: <span class="ft">?*CAMetalDrawable</span><br>
+    <span class="fp">current_command_buffer</span>: <span class="ft">?*MTLCommandBuffer</span><br>
+    <span class="fl">Geometry Pipeline</span>
+    <span class="fp">pipeline_state</span>: <span class="ft">*MTLRenderPipelineState</span><br>
+    <span class="fp">vertex_buffer</span>: <span class="ft">*MTLBuffer</span> <span class="fc">// 12MB shared memory</span><br>
+    <span class="fp">vertex_buffer_size</span>: <span class="ft">usize</span><br>
+    <span class="fp">batch</span>: <span class="ft">GeometryBatch</span><br>
+    <span class="fl">Texture Pipeline</span>
+    <span class="fp">texture_pipeline_state</span>: <span class="ft">*MTLRenderPipelineState</span><br>
+    <span class="fp">texture_vertex_buffer</span>: <span class="ft">*MTLBuffer</span><br>
+    <span class="fp">texture_batch</span>: <span class="ft">TextureBatch</span><br>
+    <span class="fl">State</span>
+    <span class="fp">width</span> / <span class="fp">height</span>: <span class="ft">u32</span> &nbsp;
+    <span class="fp">scale_factor</span>: <span class="ft">f32</span><br>
+    <span class="fp">clear_color</span>: <span class="ft">Color</span> &nbsp;
+    <span class="fp">frame_number</span>: <span class="ft">u64</span><br>
+    <span class="fp">start_time</span> / <span class="fp">last_frame_time</span>: <span class="ft">f64</span><br>
+    <span class="fl">Lifecycle</span>
+    <span class="fn">init</span>(alloc, config) &rarr; <span class="ft">MetalRenderer</span><br>
+    <span class="fn">deinit</span>()<br>
+    <span class="fl">Frame</span>
+    <span class="fn">beginFrame</span>() <span class="fc">// clear batch, get drawable, create cmd buffer</span><br>
+    <span class="fn">endFrame</span>() <span class="fc">// flush batch, present, commit</span><br>
+    <span class="fn">resize</span>(w, h) <span class="fc">// TODO</span><br>
+    <span class="fl">Drawing</span>
+    <span class="fn">drawShape</span>(shape, xform, fill, stroke, width, ctx) <span class="fc">// auto-flushes if near capacity</span><br>
+    <span class="fn">drawTexturedQuad</span>() <span class="fc">// stub</span>
+  </div>
+</div>
+
+<h3>Initialization Flow</h3>
+<ol class="flow-list">
+  <li>Create <code>MTLDevice</code> (system default GPU)</li>
+  <li>Create <code>MTLCommandQueue</code> from device</li>
+  <li>Get <code>CAMetalLayer</code> from platform window handle</li>
+  <li>Load compiled <code>.metallib</code> shader library from disk</li>
+  <li>Create geometry pipeline: <code>vertex_main</code> + <code>fragment_main</code></li>
+  <li>Create texture pipeline: <code>texture_vertex_main</code> + <code>texture_fragment_main</code> (with alpha blending)</li>
+  <li>Allocate 12MB shared <code>MTLBuffer</code> for vertex data</li>
+</ol>
+
+<div class="links">
+  <a href="#geometry-batch">GeometryBatch</a>
+  <a href="#texture-batch">TextureBatch</a>
+  <a href="#metal-types">Metal Types &amp; Bridge</a>
+  <a href="#pipeline">Frame Pipeline</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- GEOMETRY BATCH -->
+<!-- ============================================================ -->
+<section id="geometry-batch">
+<h2>GeometryBatch</h2>
+<p>Accumulates all shape vertices and draw calls for a frame, then submits them in a single GPU pass. <code>src/renderer/gpu/metal/GeometryBatch.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">GeometryBatch</div>
+  <div class="fields">
+    <span class="fp">vertices</span>: <span class="ft">ArrayList(Vertex)</span> <span class="fc">// all vertices for the frame</span><br>
+    <span class="fp">draw_calls</span>: <span class="ft">ArrayList(DrawCall)</span> <span class="fc">// GPU draw commands</span><br>
+    <span class="fl">Methods</span>
+    <span class="fn">init</span>(alloc) &nbsp; <span class="fn">deinit</span>() &nbsp; <span class="fn">clear</span>()<br>
+    <span class="fn">addShape</span>(shape, xform, fill, stroke, width, ctx) <span class="fc">// dispatches to per-shape handler</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">DrawCall</div>
+  <div class="fields">
+    <span class="fp">primitive_type</span>: <span class="ft">MTLPrimitiveType</span> <span class="fc">// .triangle or .line</span><br>
+    <span class="fp">vertex_start</span>: <span class="ft">u32</span><br>
+    <span class="fp">vertex_count</span>: <span class="ft">u32</span>
+  </div>
+</div>
+
+<h3>Per-Shape Vertex Generation</h3>
+<p>Each shape handler builds vertices in clip space and creates draw calls. Fill and outline are separate draw call groups.</p>
+
+<table>
+  <tr><th>Shape</th><th>Fill Vertices</th><th>Outline Vertices</th><th>Fill Calls</th><th>Outline Calls</th></tr>
+  <tr><td>Line</td><td class="num">&mdash;</td><td class="num">2</td><td class="num">&mdash;</td><td class="num">1</td></tr>
+  <tr><td>Triangle</td><td class="num">3</td><td class="num">6</td><td class="num">1</td><td class="num">3</td></tr>
+  <tr><td>Rectangle</td><td class="num">6 (2 tris)</td><td class="num">8</td><td class="num">2</td><td class="num">4</td></tr>
+  <tr><td>Circle (32 seg)</td><td class="num">96 (fan)</td><td class="num">64</td><td class="num">32</td><td class="num">32</td></tr>
+  <tr><td>Polygon (n-sided)</td><td class="num">tri_count &times; 3</td><td class="num">n &times; 2</td><td class="num">tri_count</td><td class="num">n</td></tr>
+</table>
+
+<h3>Vertex Building</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fn">makeVertex</span>(point, xform, ctx, color) &rarr; <span class="ft">Vertex</span><br>
+    <span class="fc">WorldPoint &rarr; apply transform &rarr; worldToClipSpace &rarr; Vertex{ position, color }</span><br><br>
+    <span class="fn">makeScreenVertex</span>(point, xform, ctx, color) &rarr; <span class="ft">Vertex</span><br>
+    <span class="fc">ScreenPoint &rarr; apply screen offset &rarr; screenToClipSpace &rarr; Vertex{ position, color }</span>
+  </div>
+</div>
+
+<h3>Batching Strategy</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">All shapes &rarr; single vertex buffer &rarr; single render pass</span><br>
+    <span class="fc">Draw calls issued in submission order (painter's algorithm, no depth testing)</span><br>
+    <span class="fc">Auto-flush when approaching 12MB vertex buffer limit</span><br>
+    <span class="fc">Estimated ~96 vertices per shape (conservative, for capacity checks)</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#metal-renderer">MetalRenderer</a>
+  <a href="#metal-types">Vertex format</a>
+  <a href="#vertex-budget">Vertex Budget</a>
+  <a href="#shapes">Shapes</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TEXTURE BATCH -->
+<!-- ============================================================ -->
+<section id="texture-batch">
+<h2>TextureBatch</h2>
+<p>Batches textured quad draw calls. Used for sprite/image rendering. <code>src/renderer/gpu/metal/texture_batch.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">TextureBatch</div>
+  <div class="fields">
+    <span class="fp">vertices</span>: <span class="ft">ArrayList(TextureVertex)</span><br>
+    <span class="fp">draw_calls</span>: <span class="ft">ArrayList(TextureDrawCall)</span><br>
+    <span class="fn">init</span>(alloc) &nbsp; <span class="fn">deinit</span>() &nbsp; <span class="fn">clear</span>()<br>
+    <span class="fn">addSprite</span>(texture, clip_corners, uvs) <span class="fc">// 6 vertices (2 triangles), 1 draw call</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">TextureDrawCall</div>
+  <div class="fields">
+    <span class="fp">texture</span>: <span class="ft">*MTLTexture</span><br>
+    <span class="fp">vertex_start</span>: <span class="ft">u32</span><br>
+    <span class="fp">vertex_count</span>: <span class="ft">u32</span> = 6 <span class="fc">// always a quad (2 triangles)</span>
+  </div>
+</div>
+
+<p>Each sprite gets 4 clip-space corners (TL, TR, BL, BR) and 4 UV coordinates, expanded to 6 vertices (2 triangles). The texture pipeline uses alpha blending (<code>src * srcAlpha + dst * (1 - srcAlpha)</code>).</p>
+
+<div class="links">
+  <a href="#metal-renderer">MetalRenderer</a>
+  <a href="#shaders">Texture Shader</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- METAL TYPES & BRIDGE -->
+<!-- ============================================================ -->
+<section id="metal-types">
+<h2>Metal Types &amp; Bridge</h2>
+<p>Type definitions and the Zig-to-Swift interop layer. <code>src/renderer/gpu/metal/metal_types.zig</code> + <code>metal_bridge.zig</code></p>
+
+<h3>Vertex Formats</h3>
+<div class="card child">
+  <div class="card-name c-purple">Vertex (extern struct)</div>
+  <div class="fields">
+    <span class="fp">position</span>: <span class="ft">[2]f32</span> <span class="fc">// clip space [-1, 1]</span><br>
+    <span class="fp">color</span>: <span class="ft">[4]f32</span> <span class="fc">// RGBA [0, 1]</span><br>
+    <span class="fc">Stride: 24 bytes (8 + 16)</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">TextureVertex (extern struct)</div>
+  <div class="fields">
+    <span class="fp">position</span>: <span class="ft">[2]f32</span> <span class="fc">// clip space [-1, 1]</span><br>
+    <span class="fp">texcoord</span>: <span class="ft">[2]f32</span> <span class="fc">// UV [0, 1]</span><br>
+    <span class="fc">Stride: 16 bytes (8 + 8)</span>
+  </div>
+</div>
+
+<h3>Metal Enums</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">MTLPrimitiveType</span>: point(0), line(1), lineStrip(2), triangle(3), triangleStrip(4)<br>
+    <span class="ft">MTLPixelFormat</span>: rgba8Unorm(70), bgra8Unorm(80), rgba16Float(115), rgba32Float(125)<br>
+    <span class="ft">MTLLoadAction</span>: dontCare(0), load(1), clear(2)<br>
+    <span class="ft">MTLStoreAction</span>: dontCare(0), store(1), multisampleResolve(2)<br>
+    <span class="ft">MTLResourceOptions</span>: storageModeShared(0x00)
+  </div>
+</div>
+
+<h3>Opaque Handles</h3>
+<p>Metal objects are opaque pointers passed between Zig and Swift:</p>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">MTLDevice</span>, <span class="ft">MTLCommandQueue</span>, <span class="ft">MTLCommandBuffer</span>, <span class="ft">MTLRenderCommandEncoder</span><br>
+    <span class="ft">MTLRenderPipelineState</span>, <span class="ft">MTLBuffer</span>, <span class="ft">MTLTexture</span>, <span class="ft">MTLLibrary</span>, <span class="ft">MTLFunction</span><br>
+    <span class="ft">CAMetalLayer</span>, <span class="ft">CAMetalDrawable</span>, <span class="ft">MTLRenderPassDescriptor</span>
+  </div>
+</div>
+
+<h3>MetalBridge (Zig &harr; Swift)</h3>
+<p>Zig wrappers in <code>metal_bridge.zig</code> call <code>extern</code> C functions implemented in <code>MetalBridge.swift</code> via <code>@_cdecl</code>.</p>
+
+<div class="card ext">
+  <div class="card-name c-orange">MetalBridge</div>
+  <div class="fields">
+    <span class="fl">Device &amp; Queue</span>
+    <span class="fn">createDevice</span>() &rarr; <span class="ft">*MTLDevice</span><br>
+    <span class="fn">createCommandQueue</span>(device) &rarr; <span class="ft">*MTLCommandQueue</span><br>
+    <span class="fn">createCommandBuffer</span>(queue) &rarr; <span class="ft">*MTLCommandBuffer</span><br>
+    <span class="fl">Layer &amp; Drawable</span>
+    <span class="fn">getLayerFromView</span>(window_handle) &rarr; <span class="ft">*CAMetalLayer</span><br>
+    <span class="fn">layerNextDrawable</span>(layer) &rarr; <span class="ft">*CAMetalDrawable</span><br>
+    <span class="fn">drawableGetTexture</span>(drawable) &rarr; <span class="ft">*MTLTexture</span><br>
+    <span class="fl">Buffers</span>
+    <span class="fn">createBuffer</span>(device, length, options) &rarr; <span class="ft">*MTLBuffer</span><br>
+    <span class="fn">bufferContents</span>(buffer) &rarr; <span class="ft">*anyopaque</span><br>
+    <span class="fn">bufferLength</span>(buffer) &rarr; <span class="ft">u64</span><br>
+    <span class="fl">Shaders &amp; Pipelines</span>
+    <span class="fn">createLibraryFromFile</span>(device, path) &rarr; <span class="ft">*MTLLibrary</span><br>
+    <span class="fn">createFunction</span>(library, name) &rarr; <span class="ft">*MTLFunction</span><br>
+    <span class="fn">createRenderPipelineState</span>(device, vert_fn, frag_fn, pixel_fmt) &rarr; <span class="ft">*MTLRenderPipelineState</span><br>
+    <span class="fn">createTexturePipelineState</span>(...) &rarr; <span class="ft">*MTLRenderPipelineState</span><br>
+    <span class="fl">Rendering</span>
+    <span class="fn">createRenderPassDescriptor</span>() &rarr; <span class="ft">*MTLRenderPassDescriptor</span><br>
+    <span class="fn">renderPassSetColorAttachment</span>(desc, texture, load, store, r, g, b, a)<br>
+    <span class="fn">createRenderEncoder</span>(cmd_buf, pass_desc) &rarr; <span class="ft">*MTLRenderCommandEncoder</span><br>
+    <span class="fn">setPipelineState</span>(encoder, pipeline)<br>
+    <span class="fn">setVertexBuffer</span>(encoder, buffer, offset, index)<br>
+    <span class="fn">drawPrimitives</span>(encoder, type, start, count)<br>
+    <span class="fn">endEncoding</span>(encoder)<br>
+    <span class="fn">commit</span>(cmd_buf) &nbsp; <span class="fn">presentDrawable</span>(cmd_buf, drawable)<br>
+    <span class="fl">Texturing</span>
+    <span class="fn">createTexture</span>(device, w, h) &rarr; <span class="ft">*MTLTexture</span> <span class="fc">// RGBA8Unorm, .shared</span><br>
+    <span class="fn">textureReplaceRegion</span>(texture, w, h, data, bytes_per_row)<br>
+    <span class="fn">setFragmentTexture</span>(encoder, texture, index)
+  </div>
+</div>
+
+<h3>Error Types</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">MetalError</span>: DeviceCreationFailed, CommandQueueCreationFailed, CommandBufferCreationFailed,<br>
+    BufferCreationFailed, BufferContentsUnavailable, LibraryCreationFailed, FunctionNotFound,<br>
+    PipelineCreationFailed, ShaderPathError, LayerUnavailable, DrawableUnavailable,<br>
+    TextureUnavailable, TextureCreationFailed, RenderPassCreationFailed, RenderEncoderCreationFailed
+  </div>
+</div>
+
+<div class="links">
+  <a href="#metal-renderer">MetalRenderer</a>
+  <a href="#shaders">Shaders</a>
+  <a href="#geometry-batch">GeometryBatch</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SHADERS -->
+<!-- ============================================================ -->
+<section id="shaders">
+<h2>Shaders</h2>
+<p>Two render pipelines defined in <code>src/platform/macos/swift/shaders.metal</code>. Compiled to <code>.metallib</code> at build time.</p>
+
+<h3>Geometry Pipeline</h3>
+<div class="card ext">
+  <div class="card-name c-orange">vertex_main + fragment_main</div>
+  <div class="fields">
+    <span class="fl">Input (VertexIn)</span>
+    <span class="fp">position</span>: <span class="ft">float2</span> [[attribute(0)]] <span class="fc">// clip space</span><br>
+    <span class="fp">color</span>: <span class="ft">float4</span> [[attribute(1)]] <span class="fc">// RGBA</span><br>
+    <span class="fl">Vertex Shader</span>
+    <span class="fc">position &rarr; float4(position, 0.0, 1.0)</span> <span class="fc">// Z=0 (ortho), W=1</span><br>
+    <span class="fc">color &rarr; pass through</span><br>
+    <span class="fl">Fragment Shader</span>
+    <span class="fc">return input.color</span> <span class="fc">// no textures, no lighting</span>
+  </div>
+</div>
+
+<h3>Texture Pipeline</h3>
+<div class="card ext">
+  <div class="card-name c-orange">texture_vertex_main + texture_fragment_main</div>
+  <div class="fields">
+    <span class="fl">Input (TextureVertexIn)</span>
+    <span class="fp">position</span>: <span class="ft">float2</span> [[attribute(0)]]<br>
+    <span class="fp">texcoord</span>: <span class="ft">float2</span> [[attribute(1)]]<br>
+    <span class="fl">Vertex Shader</span>
+    <span class="fc">position &rarr; float4(position, 0.0, 1.0)</span><br>
+    <span class="fc">texcoord &rarr; pass through</span><br>
+    <span class="fl">Fragment Shader</span>
+    <span class="fc">constexpr sampler(mag_filter::nearest, min_filter::nearest)</span><br>
+    <span class="fc">return tex.sample(sampler, texcoord)</span> <span class="fc">// nearest-neighbor (pixel-perfect)</span><br>
+    <span class="fl">Blending (set in pipeline descriptor)</span>
+    <span class="fc">dst = src * srcAlpha + dst * (1 - srcAlpha)</span> <span class="fc">// standard alpha blend</span>
+  </div>
+</div>
+
+<h3>Swift Pipeline Setup</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Geometry Vertex Descriptor</span>
+    Attribute 0: float2 at offset 0 &nbsp; Attribute 1: float4 at offset 8 &nbsp; Stride: 24 bytes<br>
+    <span class="fl">Texture Vertex Descriptor</span>
+    Attribute 0: float2 at offset 0 &nbsp; Attribute 1: float2 at offset 8 &nbsp; Stride: 16 bytes<br>
+    <span class="fl">Texture Storage</span>
+    Format: RGBA8Unorm &nbsp; Usage: .shaderRead &nbsp; Storage: .shared (CPU+GPU)
+  </div>
+</div>
+
+<div class="links">
+  <a href="#metal-types">Metal Types</a>
+  <a href="#metal-renderer">MetalRenderer</a>
+  <a href="#geometry-batch">GeometryBatch</a>
+  <a href="#texture-batch">TextureBatch</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- COLOR SYSTEM -->
+<!-- ============================================================ -->
+<section id="color">
+<h2>Color System</h2>
+<p>Dual-representation color with RGBA and HSVA always in sync. 1800+ predefined colors. <code>src/renderer/color.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">Color</div>
+  <div class="fields">
+    <span class="fp">rgba</span>: <span class="ft">Rgba</span>{ r, g, b, a: <span class="ft">u8</span> }<br>
+    <span class="fp">hsva</span>: <span class="ft">Hsva</span>{ h, s, v, a: <span class="ft">f32</span> } <span class="fc">// always in sync with rgba</span><br>
+    <span class="fl">Constructors</span>
+    <span class="fn">initRgba</span>(r, g, b, a) &nbsp; <span class="fn">initHsva</span>(h, s, v, a) &nbsp; <span class="fn">initFromHex</span>(str) &nbsp; <span class="fn">initFromU32Hex</span>(u32)<br>
+    <span class="fl">Immutable Modifiers (return new Color)</span>
+    <span class="fn">withRed</span> / <span class="fn">withGreen</span> / <span class="fn">withBlue</span> / <span class="fn">withAlpha</span><br>
+    <span class="fn">withHue</span> / <span class="fn">withSaturation</span> / <span class="fn">withBrightness</span> / <span class="fn">withOpacity</span><br>
+    <span class="fl">Classification</span>
+    <span class="fn">hue</span>() &rarr; <span class="ft">Hue</span> &nbsp; <span class="fn">tone</span>() &rarr; <span class="ft">Tone</span> &nbsp; <span class="fn">saturation</span>() &rarr; <span class="ft">Saturation</span> &nbsp; <span class="fn">temperature</span>() &rarr; <span class="ft">Temperature</span>
+  </div>
+</div>
+
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Submodules</span>
+    <span class="ft">Colors</span> <span class="fc">// 1800+ predefined colors (e.g. Colors.red, Colors.cornflower_blue)</span><br>
+    <span class="ft">ColorLibrary</span> <span class="fc">// lookup by name, filter by hue/tone/family</span><br>
+    <span class="ft">math</span> <span class="fc">// conversions (HSV&harr;RGB), distance, lerp, hue shift</span><br>
+    <span class="ft">generators</span> <span class="fc">// programmatic color generation</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#renderer-api">Renderer</a>
+  <a href="#geometry-batch">GeometryBatch (colorToFloat)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- VERTEX BUDGET -->
+<!-- ============================================================ -->
+<section id="vertex-budget">
+<h2>Vertex Budget</h2>
+<p>Understanding the limits of the current batching system.</p>
+
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Buffer Size</span>
+    MAX_VERT_SIZE = 1024 &times; 1024 &times; 12 = <strong>12,582,912 bytes</strong> (12MB)<br>
+    <span class="fl">Geometry Vertex</span>
+    24 bytes per vertex (8 position + 16 color)<br>
+    <span class="fc">Max vertices per frame: ~524,288</span><br>
+    <span class="fl">Texture Vertex</span>
+    16 bytes per vertex (8 position + 8 texcoord)<br>
+    <span class="fc">Max textured vertices per frame: ~786,432</span><br>
+    <span class="fl">Practical Limits (geometry only)</span>
+    Circles (32 segments, fill+outline): ~160 verts &rarr; ~3,276 circles/frame<br>
+    Rectangles (fill+outline): ~14 verts &rarr; ~37,449 rects/frame<br>
+    Triangles (fill+outline): ~9 verts &rarr; ~58,254 triangles/frame
+  </div>
+</div>
+
+<h3>Key Design Notes</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">No depth testing &mdash; painter's algorithm (draw order = submission order)</span><br>
+    <span class="fc">No instancing &mdash; each shape gets unique vertices</span><br>
+    <span class="fc">No compute shaders &mdash; all geometry built on CPU</span><br>
+    <span class="fc">All triangles are counter-clockwise (CCW front-facing)</span><br>
+    <span class="fc">Circle segments fixed at 32 (TODO: adaptive based on screen size)</span><br>
+    <span class="fc">Single render pass per frame (geometry), second pass for textures (when used)</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#geometry-batch">GeometryBatch</a>
+  <a href="#metal-renderer">MetalRenderer</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- BACK TO TOP -->
+<!-- ============================================================ -->
+<p style="margin-top: 3rem; text-align: center;">
+  <a href="#top" style="color: #484f58; font-size: 0.85rem;">&uarr; back to top</a>
+</p>
+
+</body>
+</html>

@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scene Editor — Implementation Plan</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0f1117;
+    color: #c9d1d9;
+    line-height: 1.6;
+    padding: 40px 20px;
+  }
+
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid #30363d;
+    padding-bottom: 32px;
+    margin-bottom: 48px;
+  }
+  header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #e6edf3;
+    letter-spacing: -0.5px;
+  }
+  header .subtitle {
+    color: #8b949e;
+    margin-top: 6px;
+    font-size: 1rem;
+  }
+  .tag {
+    display: inline-block;
+    background: #1f3a5f;
+    color: #58a6ff;
+    border: 1px solid #1f6feb;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  /* ── Big picture diagram ── */
+  .diagram {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 28px 32px;
+    margin: 32px 0;
+    font-family: "SF Mono", "Fira Mono", monospace;
+    font-size: 0.82rem;
+    color: #8b949e;
+    overflow-x: auto;
+  }
+  .diagram .hi { color: #58a6ff; }
+  .diagram .dim { color: #484f58; }
+  .diagram .grn { color: #3fb950; }
+  .diagram .ylw { color: #d29922; }
+
+  /* ── Phase sections ── */
+  .phase {
+    margin-bottom: 56px;
+  }
+  .phase-header {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .phase-number {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    color: #58a6ff;
+    text-transform: uppercase;
+    border: 1px solid #1f6feb;
+    border-radius: 4px;
+    padding: 3px 8px;
+    white-space: nowrap;
+  }
+  .phase-title {
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: #e6edf3;
+  }
+  .phase-subtitle {
+    color: #8b949e;
+    font-size: 0.9rem;
+    margin-top: -14px;
+    margin-bottom: 20px;
+    padding-left: 2px;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+  }
+  .card h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #e6edf3;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h3 .icon {
+    font-size: 1rem;
+  }
+
+  /* ── File pill ── */
+  .file {
+    display: inline-block;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: "SF Mono", "Fira Mono", monospace;
+    font-size: 0.78rem;
+    color: #79c0ff;
+    margin: 2px 2px 4px 0;
+  }
+  .file.new {
+    border-color: #238636;
+    color: #3fb950;
+  }
+  .file.edit {
+    border-color: #9e6a03;
+    color: #d29922;
+  }
+
+  /* ── Code blocks ── */
+  pre {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    font-family: "SF Mono", "Fira Mono", monospace;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: #c9d1d9;
+    margin: 12px 0;
+  }
+  pre .kw  { color: #ff7b72; }
+  pre .ty  { color: #ffa657; }
+  pre .fn  { color: #d2a8ff; }
+  pre .cm  { color: #484f58; font-style: italic; }
+  pre .st  { color: #a5d6ff; }
+  pre .nb  { color: #79c0ff; }
+  pre .op  { color: #ff7b72; }
+
+  /* ── Checklist ── */
+  .checklist {
+    list-style: none;
+    padding: 0;
+  }
+  .checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #21262d;
+    font-size: 0.9rem;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist .check {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #30363d;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .checklist .text { flex: 1; }
+  .checklist .text strong { color: #e6edf3; }
+  .checklist .text .note {
+    display: block;
+    font-size: 0.8rem;
+    color: #8b949e;
+    margin-top: 2px;
+  }
+
+  /* ── Two-col layout ── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 700px) {
+    .two-col { grid-template-columns: 1fr; }
+  }
+
+  /* ── Section label ── */
+  .section-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #8b949e;
+    margin-bottom: 8px;
+  }
+
+  /* ── Build order table ── */
+  .build-order {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+  .build-order th {
+    text-align: left;
+    padding: 8px 16px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .build-order td {
+    padding: 10px 16px;
+    border: 1px solid #21262d;
+    vertical-align: top;
+  }
+  .build-order tr:nth-child(even) td { background: #0d1117; }
+  .build-order .step-num {
+    font-family: "SF Mono", "Fira Mono", monospace;
+    font-weight: 700;
+    color: #58a6ff;
+  }
+  .build-order .step-name { color: #e6edf3; font-weight: 600; }
+  .build-order .step-note { color: #8b949e; font-size: 0.8rem; }
+
+  /* ── Out of scope ── */
+  .out-of-scope {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-left: 3px solid #484f58;
+    border-radius: 0 8px 8px 0;
+    padding: 16px 20px;
+  }
+  .out-of-scope h3 {
+    color: #8b949e;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+  }
+  .out-of-scope ul {
+    list-style: none;
+    padding: 0;
+  }
+  .out-of-scope li {
+    color: #6e7681;
+    font-size: 0.875rem;
+    padding: 3px 0;
+  }
+  .out-of-scope li::before {
+    content: "– ";
+    color: #484f58;
+  }
+
+  /* ── Callout ── */
+  .callout {
+    background: #0d2044;
+    border: 1px solid #1f6feb;
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 0.875rem;
+    color: #79c0ff;
+    margin: 12px 0;
+  }
+  .callout strong { color: #58a6ff; }
+
+  hr {
+    border: none;
+    border-top: 1px solid #21262d;
+    margin: 40px 0;
+  }
+
+  /* ── Inline code ── */
+  code {
+    font-family: "SF Mono", "Fira Mono", monospace;
+    font-size: 0.82em;
+    background: #21262d;
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: #79c0ff;
+  }
+
+  /* ── Property type table ── */
+  .prop-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+    margin: 10px 0;
+  }
+  .prop-table th {
+    text-align: left;
+    padding: 6px 12px;
+    background: #0d1117;
+    border: 1px solid #21262d;
+    color: #8b949e;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .prop-table td {
+    padding: 7px 12px;
+    border: 1px solid #21262d;
+    vertical-align: top;
+  }
+  .prop-table .ty { color: #ffa657; font-family: "SF Mono","Fira Mono",monospace; }
+  .prop-table .widget { color: #d2a8ff; }
+  .prop-table .out { color: #3fb950; font-family: "SF Mono","Fira Mono",monospace; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══════════════════════════════════════════
+       HEADER
+  ══════════════════════════════════════════ -->
+  <header>
+    <h1>Scene Editor <span class="tag">POC</span></h1>
+    <p class="subtitle">Implementation plan — the final link connecting ZixelArt → scene format → engine runtime</p>
+  </header>
+
+  <!-- ══════════════════════════════════════════
+       BIG PICTURE
+  ══════════════════════════════════════════ -->
+  <div class="diagram">
+<span class="hi">ZixelArt</span>  <span class="dim">──────────</span>  <span class="grn">.zxl files</span>
+                                       <span class="dim">↓</span>
+<span class="hi">Scene Editor</span>  <span class="dim">──</span>  <span class="grn">.scene files</span>  <span class="dim">──────────────────────</span>  <span class="hi">Engine / Player</span>
+    <span class="dim">↑  ↓</span>                                                         <span class="dim">↑</span>
+  <span class="ylw">Parse AST</span>                                                <span class="ylw">Instantiator</span>
+  <span class="ylw">Mutate AST</span>                                               <span class="ylw">ECS World</span>
+  <span class="ylw">Serialize back</span>
+
+<span class="dim">────────────────────────────────────────────────────────</span>
+
+  <span class="dim">[ Hierarchy ]</span>    <span class="dim">[ Viewport ]</span>    <span class="dim">[ Inspector ]</span>
+
+  <span class="grn">▸ GameScene</span>       <span class="hi">╔══════════╗</span>     <span class="ylw">Entity: "Bouncer"</span>
+    <span class="grn">Bouncer</span>  <span class="dim">●──▶</span>  <span class="hi">║  ●  ▪  █ ║</span>     <span class="dim">────────────────</span>
+    <span class="grn">Player</span>           <span class="hi">║          ║</span>     <span class="ylw">Transform</span>
+    <span class="grn">Wall</span>             <span class="hi">╚══════════╝</span>       <span class="dim">position  [0.0][0.0]</span>
+  <span class="dim">────────</span>            <span class="dim">click → select</span>     <span class="dim">scale     [1.0]</span>
+  <span class="grn">PlayerTemplate</span>                       <span class="ylw">Sprite:circle</span>
+                                         <span class="dim">radius    [2.0]</span>
+                                         <span class="dim">color     </span><span class="grn">■ #00FF00</span>
+</div>
+
+  <div class="callout">
+    <strong>The one new thing:</strong> a scene serializer (<code>writer.zig</code>). The parser, renderer, UI widgets, and ECS instantiator all already exist. Everything else is wiring.
+  </div>
+
+  <hr>
+
+  <!-- ══════════════════════════════════════════
+       PHASE 1 — SCAFFOLD
+  ══════════════════════════════════════════ -->
+  <div class="phase">
+    <div class="phase-header">
+      <span class="phase-number">Phase 1</span>
+      <span class="phase-title">Scaffold the executable</span>
+    </div>
+    <p class="phase-subtitle">Get a window open with three colored placeholder regions. Nothing functional yet.</p>
+
+    <div class="two-col">
+      <div class="card">
+        <h3><span class="icon">📄</span> New files</h3>
+        <span class="file new">src/tools/editor/main.zig</span>
+        <span class="file new">src/tools/editor/EditorState.zig</span>
+      </div>
+      <div class="card">
+        <h3><span class="icon">✏️</span> Edit files</h3>
+        <span class="file edit">build.zig</span>
+        <p style="font-size:0.82rem;color:#8b949e;margin-top:8px;">Add <code>editor</code> executable — same pattern as <code>zixelart</code>. Deps: <code>app</code>, <code>platform</code>, <code>renderer</code>, <code>ui</code>, <code>assets</code>, <code>scene-format</code>. No <code>engine</code> dep.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">🏗</span> EditorState — the central data model</h3>
+      <pre><span class="cm">// src/tools/editor/EditorState.zig</span>
+<span class="kw">const</span> <span class="ty">EditorState</span> = <span class="kw">struct</span> {
+    gpa:              Allocator,
+    scene_file:       ?*<span class="ty">SceneFile</span>,   <span class="cm">// parsed AST — null until file opened</span>
+    scene_path:       []<span class="kw">const</span> u8,   <span class="cm">// path on disk</span>
+    selected:         ?<span class="ty">EntityRef</span>,   <span class="cm">// which entity is clicked</span>
+    dirty:            <span class="ty">bool</span>,         <span class="cm">// unsaved changes</span>
+    camera_pos:       <span class="ty">V2</span>,           <span class="cm">// viewport pan</span>
+    camera_zoom:      <span class="ty">f32</span>,          <span class="cm">// viewport ortho_size</span>
+};
+
+<span class="cm">// Points into the AST without copying</span>
+<span class="kw">const</span> <span class="ty">EntityRef</span> = <span class="kw">struct</span> {
+    scene_idx:  ?<span class="ty">usize</span>,  <span class="cm">// null = top-level entity</span>
+    entity_idx: <span class="ty">usize</span>,   <span class="cm">// index within that scene's decls</span>
+};
+
+<span class="cm">// Methods</span>
+<span class="kw">pub fn</span> <span class="fn">init</span>(gpa: Allocator) <span class="ty">EditorState</span>
+<span class="kw">pub fn</span> <span class="fn">deinit</span>(self: *<span class="ty">EditorState</span>) <span class="ty">void</span>
+<span class="kw">pub fn</span> <span class="fn">loadFile</span>(self: *<span class="ty">EditorState</span>, path: []<span class="kw">const</span> u8) !<span class="ty">void</span>
+<span class="kw">pub fn</span> <span class="fn">save</span>(self: *<span class="ty">EditorState</span>) !<span class="ty">void</span>
+<span class="kw">pub fn</span> <span class="fn">getSelectedEntity</span>(self: *<span class="kw">const</span> <span class="ty">EditorState</span>) ?*<span class="ty">EntityDeclaration</span></pre>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">🖼</span> main.zig structure</h3>
+      <pre><span class="kw">pub fn</span> <span class="fn">main</span>(init: std.process.Init) !<span class="ty">void</span> {
+    <span class="kw">var</span> app = <span class="kw">try</span> App.<span class="fn">init</span>(gpa, io, .{
+        .title = <span class="st">"Scene Editor"</span>,
+        .width = <span class="nb">1920</span>, .height = <span class="nb">1080</span>,
+    });
+    <span class="kw">defer</span> app.<span class="fn">deinit</span>();
+
+    <span class="kw">var</span> state = <span class="ty">EditorState</span>.<span class="fn">init</span>(gpa);
+    <span class="kw">defer</span> state.<span class="fn">deinit</span>();
+
+    <span class="kw">var</span> ui_layer = <span class="ty">UILayer</span>.<span class="fn">init</span>(gpa);
+    ui_layer.<span class="fn">addView</span>(<span class="st">"hierarchy"</span>, .{ .x=<span class="nb">0</span>,    .y=<span class="nb">0</span>, .width=<span class="nb">280</span>,  .height=<span class="nb">1080</span> }, Hierarchy.<span class="fn">build</span>, .{});
+    ui_layer.<span class="fn">addView</span>(<span class="st">"inspector"</span>, .{ .x=<span class="nb">1620</span>, .y=<span class="nb">0</span>, .width=<span class="nb">300</span>,  .height=<span class="nb">1080</span> }, Inspector.<span class="fn">build</span>, .{});
+    <span class="cm">// Viewport is drawn directly each frame (not a UI view)</span>
+
+    <span class="kw">while</span> (app.<span class="fn">isRunning</span>()) {
+        <span class="kw">try</span> app.<span class="fn">beginFrame</span>();
+        app.renderer.<span class="fn">clear</span>();
+
+        <span class="fn">handleInput</span>(&amp;state, &amp;app);   <span class="cm">// Cmd+O, Cmd+S, scroll zoom</span>
+        <span class="fn">drawViewport</span>(&amp;state, &amp;app);  <span class="cm">// scene preview</span>
+        ui_layer.<span class="fn">update</span>(&amp;state, mouse_x, mouse_y, left_down, left_up);
+        ui_layer.<span class="fn">render</span>(&amp;app.renderer, &amp;font, ctx);
+
+        <span class="kw">try</span> app.<span class="fn">endFrame</span>();
+    }
+}</pre>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ══════════════════════════════════════════
+       PHASE 2 — SERIALIZER
+  ══════════════════════════════════════════ -->
+  <div class="phase">
+    <div class="phase-header">
+      <span class="phase-number">Phase 2</span>
+      <span class="phase-title">Scene serializer</span>
+    </div>
+    <p class="phase-subtitle">The only truly new functionality. Build and test this in isolation first — everything else depends on it.</p>
+
+    <div class="card">
+      <h3><span class="icon">📄</span> New file</h3>
+      <span class="file new">src/scene-format/writer.zig</span>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">⚙️</span> Function signatures</h3>
+      <pre><span class="cm">// Top-level entry — pass any std.io.Writer</span>
+<span class="kw">pub fn</span> <span class="fn">serialize</span>(scene: *<span class="kw">const</span> <span class="ty">SceneFile</span>, writer: anytype) !<span class="ty">void</span>
+
+<span class="cm">// One per declaration type, called recursively</span>
+<span class="kw">fn</span> <span class="fn">writeDeclaration</span>(decl: *<span class="kw">const</span> <span class="ty">Declaration</span>,   writer: anytype, indent: <span class="ty">u32</span>) !<span class="ty">void</span>
+<span class="kw">fn</span> <span class="fn">writeEntity</span>      (e: *<span class="kw">const</span> <span class="ty">EntityDeclaration</span>, writer: anytype, indent: <span class="ty">u32</span>) !<span class="ty">void</span>
+<span class="kw">fn</span> <span class="fn">writeScene</span>       (s: *<span class="kw">const</span> <span class="ty">SceneDeclaration</span>,  writer: anytype, indent: <span class="ty">u32</span>) !<span class="ty">void</span>
+<span class="kw">fn</span> <span class="fn">writeTemplate</span>    (t: *<span class="kw">const</span> <span class="ty">TemplateDeclaration</span>,writer: anytype, indent: <span class="ty">u32</span>) !<span class="ty">void</span>
+<span class="kw">fn</span> <span class="fn">writeAsset</span>       (a: *<span class="kw">const</span> <span class="ty">AssetDeclaration</span>,  writer: anytype, indent: <span class="ty">u32</span>) !<span class="ty">void</span>
+<span class="kw">fn</span> <span class="fn">writeComponent</span>   (c: *<span class="kw">const</span> <span class="ty">ComponentDeclaration</span>,writer: anytype,indent: <span class="ty">u32</span>) !<span class="ty">void</span>
+<span class="kw">fn</span> <span class="fn">writeGenericBlock</span>(b: *<span class="kw">const</span> <span class="ty">GenericBlock</span>,     writer: anytype, indent: <span class="ty">u32</span>) !<span class="ty">void</span>
+<span class="kw">fn</span> <span class="fn">writeSpriteBlock</span> (b: *<span class="kw">const</span> <span class="ty">SpriteBlock</span>,      writer: anytype, indent: <span class="ty">u32</span>) !<span class="ty">void</span>
+<span class="kw">fn</span> <span class="fn">writeProperty</span>    (p: *<span class="kw">const</span> <span class="ty">Property</span>,         writer: anytype, indent: <span class="ty">u32</span>) !<span class="ty">void</span>
+<span class="kw">fn</span> <span class="fn">writeValue</span>       (v: *<span class="kw">const</span> <span class="ty">Value</span>, base: <span class="ty">BaseType</span>, writer: anytype) !<span class="ty">void</span>
+<span class="kw">fn</span> <span class="fn">writeIndent</span>       (writer: anytype, indent: <span class="ty">u32</span>) !<span class="ty">void</span>  <span class="cm">// writes N*"  "</span></pre>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">📐</span> Output format rules</h3>
+      <div class="two-col">
+        <div>
+          <div class="section-label">Declaration headers</div>
+          <pre>[EntityName:entity]
+[SpriteName:asset font]
+[TemplateName:template]
+[SceneName:scene]
+  [ChildEntity:entity]</pre>
+        </div>
+        <div>
+          <div class="section-label">Value formats</div>
+          <pre>vec2:   {1.0, 2.0}
+vec3:   {1.0, 2.0, 0.0}
+color:  #RRGGBB
+bool:   true / false
+f32:    1.0  <span class="cm">(always decimal)</span>
+string: "value"</pre>
+        </div>
+      </div>
+      <div class="section-label" style="margin-top:14px;">Special: Sprite/Collider (has shape type)</div>
+      <pre>[Sprite:circle]         <span class="cm">// not [Sprite]</span>
+  radius:f32 2.0
+  fill_color:color #00FF00</pre>
+    </div>
+
+    <div class="callout">
+      <strong>Test this standalone:</strong> parse an existing <code>.scene</code> file → serialize → parse again → assert the two ASTs are equal. No editor needed.
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ══════════════════════════════════════════
+       PHASE 3 — HIERARCHY
+  ══════════════════════════════════════════ -->
+  <div class="phase">
+    <div class="phase-header">
+      <span class="phase-number">Phase 3</span>
+      <span class="phase-title">Hierarchy panel</span>
+    </div>
+    <p class="phase-subtitle">Left panel. Lists all entities/scenes/templates. Clicking selects.</p>
+
+    <div class="two-col">
+      <div class="card">
+        <h3><span class="icon">📄</span> New file</h3>
+        <span class="file new">src/tools/editor/Hierarchy.zig</span>
+        <pre style="margin-top:12px;"><span class="cm">// Must match UILayer's BuildFn signature</span>
+<span class="kw">pub fn</span> <span class="fn">build</span>(
+    gpa: Allocator,
+    state_ptr: ?*<span class="kw">const</span> anyopaque,
+) *<span class="ty">WidgetNode</span></pre>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🎨</span> Visual layout</h3>
+        <pre>┌──────────────────────────┐
+│ [ Open File ]  [ Save ]  │
+│ ─────────────────────── │
+│ ▸ GameScene              │
+│     Bouncer         ●    │  ← selected
+│     Player               │
+│     Wall                 │
+│ ─────────────────────── │
+│   PlayerTemplate         │
+└──────────────────────────┘</pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">⚙️</span> Build logic</h3>
+      <ul class="checklist">
+        <li>
+          <div class="check"></div>
+          <div class="text">
+            <strong>Cast state_ptr</strong> to <code>*EditorState</code>
+            <span class="note">If <code>scene_file == null</code> → return a single label: "No file loaded — Cmd+O to open"</span>
+          </div>
+        </li>
+        <li>
+          <div class="check"></div>
+          <div class="text">
+            <strong>Top row</strong> — <code>hstack</code> of two buttons: "Open" and "Save*" (asterisk when dirty)
+          </div>
+        </li>
+        <li>
+          <div class="check"></div>
+          <div class="text">
+            <strong>Walk <code>scene_file.decls</code></strong> — for each <code>.scene</code> emit a header label, then its child entities as indented chicklets
+          </div>
+        </li>
+        <li>
+          <div class="check"></div>
+          <div class="text">
+            <strong>Top-level <code>.entity</code></strong> → chicklet at root indent level
+          </div>
+        </li>
+        <li>
+          <div class="check"></div>
+          <div class="text">
+            <strong><code>.template</code></strong> → chicklet below a "Templates" divider
+            <span class="note">Read-only for POC — just shows name</span>
+          </div>
+        </li>
+        <li>
+          <div class="check"></div>
+          <div class="text">
+            <strong><code>is_selected</code></strong> on each chicklet → compare its <code>EntityRef</code> to <code>state.selected</code>
+          </div>
+        </li>
+        <li>
+          <div class="check"></div>
+          <div class="text">
+            <strong><code>on_click</code></strong> → set <code>state.selected</code> to this entity's <code>EntityRef</code>
+            <span class="note">Use a file-level global <code>var g_state: *EditorState</code> to capture — same pattern as ZixelArt toolbar</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ══════════════════════════════════════════
+       PHASE 4 — INSPECTOR
+  ══════════════════════════════════════════ -->
+  <div class="phase">
+    <div class="phase-header">
+      <span class="phase-number">Phase 4</span>
+      <span class="phase-title">Inspector panel</span>
+    </div>
+    <p class="phase-subtitle">Right panel. Shows component properties for the selected entity. Read-only labels first, then wire up mutation.</p>
+
+    <div class="card">
+      <h3><span class="icon">📄</span> New file</h3>
+      <span class="file new">src/tools/editor/Inspector.zig</span>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">🎨</span> Layout per selected entity</h3>
+      <pre>Entity: "Bouncer"
+─────────────────────────
+Transform
+  position   [──●──] [──●──]   ← vec2: two sliders
+  rotation   [──●──]           ← f32: one slider
+  scale      [──●──]
+
+Sprite:circle
+  radius     [──●──]
+  fill_color  ■ #00FF00        ← color swatch + hex
+  visible    [ ✓ ]             ← bool toggle button
+─────────────────────────
+Velocity
+  linear     [──●──] [──●──]</pre>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">⚙️</span> Property row builders — one per Value type</h3>
+      <table class="prop-table">
+        <tr>
+          <th>AST Value type</th>
+          <th>Widget to use</th>
+          <th>Output format</th>
+        </tr>
+        <tr>
+          <td><span class="ty">.number</span> (f32/i32)</td>
+          <td><span class="widget">slider</span> — min/max default ±100</td>
+          <td><span class="out">numberRow(gpa, name, value)</span></td>
+        </tr>
+        <tr>
+          <td><span class="ty">.vector</span> len=2</td>
+          <td>2× <span class="widget">slider</span> side by side</td>
+          <td><span class="out">vec2Row(gpa, name, x, y)</span></td>
+        </tr>
+        <tr>
+          <td><span class="ty">.vector</span> len=3</td>
+          <td>2× <span class="widget">slider</span> (x,y only — z ignored for pos)</td>
+          <td><span class="out">vec3Row(gpa, name, x, y, z)</span></td>
+        </tr>
+        <tr>
+          <td><span class="ty">.color</span></td>
+          <td><span class="widget">colorRect</span> swatch + label</td>
+          <td><span class="out">colorRow(gpa, name, u32)</span></td>
+        </tr>
+        <tr>
+          <td><span class="ty">.boolean</span></td>
+          <td><span class="widget">button</span> toggles true/false</td>
+          <td><span class="out">boolRow(gpa, name, bool)</span></td>
+        </tr>
+        <tr>
+          <td><span class="ty">.string</span></td>
+          <td><span class="widget">label</span> — read-only for POC</td>
+          <td><span class="out">stringRow(gpa, name, str)</span></td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">🔄</span> Mutation — wiring slider → AST</h3>
+      <pre><span class="cm">// After ui_layer.update() each frame in main.zig:</span>
+<span class="kw">fn</span> <span class="fn">flushInspectorChanges</span>(ui: *<span class="ty">UILayer</span>, state: *<span class="ty">EditorState</span>) <span class="ty">void</span> {
+    <span class="kw">const</span> entity = state.<span class="fn">getSelectedEntity</span>() <span class="kw">orelse return</span>;
+    <span class="kw">for</span> (entity.components) |comp| {
+        <span class="kw">const</span> props = <span class="fn">getProperties</span>(&amp;comp);
+        <span class="kw">for</span> (props) |*prop| {
+            <span class="cm">// slider widget stores its value under the key "entity.comp.prop"</span>
+            <span class="kw">const</span> id = <span class="fn">makeId</span>(entity.name, comp.<span class="fn">name</span>(), prop.name);
+            <span class="kw">if</span> (ui.<span class="fn">getState</span>(<span class="st">"inspector"</span>, id)) |ws| {
+                <span class="kw">if</span> (ws.value != <span class="fn">astValue</span>(prop)) {
+                    prop.value = <span class="fn">valueFromWidgetState</span>(ws, prop.type_annotation);
+                    state.dirty = <span class="nb">true</span>;
+                }
+            }
+        }
+    }
+}</pre>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ══════════════════════════════════════════
+       PHASE 5 — VIEWPORT
+  ══════════════════════════════════════════ -->
+  <div class="phase">
+    <div class="phase-header">
+      <span class="phase-number">Phase 5</span>
+      <span class="phase-title">Viewport panel</span>
+    </div>
+    <p class="phase-subtitle">Centre panel. Renders the scene live using a throw-away ECS world. Click an entity to select it.</p>
+
+    <div class="card">
+      <h3><span class="icon">📄</span> New file</h3>
+      <span class="file new">src/tools/editor/Viewport.zig</span>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <h3><span class="icon">⚙️</span> draw() signature</h3>
+        <pre><span class="kw">pub fn</span> <span class="fn">draw</span>(
+    state:    *<span class="ty">EditorState</span>,
+    renderer: *<span class="ty">Renderer</span>,
+    assets:   *<span class="ty">AssetManager</span>,
+    region:   <span class="ty">Region</span>,
+    ctx:      <span class="ty">RenderContext</span>,
+) <span class="ty">void</span>
+
+<span class="cm">// Region for viewport:</span>
+<span class="cm">// { x=280, y=0, width=1340, height=1080 }</span></pre>
+      </div>
+      <div class="card">
+        <h3><span class="icon">🔁</span> Per-frame logic</h3>
+        <ul class="checklist" style="font-size:0.82rem;">
+          <li>
+            <div class="check"></div>
+            <div class="text">If no scene file → draw placeholder rect + label</div>
+          </li>
+          <li>
+            <div class="check"></div>
+            <div class="text">Create temp <code>World</code> + run instantiator on AST</div>
+          </li>
+          <li>
+            <div class="check"></div>
+            <div class="text">Run <code>RenderSys</code> with camera from <code>state.camera_pos</code> / <code>camera_zoom</code></div>
+          </li>
+          <li>
+            <div class="check"></div>
+            <div class="text">Draw selection highlight wireframe rect around selected entity</div>
+          </li>
+          <li>
+            <div class="check"></div>
+            <div class="text">Destroy temp world (no leaks)</div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="icon">🖱</span> Click to select — hit testing</h3>
+      <pre><span class="cm">// In handleInput() in main.zig, on left-mouse-click in viewport region:</span>
+<span class="kw">fn</span> <span class="fn">hitTestViewport</span>(
+    state:    *<span class="ty">EditorState</span>,
+    mouse_x:  <span class="ty">f32</span>,
+    mouse_y:  <span class="ty">f32</span>,
+    region:   <span class="ty">Region</span>,
+) <span class="ty">void</span> {
+    <span class="cm">// 1. Convert mouse screen pos → world pos using camera_pos + camera_zoom</span>
+    <span class="cm">// 2. Walk scene entities — for each with Transform + Sprite:</span>
+    <span class="cm">//    compute AABB from shape geometry + transform position</span>
+    <span class="cm">// 3. First entity whose AABB contains world_pos → set state.selected</span>
+}</pre>
+      <p style="font-size:0.82rem;color:#8b949e;margin-top:10px;">Camera pan with middle-mouse drag. Scroll wheel → <code>state.camera_zoom</code>. Both stored in <code>EditorState</code>.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ══════════════════════════════════════════
+       PHASE 6 — FILE OPEN/SAVE
+  ══════════════════════════════════════════ -->
+  <div class="phase">
+    <div class="phase-header">
+      <span class="phase-number">Phase 6</span>
+      <span class="phase-title">File open / save</span>
+    </div>
+    <p class="phase-subtitle">Wire keyboard shortcuts and the platform file dialog. Closes the loop.</p>
+
+    <div class="two-col">
+      <div class="card">
+        <h3><span class="icon">⌨️</span> Keyboard shortcuts</h3>
+        <pre><span class="cm">// In handleInput() each frame:</span>
+<span class="kw">const</span> super = kb.<span class="fn">isDown</span>(.<span class="ty">LeftSuper</span>)
+           <span class="op">or</span> kb.<span class="fn">isDown</span>(.<span class="ty">RightSuper</span>);
+
+<span class="kw">if</span> (super <span class="op">and</span> kb.<span class="fn">isPressed</span>(.<span class="ty">O</span>)) {
+    <span class="kw">if</span> (platform.<span class="fn">openFileDialog</span>(
+        gpa, <span class="st">"Open Scene"</span>, &amp;.{<span class="st">".scene"</span>}
+    )) |path| {
+        <span class="kw">try</span> state.<span class="fn">loadFile</span>(path);
+    }
+}
+
+<span class="kw">if</span> (super <span class="op">and</span> kb.<span class="fn">isPressed</span>(.<span class="ty">S</span>)) {
+    <span class="kw">if</span> (state.dirty) <span class="kw">try</span> state.<span class="fn">save</span>();
+}</pre>
+      </div>
+      <div class="card">
+        <h3><span class="icon">💾</span> EditorState.loadFile / save</h3>
+        <pre><span class="kw">pub fn</span> <span class="fn">loadFile</span>(self: *<span class="ty">Self</span>, path: []<span class="kw">const</span> u8) !<span class="ty">void</span> {
+    <span class="kw">const</span> src = <span class="kw">try</span> fs.cwd()
+        .<span class="fn">readFileAlloc</span>(self.gpa, path, <span class="nb">1024</span>*<span class="nb">1024</span>);
+    <span class="kw">defer</span> self.gpa.<span class="fn">free</span>(src);
+
+    <span class="kw">if</span> (self.scene_file) |sf| {
+        sf.<span class="fn">deinit</span>(self.gpa);
+        self.gpa.<span class="fn">destroy</span>(sf);
+    }
+    self.scene_file = <span class="kw">try</span> parser.<span class="fn">parse</span>(self.gpa, src, path);
+    self.scene_path  = <span class="kw">try</span> self.gpa.<span class="fn">dupe</span>(u8, path);
+    self.selected    = <span class="nb">null</span>;
+    self.dirty       = <span class="nb">false</span>;
+}
+
+<span class="kw">pub fn</span> <span class="fn">save</span>(self: *<span class="ty">Self</span>) !<span class="ty">void</span> {
+    <span class="kw">const</span> file = <span class="kw">try</span> fs.cwd().<span class="fn">createFile</span>(self.scene_path, .{});
+    <span class="kw">defer</span> file.<span class="fn">close</span>();
+    <span class="kw">try</span> writer.<span class="fn">serialize</span>(self.scene_file.?, file.<span class="fn">writer</span>());
+    self.dirty = <span class="nb">false</span>;
+}</pre>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ══════════════════════════════════════════
+       BUILD ORDER
+  ══════════════════════════════════════════ -->
+  <div class="phase">
+    <div class="phase-header">
+      <span class="phase-number">Build order</span>
+      <span class="phase-title">What to implement, in what sequence</span>
+    </div>
+
+    <table class="build-order">
+      <tr>
+        <th>#</th>
+        <th>What</th>
+        <th>File(s)</th>
+        <th>Why this order</th>
+      </tr>
+      <tr>
+        <td class="step-num">1</td>
+        <td><span class="step-name">Scene serializer</span></td>
+        <td><code>scene-format/writer.zig</code></td>
+        <td class="step-note">No deps, test standalone. Unlocks save. Everything downstream needs it.</td>
+      </tr>
+      <tr>
+        <td class="step-num">2</td>
+        <td><span class="step-name">EditorState</span></td>
+        <td><code>editor/EditorState.zig</code></td>
+        <td class="step-note">Central data model all panels read from. Define once, use everywhere.</td>
+      </tr>
+      <tr>
+        <td class="step-num">3</td>
+        <td><span class="step-name">build.zig + main scaffold</span></td>
+        <td><code>build.zig</code>, <code>editor/main.zig</code></td>
+        <td class="step-note">Get a window open with three colored placeholder rects. Proves the setup compiles.</td>
+      </tr>
+      <tr>
+        <td class="step-num">4</td>
+        <td><span class="step-name">Hierarchy — read-only</span></td>
+        <td><code>editor/Hierarchy.zig</code></td>
+        <td class="step-note">Load a file, see entity names. Click to select. Inspector can now react.</td>
+      </tr>
+      <tr>
+        <td class="step-num">5</td>
+        <td><span class="step-name">Inspector — read-only</span></td>
+        <td><code>editor/Inspector.zig</code></td>
+        <td class="step-note">Show property values as labels. Validate the entity→component→property walk.</td>
+      </tr>
+      <tr>
+        <td class="step-num">6</td>
+        <td><span class="step-name">Viewport — scene preview</span></td>
+        <td><code>editor/Viewport.zig</code></td>
+        <td class="step-note">Renders the scene. Click to select. Now the loop feels real.</td>
+      </tr>
+      <tr>
+        <td class="step-num">7</td>
+        <td><span class="step-name">Inspector mutations</span></td>
+        <td><code>editor/Inspector.zig</code>, <code>editor/main.zig</code></td>
+        <td class="step-note">Wire sliders + color swatches back into the AST. Set dirty flag.</td>
+      </tr>
+      <tr>
+        <td class="step-num">8</td>
+        <td><span class="step-name">File open / save</span></td>
+        <td><code>editor/main.zig</code>, <code>editor/EditorState.zig</code></td>
+        <td class="step-note">Cmd+O / Cmd+S. The loop closes: edit → save → player picks it up.</td>
+      </tr>
+    </table>
+  </div>
+
+  <hr>
+
+  <!-- ══════════════════════════════════════════
+       OUT OF SCOPE
+  ══════════════════════════════════════════ -->
+  <div class="out-of-scope">
+    <h3>Not in this POC — phase 2 and beyond</h3>
+    <ul>
+      <li>Undo / redo (dirty flag is enough for now)</li>
+      <li>Drag entities in the viewport to reposition</li>
+      <li>Text input widget (string properties are read-only labels)</li>
+      <li>Asset browser (assets declared in file, not browsed)</li>
+      <li>Add / remove entities from the editor (edit file by hand, reload)</li>
+      <li>Template instantiation UI</li>
+      <li>Color picker (swatch shows color, editing by text for now)</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

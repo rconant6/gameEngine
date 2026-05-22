@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wayland Wire Protocol — Architecture Plan</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #e8e6e3;
+            background: #1a1a1a;
+            padding: 20px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #f7931e;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #f7931e;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #f7931e;
+            font-size: 1.6em;
+            margin-top: 36px;
+            margin-bottom: 12px;
+            border-left: 4px solid #f7931e;
+            padding-left: 12px;
+        }
+
+        h3 {
+            color: #ffb347;
+            font-size: 1.2em;
+            margin-top: 22px;
+            margin-bottom: 8px;
+        }
+
+        h4 {
+            color: #ffd699;
+            font-size: 1.05em;
+            margin-top: 18px;
+            margin-bottom: 6px;
+        }
+
+        p, li { margin-bottom: 8px; }
+
+        ul, ol {
+            padding-left: 30px;
+            margin-bottom: 12px;
+        }
+
+        code {
+            background: #2a2a2a;
+            color: #ffd699;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.92em;
+        }
+
+        pre {
+            background: #2a2a2a;
+            border-left: 3px solid #f7931e;
+            padding: 12px 16px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0 16px 0;
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: #e8e6e3;
+        }
+
+        .intro {
+            font-style: italic;
+            color: #b8b8b8;
+            margin-bottom: 30px;
+        }
+
+        .step {
+            background: #232323;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 18px 22px;
+            margin-bottom: 22px;
+        }
+
+        .step h2 {
+            margin-top: 0;
+            border-left: none;
+            padding-left: 0;
+        }
+
+        .checklist {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .checklist li {
+            padding: 6px 0;
+            padding-left: 28px;
+            position: relative;
+        }
+
+        .checklist li::before {
+            content: "☐";
+            position: absolute;
+            left: 0;
+            top: 4px;
+            color: #f7931e;
+            font-size: 1.1em;
+        }
+
+        .checklist li.done::before {
+            content: "☑";
+            color: #4caf50;
+        }
+
+        .checklist li.done {
+            color: #888;
+            text-decoration: line-through;
+        }
+
+        .note {
+            background: #2a2520;
+            border-left: 3px solid #ffb347;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.95em;
+        }
+
+        .principle {
+            background: #1f2a1f;
+            border-left: 3px solid #4caf50;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+
+        .why {
+            background: #1f1f2e;
+            border-left: 3px solid #6495ed;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.95em;
+        }
+
+        .gotcha {
+            background: #2e1f1f;
+            border-left: 3px solid #e74c3c;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.95em;
+        }
+
+        .file-tree {
+            background: #2a2a2a;
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.92em;
+            margin: 10px 0;
+        }
+
+        .signature {
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.92em;
+            background: #2a2a2a;
+            padding: 8px 12px;
+            border-radius: 3px;
+            margin: 6px 0;
+            color: #ffd699;
+        }
+
+        .diagram {
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 14px 0;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.82em;
+            line-height: 1.4;
+            overflow-x: auto;
+            color: #e8e6e3;
+            white-space: pre;
+        }
+        .diagram .lbl-linux  { color: #f7931e; font-weight: bold; }
+        .diagram .lbl-wire   { color: #6495ed; font-weight: bold; }
+        .diagram .lbl-iface  { color: #4caf50; font-weight: bold; }
+        .diagram .lbl-os     { color: #b8b8b8; font-weight: bold; }
+        .diagram .typ        { color: #ffd699; }
+        .diagram .arrow      { color: #ffb347; }
+        .diagram .comment    { color: #888; font-style: italic; }
+        .diagram .send       { color: #4caf50; }
+        .diagram .recv       { color: #e74c3c; }
+
+        .toc {
+            background: #232323;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 14px 22px;
+            margin-bottom: 30px;
+        }
+        .toc h3 { margin-top: 0; color: #f7931e; }
+        .toc ol { margin-bottom: 0; }
+    </style>
+</head>
+<body>
+
+<h1>Wayland Wire Protocol — Architecture Plan</h1>
+<p class="intro">
+    A pure-Zig Wayland client that speaks the wire protocol directly — no
+    libwayland, no xkbcommon, no codegen. The goal: <code>wire.zig</code>
+    becomes the complete Wayland module, <code>linux.zig</code> becomes pure
+    policy, and adding new Wayland interfaces is a one-file change.
+</p>
+
+<div class="toc">
+    <h3>Contents</h3>
+    <ol>
+        <li>Architecture Overview</li>
+        <li>The Three Layers</li>
+        <li>Step 1 — File Rename ✓</li>
+        <li>Step 2 — Wire Primitives + Connection</li>
+        <li>Step 3 — Interfaces Stabilization</li>
+        <li>Step 4 — Two-Way Proxy</li>
+        <li>Step 5 — Connection Owns Routing</li>
+        <li>Step 6 — linux.zig as Pure Policy</li>
+        <li>Adding a New Interface (post-completion)</li>
+        <li>Out of Scope</li>
+    </ol>
+</div>
+
+<div class="principle">
+    <strong>Guiding principle:</strong> three layers, three sources of truth.
+    <code>interfaces.zig</code> = the SPEC.
+    <code>wire.zig</code> = the WIRE (framing, routing, parsing, dispatching).
+    <code>linux.zig</code> = the POLICY (what events mean to the application).
+    No layer should leak its concerns into another. If sending feels clean but
+    receiving is messy, the architecture is wrong.
+</div>
+
+<h2>Architecture Overview</h2>
+
+<div class="file-tree">
+src/platform/<br>
+&nbsp;&nbsp;linux.zig                          ← pure policy: what events mean<br>
+&nbsp;&nbsp;linux/<br>
+&nbsp;&nbsp;&nbsp;&nbsp;wayland/<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;wire.zig                   ← protocol mechanics<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;interfaces.zig             ← spec map (Request/Event unions)
+</div>
+
+<h3>Why three layers — the asymmetry argument</h3>
+
+<div class="why">
+The send side currently looks clean:
+<pre><code>try display.send(.{ .get_registry = .{ .registry = registry_id } });</code></pre>
+But the receive side leaks protocol details into linux.zig:
+<pre><code>const T = std.meta.fields(WlDisplay.Event)[@intFromEnum(WlDisplay.Event.err)].type;
+const msg = try wire.parse(T, payload);
+log.err(...)</code></pre>
+That asymmetry IS the smell. If <code>Proxy(Iface)</code> is "the way to talk
+TO this interface," then it must also be "the way to react FROM it." The fix
+is making the proxy two-way and giving Connection a routing table so it can
+dispatch events to the right proxy automatically.
+</div>
+
+<h3>Layer responsibilities</h3>
+
+<h4><code>wire.zig</code> owns</h4>
+<ul>
+    <li>Unix socket connection lifecycle</li>
+    <li>Wire framing — 8-byte <code>Header</code>, payload, 4-byte alignment</li>
+    <li>Serialization (<code>emit</code>) and deserialization (<code>parse</code>)</li>
+    <li>Object ID allocation (<code>ObjIdAllocator</code>)</li>
+    <li>The routing table — maps obj_id → handler</li>
+    <li>The drain loop — read message, look up handler, dispatch</li>
+    <li><code>delete_id</code> auto-cleanup of routing entries</li>
+    <li>Type erasure machinery for the routing table (comptime trampoline)</li>
+</ul>
+
+<h4><code>interfaces.zig</code> owns</h4>
+<ul>
+    <li>Per-interface namespaces: <code>WlDisplay</code>, <code>WlRegistry</code>, <code>Callback</code>, ...</li>
+    <li><code>Request: union(enum)</code> — outgoing message variants in spec order</li>
+    <li><code>Event: union(enum)</code> — incoming message variants in spec order</li>
+    <li>Inline comptime asserts confirming variant index = wire opcode</li>
+    <li>Zero logic — pure spec map</li>
+</ul>
+
+<h4><code>linux.zig</code> owns</h4>
+<ul>
+    <li>File-scope state: <code>conn</code>, <code>compositor_id</code>, <code>seat_id</code>, etc.</li>
+    <li>File-scope <code>Proxy</code> instances for interfaces it cares about</li>
+    <li>Per-interface event handler functions (the policy)</li>
+    <li>Decisions about what's fatal vs recoverable</li>
+    <li>The <code>plat.*</code> public API (createWindow, pollNextEvent, etc.)</li>
+</ul>
+
+<h2>End-State Flow Diagram</h2>
+<p>How a request leaves <code>linux.zig</code>, travels through <code>wire.zig</code>,
+hits the compositor, and how an event comes back. Types that move between layers
+are labeled. Colors: <span class="lbl-linux">orange</span> = linux.zig,
+<span class="lbl-wire">blue</span> = wire.zig,
+<span class="lbl-iface">green</span> = interfaces.zig (types only),
+<span class="lbl-os">grey</span> = OS / compositor.</p>
+
+<h3>Send path — request leaves the application</h3>
+<div class="diagram"><span class="lbl-linux">linux.zig</span>                       <span class="lbl-wire">wire.zig</span>                         <span class="lbl-os">OS</span>
+─────────                       ────────                         ────
+
+display_proxy.send(<span class="typ">.{ .get_registry = .{ .registry = id } }</span>)
+       │
+       │  arg type: <span class="lbl-iface">WlDisplay.Request</span> (union, inferred from literal)
+       ▼
+<span class="lbl-wire">Proxy(WlDisplay).send(self, msg: WlDisplay.Request)</span>
+       │
+       │  forwards to:
+       ▼
+<span class="lbl-wire">Connection.sendRaw(obj_id: u32, msg: anytype)</span>
+       │
+       │  derives opcode: <span class="typ">u16</span> from msg's active union tag
+       │  calls:
+       ▼
+<span class="lbl-wire">emit(obj_id, opcode, msg, &send_buf) -> usize</span>
+       │
+       │  walks union variant via @typeInfo → comptime field iteration
+       │  produces wire bytes in self.send_buf
+       ▼
+<span class="lbl-wire">writer.interface.writeAll(send_buf[0..n])</span>
+<span class="lbl-wire">writer.interface.flush()</span>
+       │
+       │  bytes go down: <span class="typ">[]const u8</span>
+       ▼
+<span class="lbl-os">unix socket → wayland compositor</span>
+</div>
+
+<h3>Receive path — event arrives from the compositor</h3>
+<div class="diagram"><span class="lbl-os">OS</span>                              <span class="lbl-wire">wire.zig</span>                         <span class="lbl-linux">linux.zig</span>
+────                            ────────                         ─────────
+
+<span class="lbl-os">unix socket ← wayland compositor</span>
+       │
+       │  bytes arrive: <span class="typ">[]const u8</span>
+       ▼
+<span class="lbl-wire">Connection.drain(stop_obj_id: u32)</span>
+       │
+       │  loop body:
+       ▼
+<span class="lbl-wire">Connection.nextMessage() -> Message</span>
+       │
+       │  Message type: <span class="typ">{ header: Header, bytes: []const u8 }</span>
+       │
+       ▼
+<span class="lbl-wire">handlers.get(message.header.obj_id) -> ?Handler</span>
+       │
+       │  Handler is type-erased: <span class="typ">{ ctx: *anyopaque, handle_fn: *const fn(...) }</span>
+       │  the comptime-synthesized trampoline knows the real Proxy(Iface) type
+       ▼
+<span class="lbl-wire">trampoline_for_Iface(ctx, opcode, bytes)</span>
+       │
+       │  internally:  const p: *Proxy(Iface) = @ptrCast(ctx)
+       │  forwards to:
+       ▼
+<span class="lbl-wire">Proxy(Iface).handle(self, opcode: u16, bytes: []const u8)</span>
+       │
+       │  calls:
+       ▼
+<span class="lbl-wire">parseEvent(Iface.Event, opcode, bytes) -> Iface.Event</span>
+       │
+       │  walks <span class="lbl-iface">Iface.Event</span> union fields, parses payload, @unionInit
+       │  result type: <span class="lbl-iface">Iface.Event</span> (typed union, fully populated)
+       ▼
+<span class="lbl-wire">self.on_event(event: Iface.Event)</span>  ◄─── function pointer
+       │                                       set by linux.zig
+       ▼
+<span class="lbl-linux">onRegistryEvent(event: WlRegistry.Event) !void</span>
+       │
+       │  pure policy: switch on event variant, store IDs, log, etc.
+       ▼
+   <span class="comment">(returns void, or returns error → bubbles back through drain → init)</span>
+</div>
+
+<h3>Object lifecycle — registry → bind → proxy registration</h3>
+<div class="diagram"><span class="lbl-linux">linux.zig.init()</span>
+   │
+   ├─► <span class="lbl-wire">conn = Connection.init(gpa, io, env)</span>           <span class="comment">// socket open, handlers map ready</span>
+   │
+   ├─► display_proxy = .{ .obj_id = 1, ... }
+   │   <span class="lbl-wire">conn.registerProxy(WlDisplay, &display_proxy)</span>  <span class="comment">// trampoline synthesized at comptime</span>
+   │      │
+   │      └─► handlers.put(1, .{ ctx = &display_proxy, handle_fn = trampoline })
+   │
+   ├─► registry_id = <span class="lbl-wire">conn.ids.alloc()</span>                  <span class="comment">// returns u32, e.g. 2</span>
+   │   registry_proxy = .{ .obj_id = registry_id, ... }
+   │   <span class="lbl-wire">conn.registerProxy(WlRegistry, &registry_proxy)</span>
+   │
+   ├─► <span class="send">display_proxy.send(.{ .get_registry = .{ .registry = registry_id } })</span>
+   │      │
+   │      └─► compositor will now flood us with <span class="lbl-iface">WlRegistry.global</span> events
+   │
+   ├─► cb_id = <span class="lbl-wire">conn.ids.alloc()</span>                          <span class="comment">// e.g. 3</span>
+   │   <span class="send">display_proxy.send(.{ .sync = .{ .callback = cb_id } })</span>
+   │      │
+   │      └─► barrier — compositor sends <span class="lbl-iface">Callback.done</span> after all globals
+   │
+   └─► <span class="lbl-wire">conn.drain(cb_id)</span>
+          │
+          │  loop:
+          │    ┌──────────────────────────────────────────────┐
+          │    │  message arrives from compositor             │
+          │    │     │                                        │
+          │    │     ├─► obj_id == 2 (registry) →             │
+          │    │     │   <span class="recv">onRegistryEvent(.global { name, interface, version })</span>
+          │    │     │      stores compositor_name, seat_name, etc.
+          │    │     │                                        │
+          │    │     ├─► obj_id == 3 (callback) →             │
+          │    │     │   no handler registered → log warn     │
+          │    │     │   stop_obj_id matches → drain returns  │
+          │    │     │                                        │
+          │    │     └─► obj_id == 1, opcode == 1 (delete_id) │
+          │    │         wire auto-removes from handlers map  │
+          │    └──────────────────────────────────────────────┘
+          │
+          ▼
+   <span class="lbl-linux">init() returns ok — globals enumerated, ready to bind</span>
+</div>
+
+<div class="why">
+<strong>What to notice in the diagrams:</strong>
+<ul style="margin-bottom: 0;">
+    <li>linux.zig only ever sees typed values: <code>WlRegistry.Event</code>, <code>u32</code>, <code>[]const u8</code>. Never opcodes, never raw bytes outside of the <code>g.interface</code> string.</li>
+    <li>wire.zig handles all the type erasure (<code>*anyopaque</code>) internally. The trampoline reverses it before linux ever gets called.</li>
+    <li>interfaces.zig types travel both directions but the file itself is never executed — it's pure compile-time information.</li>
+    <li>The OS layer sees only <code>[]const u8</code> bytes. No types cross the kernel boundary.</li>
+</ul>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="step">
+<h2>Step 1 — File Rename ✓</h2>
+<ul class="checklist">
+    <li class="done"><code>protocall.zig</code> → <code>wire.zig</code></li>
+    <li class="done">Empty <code>interface.zig</code> typo file deleted</li>
+    <li class="done">Imports updated</li>
+</ul>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="step">
+<h2>Step 2 — Wire Primitives + Connection</h2>
+<p>The byte-level mechanics. Mostly done. Cleanup remaining.</p>
+
+<h3>What's done</h3>
+<ul class="checklist">
+    <li class="done"><code>WlFixed</code> packed struct (frac:u8, integer:i24)</li>
+    <li class="done"><code>ObjIdAllocator</code> — <code>next: u32 = 2</code>, <code>alloc()</code> returns + increments</li>
+    <li class="done"><code>wlPad(len)</code> inline fn — <code>(4 - @mod(len, 4)) % 4</code></li>
+    <li class="done"><code>Header</code> packed struct — <code>obj_id: u32</code>, <code>size_opcode: u32</code> with <code>size()</code> and <code>opcode()</code> methods</li>
+    <li class="done"><code>Message</code> struct — <code>{ header: Header, bytes: []const u8 }</code></li>
+    <li class="done"><code>emit</code> internal byte builder — walks union tag, writes header + payload + size patch</li>
+    <li class="done"><code>parse</code> internal byte reader — walks struct fields, offset-free signature, starts at <code>@sizeOf(Header)</code> internally</li>
+    <li class="done"><code>Connection</code> heap-allocated singleton</li>
+    <li class="done"><code>Connection.init</code> — env-driven socket path, connects, builds writer/reader, initializes ids</li>
+    <li class="done"><code>Connection.deinit</code> — closes stream, destroys self via stored gpa</li>
+    <li class="done"><code>Connection.sendRaw</code> — derives opcode from <code>activeTag</code>, calls emit, writeAll, flush</li>
+    <li class="done"><code>Connection.nextMessage</code> — peekStruct header, take(size), returns Message</li>
+</ul>
+
+<h3>Cleanup pending</h3>
+<ul class="checklist">
+    <li><code>send_buf: [4098]u8</code> typo → <code>[4096]u8</code> on line 55 of wire.zig</li>
+    <li>Remove unused <code>recv_buf</code> field on line 56 (the actual reader buffer is <code>read_buf</code>)</li>
+    <li>Remove debug prints in <code>sendRaw</code> (lines 105-111) — leftover from byte verification</li>
+    <li><code>nextMessage</code> swallows peekStruct error with a fake header on lines 122-125. Change to <code>try</code> and let it bubble — the policy layer decides what to do.</li>
+</ul>
+
+<div class="gotcha">
+<strong>Stale pointer gotcha (already learned):</strong> <code>Connection</code> must
+be heap-allocated and returned as <code>*Connection</code>. The reason: <code>writer</code>
+and <code>reader</code> hold <code>@fieldParentPtr</code> back-references to themselves
+inside the struct. If <code>Connection</code> is returned by value, those references
+become stale immediately. Heap allocation gives a stable address.
+</div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="step">
+<h2>Step 3 — Interfaces Stabilization</h2>
+<p>Lock down the spec contract that <code>Proxy</code> and routing depend on.</p>
+
+<h3>What's done</h3>
+<ul class="checklist">
+    <li class="done">snake_case field names everywhere (<code>delete_id</code>, not <code>deleteId</code>)</li>
+    <li class="done">Comptime asserts inline with each interface — living documentation</li>
+    <li class="done"><code>WlErrors</code> hoisted to top-level (not buried inside <code>WlDisplay</code>)</li>
+</ul>
+
+<h3>Outstanding</h3>
+<ul class="checklist">
+    <li>Naming consistency — <code>WLDisplay</code> vs <code>WlRegistry</code> in interfaces.zig. Pick <code>Wl</code> (matches Wayland's own casing). Update import aliases in linux.zig.</li>
+    <li>Add empty <code>Request</code> on <code>Callback</code> for shape consistency:
+        <pre><code>pub const Callback = struct {
+    pub const Request = union(enum) {};
+    pub const Event = union(enum) { done: ... };
+};</code></pre>
+    </li>
+    <li>Defer <code>wl_registry.bind</code> special encoding (interface name + version inline with new_id arg) — handle when first needed</li>
+</ul>
+
+<div class="why">
+<strong>Why the empty <code>Request</code> matters:</strong> when <code>Proxy(Iface)</code>
+references <code>Iface.Request</code>, it has to compile. If <code>Callback</code>
+omits <code>Request</code>, <code>Proxy(Callback)</code> won't compile.
+Empty <code>union(enum) {}</code> is zero-cost — the compiler discards it — and
+keeps every interface uniform.
+</div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="step">
+<h2>Step 4 — Two-Way Proxy</h2>
+<p><strong>The first big architectural move.</strong> Make Proxy own both directions
+of communication. This is what removes the asymmetry described in the architecture
+overview.</p>
+
+<h3>The new <code>Proxy</code> shape</h3>
+<pre><code>pub fn Proxy(comptime Iface: type) type {
+    return struct {
+        obj_id: u32,
+        conn: *Connection,
+        on_event: *const fn (event: Iface.Event) anyerror!void,
+
+        const Self = @This();
+        pub const Interface = Iface;
+
+        pub fn send(self: Self, msg: Iface.Request) !void {
+            try self.conn.sendRaw(self.obj_id, msg);
+        }
+
+        pub fn handle(self: Self, opcode: u16, bytes: []const u8) !void {
+            const event = try parseEvent(Iface.Event, opcode, bytes);
+            try self.on_event(event);
+        }
+    };
+}</code></pre>
+
+<h3>The supporting <code>parseEvent</code> generic</h3>
+<pre><code>pub fn parseEvent(
+    comptime EventUnion: type,
+    opcode: u16,
+    data: []const u8,
+) !EventUnion {
+    inline for (@typeInfo(EventUnion).@"union".fields, 0..) |f, i| {
+        if (i == opcode) {
+            const inner = try parse(f.type, data);
+            return @unionInit(EventUnion, f.name, inner);
+        }
+    }
+    return error.UnknownOpcode;
+}</code></pre>
+
+<h3>What changes for the caller</h3>
+<p>Sends already worked. Receives now work the same way:</p>
+<pre><code>// before: linux.zig dispatches manually
+const T = std.meta.fields(WlDisplay.Event)[@intFromEnum(...)].type;
+const msg = try wire.parse(T, bytes);
+
+// after: Proxy.handle owns it
+try display_proxy.handle(opcode, bytes);  // calls parseEvent + on_event</code></pre>
+<p>But this is just the foundation — Step 5 wires up Connection so linux.zig
+doesn't even call <code>handle</code> manually. Connection's drain loop does it.</p>
+
+<h3>Tasks</h3>
+<ul class="checklist">
+    <li>Add <code>parseEvent</code> generic to <code>wire.zig</code> (after <code>parse</code>)</li>
+    <li>Add <code>Proxy(comptime Iface: type)</code> generic with <code>obj_id</code>, <code>conn</code>, <code>on_event</code> fields</li>
+    <li>Add <code>Proxy.send</code> method (forwards to <code>conn.sendRaw</code>)</li>
+    <li>Add <code>Proxy.handle</code> method (parseEvent + on_event)</li>
+    <li>Add <code>pub const Interface = Iface;</code> for callers that want to reach <code>Proxy(X).Interface.Event</code></li>
+</ul>
+
+<div class="note">
+<code>on_event</code> is a plain function pointer — no closure capture, no
+context object. Linux's file-scope vars (<code>compositor_id</code>, etc.)
+are accessed directly inside the handler fns. The file-as-singleton pattern
+makes this work without any plumbing.
+</div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="step">
+<h2>Step 5 — Connection Owns Routing</h2>
+<p><strong>The second big architectural move.</strong> Move the dispatch table
+into <code>Connection</code>. Wire becomes the full hub.</p>
+
+<h3>Connection gains a routing table</h3>
+<pre><code>pub const Connection = struct {
+    // ... existing fields ...
+    handlers: std.AutoHashMap(u32, Handler),
+
+    const Handler = struct {
+        ctx: *anyopaque,
+        handle_fn: *const fn (
+            ctx: *anyopaque,
+            opcode: u16,
+            bytes: []const u8,
+        ) anyerror!void,
+    };
+
+    pub fn registerProxy(
+        self: *Connection,
+        comptime Iface: type,
+        proxy: *Proxy(Iface),
+    ) !void {
+        const trampoline = struct {
+            fn handle(ctx: *anyopaque, opcode: u16, bytes: []const u8) !void {
+                const p: *Proxy(Iface) = @ptrCast(@alignCast(ctx));
+                try p.handle(opcode, bytes);
+            }
+        };
+        try self.handlers.put(proxy.obj_id, .{
+            .ctx = proxy,
+            .handle_fn = trampoline.handle,
+        });
+    }
+
+    pub fn unregisterProxy(self: *Connection, obj_id: u32) void {
+        _ = self.handlers.remove(obj_id);
+    }
+
+    pub fn drain(self: *Connection, stop_obj_id: u32) !void {
+        while (true) {
+            const m = try self.nextMessage();
+            if (self.handlers.get(m.header.obj_id)) |h| {
+                try h.handle_fn(h.ctx, m.header.opcode(), m.bytes);
+            } else {
+                log.warn(.platform, "no handler for obj_id={} opcode={}",
+                    .{ m.header.obj_id, m.header.opcode() });
+            }
+            // wl_display.delete_id auto-removes routing entry
+            if (m.header.obj_id == 1 and m.header.opcode() == 1) {
+                const deleted = std.mem.readInt(
+                    u32,
+                    m.bytes[@sizeOf(Header)..][0..4],
+                    .little,
+                );
+                _ = self.handlers.remove(deleted);
+            }
+            if (m.header.obj_id == stop_obj_id) return;
+        }
+    }
+};</code></pre>
+
+<h3>The trampoline pattern explained</h3>
+<div class="why">
+The routing table needs to store handlers for any interface type uniformly.
+But each interface has a different <code>Proxy(Iface)</code> type, and
+<code>std.AutoHashMap</code> needs a single value type. Solution: type erasure
+via <code>*anyopaque</code> + a per-interface trampoline function.
+
+<p>The trampoline is synthesized at comptime per call to <code>registerProxy</code>:
+each call creates a new closure-like struct with a <code>handle</code> fn that
+casts <code>ctx</code> back to the typed <code>*Proxy(Iface)</code>. This is the
+exact pattern Zig's stdlib uses for vtables (e.g.,
+<code>std.Io.Reader.streamImpl</code>).</p>
+</div>
+
+<h3>Drain auto-cleanup</h3>
+<div class="why">
+Wayland's <code>wl_display.delete_id</code> event tells the client "this
+object is gone, the id can be reused." Wire owns the routing table, so wire
+should respond to this event by removing the entry. Linux doesn't need to
+know — the bookkeeping is purely a wire concern.
+
+<p>Special-casing this in <code>drain</code> is correct because <code>wl_display</code>
+is fixed at <code>obj_id=1</code> and <code>delete_id</code> is fixed at opcode 1.
+Both are set by the protocol forever.</p>
+</div>
+
+<h3>Tasks</h3>
+<ul class="checklist">
+    <li>Add <code>handlers: std.AutoHashMap(u32, Handler)</code> field to Connection</li>
+    <li>Initialize <code>handlers</code> in <code>Connection.init</code> with the gpa</li>
+    <li>Free <code>handlers</code> in <code>Connection.deinit</code> (call <code>handlers.deinit()</code>)</li>
+    <li>Add internal <code>Handler</code> struct (ctx + fn ptr)</li>
+    <li>Add <code>registerProxy</code> with comptime trampoline synthesis</li>
+    <li>Add <code>unregisterProxy</code> for explicit removal</li>
+    <li>Add <code>drain</code> method with delete_id auto-cleanup and stop_obj_id support</li>
+    <li>Decision: keep <code>nextMessage</code> public for advanced uses, or hide it. Recommendation: keep public — useful for testing and for any caller who wants to bypass routing.</li>
+</ul>
+
+<div class="gotcha">
+<strong>Map deinit order:</strong> when <code>Connection.deinit</code> runs, free
+<code>handlers</code> BEFORE <code>gpa.destroy(self)</code>. Otherwise you free
+the gpa-allocated memory while the map still holds references to its own
+allocator inside Connection.
+</div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<div class="step">
+<h2>Step 6 — linux.zig as Pure Policy</h2>
+<p>Final shape. linux.zig knows nothing about the protocol — it just registers
+proxies and writes typed switches on events.</p>
+
+<h3>The end-state file</h3>
+<pre><code>const std = @import("std");
+const Allocator = std.mem.Allocator;
+const plat = @import("platform.zig");
+const wire = @import("linux/wayland/wire.zig");
+const wli = @import("linux/wayland/interfaces.zig");
+const log = @import("debug").log;
+
+const Event = plat.Event;
+const WindowConfig = plat.WindowConfig;
+const Capabilities = plat.Capabilities;
+const DisplayInfo = plat.DisplayInfo;
+
+// ── file-scope state ──────────────────────────────────────────
+var gpa: Allocator = undefined;
+var conn: *wire.Connection = undefined;
+
+// known global ids (filled in by onRegistryEvent)
+var compositor_id: u32 = 0;
+var xdg_wm_base_id: u32 = 0;
+var seat_id: u32 = 0;
+var compositor_name: u32 = 0;     // for bind
+var xdg_wm_base_name: u32 = 0;
+var seat_name: u32 = 0;
+
+// proxies (file-scope so handler fns can reach them if needed)
+var display_proxy: wire.Proxy(wli.WlDisplay) = undefined;
+var registry_proxy: wire.Proxy(wli.WlRegistry) = undefined;
+
+// ── Window struct (unchanged for now) ─────────────────────────
+pub const Window = struct {
+    surface_id: u32,
+    xdg_surface_id: u32,
+    xdg_toplevel_id: u32,
+    configured: bool,
+    width: u32,
+    height: u32,
+    should_close: bool,
+    events: [64]Event,
+    event_head: usize,
+    event_tail: usize,
+
+    pub fn deinit(self: *Window) void { _ = self; }
+    pub fn shouldClose(self: *const Window) bool { return self.should_close; }
+    pub fn swapBuffers(self: *const Window, offset: u32) void { _ = self; _ = offset; }
+};
+
+// ── platform interface ────────────────────────────────────────
+pub fn init(p_gpa: Allocator, p_io: std.Io, env: *std.process.Environ.Map) !void {
+    gpa = p_gpa;
+    conn = try wire.Connection.init(gpa, p_io, env);
+
+    // wl_display is fixed at obj_id=1
+    display_proxy = .{
+        .obj_id = 1,
+        .conn = conn,
+        .on_event = onDisplayEvent,
+    };
+    try conn.registerProxy(wli.WlDisplay, &display_proxy);
+
+    // get a registry id and register a proxy for it
+    const registry_id = conn.ids.alloc();
+    registry_proxy = .{
+        .obj_id = registry_id,
+        .conn = conn,
+        .on_event = onRegistryEvent,
+    };
+    try conn.registerProxy(wli.WlRegistry, &registry_proxy);
+
+    // ask compositor to send us all the globals
+    try display_proxy.send(.{ .get_registry = .{ .registry = registry_id } });
+
+    // sync barrier — drain until callback fires
+    const cb_id = conn.ids.alloc();
+    try display_proxy.send(.{ .sync = .{ .callback = cb_id } });
+    try conn.drain(cb_id);
+
+    log.info(.platform, "globals enumerated: compositor={} xdg_wm_base={} seat={}",
+        .{ compositor_name, xdg_wm_base_name, seat_name });
+}
+
+pub fn deinit() void {
+    conn.deinit();
+}
+
+// ── event handlers (the policy) ───────────────────────────────
+fn onDisplayEvent(event: wli.WlDisplay.Event) !void {
+    switch (event) {
+        .err => |e| {
+            log.err(.platform, "wl_display error: obj={} code={} msg={s}",
+                .{ e.object_id, e.code, e.msg });
+            return error.WaylandProtocolError;
+        },
+        .delete_id => {},  // wire handles routing cleanup automatically
+    }
+}
+
+fn onRegistryEvent(event: wli.WlRegistry.Event) !void {
+    switch (event) {
+        .global => |g| {
+            log.info(.platform, "global: {s} v{}", .{ g.interface, g.version });
+            if (std.mem.eql(u8, g.interface, "wl_compositor")) {
+                compositor_name = g.name;
+            } else if (std.mem.eql(u8, g.interface, "xdg_wm_base")) {
+                xdg_wm_base_name = g.name;
+            } else if (std.mem.eql(u8, g.interface, "wl_seat")) {
+                seat_name = g.name;
+            }
+        },
+        .global_remove => {},
+    }
+}
+
+// ── stubs for the rest of plat interface (unchanged) ──────────
+pub fn createWindow(config: WindowConfig) !*Window {
+    _ = config;
+    return error.NotImplemented;
+}
+pub fn pollNextEvent() ?Event { return null; }
+// ... etc</code></pre>
+
+<h3>What's gone from linux.zig</h3>
+<ul>
+    <li><code>dispatch</code> function — wire owns dispatch via the routing table</li>
+    <li>Local <code>drain</code> function — wire owns the loop</li>
+    <li>The <code>std.meta.fields(...)[...].type</code> incantations</li>
+    <li>Direct calls to <code>wire.parse</code></li>
+    <li>Manual obj_id routing logic</li>
+    <li>Awareness of opcodes</li>
+    <li>Awareness of byte slices</li>
+    <li><code>display_id</code> file-scope var (just inlined as <code>1</code>)</li>
+    <li>Local <code>Header</code> struct (already moved to wire)</li>
+    <li>The commented-out <code>WaylandState</code> block</li>
+    <li>File-scope <code>send_buf</code>, <code>recv_buf</code>, <code>writer</code>, <code>reader</code>, <code>stream</code> (all in Connection now)</li>
+</ul>
+
+<h3>What stays</h3>
+<ul>
+    <li>File-scope state: <code>conn</code>, <code>gpa</code>, the per-interface obj_id and name vars</li>
+    <li>File-scope proxy instances (so handler fns can reach them by name)</li>
+    <li>Per-interface event handler fns at file scope</li>
+    <li>The <code>Window</code> struct</li>
+    <li>The full <code>plat.*</code> public API (window, input, time, clipboard, etc.)</li>
+</ul>
+
+<h3>Tasks</h3>
+<ul class="checklist">
+    <li>Delete the <code>dispatch</code> fn entirely</li>
+    <li>Delete the local <code>drain</code> fn (use <code>conn.drain</code>)</li>
+    <li>Delete <code>display_id</code> file-scope var</li>
+    <li>Delete the commented <code>WaylandState</code> block (lines 21-35 of current linux.zig)</li>
+    <li>Add file-scope proxy vars: <code>display_proxy</code>, <code>registry_proxy</code></li>
+    <li>Add file-scope global-tracking vars: <code>compositor_name</code>, <code>xdg_wm_base_name</code>, <code>seat_name</code> (and the corresponding <code>_id</code> vars when those get bound later)</li>
+    <li>Write <code>onDisplayEvent</code> handler at file scope</li>
+    <li>Write <code>onRegistryEvent</code> handler at file scope (with the <code>std.mem.eql</code> dispatch on interface name)</li>
+    <li>Restructure <code>init</code>: connect → register display_proxy → alloc registry_id → register registry_proxy → send get_registry → send sync → drain to cb_id</li>
+    <li>Verify globals still flood and drain stops on callback done</li>
+    <li>Remove unused imports (<code>net</code>, <code>WlHeader</code>, etc. that were only used for the old dispatch)</li>
+</ul>
+
+<h3>Errors bubble cleanly</h3>
+<p>Per the policy decision: handler returns error → drain returns error →
+<code>init</code> returns error → app decides what to do.</p>
+
+<div class="note">
+<code>onDisplayEvent</code> returning <code>error.WaylandProtocolError</code> on
+the <code>.err</code> variant is the canonical example. Display-level errors
+are fatal — bubble them. Other handlers might log and continue (e.g., unknown
+global → warn, keep going). Wire never decides recovery, only reports.
+</div>
+</div>
+
+<!-- ─────────────────────────────────────────── -->
+<h2>Adding a New Interface (post-completion)</h2>
+<p>After steps 4-6 land, supporting a new Wayland interface is a four-step
+pattern with no wire.zig changes:</p>
+
+<h3>1. Declare the interface in <code>interfaces.zig</code></h3>
+<pre><code>pub const WlCompositor = struct {
+    pub const Request = union(enum) {
+        create_surface: struct { id: u32 },
+        create_region: struct { id: u32 },
+    };
+    pub const Event = union(enum) {};
+    comptime {
+        std.debug.assert(@intFromEnum(WlCompositor.Request.create_surface) == 0);
+        std.debug.assert(@intFromEnum(WlCompositor.Request.create_region) == 1);
+    }
+};</code></pre>
+
+<h3>2. Add file-scope state in <code>linux.zig</code></h3>
+<pre><code>var compositor_id: u32 = 0;
+var compositor_proxy: wire.Proxy(wli.WlCompositor) = undefined;</code></pre>
+
+<h3>3. Write the handler fn</h3>
+<pre><code>fn onCompositorEvent(event: wli.WlCompositor.Event) !void {
+    switch (event) {
+        // empty union — no events for compositor
+    }
+}</code></pre>
+
+<h3>4. Register and use in <code>init</code></h3>
+<pre><code>// after registry roundtrip has populated compositor_name:
+compositor_id = conn.ids.alloc();
+try registry_proxy.send(.{ .bind = .{
+    .name = compositor_name,
+    .new_id = compositor_id,
+} });
+compositor_proxy = .{
+    .obj_id = compositor_id,
+    .conn = conn,
+    .on_event = onCompositorEvent,
+};
+try conn.registerProxy(wli.WlCompositor, &compositor_proxy);</code></pre>
+
+<p><code>wire.zig</code> is never touched. That's the entire point of the architecture.</p>
+
+<h2>Out of Scope (deferred, not forgotten)</h2>
+<ul>
+    <li><strong><code>wl_registry.bind</code> special encoding</strong> — the
+    new_id arg on the wire carries the interface name string and version inline.
+    Every other request uses bare u32 new_ids. Special-case in <code>emit</code>
+    when implementing window creation.</li>
+
+    <li><strong>SCM_RIGHTS file descriptor passing</strong> —
+    <code>wl_keyboard.keymap</code> sends a memory-mapped fd via Unix socket
+    ancillary data, not in the message payload. Requires <code>sendmsg</code>
+    with <code>cmsg</code>. Handle when keyboard input matters.</li>
+
+    <li><strong>Non-blocking poll</strong> — current <code>nextMessage</code>
+    blocks. <code>pollNextEvent</code> needs a non-blocking variant of
+    <code>drain</code>. Add when game-loop integration starts.</li>
+
+    <li><strong>Send batching</strong> — multiple requests per frame could
+    share one <code>flush</code> call. Wire-internal optimization, never visible
+    to linux.zig.</li>
+
+    <li><strong>Comptime-synthesized convenience methods</strong> —
+    auto-generate <code>display.getRegistry(id)</code> from the union variants.
+    Worth doing if surface area grows past ~20 requests. For now, the union
+    literal call site is acceptable verbosity.</li>
+
+    <li><strong>Multi-window support</strong> — currently the architecture
+    assumes one window. When multiple windows are needed, surface_id → Window
+    routing has to live somewhere — probably linux.zig owns a hashmap of
+    surface_id → *Window. Wire stays single-connection.</li>
+
+    <li><strong>Generated zwayland</strong> — eventual semester-project goal:
+    parse <code>wayland.xml</code> at comptime and generate
+    <code>interfaces.zig</code> automatically. For this engine, hand-writing
+    6-8 interfaces is faster than building the generator.</li>
+</ul>
+
+</body>
+</html>

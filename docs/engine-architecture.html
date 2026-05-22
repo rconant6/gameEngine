@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Engine Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 2rem 2rem 6rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1 { color: #58a6ff; font-size: 1.8rem; border-bottom: 1px solid #21262d; padding-bottom: 0.5rem; margin-bottom: 0.25rem; }
+  .page-sub { color: #8b949e; font-size: 0.9rem; margin-bottom: 2rem; }
+  h2 { color: #f0883e; font-size: 1.35rem; margin-top: 3rem; margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid #21262d; }
+  h3 { color: #d2a8ff; font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  p, li { margin-bottom: 0.4rem; }
+  code {
+    background: #161b22; padding: 0.15rem 0.4rem; border-radius: 3px;
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.85em; color: #79c0ff;
+  }
+  .mono { font-family: 'SF Mono','Fira Code',monospace; }
+
+  /* ---- NAV ---- */
+  nav {
+    background: #161b22; border: 1px solid #21262d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin-bottom: 2rem;
+  }
+  nav .nav-title { color: #8b949e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: 0.5rem; }
+  nav .nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.3rem 1rem; }
+  nav a { font-size: 0.85rem; display: block; padding: 0.15rem 0; }
+
+  /* ---- SECTION ---- */
+  section { scroll-margin-top: 1rem; }
+
+  /* ---- STRUCT CARD ---- */
+  .card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin: 0.75rem 0;
+  }
+  .card.main   { border-color: #58a6ff; }
+  .card.child  { border-color: #d2a8ff; }
+  .card.leaf   { border-color: #7ee787; }
+  .card.ext    { border-color: #f0883e; border-style: dashed; }
+
+  .card-name {
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem;
+  }
+  .card-name.c-blue   { color: #58a6ff; }
+  .card-name.c-purple { color: #d2a8ff; }
+  .card-name.c-green  { color: #7ee787; }
+  .card-name.c-orange { color: #f0883e; }
+
+  .fields {
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.8rem; line-height: 1.7;
+  }
+  .fn  { color: #d2a8ff; }
+  .ft  { color: #7ee787; }
+  .fp  { color: #79c0ff; }
+  .fc  { color: #8b949e; font-style: italic; }
+  .fl  { color: #484f58; font-family: -apple-system,sans-serif; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-top: 0.4rem; margin-bottom: 0.15rem; }
+
+  /* ---- SVG diagrams ---- */
+  .diagram-wrap { margin: 1rem 0; overflow-x: auto; }
+  svg { overflow: visible; }
+  .box { fill: #161b22; stroke: #30363d; stroke-width: 1.5; rx: 8; }
+  .box-main { stroke: #58a6ff; stroke-width: 2; }
+  .box-purple { stroke: #d2a8ff; }
+  .box-green { stroke: #7ee787; }
+  .box-orange { stroke: #f0883e; stroke-dasharray: 5,4; }
+  .hdr { fill: #21262d; rx: 8; }
+  .hdr-clip { fill: #21262d; }
+
+  .t-name   { fill: #58a6ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-purple { fill: #d2a8ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-green  { fill: #7ee787; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-orange { fill: #f0883e; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-field  { fill: #79c0ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-type   { fill: #7ee787; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-fn     { fill: #d2a8ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-dim    { fill: #8b949e; font-family: -apple-system,sans-serif; font-size: 10px; font-style: italic; }
+  .t-sec    { fill: #484f58; font-family: -apple-system,sans-serif; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .line-own  { stroke: #58a6ff; stroke-width: 2; fill: none; }
+  .line-ref  { stroke: #f0883e; stroke-dasharray: 6,4; fill: none; }
+  .line-flow { stroke: #7ee787; stroke-width: 2; fill: none; }
+  .arr-blue   { fill: #58a6ff; }
+  .arr-orange { fill: #f0883e; }
+  .arr-green  { fill: #7ee787; }
+
+  /* ---- LINK PILLS ---- */
+  .links { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+  .links a {
+    background: #21262d; border: 1px solid #30363d; border-radius: 2rem;
+    padding: 0.25rem 0.75rem; font-size: 0.75rem; white-space: nowrap;
+  }
+  .links a:hover { border-color: #58a6ff; text-decoration: none; }
+
+  /* ---- FLOW LIST ---- */
+  .flow-list { list-style: none; counter-reset: fl; margin: 0.75rem 0; }
+  .flow-list li {
+    counter-increment: fl; position: relative; padding: 0.5rem 0.75rem 0.5rem 2.75rem;
+    background: #161b22; border: 1px solid #21262d; border-radius: 6px; margin: 0.35rem 0;
+  }
+  .flow-list li::before {
+    content: counter(fl); position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+    background: #30363d; color: #8b949e; font-size: 0.7rem; font-weight: 700;
+    width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px;
+  }
+</style>
+</head>
+<body>
+
+<h1 id="top">Engine Architecture</h1>
+<p class="page-sub">Complete system map &mdash; macro overview, then each subsystem in detail with cross-links</p>
+
+<!-- ============================================================ -->
+<!-- NAV -->
+<!-- ============================================================ -->
+<nav>
+  <div class="nav-title">Jump to system</div>
+  <div class="nav-grid">
+    <a href="#macro">Macro Overview</a>
+    <a href="#game-loop">Game Loop</a>
+    <a href="#engine">Engine</a>
+    <a href="#ecs">ECS (World)</a>
+    <a href="#components">Components</a>
+    <a href="#systems">Systems</a>
+    <a href="#actions">Action System</a>
+    <a href="#scene">Scene Format</a>
+    <a href="#scene-runtime">Scene Runtime</a>
+    <a href="#registries">Registries</a>
+    <a href="#renderer">Renderer</a>
+    <a href="#metal">Metal Backend</a>
+    <a href="#platform">Platform</a>
+    <a href="#input">Input</a>
+    <a href="#assets">Assets</a>
+    <a href="#math">Math</a>
+    <a href="#debug">Debug &amp; Logging</a>
+    <a href="#ui">UI</a>
+  </div>
+</nav>
+
+<!-- ============================================================ -->
+<!-- MACRO OVERVIEW -->
+<!-- ============================================================ -->
+<section id="macro">
+<h2>Macro Overview</h2>
+
+<div class="diagram-wrap">
+<svg width="1060" height="580" viewBox="0 0 1060 580">
+  <defs>
+    <marker id="a-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-blue"/></marker>
+    <marker id="a-orange" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-orange"/></marker>
+    <marker id="a-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-green"/></marker>
+  </defs>
+
+  <!-- Engine box (top center) -->
+  <rect class="box box-main" x="380" y="10" width="300" height="60"/>
+  <rect class="hdr" x="380" y="10" width="300" height="28" rx="8"/>
+  <rect class="hdr-clip" x="380" y="26" width="300" height="12"/>
+  <text x="530" y="28" text-anchor="middle" class="t-name">Engine</text>
+  <text x="530" y="52" text-anchor="middle" class="t-dim">orchestrates all subsystems</text>
+
+  <!-- Row 2: ECS / Scene / Actions -->
+  <rect class="box box-purple" x="30" y="130" width="200" height="60"/>
+  <rect class="hdr" x="30" y="130" width="200" height="28" rx="8"/><rect class="hdr-clip" x="30" y="146" width="200" height="12"/>
+  <text x="130" y="148" text-anchor="middle" class="t-purple">ECS (World)</text>
+  <text x="130" y="172" text-anchor="middle" class="t-dim">entities + components + queries</text>
+
+  <rect class="box box-purple" x="270" y="130" width="200" height="60"/>
+  <rect class="hdr" x="270" y="130" width="200" height="28" rx="8"/><rect class="hdr-clip" x="270" y="146" width="200" height="12"/>
+  <text x="370" y="148" text-anchor="middle" class="t-purple">Scene Runtime</text>
+  <text x="370" y="172" text-anchor="middle" class="t-dim">manager + instantiator + templates</text>
+
+  <rect class="box box-purple" x="510" y="130" width="200" height="60"/>
+  <rect class="hdr" x="510" y="130" width="200" height="28" rx="8"/><rect class="hdr-clip" x="510" y="146" width="200" height="12"/>
+  <text x="610" y="148" text-anchor="middle" class="t-purple">Systems</text>
+  <text x="610" y="172" text-anchor="middle" class="t-dim">movement, physics, render, ...</text>
+
+  <rect class="box box-purple" x="750" y="130" width="200" height="60"/>
+  <rect class="hdr" x="750" y="130" width="200" height="28" rx="8"/><rect class="hdr-clip" x="750" y="146" width="200" height="12"/>
+  <text x="850" y="148" text-anchor="middle" class="t-purple">Action System</text>
+  <text x="850" y="172" text-anchor="middle" class="t-dim">triggers + queue + executor</text>
+
+  <!-- Row 3: Renderer / Platform / Assets -->
+  <rect class="box" x="30" y="260" width="200" height="60" style="stroke:#7ee787;"/>
+  <rect class="hdr" x="30" y="260" width="200" height="28" rx="8"/><rect class="hdr-clip" x="30" y="276" width="200" height="12"/>
+  <text x="130" y="278" text-anchor="middle" class="t-green">Renderer</text>
+  <text x="130" y="302" text-anchor="middle" class="t-dim">shapes, text, draw calls</text>
+
+  <rect class="box" x="270" y="260" width="200" height="60" style="stroke:#7ee787;"/>
+  <rect class="hdr" x="270" y="260" width="200" height="28" rx="8"/><rect class="hdr-clip" x="270" y="276" width="200" height="12"/>
+  <text x="370" y="278" text-anchor="middle" class="t-green">Platform</text>
+  <text x="370" y="302" text-anchor="middle" class="t-dim">window, events, OS abstraction</text>
+
+  <rect class="box" x="510" y="260" width="200" height="60" style="stroke:#7ee787;"/>
+  <rect class="hdr" x="510" y="260" width="200" height="28" rx="8"/><rect class="hdr-clip" x="510" y="276" width="200" height="12"/>
+  <text x="610" y="278" text-anchor="middle" class="t-green">Assets</text>
+  <text x="610" y="302" text-anchor="middle" class="t-dim">fonts (+ zxl coming)</text>
+
+  <rect class="box" x="750" y="260" width="200" height="60" style="stroke:#7ee787;"/>
+  <rect class="hdr" x="750" y="260" width="200" height="28" rx="8"/><rect class="hdr-clip" x="750" y="276" width="200" height="12"/>
+  <text x="850" y="278" text-anchor="middle" class="t-green">Scene Format</text>
+  <text x="850" y="302" text-anchor="middle" class="t-dim">lexer + parser + AST</text>
+
+  <!-- Row 4: Low-level -->
+  <rect class="box box-orange" x="30" y="390" width="200" height="60"/>
+  <rect class="hdr" x="30" y="390" width="200" height="28" rx="8"/><rect class="hdr-clip" x="30" y="406" width="200" height="12"/>
+  <text x="130" y="408" text-anchor="middle" class="t-orange">Metal Backend</text>
+  <text x="130" y="432" text-anchor="middle" class="t-dim">GPU pipeline, batching, shaders</text>
+
+  <rect class="box box-orange" x="270" y="390" width="200" height="60"/>
+  <rect class="hdr" x="270" y="390" width="200" height="28" rx="8"/><rect class="hdr-clip" x="270" y="406" width="200" height="12"/>
+  <text x="370" y="408" text-anchor="middle" class="t-orange">macOS / Linux / Win</text>
+  <text x="370" y="432" text-anchor="middle" class="t-dim">native window + input</text>
+
+  <rect class="box box-orange" x="510" y="390" width="200" height="60"/>
+  <rect class="hdr" x="510" y="390" width="200" height="28" rx="8"/><rect class="hdr-clip" x="510" y="406" width="200" height="12"/>
+  <text x="610" y="408" text-anchor="middle" class="t-orange">Registries</text>
+  <text x="610" y="432" text-anchor="middle" class="t-dim">comptime component/shape unions</text>
+
+  <rect class="box box-orange" x="750" y="390" width="200" height="60"/>
+  <rect class="hdr" x="750" y="390" width="200" height="28" rx="8"/><rect class="hdr-clip" x="750" y="406" width="200" height="12"/>
+  <text x="850" y="408" text-anchor="middle" class="t-orange">Math + Debug</text>
+  <text x="850" y="432" text-anchor="middle" class="t-dim">V2, Color, logging</text>
+
+  <!-- CONNECTIONS: Engine -> row 2 -->
+  <path d="M 430,70 L 430,100 Q 430,120 410,120 L 140,120 L 130,130" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 480,70 L 480,100 Q 480,120 470,120 L 380,120 L 370,130" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 580,70 L 580,100 Q 580,120 590,120 L 610,130" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 630,70 L 630,100 Q 630,120 680,120 L 840,120 L 850,130" class="line-own" marker-end="url(#a-blue)"/>
+
+  <!-- Row 2 -> Row 3 -->
+  <path d="M 130,190 L 130,260" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 370,190 L 370,260" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 610,190 L 610,260" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 850,190 L 850,260" class="line-own" marker-end="url(#a-blue)"/>
+
+  <!-- Row 3 -> Row 4 -->
+  <path d="M 130,320 L 130,390" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 370,320 L 370,390" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 610,320 L 610,390" class="line-ref" marker-end="url(#a-orange)"/>
+  <path d="M 850,320 L 850,390" class="line-ref" marker-end="url(#a-orange)"/>
+
+  <!-- Cross-links (dashed) -->
+  <path d="M 230,160 L 270,160" class="line-ref" marker-end="url(#a-orange)"/>
+  <text x="240" y="153" class="t-dim" font-size="8">instantiates into</text>
+
+  <path d="M 710,160 L 750,160" class="line-ref" marker-end="url(#a-orange)"/>
+  <text x="715" y="153" class="t-dim" font-size="8">triggers</text>
+
+  <!-- Layer labels -->
+  <text x="10" y="52" class="t-sec" font-size="10">ORCHESTRATION</text>
+  <text x="10" y="160" class="t-sec" font-size="10">GAME LOGIC</text>
+  <text x="10" y="290" class="t-sec" font-size="10">SERVICES</text>
+  <text x="10" y="420" class="t-sec" font-size="10">BACKENDS</text>
+
+  <!-- Module dep note -->
+  <rect x="30" y="490" width="920" height="70" rx="8" fill="#0d1f0d" stroke="#238636"/>
+  <text x="50" y="512" fill="#7ee787" font-size="12" font-weight="600">Module Dependency Rule</text>
+  <text x="50" y="530" class="t-dim" font-size="11">Each layer only depends downward. No circular deps. build.zig enforces this via explicit ModuleDef entries.</text>
+  <text x="50" y="546" class="t-dim" font-size="11">debug is auto-injected into every module. build_options is compile-time generated (renderer backend, validation).</text>
+</svg>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- GAME LOOP -->
+<!-- ============================================================ -->
+<section id="game-loop">
+<h2>Game Loop</h2>
+<p>The engine runs a fixed update loop. Each frame executes systems in this order:</p>
+
+<ol class="flow-list">
+  <li><strong>ActionSys</strong> &mdash; process input/collision triggers, execute queued actions</li>
+  <li><strong>PhysicsSys</strong> &mdash; apply forces, update velocities <span class="fc">(stub)</span></li>
+  <li><strong>MovementSys</strong> &mdash; <code>position += velocity * dt</code></li>
+  <li><strong>CollisionDetectionSys</strong> &mdash; detect overlaps, populate collision events</li>
+  <li><strong>CameraTrackingSys</strong> &mdash; spring-damper follow target entity</li>
+  <li><strong>LifetimeSys</strong> &mdash; decrement timers, mark expired entities with <code>Destroy</code></li>
+  <li><strong>RenderSys</strong> &mdash; draw world-space sprites/text, then screen-space UI</li>
+</ol>
+
+<div class="links">
+  <a href="#systems">Systems detail</a>
+  <a href="#engine">Engine struct</a>
+  <a href="#actions">Action system</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ENGINE -->
+<!-- ============================================================ -->
+<section id="engine">
+<h2>Engine</h2>
+<p>Top-level struct that owns all subsystems. Created by games via <code>Engine.init()</code>.</p>
+<p><code>src/Engine.zig</code> (public API) &rarr; <code>src/engine/engine.zig</code> (implementation)</p>
+
+<div class="card main">
+  <div class="card-name c-blue">Engine</div>
+  <div class="fields">
+    <span class="fl">Core</span>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">window</span>: <span class="ft">platform.Window</span><br>
+    <span class="fp">input</span>: <span class="ft">Input</span><br>
+    <span class="fp">renderer</span>: <span class="ft">Renderer</span><br>
+    <span class="fp">assets</span>: <span class="ft">AssetManager</span><br>
+    <span class="fl">ECS &amp; Game Logic</span>
+    <span class="fp">world</span>: <span class="ft">World</span><br>
+    <span class="fp">collision_events</span>: <span class="ft">ArrayList(Collision)</span><br>
+    <span class="fp">action_system</span>: <span class="ft">ActionSystem</span><br>
+    <span class="fl">Scene</span>
+    <span class="fp">scene_manager</span>: <span class="ft">SceneManager</span><br>
+    <span class="fp">template_manager</span>: <span class="ft">TemplateManager</span><br>
+    <span class="fp">instantiator</span>: <span class="ft">Instantiator</span><br>
+    <span class="fl">Camera &amp; Display</span>
+    <span class="fp">active_camera_entity</span>: <span class="ft">Entity</span><br>
+    <span class="fp">window_width</span> / <span class="fp">window_height</span>: <span class="ft">u32</span><br>
+    <span class="fl">Debug</span>
+    <span class="fp">debugger</span>: <span class="ft">DebugManager</span><br>
+    <span class="fp">performance_metrics</span>: <span class="ft">PerformanceMetrics</span> <span class="fc">{ fps, frame_time, min/max }</span><br>
+    <span class="fp">running</span>: <span class="ft">bool</span><br>
+    <span class="fl">Public API</span>
+    <span class="fn">init</span>(alloc, title, w, h) &rarr; <span class="ft">*Engine</span><br>
+    <span class="fn">deinit</span>()<br>
+    <span class="fn">loadScene</span>(name, filename)<br>
+    <span class="fn">setActiveScene</span>(name)<br>
+    <span class="fn">instantiateActiveScene</span>()<br>
+    <span class="fn">run</span>() <span class="fc">// main loop: update + render</span><br>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#ecs">World</a>
+  <a href="#renderer">Renderer</a>
+  <a href="#platform">Platform</a>
+  <a href="#assets">Assets</a>
+  <a href="#scene-runtime">Scene Runtime</a>
+  <a href="#actions">Action System</a>
+  <a href="#systems">Systems</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ECS -->
+<!-- ============================================================ -->
+<section id="ecs">
+<h2>ECS (World)</h2>
+<p>Custom Entity Component System using sparse-dense storage arrays for cache-friendly iteration.</p>
+<p><code>src/ecs/</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">World</div>
+  <div class="fields">
+    <span class="fl">Fields</span>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">next_entity_id</span>: <span class="ft">usize</span><br>
+    <span class="fp">component_storages</span>: <span class="ft">StringHashMap(StorageInterface)</span><br>
+    <span class="fp">template_manager</span>: <span class="ft">*TemplateManager</span><br>
+    <span class="fl">Entity Operations</span>
+    <span class="fn">createEntity</span>() &rarr; <span class="ft">Entity</span><br>
+    <span class="fn">destroyEntity</span>(entity)<br>
+    <span class="fn">createEntityFromTemplate</span>(name, offset) &rarr; <span class="ft">Entity</span><br>
+    <span class="fl">Component Operations</span>
+    <span class="fn">addComponent</span>(entity, T, value)<br>
+    <span class="fn">removeComponent</span>(entity, T)<br>
+    <span class="fn">hasComponent</span>(entity, T) &rarr; <span class="ft">bool</span><br>
+    <span class="fn">getComponent</span>(entity, T) &rarr; <span class="ft">?*const T</span><br>
+    <span class="fn">getComponentMut</span>(entity, T) &rarr; <span class="ft">?*T</span><br>
+    <span class="fl">Queries</span>
+    <span class="fn">query</span>(.{T1, T2, ...}) &rarr; <span class="ft">Query</span><br>
+    <span class="fn">findEntityByTag</span>(tag) &rarr; <span class="ft">?Entity</span><br>
+    <span class="fn">findEntitiesByTag</span>(tag) &rarr; <span class="ft">[]Entity</span><br>
+    <span class="fn">findEntitiesByPattern</span>(pattern) &rarr; <span class="ft">[]Entity</span><br>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Entity</div>
+  <div class="fields">
+    <span class="fp">id</span>: <span class="ft">usize</span> <span class="fc">// simple value type, no methods</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">ComponentStorage(T)</div>
+  <div class="fields">
+    <span class="fl">Sparse-Dense Array</span>
+    <span class="fp">sparse</span>: <span class="ft">ArrayList(?usize)</span> <span class="fc">// entity_id &rarr; dense_index</span><br>
+    <span class="fp">dense</span>: <span class="ft">ArrayList(T)</span> <span class="fc">// packed component data</span><br>
+    <span class="fp">entities</span>: <span class="ft">ArrayList(usize)</span> <span class="fc">// dense_index &rarr; entity_id</span><br>
+    <span class="fl">Methods</span>
+    <span class="fn">add</span> / <span class="fn">remove</span> / <span class="fn">get</span> / <span class="fn">getMut</span> / <span class="fn">set</span> / <span class="fn">has</span> / <span class="fn">clear</span><br>
+    <span class="fn">iterator</span>() &rarr; yields <span class="ft">Entry { entity, *const T }</span><br>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Query(ComponentTypes...)</div>
+  <div class="fields">
+    Iterates the smallest storage, checks others for matching entity.<br>
+    <span class="fn">next</span>() &rarr; <span class="ft">?Entry { entity, component pointers }</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#components">Components</a>
+  <a href="#systems">Systems</a>
+  <a href="#engine">Engine</a>
+  <a href="#scene-runtime">Templates</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- COMPONENTS -->
+<!-- ============================================================ -->
+<section id="components">
+<h2>Components</h2>
+<p>All component types live in <code>src/ecs/Components.zig</code>. Registered at comptime via <a href="#registries">ComponentRegistry</a>.</p>
+
+<h3>Spatial</h3>
+<div class="card child">
+  <div class="card-name c-purple">Transform</div>
+  <div class="fields">
+    <span class="fp">position</span>: <span class="ft">V2</span> = .ZERO &nbsp;
+    <span class="fp">rotation</span>: <span class="ft">f32</span> = 0 &nbsp;
+    <span class="fp">scale</span>: <span class="ft">f32</span> = 1
+  </div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">Velocity</div>
+  <div class="fields">
+    <span class="fp">linear</span>: <span class="ft">V2</span> &nbsp;
+    <span class="fp">angular</span>: <span class="ft">f32</span>
+  </div>
+</div>
+
+<h3>Rendering</h3>
+<div class="card child">
+  <div class="card-name c-purple">Sprite</div>
+  <div class="fields">
+    <span class="fp">geometry</span>: <span class="ft">?ShapeData</span> <span class="fc">// Circle | Rectangle | Triangle | Line | Polygon</span><br>
+    <span class="fp">fill_color</span>: <span class="ft">?Color</span> &nbsp;
+    <span class="fp">stroke_color</span>: <span class="ft">?Color</span> &nbsp;
+    <span class="fp">stroke_width</span>: <span class="ft">f32</span> &nbsp;
+    <span class="fp">visible</span>: <span class="ft">bool</span>
+  </div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">Text</div>
+  <div class="fields">
+    <span class="fp">text</span>: <span class="ft">[]const u8</span> &nbsp;
+    <span class="fp">font_asset</span>: <span class="ft">FontHandle</span> &nbsp;
+    <span class="fp">size</span>: <span class="ft">f32</span> &nbsp;
+    <span class="fp">text_color</span>: <span class="ft">Color</span>
+  </div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">RenderLayer</div>
+  <div class="fields"><span class="fp">z_order</span>: <span class="ft">i32</span> = 0</div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">UIElement</div>
+  <div class="fields">
+    <span class="fp">anchor</span>: <span class="ft">ScreenAnchor</span> <span class="fc">// TopLeft..BottomRight (9 positions)</span> &nbsp;
+    <span class="fp">offset</span>: <span class="ft">V2</span>
+  </div>
+</div>
+
+<h3>Physics &amp; Collision</h3>
+<div class="card child">
+  <div class="card-name c-purple">Physics</div>
+  <div class="fields">
+    <span class="fp">mass</span>: <span class="ft">f32</span> &nbsp;
+    <span class="fp">friction</span>: <span class="ft">f32</span>
+  </div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">Collider</div>
+  <div class="fields">
+    <span class="fp">collider</span>: <span class="ft">ColliderData</span> <span class="fc">// CircleCollider { origin, radius } | RectangleCollider { center, half_w, half_h }</span>
+  </div>
+</div>
+
+<h3>Camera</h3>
+<div class="card child">
+  <div class="card-name c-purple">Camera</div>
+  <div class="fields">
+    <span class="fp">ortho_size</span>: <span class="ft">f32</span> &nbsp;
+    <span class="fp">viewport</span>: <span class="ft">Rect(WorldPoint)</span> &nbsp;
+    <span class="fp">priority</span>: <span class="ft">i32</span> &nbsp;
+    <span class="fp">rotation</span>: <span class="ft">f32</span> &nbsp;
+    <span class="fp">background</span>: <span class="ft">?Color</span><br>
+    <span class="fl">Static helpers (operate on World + Entity)</span>
+    <span class="fn">setPosition</span> / <span class="fn">getPosition</span> / <span class="fn">translate</span> / <span class="fn">zoom</span> / <span class="fn">smoothZoom</span> / <span class="fn">getViewBounds</span><br>
+    <span class="fn">enableCameraTracking</span> / <span class="fn">setTrackingTarget</span> / <span class="fn">setCameraFollowStiffness</span> / <span class="fn">setCameraFollowDamping</span>
+  </div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">CameraTracking</div>
+  <div class="fields">
+    <span class="fp">target</span>: <span class="ft">?Entity</span> &nbsp;
+    <span class="fp">target_offset</span>: <span class="ft">V2</span> &nbsp;
+    <span class="fp">mode</span>: <span class="ft">TrackingMode</span> <span class="fc">// packed bools: enabled, immediate, smooth, lead_h/v, lock_x/y, deadzone, auto_zoom, shake</span><br>
+    <span class="fp">follow_stiffness</span> / <span class="fp">follow_damping</span>: <span class="ft">V2</span> &nbsp;
+    <span class="fp">lead_distance</span> / <span class="fp">current_lead_offset</span>: <span class="ft">V2</span><br>
+    <span class="fp">velocity_tracker</span> / <span class="fp">last_target_position</span>: <span class="ft">V2</span>
+  </div>
+</div>
+
+<h3>Gameplay &amp; Tags</h3>
+<div class="card child">
+  <div class="card-name c-purple">Tag</div>
+  <div class="fields">
+    <span class="fp">tags</span>: <span class="ft">[]const u8</span><br>
+    <span class="fn">hasTag</span>(tag) &rarr; <span class="ft">bool</span> &nbsp;
+    <span class="fn">matchesPattern</span>(pattern) &rarr; <span class="ft">bool</span> <span class="fc">// "enemy*", "*_boss", exact</span>
+  </div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">Lifetime</div>
+  <div class="fields"><span class="fp">remaining</span>: <span class="ft">f32</span> <span class="fc">// seconds until Destroy</span></div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">Health</div>
+  <div class="fields"><span class="fp">remaining</span>: <span class="ft">i32</span></div>
+</div>
+
+<h3>Action Triggers</h3>
+<div class="card child">
+  <div class="card-name c-purple">OnInput / OnCollision</div>
+  <div class="fields">
+    <span class="ft">ActionBindings(TriggerType)</span> wrapping <span class="fp">triggers</span>: <span class="ft">[]TriggerType</span><br>
+    <span class="fc">See <a href="#actions">Action System</a> for trigger details</span>
+  </div>
+</div>
+
+<h3>Markers</h3>
+<p><code>ScreenSpace</code>, <code>Destroy</code>, <code>ActiveCamera</code>, <code>MinimapCamera</code> &mdash; zero-size tag components</p>
+
+<div class="links">
+  <a href="#ecs">World / Storage</a>
+  <a href="#systems">Systems that use these</a>
+  <a href="#registries">ComponentRegistry</a>
+  <a href="#renderer">Renderer (shapes, color)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SYSTEMS -->
+<!-- ============================================================ -->
+<section id="systems">
+<h2>Systems</h2>
+<p>Pure functions called by the engine each frame. <code>src/systems/</code></p>
+
+<div class="card leaf">
+  <div class="card-name c-green">ActionSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(world, action_system, trigger_ctx)<br>
+    <span class="fc">1) Process all registered trigger systems (input, collision)</span><br>
+    <span class="fc">2) Execute queued actions via ActionExecutor</span><br>
+    <span class="fc">3) Clear queue for next frame</span>
+  </div>
+</div>
+<div class="card leaf">
+  <div class="card-name c-green">MovementSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(world, dt, debugger)<br>
+    Query: <span class="ft">Transform + Velocity</span><br>
+    <span class="fc">transform.position += velocity.linear * dt</span><br>
+    <span class="fc">transform.rotation += velocity.angular * dt</span>
+  </div>
+</div>
+<div class="card leaf">
+  <div class="card-name c-green">PhysicsSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(world, dt) <span class="fc">// stub &mdash; not yet implemented</span>
+  </div>
+</div>
+<div class="card leaf">
+  <div class="card-name c-green">CollisionDetectionSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(world, collision_events, debugger)<br>
+    Query: <span class="ft">Transform + Collider</span> (all pairs)<br>
+    <span class="fc">Circle-Circle, Circle-Rect, Rect-Rect dispatch</span><br>
+    <span class="fc">Populates Collision { entity_a, entity_b, point, normal, penetration }</span>
+  </div>
+</div>
+<div class="card leaf">
+  <div class="card-name c-green">CameraTrackingSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(world, dt)<br>
+    Query: <span class="ft">CameraTracking + ActiveCamera</span><br>
+    <span class="fc">Immediate mode: snap to target</span><br>
+    <span class="fc">Smooth mode: spring-damper (stiffness + damping)</span>
+  </div>
+</div>
+<div class="card leaf">
+  <div class="card-name c-green">LifetimeSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(world, dt)<br>
+    Query: <span class="ft">Lifetime</span> &rarr; decrement, add <span class="ft">Destroy</span> if expired<br>
+    Query: <span class="ft">Destroy</span> &rarr; <span class="fn">destroyEntity</span>()
+  </div>
+</div>
+<div class="card leaf">
+  <div class="card-name c-green">RenderSys</div>
+  <div class="fields">
+    <span class="fn">run</span>(renderer, world, assets, camera, dt, debugger, w, h)<br>
+    <span class="fc">World-space pass:</span> Query <span class="ft">Transform + Sprite</span> &rarr; <span class="fn">drawGeometry</span><br>
+    <span class="fc">World-space text:</span> Query <span class="ft">Transform + Text</span> &rarr; <span class="fn">drawText</span><br>
+    <span class="fc">Screen-space pass:</span> Query <span class="ft">UIElement + Sprite</span> &rarr; anchor-positioned <span class="fn">drawGeometry</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#game-loop">Execution order</a>
+  <a href="#ecs">World / Query</a>
+  <a href="#components">Components</a>
+  <a href="#actions">Action System</a>
+  <a href="#renderer">Renderer</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ACTION SYSTEM -->
+<!-- ============================================================ -->
+<section id="actions">
+<h2>Action System</h2>
+<p>Event-driven gameplay: triggers fire &rarr; actions queue &rarr; executor modifies world. <code>src/action/</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">ActionSystem</div>
+  <div class="fields">
+    <span class="fp">action_queue</span>: <span class="ft">ActionQueue</span><br>
+    <span class="fp">trigger_systems</span>: <span class="ft">ArrayList(TriggerSystem)</span><br>
+    <span class="fn">registerTrigger</span>(trigger_system)
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">InputTrigger</div>
+  <div class="fields">
+    <span class="fp">input</span>: <span class="ft">union { key: KeyCode, mouse: MouseButton }</span><br>
+    <span class="fp">actions</span>: <span class="ft">[]const Action</span><br>
+    <span class="fc">Fires when key/button isPressed, enqueues actions</span>
+  </div>
+</div>
+<div class="card child">
+  <div class="card-name c-purple">CollisionTrigger</div>
+  <div class="fields">
+    <span class="fp">other_tag_pattern</span>: <span class="ft">[]const u8</span> <span class="fc">// pattern match: "enemy*"</span><br>
+    <span class="fp">actions</span>: <span class="ft">[]const Action</span><br>
+    <span class="fc">Fires when collision with matching tag, enqueues actions</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Action</div>
+  <div class="fields">
+    <span class="fp">action_type</span>: <span class="ft">ActionType</span> <span class="fc">// union:</span><br>
+    &nbsp;&nbsp;<span class="ft">destroy_self</span> | <span class="ft">destroy_other</span> | <span class="ft">spawn_entity</span>{ template, offset } |<br>
+    &nbsp;&nbsp;<span class="ft">set_velocity</span>{ target, velocity } | <span class="ft">debug_print</span> | <span class="ft">play_sound</span><br>
+    <span class="fp">priority</span>: <span class="ft">i32</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">ActionQueue &rarr; ActionExecutor</div>
+  <div class="fields">
+    Queue: <span class="fn">append</span>(action, context) &rarr; <span class="fn">sortByPriority</span>()<br>
+    Executor: switch on <span class="ft">ActionType</span> &rarr; modify World (add <span class="ft">Destroy</span>, spawn, set velocity...)
+  </div>
+</div>
+
+<div class="links">
+  <a href="#components">OnInput / OnCollision components</a>
+  <a href="#systems">ActionSys</a>
+  <a href="#input">Input (key/mouse)</a>
+  <a href="#ecs">World</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SCENE FORMAT -->
+<!-- ============================================================ -->
+<section id="scene">
+<h2>Scene Format</h2>
+<p>Custom declarative DSL for defining game scenes. <code>src/scene-format/</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">Lexer</div>
+  <div class="fields">
+    <span class="fp">src</span>: <span class="ft">[:0]const u8</span> &nbsp;
+    <span class="fp">index</span>: <span class="ft">u32</span> &nbsp;
+    <span class="fp">indent_level</span>: <span class="ft">u32</span><br>
+    <span class="fn">next</span>() &rarr; <span class="ft">?Token</span><br>
+    <span class="fc">Indent-sensitive, emits indent/dedent tokens</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Parser</div>
+  <div class="fields">
+    <span class="fp">lexer</span>: <span class="ft">Lexer</span> &nbsp;
+    <span class="fp">current_tok</span> / <span class="fp">previous_tok</span>: <span class="ft">Token</span><br>
+    <span class="fn">parse</span>() &rarr; <span class="ft">SceneFile</span><br>
+    <span class="fc">Recursive descent: declarations &rarr; components &rarr; properties &rarr; values</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">AST</div>
+  <div class="fields">
+    <span class="ft">SceneFile</span> { decls: []<span class="ft">Declaration</span> }<br>
+    <span class="ft">Declaration</span> = <span class="ft">SceneDecl</span> | <span class="ft">EntityDecl</span> | <span class="ft">AssetDecl</span> | <span class="ft">TemplateDecl</span> | <span class="ft">ComponentDecl</span><br>
+    <span class="ft">ComponentDecl</span> = <span class="ft">GenericBlock</span> | <span class="ft">SpriteBlock</span>{ shape_type } | <span class="ft">ColliderBlock</span>{ shape_type }<br>
+    <span class="ft">Property</span> { name, <span class="ft">TypeAnnotation</span>{ base_type, is_array }, <span class="ft">Value</span> }<br>
+    <span class="ft">Value</span> = number | string | color | bool | vector | assetRef | array<br>
+    <span class="ft">BaseType</span> = vec2 | vec3 | f32 | i32 | u32 | bool | string | color | asset<br>
+    <span class="ft">AssetType</span> = font <span class="fc">// + zxl coming</span>
+  </div>
+</div>
+
+<h3>Example</h3>
+<div class="card" style="border-color: #21262d; font-family: 'SF Mono',monospace; font-size: 0.8rem; line-height: 1.8;">
+  <span style="color:#f0883e">[GameFont:asset font]</span><br>
+  &nbsp;&nbsp;<span style="color:#79c0ff">filename</span>:<span style="color:#d2a8ff">string</span> <span style="color:#7ee787">"orbitron.ttf"</span><br><br>
+  <span style="color:#f0883e">[Player:entity]</span><br>
+  &nbsp;&nbsp;<span style="color:#f0883e">[Transform]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#79c0ff">position</span>:<span style="color:#d2a8ff">vec2</span> <span style="color:#7ee787">{0.0, 0.0}</span><br>
+  &nbsp;&nbsp;<span style="color:#f0883e">[Sprite:circle]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#79c0ff">radius</span>:<span style="color:#d2a8ff">f32</span> <span style="color:#7ee787">5.0</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#79c0ff">fill_color</span>:<span style="color:#d2a8ff">color</span> <span style="color:#7ee787">#ff0000</span><br>
+  &nbsp;&nbsp;<span style="color:#f0883e">[Tag]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#79c0ff">tags</span>:<span style="color:#d2a8ff">string</span> <span style="color:#7ee787">"player"</span>
+</div>
+
+<div class="links">
+  <a href="#scene-runtime">Scene Runtime (loads these)</a>
+  <a href="#registries">Registries (resolve types)</a>
+  <a href="#components">Components</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SCENE RUNTIME -->
+<!-- ============================================================ -->
+<section id="scene-runtime">
+<h2>Scene Runtime</h2>
+<p>Loads .scene files, manages active scene, instantiates entities. <code>src/scene/</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">SceneManager</div>
+  <div class="fields">
+    <span class="fp">scenes</span>: <span class="ft">StringHashMap(*SceneFile)</span><br>
+    <span class="fp">active_scene_name</span>: <span class="ft">?[]const u8</span><br>
+    <span class="fn">loadScene</span>(name, path) &nbsp; <span class="fn">setActiveScene</span>(name) &nbsp; <span class="fn">getActiveScene</span>() &rarr; <span class="ft">?*SceneFile</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">TemplateManager</div>
+  <div class="fields">
+    <span class="fp">templates</span>: <span class="ft">StringHashMap(Template)</span><br>
+    <span class="fn">loadTemplateFile</span>(name) &nbsp; <span class="fn">loadTemplatesFromDirectory</span>(path)<br>
+    <span class="fn">instantiate</span>(name, position) &rarr; <span class="ft">Entity</span> <span class="fc">// runtime spawning</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Instantiator</div>
+  <div class="fields">
+    <span class="fp">world</span>: <span class="ft">*World</span> &nbsp; <span class="fp">assets</span>: <span class="ft">*AssetManager</span><br>
+    <span class="fp">last_instantiated_entities</span>: <span class="ft">ArrayList(Entity)</span><br>
+    <span class="fn">instantiate</span>(scene_file) <span class="fc">// walks AST, creates entities</span><br>
+    <span class="fn">instantiateEntity</span>(decl) &rarr; creates entity + adds components<br>
+    <span class="fn">instantiateAsset</span>(decl) &rarr; loads font (+ zxl coming)<br>
+    <span class="fn">buildGenericComponent</span> / <span class="fn">buildSpriteComponent</span> / <span class="fn">buildColliderComponent</span><br>
+    <span class="fn">buildTriggerComponent</span> / <span class="fn">buildAction</span> <span class="fc">// nested block &rarr; trigger &rarr; action</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#scene">Scene Format (AST input)</a>
+  <a href="#ecs">World (output)</a>
+  <a href="#registries">Registries (type resolution)</a>
+  <a href="#assets">Assets (font loading)</a>
+  <a href="#engine">Engine</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- REGISTRIES -->
+<!-- ============================================================ -->
+<section id="registries">
+<h2>Registries</h2>
+<p>Comptime metaprogramming: introspect component/shape structs &rarr; generate tagged unions for type-safe polymorphism. <code>src/registry/</code></p>
+
+<div class="card ext">
+  <div class="card-name c-orange">ComponentRegistry</div>
+  <div class="fields">
+    Introspects <span class="ft">Components</span> struct at comptime &rarr; generates <span class="ft">ComponentData</span> union<br>
+    <span class="fn">getComponentIndex</span>(name) &nbsp; <span class="fn">createComponentUnion</span>(T, value) &rarr; <span class="ft">ComponentData</span>
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">ShapeRegistry</div>
+  <div class="fields">
+    Generates <span class="ft">ShapeData</span> union from all shape types &times; coordinate spaces (World + Screen)<br>
+    <span class="fc">Circle, Rectangle, Triangle, Line, Polygon &times; WorldPoint/ScreenPoint = 12 variants</span><br>
+    <span class="fn">getShapeType</span>(name) &nbsp; <span class="fn">createShapeUnion</span>(T, shape) &rarr; <span class="ft">ShapeData</span>
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">ColliderRegistry</div>
+  <div class="fields">
+    Generates <span class="ft">ColliderData</span> union: <span class="ft">CircleCollider | RectangleCollider</span><br>
+    <span class="fn">getColliderType</span>(name) &nbsp; <span class="fn">createColliderUnion</span>(T, shape) &rarr; <span class="ft">ColliderData</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#components">Components</a>
+  <a href="#renderer">Shapes</a>
+  <a href="#scene-runtime">Instantiator (consumer)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- RENDERER -->
+<!-- ============================================================ -->
+<section id="renderer">
+<h2>Renderer</h2>
+<p>Multi-backend renderer. Currently shape-based only (no textures). <code>src/renderer/</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">Renderer</div>
+  <div class="fields">
+    <span class="fp">backend</span>: <span class="ft">BackendImpl</span> <span class="fc">// Metal | Vulkan(stub) | OpenGL(stub)</span><br>
+    <span class="fp">width</span> / <span class="fp">height</span>: <span class="ft">u32</span><br>
+    <span class="fl">Public API</span>
+    <span class="fn">init</span>(alloc, config) &nbsp; <span class="fn">deinit</span>() &nbsp; <span class="fn">resize</span>(w, h)<br>
+    <span class="fn">beginFrame</span>() &nbsp; <span class="fn">endFrame</span>() &nbsp; <span class="fn">clear</span>() &nbsp; <span class="fn">setClearColor</span>(color)<br>
+    <span class="fn">drawGeometry</span>(shape, transform, fill, stroke, width, ctx)<br>
+    <span class="fn">drawText</span>(font, text, pos, scale, color, ctx)<br>
+    <span class="fn">drawTextScreen</span>(font, text, pos, scale, color, ctx)
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">RenderContext</div>
+  <div class="fields">
+    <span class="fp">width</span> / <span class="fp">height</span>: <span class="ft">u32</span> &nbsp;
+    <span class="fp">camera_loc</span>: <span class="ft">WorldPoint</span> &nbsp;
+    <span class="fp">ortho_size</span>: <span class="ft">f32</span><br>
+    <span class="fp">scale_factor</span>: <span class="ft">f32</span> &nbsp;
+    <span class="fp">frame_number</span>: <span class="ft">u64</span> &nbsp;
+    <span class="fp">time</span> / <span class="fp">delta_time</span>: <span class="ft">f64</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Color</div>
+  <div class="fields">
+    <span class="fp">rgba</span>: <span class="ft">Rgba</span>{ r, g, b, a: <span class="ft">u8</span> } &nbsp;
+    <span class="fp">hsva</span>: <span class="ft">Hsva</span>{ h, s, v, a: <span class="ft">f32</span> } <span class="fc">// always in sync</span><br>
+    <span class="fn">initRgba</span> / <span class="fn">initHsva</span> / <span class="fn">initFromHex</span> / <span class="fn">initFromU32Hex</span><br>
+    <span class="fn">withRed</span> / <span class="fn">withGreen</span> / <span class="fn">withBlue</span> / <span class="fn">withAlpha</span> <span class="fc">// return new Color</span><br>
+    <span class="fn">withHue</span> / <span class="fn">withSaturation</span> / <span class="fn">withBrightness</span> / <span class="fn">withOpacity</span><br>
+    <span class="fn">hue</span>() / <span class="fn">tone</span>() / <span class="fn">saturation</span>() / <span class="fn">temperature</span>() <span class="fc">// classification</span>
+  </div>
+</div>
+
+<h3>Shapes <span style="color:#8b949e; font-size: 0.85rem; font-weight: 400;">(generic over PointType: WorldPoint | ScreenPoint)</span></h3>
+<div class="card child">
+  <div class="card-name c-purple">Shape Types</div>
+  <div class="fields">
+    <span class="ft">Circle</span>{ origin, radius } &nbsp;
+    <span class="ft">Rectangle</span>{ center, half_w, half_h } &nbsp;
+    <span class="ft">Triangle</span>{ v0, v1, v2 }<br>
+    <span class="ft">Line</span>{ start, end } &nbsp;
+    <span class="ft">Polygon</span>{ points[], center, triangle_cache } &nbsp;
+    <span class="ft">Ellipse</span> <span class="fc">(stub)</span>
+  </div>
+</div>
+
+<h3>Coordinate Spaces</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">World</span> &rarr; game coordinates, infinite, camera-relative<br>
+    <span class="ft">Screen</span> &rarr; pixel coords (0..w, 0..h), UI<br>
+    <span class="ft">Clip</span> &rarr; GPU NDC (-1..1), automatic<br><br>
+    <span class="fn">worldToScreen</span> / <span class="fn">worldToClipSpace</span> / <span class="fn">screenToClipSpace</span> / <span class="fn">screenToWorld</span><br>
+    <span class="fn">getAnchorPosition</span>(anchor, ctx) <span class="fc">// 9-point screen anchoring for UI</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#metal">Metal Backend</a>
+  <a href="#components">Sprite component</a>
+  <a href="#systems">RenderSys</a>
+  <a href="#math">Math types</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- METAL BACKEND -->
+<!-- ============================================================ -->
+<section id="metal">
+<h2>Metal Backend</h2>
+<p>macOS GPU rendering. Single pipeline, vertex colors, no textures (yet). <code>src/renderer/gpu/metal/</code></p>
+
+<div class="card ext">
+  <div class="card-name c-orange">MetalRenderer</div>
+  <div class="fields">
+    <span class="fp">device</span>: <span class="ft">*MTLDevice</span> &nbsp;
+    <span class="fp">command_queue</span>: <span class="ft">*MTLCommandQueue</span> &nbsp;
+    <span class="fp">pipeline_state</span>: <span class="ft">*MTLRenderPipelineState</span><br>
+    <span class="fp">vertex_buffer</span>: <span class="ft">*MTLBuffer</span> <span class="fc">// 12MB shared memory</span><br>
+    <span class="fp">batch</span>: <span class="ft">GeometryBatch</span><br>
+    <span class="fn">init</span> / <span class="fn">deinit</span> / <span class="fn">beginFrame</span> / <span class="fn">endFrame</span> / <span class="fn">drawShape</span>
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">GeometryBatch</div>
+  <div class="fields">
+    <span class="fp">vertices</span>: <span class="ft">ArrayList(Vertex)</span> &nbsp;
+    <span class="fp">draw_calls</span>: <span class="ft">ArrayList(DrawCall)</span><br>
+    <span class="ft">Vertex</span> = extern { position: <span class="ft">[2]f32</span>, color: <span class="ft">[4]f32</span> } <span class="fc">// clip-space pos + RGBA</span><br>
+    <span class="ft">DrawCall</span> = { primitive_type, vertex_start, vertex_count }<br>
+    <span class="fn">addShape</span> &rarr; dispatches to <span class="fn">addCircle</span>(32 segments) / <span class="fn">addRectangle</span>(2 tris) / <span class="fn">addPolygon</span>(ear-clip) / ...
+  </div>
+</div>
+
+<div class="card ext">
+  <div class="card-name c-orange">Shaders (shaders.metal)</div>
+  <div class="fields">
+    <span class="fn">vertex_main</span>: VertexIn{ position: float2, color: float4 } &rarr; VertexOut{ position: float4, color: float4 }<br>
+    <span class="fn">fragment_main</span>: returns input color directly <span class="fc">// no textures, no lighting</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#renderer">Renderer (abstraction)</a>
+  <a href="#platform">Platform (window handle)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- PLATFORM -->
+<!-- ============================================================ -->
+<section id="platform">
+<h2>Platform</h2>
+<p>OS abstraction. macOS via Swift/ObjC bridge, Linux via X11, Windows via Win32. <code>src/platform/</code></p>
+
+<div class="card leaf">
+  <div class="card-name c-green">Platform API</div>
+  <div class="fields">
+    <span class="fn">init</span>() / <span class="fn">deinit</span>() / <span class="fn">createWindow</span>(config) &rarr; <span class="ft">*Window</span><br>
+    <span class="fn">pollEvent</span>() &rarr; <span class="ft">?Event</span> &nbsp; <span class="fn">waitEvent</span>() &rarr; <span class="ft">Event</span><br>
+    <span class="fn">getTime</span>() &rarr; <span class="ft">f64</span> &nbsp; <span class="fn">sleep</span>(seconds) &nbsp; <span class="fn">getNativeWindowHandle</span>() &rarr; <span class="ft">*anyopaque</span><br>
+    <span class="fn">getWindowScaleFactor</span>() &rarr; <span class="ft">f32</span> &nbsp; <span class="fn">getCapabilities</span>() / <span class="fn">getPlatformName</span>()<br>
+    <span class="fn">getClipboardText</span>() / <span class="fn">setClipboardText</span>() / <span class="fn">openFileDialog</span>() / <span class="fn">saveFileDialog</span>()
+  </div>
+</div>
+
+<div class="card leaf">
+  <div class="card-name c-green">Event</div>
+  <div class="fields">
+    <span class="ft">WindowClose</span> | <span class="ft">WindowResize</span>{ w, h } | <span class="ft">WindowFocus</span>Gained/Lost<br>
+    <span class="ft">KeyPress</span>{ key, modifiers } | <span class="ft">KeyRelease</span>{ key, modifiers } | <span class="ft">TextInput</span>{ codepoint }<br>
+    <span class="ft">MouseButtonPress</span>{ button, x, y } | <span class="ft">MouseButtonRelease</span>{ button, x, y }<br>
+    <span class="ft">MouseMove</span>{ x, y, delta_x, delta_y } | <span class="ft">MouseWheel</span>{ delta_x, delta_y }
+  </div>
+</div>
+
+<div class="links">
+  <a href="#input">Input (high-level)</a>
+  <a href="#metal">Metal Backend (window handle)</a>
+  <a href="#engine">Engine</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- INPUT -->
+<!-- ============================================================ -->
+<section id="input">
+<h2>Input</h2>
+<p>High-level input state tracking built on platform events. <code>src/platform/</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">InputDevice(T)</div>
+  <div class="fields">
+    Generic over any contiguous enum (KeyCode or MouseButton)<br>
+    <span class="fp">pressed</span> / <span class="fp">just_pressed</span> / <span class="fp">just_released</span>: <span class="ft">[count]bool</span><br>
+    <span class="fn">isDown</span>(T) / <span class="fn">isPressed</span>(T) / <span class="fn">isReleased</span>(T) &rarr; <span class="ft">bool</span><br>
+    <span class="fn">updateState</span>(T, down) &nbsp; <span class="fn">clearFrameStates</span>()
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Keyboard = InputDevice(KeyCode)</div>
+  <div class="fields">
+    <span class="ft">KeyCode</span>: A-Z, 0-9, arrows, F1-F12, modifiers (Shift/Ctrl/Alt/Cmd L+R), punctuation, numpad <span class="fc">// 97 values</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Mouse</div>
+  <div class="fields">
+    <span class="fp">buttons</span>: <span class="ft">InputDevice(MouseButton)</span> <span class="fc">// Left, Right, Middle, Extra1, Extra2</span><br>
+    <span class="fp">position</span>: <span class="ft">V2</span> &nbsp;
+    <span class="fp">scroll_delta</span>: <span class="ft">V2</span> &nbsp;
+    <span class="fp">location_delta</span>: <span class="ft">V2</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Input (high-level wrapper)</div>
+  <div class="fields">
+    <span class="fn">isDown</span> / <span class="fn">isPressed</span> / <span class="fn">isReleased</span> <span class="fc">// works with KeyCode or MouseButton</span><br>
+    <span class="fn">getAxis</span>(negative, positive) &rarr; <span class="ft">f32</span> <span class="fc">// -1, 0, or 1</span><br>
+    <span class="fn">getAxis2d</span>(left, right, up, down) &rarr; <span class="ft">V2</span> <span class="fc">// normalized</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#platform">Platform (events)</a>
+  <a href="#actions">Action System (triggers)</a>
+  <a href="#engine">Engine</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- ASSETS -->
+<!-- ============================================================ -->
+<section id="assets">
+<h2>Assets</h2>
+<p>Asset loading and management. Currently fonts only. <code>src/assets/</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">AssetManager</div>
+  <div class="fields">
+    <span class="fp">fonts</span>: <span class="ft">FontManager</span><br>
+    <span class="fp">name_to_font</span>: <span class="ft">StringHashMap(FontHandle)</span><br>
+    <span class="fn">init</span>(alloc) <span class="fc">// loads embedded default Orbitron font</span><br>
+    <span class="fn">loadFont</span> / <span class="fn">loadFontFromPath</span> / <span class="fn">getFontHandle</span> / <span class="fn">getFont</span> / <span class="fn">getFontByName</span><br>
+    <span class="fn">registerFontAsset</span>(name, handle) <span class="fc">// scene instantiation registers by asset name</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">FontManager</div>
+  <div class="fields">
+    <span class="fp">fonts</span>: <span class="ft">ArrayList(FontEntry)</span> <span class="fc">// { normalized_path, *Font }</span><br>
+    <span class="fp">path_to_handle</span>: <span class="ft">StringHashMap(FontHandle)</span> <span class="fc">// deduplication</span><br>
+    <span class="fn">loadFont</span>(name) / <span class="fn">loadFontFromPath</span>(path) / <span class="fn">loadFontFromMemory</span>(name, data)<br>
+    <span class="fn">getFont</span>(handle) &rarr; <span class="ft">?*Font</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">FontHandle</div>
+  <div class="fields">
+    <span class="fp">id</span>: <span class="ft">usize</span> <span class="fc">// opaque index into FontManager.fonts ArrayList</span>
+  </div>
+</div>
+
+<p style="margin-top: 0.75rem; color: #8b949e; font-style: italic;">ZxlManager + ZxlHandle coming in Phase 1 &mdash; same pattern as FontManager.</p>
+
+<div class="links">
+  <a href="#scene-runtime">Instantiator (loads fonts)</a>
+  <a href="#renderer">Renderer (uses fonts for drawText)</a>
+  <a href="#components">Text component (FontHandle)</a>
+  <a href="#engine">Engine</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- MATH -->
+<!-- ============================================================ -->
+<section id="math">
+<h2>Math</h2>
+<p>Foundation types used everywhere. <code>src/math/</code></p>
+
+<div class="card leaf">
+  <div class="card-name c-green">V2 (WorldPoint)</div>
+  <div class="fields">
+    <span class="fp">x</span>, <span class="fp">y</span>: <span class="ft">f32</span><br>
+    <span class="fn">add</span> / <span class="fn">sub</span> / <span class="fn">mul</span> / <span class="fn">div</span> / <span class="fn">negate</span> / <span class="fn">normalize</span> / <span class="fn">magnitude</span> / <span class="fn">distance</span> / <span class="fn">dot</span> / <span class="fn">cross</span><br>
+    <span class="fc">ZERO = {0, 0}</span>
+  </div>
+</div>
+
+<div class="card leaf">
+  <div class="card-name c-green">ScreenPoint</div>
+  <div class="fields">
+    <span class="fp">x</span>, <span class="fp">y</span>: <span class="ft">f32</span> <span class="fc">// same ops as V2, used for screen-space rendering</span>
+  </div>
+</div>
+
+<div class="card leaf">
+  <div class="card-name c-green">V2I / V2U</div>
+  <div class="fields">
+    <span class="ft">V2I</span>: x, y: <span class="ft">i32</span> &nbsp; <span class="ft">V2U</span>: x, y: <span class="ft">u32</span> <span class="fc">// integer variants for platform coords</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#components">Transform, Velocity (V2)</a>
+  <a href="#renderer">Shapes (WorldPoint/ScreenPoint)</a>
+  <a href="#platform">Platform (V2I mouse coords)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DEBUG -->
+<!-- ============================================================ -->
+<section id="debug">
+<h2>Debug &amp; Logging</h2>
+<p>Auto-injected into every module. Release builds compile to no-ops. <code>src/debug/</code></p>
+
+<div class="card leaf">
+  <div class="card-name c-green">Logger (global singleton)</div>
+  <div class="fields">
+    <span class="fl">Levels</span>
+    <span class="ft">trace</span> | <span class="ft">debug</span> | <span class="ft">info</span> | <span class="ft">warn</span> | <span class="ft">err</span> | <span class="ft">fatal</span><br>
+    <span class="fl">Categories</span>
+    action, application, assets, debug, ecs, engine, general, input, platform, registry, renderer, scene, sceneFormat, systems, ui<br>
+    <span class="fl">API</span>
+    <span class="fn">log.info</span>(.ecs, "msg: {}", .{val}) &nbsp; <span class="fn">log.warn</span>(.renderer, ...) &nbsp; etc.<br>
+    <span class="fn">setMinLogLevel</span>(level) &nbsp; <span class="fn">setCategoryLevel</span>(cat, level)<br>
+    <span class="fc">Thread-safe via mutex. Sinks: console (ANSI color) + file.</span>
+  </div>
+</div>
+
+<div class="card leaf">
+  <div class="card-name c-green">DebugDraw</div>
+  <div class="fields">
+    <span class="fn">addArrow</span> / <span class="fn">addCircle</span> / <span class="fn">addLine</span> / <span class="fn">addRect</span> / <span class="fn">addText</span><br>
+    <span class="fc">Visual debug overlays: collision bounds, velocity arrows, camera frustums</span><br>
+    <span class="fc">Conditionally compiled &mdash; zero cost in release builds</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#engine">Engine (owns DebugManager)</a>
+  <a href="#systems">Systems (pass debugger)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- UI -->
+<!-- ============================================================ -->
+<section id="ui">
+<h2>UI</h2>
+<p>Widget system for tool UIs (ZixelArt, editor). Separate from ECS UIElement. <code>src/ui/</code></p>
+
+<div class="card leaf">
+  <div class="card-name c-green">UI System</div>
+  <div class="fields">
+    <span class="fl">Layout</span>
+    <span class="ft">HStack</span> | <span class="ft">VStack</span> | <span class="ft">Grid</span> | <span class="ft">Spacer</span> <span class="fc">// flexbox-style containers</span><br>
+    <span class="fl">Widgets</span>
+    <span class="ft">Button</span> | <span class="ft">Chicklet</span> | <span class="ft">Label</span> | <span class="ft">Slider</span> | <span class="ft">Panel</span> | <span class="ft">ColorRect</span> | <span class="ft">Divider</span><br>
+    <span class="fl">Infrastructure</span>
+    <span class="ft">UIManager</span> <span class="fc">// state + event dispatch</span><br>
+    <span class="ft">UILayer</span> + <span class="ft">ViewBuilder</span> <span class="fc">// declarative UI construction</span><br>
+    <span class="ft">WidgetNode</span> <span class="fc">// tree structure</span><br>
+    <span class="ft">UIEvent</span> <span class="fc">// mouse/keyboard events for widgets</span><br>
+    <span class="ft">Rect</span>, <span class="ft">Size</span>, <span class="ft">Constraints</span>, <span class="ft">EdgeInsets</span>, <span class="ft">Alignment</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#renderer">Renderer (draws widgets)</a>
+  <a href="#input">Input (widget events)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- BACK TO TOP -->
+<!-- ============================================================ -->
+<p style="margin-top: 3rem; text-align: center;">
+  <a href="#top" style="color: #484f58; font-size: 0.85rem;">&uarr; back to top</a>
+</p>
+
+</body>
+</html>

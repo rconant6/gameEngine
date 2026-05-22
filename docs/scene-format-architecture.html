@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scene Format Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 2rem 2rem 6rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1 { color: #58a6ff; font-size: 1.8rem; border-bottom: 1px solid #21262d; padding-bottom: 0.5rem; margin-bottom: 0.25rem; }
+  .page-sub { color: #8b949e; font-size: 0.9rem; margin-bottom: 2rem; }
+  h2 { color: #f0883e; font-size: 1.35rem; margin-top: 3rem; margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid #21262d; }
+  h3 { color: #d2a8ff; font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  p, li { margin-bottom: 0.4rem; }
+  code {
+    background: #161b22; padding: 0.15rem 0.4rem; border-radius: 3px;
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.85em; color: #79c0ff;
+  }
+  .mono { font-family: 'SF Mono','Fira Code',monospace; }
+
+  nav {
+    background: #161b22; border: 1px solid #21262d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin-bottom: 2rem;
+  }
+  nav .nav-title { color: #8b949e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: 0.5rem; }
+  nav .nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.3rem 1rem; }
+  nav a { font-size: 0.85rem; display: block; padding: 0.15rem 0; }
+
+  section { scroll-margin-top: 1rem; }
+
+  .card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin: 0.75rem 0;
+  }
+  .card.main   { border-color: #58a6ff; }
+  .card.child  { border-color: #d2a8ff; }
+  .card.leaf   { border-color: #7ee787; }
+  .card.ext    { border-color: #f0883e; border-style: dashed; }
+
+  .card-name {
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem;
+  }
+  .card-name.c-blue   { color: #58a6ff; }
+  .card-name.c-purple { color: #d2a8ff; }
+  .card-name.c-green  { color: #7ee787; }
+  .card-name.c-orange { color: #f0883e; }
+
+  .fields {
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.8rem; line-height: 1.7;
+  }
+  .fn  { color: #d2a8ff; }
+  .ft  { color: #7ee787; }
+  .fp  { color: #79c0ff; }
+  .fc  { color: #8b949e; font-style: italic; }
+  .fl  { color: #484f58; font-family: -apple-system,sans-serif; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-top: 0.4rem; margin-bottom: 0.15rem; }
+
+  .diagram-wrap { margin: 1rem 0; overflow-x: auto; }
+  svg { overflow: visible; }
+  .box { fill: #161b22; stroke: #30363d; stroke-width: 1.5; rx: 8; }
+  .box-main { stroke: #58a6ff; stroke-width: 2; }
+  .box-purple { stroke: #d2a8ff; }
+  .box-green { stroke: #7ee787; }
+  .box-orange { stroke: #f0883e; stroke-dasharray: 5,4; }
+  .hdr { fill: #21262d; rx: 8; }
+  .hdr-clip { fill: #21262d; }
+
+  .t-name   { fill: #58a6ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-purple { fill: #d2a8ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-green  { fill: #7ee787; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-orange { fill: #f0883e; font-family: 'SF Mono','Fira Code',monospace; font-size: 13px; font-weight: 700; }
+  .t-field  { fill: #79c0ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-type   { fill: #7ee787; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-fn     { fill: #d2a8ff; font-family: 'SF Mono','Fira Code',monospace; font-size: 10.5px; }
+  .t-dim    { fill: #8b949e; font-family: -apple-system,sans-serif; font-size: 10px; font-style: italic; }
+  .t-sec    { fill: #484f58; font-family: -apple-system,sans-serif; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .line-own  { stroke: #58a6ff; stroke-width: 2; fill: none; }
+  .line-ref  { stroke: #f0883e; stroke-dasharray: 6,4; fill: none; }
+  .line-flow { stroke: #7ee787; stroke-width: 2; fill: none; }
+  .arr-blue   { fill: #58a6ff; }
+  .arr-orange { fill: #f0883e; }
+  .arr-green  { fill: #7ee787; }
+
+  .links { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+  .links a {
+    background: #21262d; border: 1px solid #30363d; border-radius: 2rem;
+    padding: 0.25rem 0.75rem; font-size: 0.75rem; white-space: nowrap;
+  }
+  .links a:hover { border-color: #58a6ff; text-decoration: none; }
+
+  .flow-list { list-style: none; counter-reset: fl; margin: 0.75rem 0; }
+  .flow-list li {
+    counter-increment: fl; position: relative; padding: 0.5rem 0.75rem 0.5rem 2.75rem;
+    background: #161b22; border: 1px solid #21262d; border-radius: 6px; margin: 0.35rem 0;
+  }
+  .flow-list li::before {
+    content: counter(fl); position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%);
+    background: #30363d; color: #8b949e; font-size: 0.7rem; font-weight: 700;
+    width: 20px; height: 20px; border-radius: 50%; text-align: center; line-height: 20px;
+  }
+
+  /* scene example blocks */
+  .scene-example {
+    background: #161b22; border: 1px solid #21262d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin: 0.75rem 0;
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.8rem; line-height: 1.8;
+    overflow-x: auto;
+  }
+  .s-decl  { color: #f0883e; }
+  .s-prop  { color: #79c0ff; }
+  .s-type  { color: #d2a8ff; }
+  .s-val   { color: #7ee787; }
+  .s-str   { color: #a5d6ff; }
+  .s-cmt   { color: #484f58; font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1 id="top">Scene Format Architecture</h1>
+<p class="page-sub">Complete reference for the .scene and .template language &mdash; syntax, lexer, parser, AST, and the runtime that brings scenes to life</p>
+
+<!-- ============================================================ -->
+<!-- NAV -->
+<!-- ============================================================ -->
+<nav>
+  <div class="nav-title">Jump to section</div>
+  <div class="nav-grid">
+    <a href="#overview">Overview</a>
+    <a href="#language">Language Reference</a>
+    <a href="#declarations">Declaration Types</a>
+    <a href="#components">Component Blocks</a>
+    <a href="#properties">Properties &amp; Values</a>
+    <a href="#triggers">Triggers &amp; Actions</a>
+    <a href="#tokens">Token Set</a>
+    <a href="#lexer">Lexer</a>
+    <a href="#ast">AST</a>
+    <a href="#parser">Parser</a>
+    <a href="#scene-manager">SceneManager</a>
+    <a href="#template-manager">TemplateManager</a>
+    <a href="#instantiator">Instantiator</a>
+    <a href="#loader">Loader</a>
+    <a href="#examples">Full Examples</a>
+    <a href="#pipeline">End-to-End Pipeline</a>
+  </div>
+</nav>
+
+<!-- ============================================================ -->
+<!-- OVERVIEW -->
+<!-- ============================================================ -->
+<section id="overview">
+<h2>Overview</h2>
+<p>The scene format is a custom declarative DSL for defining game scenes, entity templates, and asset declarations. It uses indent-based nesting (2 spaces, no tabs) and bracket-based declaration headers. The system has two halves:</p>
+
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Language &amp; Parsing (scene-format module)</span>
+    <span class="fp">src/scene-format/</span> <span class="fc">// zero external dependencies</span><br>
+    &nbsp;&nbsp;token.zig, lexer.zig, parser.zig, ast.zig<br>
+    <span class="fl">Runtime (scene module)</span>
+    <span class="fp">src/scene/</span> <span class="fc">// depends on ECS, renderer, assets, registry, action</span><br>
+    &nbsp;&nbsp;manager.zig, templates.zig, instantiator.zig, loader.zig
+  </div>
+</div>
+
+<div class="diagram-wrap">
+<svg width="1060" height="400" viewBox="0 0 1060 400">
+  <defs>
+    <marker id="a-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-blue"/></marker>
+    <marker id="a-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-green"/></marker>
+    <marker id="a-orange" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><polygon points="0,0 8,4 0,8" class="arr-orange"/></marker>
+  </defs>
+
+  <text x="10" y="50" class="t-sec" font-size="10">FILES</text>
+  <text x="10" y="160" class="t-sec" font-size="10">PARSING</text>
+  <text x="10" y="270" class="t-sec" font-size="10">RUNTIME</text>
+  <text x="10" y="370" class="t-sec" font-size="10">OUTPUT</text>
+
+  <!-- Row 1 -->
+  <rect class="box" x="200" y="20" width="200" height="55" style="stroke:#7ee787;"/>
+  <rect class="hdr" x="200" y="20" width="200" height="26" rx="8"/><rect class="hdr-clip" x="200" y="38" width="200" height="8"/>
+  <text x="300" y="38" text-anchor="middle" class="t-green">.scene files</text>
+  <text x="300" y="58" text-anchor="middle" class="t-dim">assets/scenes/</text>
+
+  <rect class="box" x="440" y="20" width="200" height="55" style="stroke:#7ee787;"/>
+  <rect class="hdr" x="440" y="20" width="200" height="26" rx="8"/><rect class="hdr-clip" x="440" y="38" width="200" height="8"/>
+  <text x="540" y="38" text-anchor="middle" class="t-green">.template files</text>
+  <text x="540" y="58" text-anchor="middle" class="t-dim">assets/templates/</text>
+
+  <rect class="box box-purple" x="680" y="20" width="200" height="55"/>
+  <rect class="hdr" x="680" y="20" width="200" height="26" rx="8"/><rect class="hdr-clip" x="680" y="38" width="200" height="8"/>
+  <text x="780" y="38" text-anchor="middle" class="t-purple">Loader</text>
+  <text x="780" y="58" text-anchor="middle" class="t-dim">file I/O, path resolution</text>
+
+  <!-- Row 2 -->
+  <rect class="box box-orange" x="200" y="120" width="160" height="55"/>
+  <rect class="hdr" x="200" y="120" width="160" height="26" rx="8"/><rect class="hdr-clip" x="200" y="138" width="160" height="8"/>
+  <text x="280" y="138" text-anchor="middle" class="t-orange">Lexer</text>
+  <text x="280" y="158" text-anchor="middle" class="t-dim">source &rarr; tokens</text>
+
+  <rect class="box box-orange" x="400" y="120" width="160" height="55"/>
+  <rect class="hdr" x="400" y="120" width="160" height="26" rx="8"/><rect class="hdr-clip" x="400" y="138" width="160" height="8"/>
+  <text x="480" y="138" text-anchor="middle" class="t-orange">Parser</text>
+  <text x="480" y="158" text-anchor="middle" class="t-dim">tokens &rarr; AST</text>
+
+  <rect class="box box-main" x="600" y="120" width="200" height="55"/>
+  <rect class="hdr" x="600" y="120" width="200" height="26" rx="8"/><rect class="hdr-clip" x="600" y="138" width="200" height="8"/>
+  <text x="700" y="138" text-anchor="middle" class="t-name">SceneFile (AST)</text>
+  <text x="700" y="158" text-anchor="middle" class="t-dim">declarations, components, props</text>
+
+  <!-- Row 3 -->
+  <rect class="box box-purple" x="200" y="230" width="200" height="55"/>
+  <rect class="hdr" x="200" y="230" width="200" height="26" rx="8"/><rect class="hdr-clip" x="200" y="248" width="200" height="8"/>
+  <text x="300" y="248" text-anchor="middle" class="t-purple">SceneManager</text>
+  <text x="300" y="268" text-anchor="middle" class="t-dim">load, activate, switch</text>
+
+  <rect class="box box-purple" x="440" y="230" width="200" height="55"/>
+  <rect class="hdr" x="440" y="230" width="200" height="26" rx="8"/><rect class="hdr-clip" x="440" y="248" width="200" height="8"/>
+  <text x="540" y="248" text-anchor="middle" class="t-purple">TemplateManager</text>
+  <text x="540" y="268" text-anchor="middle" class="t-dim">reusable entity blueprints</text>
+
+  <rect class="box box-main" x="680" y="230" width="200" height="55"/>
+  <rect class="hdr" x="680" y="230" width="200" height="26" rx="8"/><rect class="hdr-clip" x="680" y="248" width="200" height="8"/>
+  <text x="780" y="248" text-anchor="middle" class="t-name">Instantiator</text>
+  <text x="780" y="268" text-anchor="middle" class="t-dim">AST &rarr; ECS entities</text>
+
+  <!-- Row 4 -->
+  <rect class="box box-main" x="350" y="340" width="200" height="45"/>
+  <rect class="hdr" x="350" y="340" width="200" height="22" rx="8"/><rect class="hdr-clip" x="350" y="354" width="200" height="8"/>
+  <text x="450" y="354" text-anchor="middle" class="t-name">World</text>
+  <text x="450" y="372" text-anchor="middle" class="t-dim">populated ECS entities</text>
+
+  <rect class="box box-purple" x="600" y="340" width="200" height="45"/>
+  <rect class="hdr" x="600" y="340" width="200" height="22" rx="8"/><rect class="hdr-clip" x="600" y="354" width="200" height="8"/>
+  <text x="700" y="354" text-anchor="middle" class="t-purple">AssetManager</text>
+  <text x="700" y="372" text-anchor="middle" class="t-dim">loaded fonts</text>
+
+  <!-- Connections -->
+  <path d="M 300,75 L 300,100 Q 300,112 290,112 L 290,120" class="line-flow" marker-end="url(#a-green)"/>
+  <path d="M 540,75 L 540,100 Q 540,112 400,112 L 340,120" class="line-flow" marker-end="url(#a-green)"/>
+  <path d="M 780,75 L 780,100 Q 780,112 340,112 L 300,120" class="line-ref" marker-end="url(#a-orange)"/>
+
+  <path d="M 360,148 L 400,148" class="line-flow" marker-end="url(#a-green)"/>
+  <path d="M 560,148 L 600,148" class="line-flow" marker-end="url(#a-green)"/>
+
+  <path d="M 700,175 L 700,200 Q 700,222 500,222 L 350,230" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 700,175 L 700,200 Q 700,222 600,222 L 570,230" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 700,175 L 700,200 Q 700,222 740,222 L 770,230" class="line-own" marker-end="url(#a-blue)"/>
+
+  <path d="M 300,285 L 300,310 Q 300,332 380,332 L 400,340" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 540,285 L 540,310 Q 540,332 500,332 L 480,340" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 780,285 L 780,310 Q 780,332 520,332 L 500,340" class="line-own" marker-end="url(#a-blue)"/>
+  <path d="M 780,285 L 780,310 Q 780,332 730,332 L 720,340" class="line-ref" marker-end="url(#a-orange)"/>
+</svg>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- LANGUAGE REFERENCE -->
+<!-- ============================================================ -->
+<section id="language">
+<h2>Language Reference</h2>
+<p>Quick syntax summary for the .scene and .template format.</p>
+
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Indentation</span>
+    <span class="fc">2 spaces per level. Tabs are forbidden. Indent/dedent generates tokens.</span><br>
+    <span class="fl">Comments</span>
+    <span class="fc">// line comments (anywhere on a line)</span><br>
+    <span class="fl">Declarations</span>
+    <span class="fc">[Name:type] where type = scene | entity | template | asset</span><br>
+    <span class="fl">Components</span>
+    <span class="fc">[ComponentName] or [ComponentName:shape_type]</span><br>
+    <span class="fl">Properties</span>
+    <span class="fc">name:type value</span><br>
+    <span class="fl">Types</span>
+    <span class="fc">f32, i32, u32, bool, string, color, vec2, vec3, asset_ref</span><br>
+    <span class="fl">Arrays</span>
+    <span class="fc">type[] for array annotation, {val1, val2, ...} for array values</span><br>
+    <span class="fl">Vectors</span>
+    <span class="fc">{x, y} for vec2, {x, y, z} for vec3</span><br>
+    <span class="fl">Colors</span>
+    <span class="fc">#RRGGBB or #RRGGBBAA (hex)</span><br>
+    <span class="fl">Strings</span>
+    <span class="fc">Double-quoted: "text here"</span><br>
+    <span class="fl">Asset References</span>
+    <span class="fc">asset_ref "AssetName" (refers to a declared asset by name)</span>
+  </div>
+</div>
+
+<h3>Minimal Example</h3>
+<div class="scene-example">
+  <span class="s-decl">[MyScene:scene]</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[Ball:entity]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[Transform]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">position</span>:<span class="s-type">vec2</span> <span class="s-val">{0.0, 0.0}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[Sprite:circle]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">radius</span>:<span class="s-type">f32</span> <span class="s-val">5.0</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">fill_color</span>:<span class="s-type">color</span> <span class="s-val">#ff0000</span>
+</div>
+
+<div class="links">
+  <a href="#declarations">Declaration Types</a>
+  <a href="#components">Components</a>
+  <a href="#properties">Properties &amp; Values</a>
+  <a href="#examples">Full Examples</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- DECLARATION TYPES -->
+<!-- ============================================================ -->
+<section id="declarations">
+<h2>Declaration Types</h2>
+<p>Top-level declarations use the <code>[Name:type]</code> syntax. Four types are supported.</p>
+
+<div class="card child">
+  <div class="card-name c-purple">[Name:scene]</div>
+  <div class="fields">
+    <span class="fc">Container for entities and nested scenes. Can nest arbitrarily.</span><br>
+    <span class="fc">Children: entity, scene, asset declarations</span>
+  </div>
+</div>
+
+<div class="scene-example">
+  <span class="s-decl">[GameWorld:scene]</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[Player:entity]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-cmt">// components...</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[UI:scene]</span> <span class="s-cmt">// nested scene</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[HUD:entity]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-cmt">// components...</span>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">[Name:entity]</div>
+  <div class="fields">
+    <span class="fc">Defines an entity with component blocks as children.</span><br>
+    <span class="fc">Creates an entity in the World with each component added via addComponent().</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">[Name:template]</div>
+  <div class="fields">
+    <span class="fc">Reusable entity blueprint. Same structure as entity but loaded into TemplateManager.</span><br>
+    <span class="fc">Typically in separate .template files. Spawned at runtime via createEntityFromTemplate().</span><br>
+    <span class="fc">Template names are case-insensitive for lookup.</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">[Name:asset type]</div>
+  <div class="fields">
+    <span class="fc">Declares an asset to load. Currently only font type is supported.</span><br>
+    <span class="fc">The Name becomes the asset reference identifier used by components.</span>
+  </div>
+</div>
+
+<div class="scene-example">
+  <span class="s-decl">[GameFont:asset font]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">filename</span>:<span class="s-type">string</span> <span class="s-str">"Orbitron.ttf"</span><br><br>
+  <span class="s-decl">[TitleFont:asset font]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">abs_path</span>:<span class="s-type">string</span> <span class="s-str">"assets/fonts/title.ttf"</span><br><br>
+  <span class="s-decl">[SystemFont:asset font]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">path</span>:<span class="s-type">string</span> <span class="s-str">"assets/fonts/"</span><br>
+  &nbsp;&nbsp;<span class="s-prop">filename</span>:<span class="s-type">string</span> <span class="s-str">"arial.ttf"</span>
+</div>
+
+<div class="links">
+  <a href="#components">Component Blocks</a>
+  <a href="#triggers">Triggers &amp; Actions</a>
+  <a href="#ast">AST (Declaration union)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- COMPONENT BLOCKS -->
+<!-- ============================================================ -->
+<section id="components">
+<h2>Component Blocks</h2>
+<p>Inside entity and template declarations. Three variants based on the component type.</p>
+
+<h3>Generic Components</h3>
+<p>Most components use the plain <code>[ComponentName]</code> syntax with typed properties.</p>
+
+<div class="scene-example">
+  <span class="s-decl">[Transform]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">position</span>:<span class="s-type">vec2</span> <span class="s-val">{5.0, -3.0}</span><br>
+  &nbsp;&nbsp;<span class="s-prop">rotation</span>:<span class="s-type">f32</span> <span class="s-val">0.0</span><br>
+  &nbsp;&nbsp;<span class="s-prop">scale</span>:<span class="s-type">f32</span> <span class="s-val">1.0</span><br><br>
+  <span class="s-decl">[Velocity]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">linear</span>:<span class="s-type">vec2</span> <span class="s-val">{3.0, 0.0}</span><br>
+  &nbsp;&nbsp;<span class="s-prop">angular</span>:<span class="s-type">f32</span> <span class="s-val">0.0</span><br><br>
+  <span class="s-decl">[Tag]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">tags</span>:<span class="s-type">string</span> <span class="s-str">"player,ship"</span><br><br>
+  <span class="s-decl">[Lifetime]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">remaining</span>:<span class="s-type">f32</span> <span class="s-val">2.0</span><br><br>
+  <span class="s-decl">[Text]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">text</span>:<span class="s-type">string</span> <span class="s-str">"Hello World"</span><br>
+  &nbsp;&nbsp;<span class="s-prop">font_asset</span>:<span class="s-type">asset_ref</span> <span class="s-str">"GameFont"</span><br>
+  &nbsp;&nbsp;<span class="s-prop">text_color</span>:<span class="s-type">color</span> <span class="s-val">#FF8800</span><br>
+  &nbsp;&nbsp;<span class="s-prop">size</span>:<span class="s-type">f32</span> <span class="s-val">0.8</span>
+</div>
+
+<h3>Sprite Components (shape-typed)</h3>
+<p>Sprites use <code>[Sprite:shape_type]</code> syntax. The shape type determines which geometry fields are expected.</p>
+
+<div class="scene-example">
+  <span class="s-decl">[Sprite:circle]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">origin</span>:<span class="s-type">vec2</span> <span class="s-val">{0.0, 0.0}</span><br>
+  &nbsp;&nbsp;<span class="s-prop">radius</span>:<span class="s-type">f32</span> <span class="s-val">2.0</span><br>
+  &nbsp;&nbsp;<span class="s-prop">fill_color</span>:<span class="s-type">color</span> <span class="s-val">#00FF00</span><br>
+  &nbsp;&nbsp;<span class="s-prop">stroke_color</span>:<span class="s-type">color</span> <span class="s-val">#FFFFFF</span><br>
+  &nbsp;&nbsp;<span class="s-prop">stroke_width</span>:<span class="s-type">f32</span> <span class="s-val">1.0</span><br>
+  &nbsp;&nbsp;<span class="s-prop">visible</span>:<span class="s-type">bool</span> <span class="s-val">true</span>
+</div>
+<div class="scene-example">
+  <span class="s-decl">[Sprite:rectangle]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">center</span>:<span class="s-type">vec2</span> <span class="s-val">{0.0, 0.0}</span><br>
+  &nbsp;&nbsp;<span class="s-prop">half_width</span>:<span class="s-type">f32</span> <span class="s-val">1.5</span><br>
+  &nbsp;&nbsp;<span class="s-prop">half_height</span>:<span class="s-type">f32</span> <span class="s-val">1.0</span><br>
+  &nbsp;&nbsp;<span class="s-prop">fill_color</span>:<span class="s-type">color</span> <span class="s-val">#AA00FF</span>
+</div>
+<div class="scene-example">
+  <span class="s-decl">[Sprite:triangle]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">v0</span>:<span class="s-type">vec2</span> <span class="s-val">{0.0, 1.0}</span><br>
+  &nbsp;&nbsp;<span class="s-prop">v1</span>:<span class="s-type">vec2</span> <span class="s-val">{-1.0, -1.0}</span><br>
+  &nbsp;&nbsp;<span class="s-prop">v2</span>:<span class="s-type">vec2</span> <span class="s-val">{1.0, -1.0}</span><br>
+  &nbsp;&nbsp;<span class="s-prop">fill_color</span>:<span class="s-type">color</span> <span class="s-val">#0000FF</span>
+</div>
+<div class="scene-example">
+  <span class="s-decl">[Sprite:polygon]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">points</span>:<span class="s-type">vec2[]</span> <span class="s-val">{</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-val">{0.0, 1.0}</span>,<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-val">{0.951, 0.309}</span>,<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-val">{0.588, -0.809}</span>,<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-val">{-0.588, -0.809}</span>,<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-val">{-0.951, 0.309}</span><br>
+  &nbsp;&nbsp;<span class="s-val">}</span><br>
+  &nbsp;&nbsp;<span class="s-prop">fill_color</span>:<span class="s-type">color</span> <span class="s-val">#00FFAA</span>
+</div>
+
+<h3>Collider Components (shape-typed)</h3>
+<p>Same <code>[Collider:shape_type]</code> syntax. Shape properties match the collider shape.</p>
+
+<div class="scene-example">
+  <span class="s-decl">[Collider:circle]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">radius</span>:<span class="s-type">f32</span> <span class="s-val">1.0</span><br><br>
+  <span class="s-decl">[Collider:rectangle]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">center</span>:<span class="s-type">vec2</span> <span class="s-val">{0.0, 0.0}</span><br>
+  &nbsp;&nbsp;<span class="s-prop">half_width</span>:<span class="s-type">f32</span> <span class="s-val">1.5</span><br>
+  &nbsp;&nbsp;<span class="s-prop">half_height</span>:<span class="s-type">f32</span> <span class="s-val">1.8</span>
+</div>
+
+<div class="links">
+  <a href="#properties">Properties &amp; Values</a>
+  <a href="#triggers">Triggers &amp; Actions</a>
+  <a href="#declarations">Declarations</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- PROPERTIES & VALUES -->
+<!-- ============================================================ -->
+<section id="properties">
+<h2>Properties &amp; Values</h2>
+<p>Properties follow the pattern: <code>name:type value</code>. The type annotation tells the parser how to interpret the value.</p>
+
+<h3>Type Annotations</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Numeric</span>
+    <span class="ft">f32</span> <span class="fc">// floating point: 1.0, -3.5, 0.0</span><br>
+    <span class="ft">i32</span> <span class="fc">// signed integer: 0, -1, 42</span><br>
+    <span class="ft">u32</span> <span class="fc">// unsigned integer: 0, 1, 255</span><br>
+    <span class="fl">Vectors</span>
+    <span class="ft">vec2</span> <span class="fc">// 2D vector: {x, y}</span><br>
+    <span class="ft">vec3</span> <span class="fc">// 3D vector: {x, y, z}</span><br>
+    <span class="fl">Other</span>
+    <span class="ft">bool</span> <span class="fc">// boolean: true, false</span><br>
+    <span class="ft">string</span> <span class="fc">// quoted string: "hello"</span><br>
+    <span class="ft">color</span> <span class="fc">// hex color: #RRGGBB or #RRGGBBAA</span><br>
+    <span class="ft">asset_ref</span> <span class="fc">// asset name reference: "FontName"</span><br>
+    <span class="fl">Arrays</span>
+    <span class="fc">Append [] to any type: vec2[], f32[], string[]</span><br>
+    <span class="fc">Array values: {val1, val2, val3} with optional multiline</span>
+  </div>
+</div>
+
+<h3>Value Examples</h3>
+<div class="scene-example">
+  <span class="s-cmt">// Scalars</span><br>
+  <span class="s-prop">speed</span>:<span class="s-type">f32</span> <span class="s-val">3.5</span><br>
+  <span class="s-prop">health</span>:<span class="s-type">i32</span> <span class="s-val">100</span><br>
+  <span class="s-prop">damage</span>:<span class="s-type">f32</span> <span class="s-val">-1.5</span> <span class="s-cmt">// negative numbers supported</span><br>
+  <span class="s-prop">visible</span>:<span class="s-type">bool</span> <span class="s-val">true</span><br><br>
+  <span class="s-cmt">// Strings</span><br>
+  <span class="s-prop">name</span>:<span class="s-type">string</span> <span class="s-str">"Player One"</span><br><br>
+  <span class="s-cmt">// Colors</span><br>
+  <span class="s-prop">fill_color</span>:<span class="s-type">color</span> <span class="s-val">#FF0000</span> <span class="s-cmt">// red, opaque</span><br>
+  <span class="s-prop">bg_color</span>:<span class="s-type">color</span> <span class="s-val">#FF000080</span> <span class="s-cmt">// red, 50% alpha</span><br><br>
+  <span class="s-cmt">// Vectors</span><br>
+  <span class="s-prop">position</span>:<span class="s-type">vec2</span> <span class="s-val">{5.0, -3.0}</span><br>
+  <span class="s-prop">position3d</span>:<span class="s-type">vec3</span> <span class="s-val">{0.0, 0.0, 1.0}</span><br><br>
+  <span class="s-cmt">// Asset references</span><br>
+  <span class="s-prop">font_asset</span>:<span class="s-type">asset_ref</span> <span class="s-str">"OrbitronFont"</span><br><br>
+  <span class="s-cmt">// Arrays (inline)</span><br>
+  <span class="s-prop">points</span>:<span class="s-type">vec2[]</span> <span class="s-val">{{0.0, 1.0}, {1.0, 0.0}, {-1.0, 0.0}}</span><br><br>
+  <span class="s-cmt">// Arrays (multiline)</span><br>
+  <span class="s-prop">points</span>:<span class="s-type">vec2[]</span> <span class="s-val">{</span><br>
+  &nbsp;&nbsp;<span class="s-val">{0.0, 0.5}</span>,<br>
+  &nbsp;&nbsp;<span class="s-val">{0.15, 0.2}</span>,<br>
+  &nbsp;&nbsp;<span class="s-val">{-0.15, 0.2}</span><br>
+  <span class="s-val">}</span>
+</div>
+
+<div class="links">
+  <a href="#components">Components</a>
+  <a href="#tokens">Token Set</a>
+  <a href="#ast">AST (Value union)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TRIGGERS & ACTIONS -->
+<!-- ============================================================ -->
+<section id="triggers">
+<h2>Triggers &amp; Actions</h2>
+<p><code>[OnInput]</code> and <code>[OnCollision]</code> components use nested <code>[trigger]</code> and <code>[action]</code> blocks.</p>
+
+<h3>OnInput (keyboard/mouse triggers)</h3>
+<div class="scene-example">
+  <span class="s-decl">[OnInput]</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[trigger]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">key</span>:<span class="s-type">string</span> <span class="s-str">"Space"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[action]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">type</span>:<span class="s-type">string</span> <span class="s-str">"spawn_entity"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">template_name</span>:<span class="s-type">string</span> <span class="s-str">"Projectile"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">offset</span>:<span class="s-type">vec2</span> <span class="s-val">{0.0, 2.0}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">priority</span>:<span class="s-type">i32</span> <span class="s-val">0</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[trigger]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">key</span>:<span class="s-type">string</span> <span class="s-str">"W"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[action]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">type</span>:<span class="s-type">string</span> <span class="s-str">"set_velocity"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">target</span>:<span class="s-type">string</span> <span class="s-str">"self"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">velocity</span>:<span class="s-type">vec2</span> <span class="s-val">{0.0, 5.0}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">priority</span>:<span class="s-type">i32</span> <span class="s-val">0</span>
+</div>
+
+<h3>OnCollision (tag-based triggers)</h3>
+<div class="scene-example">
+  <span class="s-decl">[OnCollision]</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[trigger]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">other_tag_pattern</span>:<span class="s-type">string</span> <span class="s-str">"enemy"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[action]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">type</span>:<span class="s-type">string</span> <span class="s-str">"spawn_entity"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">template_name</span>:<span class="s-type">string</span> <span class="s-str">"Explosion"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">offset</span>:<span class="s-type">vec2</span> <span class="s-val">{0.0, 0.0}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">priority</span>:<span class="s-type">i32</span> <span class="s-val">0</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[action]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">type</span>:<span class="s-type">string</span> <span class="s-str">"destroy_self"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">priority</span>:<span class="s-type">i32</span> <span class="s-val">1</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[action]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">type</span>:<span class="s-type">string</span> <span class="s-str">"destroy_other"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">priority</span>:<span class="s-type">i32</span> <span class="s-val">2</span>
+</div>
+
+<h3>Action Types</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">destroy_self</span> <span class="fc">// mark self for destruction</span><br>
+    &nbsp;&nbsp;<span class="fp">priority</span>:<span class="ft">i32</span><br><br>
+    <span class="ft">destroy_other</span> <span class="fc">// mark colliding entity for destruction</span><br>
+    &nbsp;&nbsp;<span class="fp">priority</span>:<span class="ft">i32</span><br><br>
+    <span class="ft">spawn_entity</span> <span class="fc">// create entity from template at collision point</span><br>
+    &nbsp;&nbsp;<span class="fp">template_name</span>:<span class="ft">string</span> &nbsp; <span class="fp">offset</span>:<span class="ft">vec2</span> &nbsp; <span class="fp">priority</span>:<span class="ft">i32</span><br><br>
+    <span class="ft">set_velocity</span> <span class="fc">// change velocity of self or other</span><br>
+    &nbsp;&nbsp;<span class="fp">target</span>:<span class="ft">string</span> <span class="fc">// "self" or "other"</span> &nbsp; <span class="fp">velocity</span>:<span class="ft">vec2</span> &nbsp; <span class="fp">priority</span>:<span class="ft">i32</span><br><br>
+    <span class="ft">debug_print</span> <span class="fc">// log a message</span><br>
+    &nbsp;&nbsp;<span class="fp">message</span>:<span class="ft">string</span> &nbsp; <span class="fp">priority</span>:<span class="ft">i32</span><br><br>
+    <span class="ft">play_sound</span> <span class="fc">// play audio (stub)</span><br>
+    &nbsp;&nbsp;<span class="fp">sound</span>:<span class="ft">string</span> &nbsp; <span class="fp">priority</span>:<span class="ft">i32</span>
+  </div>
+</div>
+
+<p><strong>Priority:</strong> Lower numbers execute first. Multiple actions in a trigger execute in priority order.</p>
+
+<div class="links">
+  <a href="#components">Components</a>
+  <a href="#instantiator">Instantiator (builds triggers)</a>
+  <a href="#examples">Full Examples</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TOKEN SET -->
+<!-- ============================================================ -->
+<section id="tokens">
+<h2>Token Set</h2>
+<p>Complete set of tokens emitted by the Lexer. <code>src/scene-format/token.zig</code></p>
+
+<div class="card child">
+  <div class="card-name c-purple">Token</div>
+  <div class="fields">
+    <span class="fp">tag</span>: <span class="ft">Tag</span> <span class="fc">// token type enum</span><br>
+    <span class="fp">loc</span>: <span class="ft">DataLocation</span> <span class="fc">// { start: u32, end: u32 } byte offsets</span><br>
+    <span class="fp">src_loc</span>: <span class="ft">SourceLocation</span> <span class="fc">// { line: u32, col: u32, len: u32 }</span><br>
+    <span class="fp">current_indent_level</span>: <span class="ft">u32</span> = 0<br>
+    <span class="fp">pending_dedents</span>: <span class="ft">u32</span> = 0
+  </div>
+</div>
+
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Structure Tokens</span>
+    <span class="ft">l_bracket</span> / <span class="ft">r_bracket</span> <span class="fc">// [ ]</span><br>
+    <span class="ft">l_brace</span> / <span class="ft">r_brace</span> <span class="fc">// { }</span><br>
+    <span class="ft">minus</span> <span class="fc">// - (negative numbers)</span><br>
+    <span class="ft">dot</span> <span class="fc">// . (floats)</span><br>
+    <span class="ft">comma</span> / <span class="ft">colon</span> <span class="fc">// , :</span><br>
+    <span class="ft">whitespace</span> / <span class="ft">comment</span><br>
+    <span class="ft">indent</span> / <span class="ft">dedent</span> <span class="fc">// 2-space level changes</span><br>
+    <span class="ft">eof</span><br>
+    <span class="fl">Declaration Keywords</span>
+    <span class="ft">scene</span> / <span class="ft">entity</span> / <span class="ft">asset</span> / <span class="ft">template</span> / <span class="ft">shape</span><br>
+    <span class="fl">Type Keywords</span>
+    <span class="ft">vec2</span> / <span class="ft">vec3</span> / <span class="ft">f32</span> / <span class="ft">i32</span> / <span class="ft">u32</span> / <span class="ft">bool</span> / <span class="ft">string</span> / <span class="ft">color</span> / <span class="ft">asset_ref</span><br>
+    <span class="fl">Asset Type Keywords</span>
+    <span class="ft">font</span><br>
+    <span class="fl">Literals</span>
+    <span class="ft">number</span> <span class="fc">// integers and floats</span><br>
+    <span class="ft">string_lit</span> <span class="fc">// "quoted strings"</span><br>
+    <span class="ft">color_lit</span> <span class="fc">// hex after # (6 or 8 digits)</span><br>
+    <span class="ft">true</span> / <span class="ft">false</span><br>
+    <span class="fl">Other</span>
+    <span class="ft">identifier</span> <span class="fc">// names</span><br>
+    <span class="ft">invalid</span> <span class="fc">// error marker</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#lexer">Lexer</a>
+  <a href="#parser">Parser</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- LEXER -->
+<!-- ============================================================ -->
+<section id="lexer">
+<h2>Lexer</h2>
+<p>Tokenizes source text. Indent-aware: tracks 2-space indentation and emits INDENT/DEDENT tokens. <code>src/scene-format/lexer.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">Lexer</div>
+  <div class="fields">
+    <span class="fl">Fields</span>
+    <span class="fp">src</span>: <span class="ft">[:0]const u8</span> <span class="fc">// null-terminated source</span><br>
+    <span class="fp">index</span>: <span class="ft">u32</span> <span class="fc">// current position</span><br>
+    <span class="fp">token_start</span>: <span class="ft">u32</span><br>
+    <span class="fp">src_loc</span>: <span class="ft">SourceLocation</span> <span class="fc">// line/col tracking</span><br>
+    <span class="fp">indent_level</span>: <span class="ft">u32</span> <span class="fc">// current indent (in 2-space units)</span><br>
+    <span class="fp">dedents_left</span>: <span class="ft">u32</span> <span class="fc">// pending dedent tokens</span><br>
+    <span class="fp">space_count</span>: <span class="ft">u32</span> <span class="fc">// spaces at line start</span><br>
+    <span class="fp">hex_color_count</span>: <span class="ft">u32</span><br>
+    <span class="fl">API</span>
+    <span class="fn">init</span>(src) &rarr; <span class="ft">Lexer</span><br>
+    <span class="fn">next</span>() &rarr; <span class="ft">!?Token</span> <span class="fc">// null at EOF</span>
+  </div>
+</div>
+
+<h3>Indentation Rules</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">Exactly 2 spaces per indentation level</span><br>
+    <span class="fc">Tabs are forbidden (LexerError.TabIndentationFound)</span><br>
+    <span class="fc">At each new line: compare new indent level vs current</span><br>
+    <span class="fc">&nbsp;&nbsp;Increased by 1 level &rarr; emit INDENT token</span><br>
+    <span class="fc">&nbsp;&nbsp;Decreased by N levels &rarr; emit N DEDENT tokens (one per call to next())</span><br>
+    <span class="fc">&nbsp;&nbsp;Same level &rarr; no indent/dedent tokens</span><br>
+    <span class="fc">Odd space counts cause InvalidIndentation error</span>
+  </div>
+</div>
+
+<h3>Lexer Errors</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">InvalidCharacter</span> <span class="fc">// unrecognized character</span><br>
+    <span class="ft">InvalidColor</span> <span class="fc">// # not followed by 6 or 8 hex digits</span><br>
+    <span class="ft">InvalidIndentation</span> <span class="fc">// odd number of spaces</span><br>
+    <span class="ft">InvalidNumber</span> <span class="fc">// malformed number literal</span><br>
+    <span class="ft">TabIndentationFound</span> <span class="fc">// tab character at line start</span><br>
+    <span class="ft">UnclosedString</span> <span class="fc">// missing closing quote</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#tokens">Token Set</a>
+  <a href="#parser">Parser</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- AST -->
+<!-- ============================================================ -->
+<section id="ast">
+<h2>AST</h2>
+<p>Abstract Syntax Tree produced by the parser. <code>src/scene-format/ast.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">SceneFile</div>
+  <div class="fields">
+    <span class="fp">decls</span>: <span class="ft">[]Declaration</span> <span class="fc">// top-level declarations</span><br>
+    <span class="fp">source_file_name</span>: <span class="ft">[]const u8</span> <span class="fc">// for error messages</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Declaration (tagged union)</div>
+  <div class="fields">
+    <span class="ft">.scene</span>: <span class="ft">SceneDeclaration</span><br>
+    <span class="ft">.entity</span>: <span class="ft">EntityDeclaration</span><br>
+    <span class="ft">.asset</span>: <span class="ft">AssetDeclaration</span><br>
+    <span class="ft">.component</span>: <span class="ft">ComponentDeclaration</span><br>
+    <span class="ft">.template</span>: <span class="ft">TemplateDeclaration</span>
+  </div>
+</div>
+
+<h3>Declaration Types</h3>
+<div class="card child">
+  <div class="card-name c-purple">SceneDeclaration</div>
+  <div class="fields">
+    <span class="fp">name</span>: <span class="ft">[]const u8</span><br>
+    <span class="fp">decls</span>: <span class="ft">[]Declaration</span> <span class="fc">// child entities, nested scenes, assets</span><br>
+    <span class="fp">is_container</span>: <span class="ft">bool</span> <span class="fc">// has indented content</span><br>
+    <span class="fp">location</span>: <span class="ft">SourceLocation</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">EntityDeclaration</div>
+  <div class="fields">
+    <span class="fp">name</span>: <span class="ft">[]const u8</span><br>
+    <span class="fp">components</span>: <span class="ft">[]ComponentDeclaration</span><br>
+    <span class="fp">location</span>: <span class="ft">SourceLocation</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">TemplateDeclaration</div>
+  <div class="fields">
+    <span class="fp">name</span>: <span class="ft">[]const u8</span><br>
+    <span class="fp">components</span>: <span class="ft">[]ComponentDeclaration</span><br>
+    <span class="fp">location</span>: <span class="ft">SourceLocation</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">AssetDeclaration</div>
+  <div class="fields">
+    <span class="fp">name</span>: <span class="ft">[]const u8</span><br>
+    <span class="fp">asset_type</span>: <span class="ft">AssetType</span> <span class="fc">// .font (only type currently)</span><br>
+    <span class="fp">properties</span>: <span class="ft">?[]Property</span><br>
+    <span class="fp">location</span>: <span class="ft">SourceLocation</span>
+  </div>
+</div>
+
+<h3>Component Declarations</h3>
+<div class="card child">
+  <div class="card-name c-purple">ComponentDeclaration (tagged union)</div>
+  <div class="fields">
+    <span class="ft">.generic</span>: <span class="ft">GenericBlock</span> <span class="fc">// [Transform], [Tag], [OnInput], etc.</span><br>
+    <span class="ft">.sprite</span>: <span class="ft">SpriteBlock</span> <span class="fc">// [Sprite:circle], [Sprite:polygon], etc.</span><br>
+    <span class="ft">.collider</span>: <span class="ft">SpriteBlock</span> <span class="fc">// [Collider:circle], [Collider:rectangle]</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">GenericBlock</div>
+  <div class="fields">
+    <span class="fp">name</span>: <span class="ft">[]const u8</span> <span class="fc">// component type name</span><br>
+    <span class="fp">properties</span>: <span class="ft">?[]Property</span><br>
+    <span class="fp">nested_blocks</span>: <span class="ft">?[]GenericBlock</span> <span class="fc">// for [trigger] and [action] nesting</span><br>
+    <span class="fp">location</span>: <span class="ft">SourceLocation</span><br>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">SpriteBlock</div>
+  <div class="fields">
+    <span class="fp">name</span>: <span class="ft">[]const u8</span> <span class="fc">// "Sprite" or "Collider"</span><br>
+    <span class="fp">shape_type</span>: <span class="ft">[]const u8</span> <span class="fc">// "circle", "rectangle", "triangle", "polygon"</span><br>
+    <span class="fp">properties</span>: <span class="ft">?[]Property</span><br>
+    <span class="fp">location</span>: <span class="ft">SourceLocation</span><br>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span>
+  </div>
+</div>
+
+<h3>Properties &amp; Values</h3>
+<div class="card child">
+  <div class="card-name c-purple">Property</div>
+  <div class="fields">
+    <span class="fp">name</span>: <span class="ft">[]const u8</span><br>
+    <span class="fp">type_annotation</span>: <span class="ft">TypeAnnotation</span><br>
+    <span class="fp">value</span>: <span class="ft">Value</span><br>
+    <span class="fp">location</span>: <span class="ft">SourceLocation</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">TypeAnnotation</div>
+  <div class="fields">
+    <span class="fp">base_type</span>: <span class="ft">BaseType</span> <span class="fc">// vec2, vec3, f32, i32, u32, bool, string, color, asset</span><br>
+    <span class="fp">is_array</span>: <span class="ft">bool</span> <span class="fc">// true if [] suffix present</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Value (tagged union)</div>
+  <div class="fields">
+    <span class="ft">.number</span>: <span class="ft">f64</span> <span class="fc">// all numeric types stored as f64</span><br>
+    <span class="ft">.string</span>: <span class="ft">[]const u8</span><br>
+    <span class="ft">.color</span>: <span class="ft">u32</span> <span class="fc">// hex color as packed u32</span><br>
+    <span class="ft">.boolean</span>: <span class="ft">bool</span><br>
+    <span class="ft">.vector</span>: <span class="ft">[]f64</span> <span class="fc">// vec2 = 2 elements, vec3 = 3</span><br>
+    <span class="ft">.assetRef</span>: <span class="ft">[]const u8</span> <span class="fc">// asset name</span><br>
+    <span class="ft">.array</span>: <span class="ft">[]Value</span> <span class="fc">// array of values</span>
+  </div>
+</div>
+
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Enums</span>
+    <span class="ft">BaseType</span> = vec2, vec3, f32, i32, u32, bool, string, color, asset<br>
+    <span class="ft">AssetType</span> = font <span class="fc">// + texture, audio, shader, sprite, material, mesh planned</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#parser">Parser</a>
+  <a href="#instantiator">Instantiator (consumes AST)</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- PARSER -->
+<!-- ============================================================ -->
+<section id="parser">
+<h2>Parser</h2>
+<p>Recursive descent parser. Consumes tokens from the Lexer and builds the AST. <code>src/scene-format/parser.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">Parser</div>
+  <div class="fields">
+    <span class="fl">Fields</span>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">lexer</span>: <span class="ft">Lexer</span><br>
+    <span class="fp">current_tok</span>: <span class="ft">Token</span><br>
+    <span class="fp">previous_tok</span>: <span class="ft">?Token</span><br>
+    <span class="fp">file_name</span>: <span class="ft">[]const u8</span><br>
+    <span class="fl">API</span>
+    <span class="fn">init</span>(alloc, src, file_name) &rarr; <span class="ft">Parser</span><br>
+    <span class="fn">parse</span>() &rarr; <span class="ft">SceneFile</span>
+  </div>
+</div>
+
+<h3>Grammar</h3>
+<div class="card" style="border-color: #21262d; font-family: 'SF Mono',monospace; font-size: 0.78rem; line-height: 1.8;">
+  SceneFile&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= Declaration*<br>
+  Declaration&nbsp;&nbsp;&nbsp;&nbsp;:= <span style="color:#f0883e">"["</span> identifier <span style="color:#f0883e">":"</span> DeclType <span style="color:#f0883e">"]"</span> DeclBody<br><br>
+  DeclType&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= <span style="color:#d2a8ff">"scene"</span> | <span style="color:#d2a8ff">"entity"</span> | <span style="color:#d2a8ff">"template"</span> | <span style="color:#d2a8ff">"asset"</span> AssetType<br>
+  AssetType&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= <span style="color:#d2a8ff">"font"</span><br><br>
+  DeclBody(scene)&nbsp;&nbsp;&nbsp;&nbsp;:= INDENT Declaration* DEDENT?<br>
+  DeclBody(entity)&nbsp;&nbsp;&nbsp;:= INDENT ComponentBlock* DEDENT?<br>
+  DeclBody(template)&nbsp;:= INDENT ComponentBlock* DEDENT?<br>
+  DeclBody(asset)&nbsp;&nbsp;&nbsp;&nbsp;:= INDENT Property* DEDENT?<br><br>
+  ComponentBlock&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= <span style="color:#f0883e">"["</span> identifier (<span style="color:#f0883e">":"</span> shape_type)? <span style="color:#f0883e">"]"</span> CompBody<br>
+  CompBody&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= INDENT (Property | NestedBlock)* DEDENT?<br><br>
+  NestedBlock&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= <span style="color:#f0883e">"["</span> identifier <span style="color:#f0883e">"]"</span> INDENT (Property | NestedBlock)* DEDENT<br><br>
+  Property&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= identifier <span style="color:#f0883e">":"</span> TypeAnnotation Value<br>
+  TypeAnnotation&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= BaseType (<span style="color:#f0883e">"["</span> <span style="color:#f0883e">"]"</span>)?<br><br>
+  Value&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= ScalarValue | ArrayValue<br>
+  ScalarValue&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= VectorValue | number | <span style="color:#d2a8ff">"-"</span> number | boolean | string_lit | color_lit<br>
+  VectorValue&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= <span style="color:#f0883e">"{"</span> number (<span style="color:#f0883e">","</span> number)+ <span style="color:#f0883e">"}"</span><br>
+  ArrayValue&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:= <span style="color:#f0883e">"{"</span> INDENT? (ScalarValue (<span style="color:#f0883e">","</span> ScalarValue)*)? DEDENT? <span style="color:#f0883e">"}"</span>
+</div>
+
+<h3>Parser Errors</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">UnexpectedToken</span> <span class="fc">// wrong token at position</span><br>
+    <span class="ft">UnknownDeclarationType</span> <span class="fc">// not scene/entity/template/asset</span><br>
+    <span class="ft">UnknownType</span> <span class="fc">// unrecognized type annotation</span><br>
+    <span class="ft">UnknownAssetType</span> <span class="fc">// not "font"</span><br>
+    <span class="ft">UnknownComponentType</span> <span class="fc">// Sprite/Collider with unknown shape</span><br>
+    <span class="ft">UnsupportedVectorLength</span> <span class="fc">// vec with wrong number of elements</span><br>
+    <span class="ft">UnclosedArrayBrackets</span> <span class="fc">// missing } for array</span><br>
+    <span class="ft">NoPreviousTokens</span> / <span class="ft">NoTokenReturned</span><br>
+    <span class="ft">Unimplemented</span><br>
+    <span class="fc">+ all LexerError types propagate</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#lexer">Lexer</a>
+  <a href="#ast">AST</a>
+  <a href="#tokens">Tokens</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SCENE MANAGER -->
+<!-- ============================================================ -->
+<section id="scene-manager">
+<h2>SceneManager</h2>
+<p>Manages loaded scenes and the active scene. <code>src/scene/manager.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">SceneManager</div>
+  <div class="fields">
+    <span class="fl">Fields</span>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">scenes</span>: <span class="ft">StringHashMap(*SceneFile)</span> <span class="fc">// loaded scenes by name</span><br>
+    <span class="fp">scene_file_paths</span>: <span class="ft">StringHashMap([]const u8)</span> <span class="fc">// paths for reload</span><br>
+    <span class="fp">active_scene_name</span>: <span class="ft">?[]const u8</span><br>
+    <span class="fl">Lifecycle</span>
+    <span class="fn">init</span>(alloc) &rarr; <span class="ft">SceneManager</span> &nbsp; <span class="fn">deinit</span>()<br>
+    <span class="fl">Scene Operations</span>
+    <span class="fn">loadScene</span>(name, file_path) <span class="fc">// parse file &rarr; store SceneFile</span><br>
+    <span class="fn">unloadScene</span>(name) <span class="fc">// can't unload active scene</span><br>
+    <span class="fn">reloadActiveScene</span>() <span class="fc">// re-read file from disk, re-parse</span><br>
+    <span class="fn">setActiveScene</span>(name)<br>
+    <span class="fn">getActiveScene</span>() &rarr; <span class="ft">?*const SceneFile</span><br>
+    <span class="fn">getScene</span>(name) &rarr; <span class="ft">?*const SceneFile</span>
+  </div>
+</div>
+
+<h3>Errors</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">SceneAlreadyLoaded</span> / <span class="ft">SceneNotFound</span> / <span class="ft">CannotUnloadActiveScene</span> / <span class="ft">NoActiveScene</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#loader">Loader</a>
+  <a href="#instantiator">Instantiator</a>
+  <a href="#template-manager">TemplateManager</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- TEMPLATE MANAGER -->
+<!-- ============================================================ -->
+<section id="template-manager">
+<h2>TemplateManager</h2>
+<p>Manages reusable entity blueprints. Templates are typically loaded from <code>assets/templates/</code>. <code>src/scene/templates.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">TemplateManager</div>
+  <div class="fields">
+    <span class="fl">Fields</span>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">template_files</span>: <span class="ft">ArrayList(*SceneFile)</span> <span class="fc">// loaded template files</span><br>
+    <span class="fp">templates</span>: <span class="ft">StringHashMap(Template)</span> <span class="fc">// lowercase name &rarr; template</span><br>
+    <span class="fp">instantiator</span>: <span class="ft">*Instantiator</span><br>
+    <span class="fl">Lifecycle</span>
+    <span class="fn">init</span>(alloc, instantiator) &nbsp; <span class="fn">deinit</span>()<br>
+    <span class="fl">Loading</span>
+    <span class="fn">loadTemplateFile</span>(name) <span class="fc">// from assets/templates/{name}.template</span><br>
+    <span class="fn">loadTemplatesFromDirectory</span>(dir_path) <span class="fc">// load all .template files</span><br>
+    <span class="fl">Lookup</span>
+    <span class="fn">hasTemplate</span>(name) &rarr; <span class="ft">bool</span> <span class="fc">// case-insensitive</span><br>
+    <span class="fn">getTemplate</span>(name) &rarr; <span class="ft">?Template</span> <span class="fc">// case-insensitive</span><br>
+    <span class="fl">Spawning</span>
+    <span class="fn">instantiate</span>(name, position) &rarr; <span class="ft">Entity</span> <span class="fc">// create entity at position</span>
+  </div>
+</div>
+
+<div class="card child">
+  <div class="card-name c-purple">Template</div>
+  <div class="fields">
+    <span class="fp">name</span>: <span class="ft">[]const u8</span> <span class="fc">// original name</span><br>
+    <span class="fp">declaration</span>: <span class="ft">TemplateDeclaration</span> <span class="fc">// component list from AST</span>
+  </div>
+</div>
+
+<p>Multiple templates can be defined in a single <code>.template</code> file. Each <code>[Name:template]</code> block becomes a separate entry in the template map. The action system uses templates for <code>spawn_entity</code> actions.</p>
+
+<div class="links">
+  <a href="#scene-manager">SceneManager</a>
+  <a href="#instantiator">Instantiator</a>
+  <a href="#loader">Loader</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- INSTANTIATOR -->
+<!-- ============================================================ -->
+<section id="instantiator">
+<h2>Instantiator</h2>
+<p>Walks the AST and creates ECS entities with components. The bridge between the declarative scene format and the runtime ECS World. <code>src/scene/instantiator.zig</code></p>
+
+<div class="card main">
+  <div class="card-name c-blue">Instantiator</div>
+  <div class="fields">
+    <span class="fl">Fields</span>
+    <span class="fp">allocator</span>: <span class="ft">Allocator</span><br>
+    <span class="fp">world</span>: <span class="ft">*World</span> <span class="fc">// target ECS world</span><br>
+    <span class="fp">assets</span>: <span class="ft">*AssetManager</span> <span class="fc">// for font loading</span><br>
+    <span class="fp">last_instantiated_entities</span>: <span class="ft">ArrayList(Entity)</span> <span class="fc">// for cleanup on reload</span><br>
+    <span class="fp">in_screen_space</span>: <span class="ft">bool</span> = false<br>
+    <span class="fl">Public API</span>
+    <span class="fn">init</span>(alloc, world, assets) &nbsp; <span class="fn">deinit</span>()<br>
+    <span class="fn">instantiate</span>(scene_file) <span class="fc">// process all declarations in SceneFile</span><br>
+    <span class="fn">clearLastInstantiated</span>(world) <span class="fc">// destroy all entities from previous instantiate</span><br>
+    <span class="fl">Declaration Handlers</span>
+    <span class="fn">instantiateScene</span>(scene_decl) <span class="fc">// recurse into nested scenes</span><br>
+    <span class="fn">instantiateEntity</span>(entity_decl) <span class="fc">// create entity + add all components</span><br>
+    <span class="fn">instantiateAsset</span>(asset_decl) <span class="fc">// load and register font</span><br>
+    <span class="fn">addComponent</span>(entity, comp_decl) <span class="fc">// dispatch to builder by type</span><br>
+    <span class="fl">Component Builders</span>
+    <span class="fn">buildGenericComponent</span>(T, comp) <span class="fc">// reflection: match properties to struct fields</span><br>
+    <span class="fn">buildSpriteComponent</span>(ShapeT, sprite) <span class="fc">// geometry + colors</span><br>
+    <span class="fn">buildPolygonSprite</span>(sprite) <span class="fc">// special: vec2[] &rarr; polygon points</span><br>
+    <span class="fn">buildColliderComponent</span>(ShapeT, collider)<br>
+    <span class="fn">buildTriggerComponent</span>(CompT, TrigT, comp) <span class="fc">// OnInput / OnCollision</span><br>
+    <span class="fn">buildTrigger</span>(TrigT, block) <span class="fc">// parse [trigger] block</span><br>
+    <span class="fn">buildAction</span>(block) <span class="fc">// parse [action] block</span><br>
+    <span class="fl">Value Extraction</span>
+    <span class="fn">extractValueForType</span>(T, value) &rarr; <span class="ft">?T</span>
+  </div>
+</div>
+
+<h3>Value Extraction (type conversion)</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fc">The extractValueForType function maps AST Values to Zig types:</span><br><br>
+    <span class="ft">f32</span> <span class="fc">&larr; Value.number (cast from f64)</span><br>
+    <span class="ft">i32</span> / <span class="ft">u32</span> <span class="fc">&larr; Value.number (integer cast)</span><br>
+    <span class="ft">bool</span> <span class="fc">&larr; Value.boolean</span><br>
+    <span class="ft">[]const u8</span> <span class="fc">&larr; Value.string</span><br>
+    <span class="ft">V2</span> <span class="fc">&larr; Value.vector (2-element f64 array)</span><br>
+    <span class="ft">Color</span> <span class="fc">&larr; Value.color (u32 hex &rarr; Color.initFromU32Hex)</span><br>
+    <span class="ft">FontHandle</span> <span class="fc">&larr; Value.assetRef (lookup in AssetManager)</span><br>
+    <span class="ft">enum types</span> <span class="fc">&larr; Value.string (match string to enum field name)</span><br>
+    <span class="ft">KeyCode</span> <span class="fc">&larr; Value.string (e.g. "Space", "W", "A")</span><br>
+    <span class="ft">optional T</span> <span class="fc">&larr; wraps non-optional extraction in ?T</span><br>
+    <span class="ft">arrays</span> <span class="fc">&larr; Value.array (recursively extract each element)</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#ast">AST</a>
+  <a href="#scene-manager">SceneManager</a>
+  <a href="#template-manager">TemplateManager</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- LOADER -->
+<!-- ============================================================ -->
+<section id="loader">
+<h2>Loader</h2>
+<p>File I/O and path resolution. <code>src/scene/loader.zig</code></p>
+
+<div class="card leaf">
+  <div class="card-name c-green">loader</div>
+  <div class="fields">
+    <span class="fn">loadSceneFile</span>(alloc, file_path) &rarr; <span class="ft">SceneFile</span><br>
+    <span class="fc">&nbsp;&nbsp;Simple name (no /) &rarr; assets/scenes/{name}.scene</span><br>
+    <span class="fc">&nbsp;&nbsp;Full path &rarr; used as-is (adds .scene if needed)</span><br><br>
+    <span class="fn">loadTemplateFile</span>(alloc, file_path) &rarr; <span class="ft">SceneFile</span><br>
+    <span class="fc">&nbsp;&nbsp;Simple name &rarr; assets/templates/{name}.template</span><br>
+    <span class="fc">&nbsp;&nbsp;Full path &rarr; used as-is (adds .template if needed)</span><br><br>
+    <span class="fc">Max file size: 1MB</span><br>
+    <span class="fc">Reads file &rarr; Lexer &rarr; Parser &rarr; SceneFile</span>
+  </div>
+</div>
+
+<h3>Errors</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="ft">FileNotFound</span> / <span class="ft">ReadError</span> / <span class="ft">InavlidFormat</span>
+  </div>
+</div>
+
+<h3>Engine API</h3>
+<div class="card" style="border-color: #21262d;">
+  <div class="fields">
+    <span class="fl">Engine methods (src/engine/EngineScene.zig)</span>
+    <span class="fn">loadScene</span>(name, filename) <span class="fc">// SceneManager.loadScene()</span><br>
+    <span class="fn">loadTemplates</span>(dir_path) <span class="fc">// TemplateManager.loadTemplatesFromDirectory()</span><br>
+    <span class="fn">setActiveScene</span>(name) <span class="fc">// SceneManager.setActiveScene()</span><br>
+    <span class="fn">instantiateActiveScene</span>() <span class="fc">// Instantiator.instantiate(active_scene)</span><br>
+    <span class="fn">reloadActiveScene</span>() <span class="fc">// clear entities + reload file + re-instantiate</span>
+  </div>
+</div>
+
+<div class="links">
+  <a href="#scene-manager">SceneManager</a>
+  <a href="#template-manager">TemplateManager</a>
+  <a href="#pipeline">Pipeline</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- FULL EXAMPLES -->
+<!-- ============================================================ -->
+<section id="examples">
+<h2>Full Examples</h2>
+<p>Real examples from the project showing all major features.</p>
+
+<h3>Scene with Assets, Entities, Nested Scenes</h3>
+<div class="scene-example">
+  <span class="s-cmt">// Asset declarations at top level</span><br>
+  <span class="s-decl">[OrbitronFont:asset font]</span><br>
+  &nbsp;&nbsp;<span class="s-prop">path</span>:<span class="s-type">string</span> <span class="s-str">"assets/fonts/"</span><br>
+  &nbsp;&nbsp;<span class="s-prop">filename</span>:<span class="s-type">string</span> <span class="s-str">"Orbitron.ttf"</span><br><br>
+  <span class="s-decl">[GameScene:scene]</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[Bouncer:entity]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[Transform]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">position</span>:<span class="s-type">vec3</span> <span class="s-val">{0.0, 0.0, 0.0}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">rotation</span>:<span class="s-type">f32</span> <span class="s-val">0.0</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">scale</span>:<span class="s-type">f32</span> <span class="s-val">1.0</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[Velocity]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">linear</span>:<span class="s-type">vec2</span> <span class="s-val">{5.0, 3.0}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">angular</span>:<span class="s-type">f32</span> <span class="s-val">0.0</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[Sprite:circle]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">origin</span>:<span class="s-type">vec2</span> <span class="s-val">{0.0, 0.0}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">radius</span>:<span class="s-type">f32</span> <span class="s-val">2.0</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">fill_color</span>:<span class="s-type">color</span> <span class="s-val">#00FF00</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">stroke_color</span>:<span class="s-type">color</span> <span class="s-val">#FFFFFF</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">stroke_width</span>:<span class="s-type">f32</span> <span class="s-val">1.0</span><br><br>
+  &nbsp;&nbsp;<span class="s-decl">[SmallText:entity]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[Transform]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">position</span>:<span class="s-type">vec2</span> <span class="s-val">{-13.0, 8.0}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[Text]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">text</span>:<span class="s-type">string</span> <span class="s-str">"Hello World"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">font_asset</span>:<span class="s-type">asset_ref</span> <span class="s-str">"OrbitronFont"</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">text_color</span>:<span class="s-type">color</span> <span class="s-val">#FF8800</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">size</span>:<span class="s-type">f32</span> <span class="s-val">0.80</span><br><br>
+  &nbsp;&nbsp;<span class="s-decl">[UI:scene]</span> <span class="s-cmt">// nested scene for UI layer</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[HealthBar:entity]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[Transform]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">position</span>:<span class="s-type">vec2</span> <span class="s-val">{-10.0, -8.0}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-decl">[Sprite:rectangle]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">half_width</span>:<span class="s-type">f32</span> <span class="s-val">0.2</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">half_height</span>:<span class="s-type">f32</span> <span class="s-val">0.05</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">fill_color</span>:<span class="s-type">color</span> <span class="s-val">#FF0000</span>
+</div>
+
+<h3>Template with Polygon and Tags</h3>
+<div class="scene-example">
+  <span class="s-decl">[PlayerShip:template]</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[Transform]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">position</span>:<span class="s-type">vec2</span> <span class="s-val">{0.0, 0.0}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">rotation</span>:<span class="s-type">f32</span> <span class="s-val">0.0</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">scale</span>:<span class="s-type">f32</span> <span class="s-val">1.0</span><br><br>
+  &nbsp;&nbsp;<span class="s-decl">[Velocity]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">linear</span>:<span class="s-type">vec2</span> <span class="s-val">{0.0, 0.0}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">angular</span>:<span class="s-type">f32</span> <span class="s-val">0.0</span><br><br>
+  &nbsp;&nbsp;<span class="s-decl">[Sprite:polygon]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">points</span>:<span class="s-type">vec2[]</span> <span class="s-val">{</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-val">{0.0, 0.5}</span>,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-cmt">// nose</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-val">{0.15, 0.2}</span>,&nbsp;&nbsp;&nbsp;<span class="s-cmt">// upper right</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-val">{0.25, -0.1}</span>,&nbsp;&nbsp;<span class="s-cmt">// mid right</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-val">{-0.25, -0.1}</span>,&nbsp;<span class="s-cmt">// mid left</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="s-val">{-0.15, 0.2}</span>&nbsp;&nbsp;&nbsp;<span class="s-cmt">// upper left</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-val">}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">fill_color</span>:<span class="s-type">color</span> <span class="s-val">#2C3E50</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">stroke_color</span>:<span class="s-type">color</span> <span class="s-val">#34495E</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">stroke_width</span>:<span class="s-type">f32</span> <span class="s-val">1.0</span><br><br>
+  &nbsp;&nbsp;<span class="s-decl">[Tag]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">tags</span>:<span class="s-type">string</span> <span class="s-str">"player,ship"</span>
+</div>
+
+<h3>Template with Lifetime (short-lived effect)</h3>
+<div class="scene-example">
+  <span class="s-decl">[Spark:template]</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[Transform]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">position</span>:<span class="s-type">vec2</span> <span class="s-val">{0.0, 0.0}</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">scale</span>:<span class="s-type">f32</span> <span class="s-val">0.2</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[Velocity]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">linear</span>:<span class="s-type">vec2</span> <span class="s-val">{200.0, -200.0}</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[Sprite:circle]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">radius</span>:<span class="s-type">f32</span> <span class="s-val">0.15</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">fill_color</span>:<span class="s-type">color</span> <span class="s-val">#FFFF00</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[Tag]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">tags</span>:<span class="s-type">string</span> <span class="s-str">"spark,particle,effect"</span><br>
+  &nbsp;&nbsp;<span class="s-decl">[Lifetime]</span><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;<span class="s-prop">remaining</span>:<span class="s-type">f32</span> <span class="s-val">0.2</span>
+</div>
+
+<div class="links">
+  <a href="#language">Language Reference</a>
+  <a href="#triggers">Triggers &amp; Actions</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- END-TO-END PIPELINE -->
+<!-- ============================================================ -->
+<section id="pipeline">
+<h2>End-to-End Pipeline</h2>
+<p>How a <code>.scene</code> file goes from text on disk to running entities in the game.</p>
+
+<h3>Loading &amp; Parsing</h3>
+<ol class="flow-list">
+  <li><code>engine.loadScene("game", "game")</code> &rarr; SceneManager calls Loader</li>
+  <li>Loader reads <code>assets/scenes/game.scene</code> from disk (max 1MB)</li>
+  <li>Lexer tokenizes source: handles indentation, keywords, literals, comments</li>
+  <li>Parser builds AST: SceneFile with Declaration tree</li>
+  <li>SceneManager stores the SceneFile by name</li>
+</ol>
+
+<h3>Template Loading</h3>
+<ol class="flow-list">
+  <li><code>engine.loadTemplates("assets/templates")</code> &rarr; TemplateManager</li>
+  <li>Scans directory for all <code>.template</code> files</li>
+  <li>Each file is loaded and parsed identically to scenes</li>
+  <li>Each <code>[Name:template]</code> block registered in template map (lowercase key)</li>
+</ol>
+
+<h3>Activation &amp; Instantiation</h3>
+<ol class="flow-list">
+  <li><code>engine.setActiveScene("game")</code> &rarr; marks scene as active</li>
+  <li><code>engine.instantiateActiveScene()</code> &rarr; Instantiator.instantiate(scene_file)</li>
+  <li>Walk AST declarations top-to-bottom:</li>
+  <li>&nbsp;&nbsp;<strong>Asset declarations</strong> &rarr; load fonts, register in AssetManager</li>
+  <li>&nbsp;&nbsp;<strong>Scene declarations</strong> &rarr; recurse into child declarations</li>
+  <li>&nbsp;&nbsp;<strong>Entity declarations</strong> &rarr; <code>world.createEntity()</code>, then for each component:</li>
+  <li>&nbsp;&nbsp;&nbsp;&nbsp;Generic: reflection-match properties to struct fields &rarr; <code>world.addComponent()</code></li>
+  <li>&nbsp;&nbsp;&nbsp;&nbsp;Sprite: build shape geometry + colors &rarr; <code>world.addComponent(entity, Sprite, ...)</code></li>
+  <li>&nbsp;&nbsp;&nbsp;&nbsp;Collider: build collider shape &rarr; <code>world.addComponent(entity, Collider, ...)</code></li>
+  <li>&nbsp;&nbsp;&nbsp;&nbsp;OnInput/OnCollision: build nested triggers + actions &rarr; <code>world.addComponent()</code></li>
+  <li>All created entities tracked in <code>last_instantiated_entities</code> for cleanup on reload</li>
+</ol>
+
+<h3>Runtime Spawning</h3>
+<ol class="flow-list">
+  <li>ActionExecutor encounters <code>spawn_entity</code> action with template name</li>
+  <li><code>world.createEntityFromTemplate(name, position)</code></li>
+  <li>TemplateManager looks up template (case-insensitive)</li>
+  <li>Instantiator creates entity, adds components from template declaration</li>
+  <li>Transform.position receives the spawn position offset</li>
+</ol>
+
+<h3>Scene Reload</h3>
+<ol class="flow-list">
+  <li><code>engine.reloadActiveScene()</code></li>
+  <li>Destroy all entities from <code>last_instantiated_entities</code></li>
+  <li>Re-read <code>.scene</code> file from disk (picks up edits)</li>
+  <li>Re-parse and re-instantiate</li>
+</ol>
+
+<div class="links">
+  <a href="#scene-manager">SceneManager</a>
+  <a href="#template-manager">TemplateManager</a>
+  <a href="#instantiator">Instantiator</a>
+  <a href="#loader">Loader</a>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<!-- BACK TO TOP -->
+<!-- ============================================================ -->
+<p style="margin-top: 3rem; text-align: center;">
+  <a href="#top" style="color: #484f58; font-size: 0.85rem;">&uarr; back to top</a>
+</p>
+
+</body>
+</html>
