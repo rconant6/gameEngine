@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulkan Renderer — Swapchain &amp; Frame Loop Plan</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #e8e6e3;
+            background: #1a1a1a;
+            padding: 20px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #f7931e;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #f7931e;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #f7931e;
+            font-size: 1.6em;
+            margin-top: 36px;
+            margin-bottom: 12px;
+            border-left: 4px solid #f7931e;
+            padding-left: 12px;
+        }
+
+        h3 {
+            color: #ffb347;
+            font-size: 1.2em;
+            margin-top: 22px;
+            margin-bottom: 8px;
+        }
+
+        h4 {
+            color: #ffd699;
+            font-size: 1.05em;
+            margin-top: 18px;
+            margin-bottom: 6px;
+        }
+
+        p, li { margin-bottom: 8px; }
+
+        ul, ol {
+            padding-left: 30px;
+            margin-bottom: 12px;
+        }
+
+        code {
+            background: #2a2a2a;
+            color: #ffd699;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.92em;
+        }
+
+        pre {
+            background: #2a2a2a;
+            border-left: 3px solid #f7931e;
+            padding: 12px 16px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0 16px 0;
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: #e8e6e3;
+        }
+
+        .intro {
+            font-style: italic;
+            color: #b8b8b8;
+            margin-bottom: 30px;
+            margin-top: 12px;
+        }
+
+        .phase {
+            background: #232323;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 18px 22px;
+            margin-bottom: 28px;
+        }
+
+        .phase h2 {
+            margin-top: 0;
+            border-left: none;
+            padding-left: 0;
+        }
+
+        .phase-label {
+            display: inline-block;
+            background: #f7931e;
+            color: #1a1a1a;
+            font-weight: bold;
+            font-size: 0.78em;
+            padding: 2px 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .phase-label.done-label {
+            background: #4caf50;
+        }
+
+        .checklist {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .checklist li {
+            padding: 5px 0 5px 32px;
+            position: relative;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .checklist li:last-child { border-bottom: none; }
+
+        .checklist li input[type="checkbox"] {
+            position: absolute;
+            left: 4px;
+            top: 8px;
+            accent-color: #f7931e;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .checklist li.done {
+            color: #666;
+            text-decoration: line-through;
+        }
+
+        .note {
+            background: #2a2520;
+            border-left: 3px solid #ffb347;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.95em;
+        }
+
+        .principle {
+            background: #1f2a1f;
+            border-left: 3px solid #4caf50;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+
+        .why {
+            background: #1f1f2e;
+            border-left: 3px solid #6495ed;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.95em;
+        }
+
+        .gotcha {
+            background: #2e1f1f;
+            border-left: 3px solid #e74c3c;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.95em;
+        }
+
+        .file-tree {
+            background: #2a2a2a;
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.92em;
+            margin: 10px 0;
+            line-height: 1.7;
+        }
+
+        .file-tree .new    { color: #4caf50; }
+        .file-tree .modify { color: #6495ed; }
+        .file-tree .keep   { color: #888; }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 8px 0 14px 0;
+            font-size: 0.88em;
+        }
+
+        .legend span { display: flex; align-items: center; gap: 6px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .dot-new    { background: #4caf50; }
+        .dot-modify { background: #6495ed; }
+        .dot-keep   { background: #888; }
+
+        .diagram {
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 14px 0;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.82em;
+            line-height: 1.6;
+            overflow-x: auto;
+            color: #e8e6e3;
+            white-space: pre;
+        }
+
+        .toc {
+            background: #232323;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 14px 22px;
+            margin-bottom: 30px;
+        }
+        .toc h3 { margin-top: 0; color: #f7931e; }
+        .toc ol { margin-bottom: 0; }
+        .toc a { color: #ffb347; text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+
+        .handoff {
+            background: #1a2a1a;
+            border: 2px solid #4caf50;
+            border-radius: 6px;
+            padding: 14px 18px;
+            margin: 14px 0;
+        }
+        .handoff h3 { color: #4caf50; margin-top: 0; }
+
+        .sub-checklist {
+            list-style: none;
+            padding-left: 20px;
+            margin-top: 4px;
+        }
+        .sub-checklist li {
+            padding: 3px 0 3px 28px;
+            border-bottom: none;
+            font-size: 0.93em;
+            color: #b8b8b8;
+        }
+        .sub-checklist li input[type="checkbox"] {
+            position: absolute;
+            left: 4px;
+            top: 6px;
+            accent-color: #f7931e;
+            width: 14px;
+            height: 14px;
+        }
+
+        .tag {
+            display: inline-block;
+            font-size: 0.75em;
+            padding: 1px 7px;
+            border-radius: 8px;
+            margin-left: 6px;
+            vertical-align: middle;
+            font-weight: bold;
+        }
+        .tag-new    { background: #1f2a1f; color: #4caf50; border: 1px solid #4caf50; }
+        .tag-modify { background: #1f1f2e; color: #6495ed; border: 1px solid #6495ed; }
+        .tag-keep   { background: #2a2a2a; color: #888;    border: 1px solid #555; }
+        .tag-done   { background: #1f2a1f; color: #4caf50; border: 1px solid #4caf50; }
+
+        .done-block {
+            background: #1f2a1f;
+            border: 1px solid #2a3a2a;
+            border-radius: 6px;
+            padding: 18px 22px;
+            margin-bottom: 28px;
+            opacity: 0.75;
+        }
+        .done-block h2 { margin-top: 0; border-left: none; padding-left: 0; color: #4caf50; }
+    </style>
+</head>
+<body>
+
+<h1>Vulkan Renderer — Swapchain &amp; Frame Loop</h1>
+<p class="intro">
+    Phase 6 of the rendering stack. Instance → Surface → PhysicalDevice → Device are
+    done. This plan adds everything needed to get pixels on screen: a swapchain, render
+    pass, framebuffers, command recording infrastructure, and a working
+    <code>beginFrame</code>/<code>endFrame</code> loop that clears to a color and presents.
+</p>
+
+<div class="toc">
+    <h3>Phases</h3>
+    <ol>
+        <li><a href="#done">Already Done</a> &nbsp;— Instance, Surface, PhysicalDevice, Device</li>
+        <li><a href="#phase1">Phase 1 — Device Extension</a> &nbsp;<code>Device.zig</code></li>
+        <li><a href="#phase2">Phase 2 — Swapchain</a> &nbsp;<code>Swapchain.zig</code></li>
+        <li><a href="#phase3">Phase 3 — Render Pass</a> &nbsp;<code>RenderPass.zig</code></li>
+        <li><a href="#phase4">Phase 4 — Framebuffers</a> &nbsp;<code>Framebuffer.zig</code></li>
+        <li><a href="#phase5">Phase 5 — Command Pool</a> &nbsp;<code>CommandPool.zig</code></li>
+        <li><a href="#phase6">Phase 6 — Sync Primitives</a> &nbsp;<code>Sync.zig</code></li>
+        <li><a href="#phase7">Phase 7 — Frame Loop</a> &nbsp;<code>vulkan_renderer.zig</code></li>
+        <li><a href="#phase8">Phase 8 — Resize</a></li>
+    </ol>
+</div>
+
+<div class="principle">
+    <strong>Goal:</strong> A window that clears to a solid color each frame and presents it via
+    the swapchain. No draw calls, no pipeline, no shaders — just the frame machinery.
+    Once this works, all future rendering (geometry, textures, UI) slots into
+    <code>beginFrame</code>/<code>endFrame</code> without touching the infrastructure again.
+</div>
+
+
+<!-- FILE TREE -->
+<h2>File Layout</h2>
+
+<div class="legend">
+    <span><span class="dot dot-new"></span> new</span>
+    <span><span class="dot dot-modify"></span> modify</span>
+    <span><span class="dot dot-keep"></span> keep as-is</span>
+</div>
+
+<div class="file-tree">
+src/renderer/gpu/vulkan/
+  <span class="modify">vulkan_renderer.zig</span>        ← MODIFY — add swapchain/sync fields, implement frame methods
+  <span class="modify">types.zig</span>                  ← MODIFY — re-export new support types
+  <span class="keep">c_bridge.zig</span>               ← keep
+  support/
+    <span class="keep">Instance.zig</span>             ← keep ✅
+    <span class="keep">Surface.zig</span>              ← keep ✅
+    <span class="keep">PhysicalDevice.zig</span>       ← keep ✅
+    <span class="modify">Device.zig</span>             ← MODIFY — add VK_KHR_swapchain extension
+    <span class="new">Swapchain.zig</span>            ← NEW — VkSwapchainKHR + images + image views
+    <span class="new">RenderPass.zig</span>           ← NEW — single color attachment clear pass
+    <span class="new">Framebuffer.zig</span>          ← NEW — one VkFramebuffer per swapchain image
+    <span class="new">CommandPool.zig</span>          ← NEW — pool + per-frame command buffers
+    <span class="new">Sync.zig</span>                 ← NEW — semaphores + fences per frame-in-flight
+</div>
+
+<!-- INIT CHAIN DIAGRAM -->
+<h2>Init Chain</h2>
+<div class="diagram">VulkanRenderer.init()
+  Instance.init()        → VkInstance (VK_KHR_surface + VK_KHR_wayland_surface)  ✅ done
+  Surface.init()         → VkSurfaceKHR (from wl_display + wl_surface)            ✅ done
+  PhysicalDevice.init()  → selects GPU, finds graphics + present queue family      ✅ done
+  Device.init()          → VkDevice + queues (+ VK_KHR_swapchain added)           ← Phase 1
+  Swapchain.init()       → VkSwapchainKHR + []VkImage + []VkImageView             ← Phase 2
+  RenderPass.init()      → VkRenderPass (UNDEFINED → COLOR_ATTACHMENT → PRESENT)  ← Phase 3
+  Framebuffer.init()     → []VkFramebuffer, one per swapchain image               ← Phase 4
+  CommandPool.init()     → VkCommandPool + [2]VkCommandBuffer                     ← Phase 5
+  Sync.init()            → [2]{ image_available, render_finished, in_flight }      ← Phase 6</div>
+
+<!-- FRAME LOOP DIAGRAM -->
+<h2>Frame Loop</h2>
+<div class="diagram">beginFrame()
+  │  vkWaitForFences(in_flight[current_frame])
+  │  vkAcquireNextImageKHR → current_image index
+  │  vkResetFences(in_flight[current_frame])
+  │  vkResetCommandBuffer(cmd[current_frame])
+  │  vkBeginCommandBuffer
+  │  vkCmdBeginRenderPass  ← VkClearColorValue from setClearColor()
+  │
+  └── (draw calls go here in future phases)
+
+endFrame()
+  │  vkCmdEndRenderPass
+  │  vkEndCommandBuffer
+  │
+  │  vkQueueSubmit
+  │    waitSemaphore   = image_available[current_frame]
+  │    waitDstStage    = COLOR_ATTACHMENT_OUTPUT
+  │    signalSemaphore = render_finished[current_frame]
+  │    fence           = in_flight[current_frame]
+  │
+  │  vkQueuePresentKHR
+  │    waitSemaphore = render_finished[current_frame]
+  │    imageIndex    = current_image
+  │
+  └── current_frame = (current_frame + 1) % 2</div>
+
+
+<!-- ALREADY DONE -->
+<div class="done-block" id="done">
+    <div class="phase-label done-label">Complete</div>
+    <h2>Already Done</h2>
+    <p>These files exist and work. Do not touch them during this phase.</p>
+    <ul>
+        <li><code>Instance.zig</code> — VkInstance with <code>VK_KHR_surface</code> + <code>VK_KHR_wayland_surface</code>, API version 1.4</li>
+        <li><code>Surface.zig</code> — <code>VkWaylandSurfaceCreateInfoKHR</code> from <code>WindowHandle.display</code> + <code>WindowHandle.surface</code></li>
+        <li><code>PhysicalDevice.zig</code> — enumerates GPUs, finds graphics + present queue families via <code>vkGetPhysicalDeviceSurfaceSupportKHR</code></li>
+        <li><code>Device.zig</code> — <code>VkDevice</code> + graphics/present queues retrieved (single queue family only; splits not yet supported)</li>
+        <li><code>vulkan_renderer.zig</code> — <code>init()</code> chains all four above; <code>deinit()</code> tears them down in reverse</li>
+        <li>Full call chain: <code>app.zig</code> → <code>plat.getNativeWindowHandle()</code> → <code>Renderer.init(config)</code> → <code>VulkanRenderer.init()</code></li>
+    </ul>
+</div>
+
+
+<!-- PHASE 1 -->
+<div class="phase" id="phase1">
+    <div class="phase-label">Phase 1</div>
+    <h2>Device Extension <span class="tag tag-modify">modify</span></h2>
+    <p>
+        <code>Device.zig</code> currently sets <code>enabledExtensionCount = 0</code>.
+        Swapchain creation will fail at runtime without <code>VK_KHR_swapchain</code>
+        as a device extension. This is the only change to existing files before the
+        new modules are built.
+    </p>
+
+    <h3>Device.zig changes</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> Add extension list: <code>const device_extensions = [_][*c]const u8{ "VK_KHR_swapchain" };</code></li>
+        <li><input type="checkbox"> Set <code>dev_create_info.enabledExtensionCount = device_extensions.len;</code></li>
+        <li><input type="checkbox"> Set <code>dev_create_info.ppEnabledExtensionNames = &amp;device_extensions;</code></li>
+        <li><input type="checkbox"> Confirm build still succeeds and engine still launches</li>
+    </ul>
+
+    <div class="why">
+        <strong>Why device extension, not instance?</strong> <code>VK_KHR_surface</code> and
+        <code>VK_KHR_wayland_surface</code> are instance extensions — they teach the instance
+        how to create a surface object. <code>VK_KHR_swapchain</code> is a device extension —
+        it teaches the device how to present images to that surface. Different layers of the
+        Vulkan object model.
+    </div>
+</div>
+
+
+<!-- PHASE 2 -->
+<div class="phase" id="phase2">
+    <div class="phase-label">Phase 2</div>
+    <h2>Swapchain <span class="tag tag-new">new</span></h2>
+    <p>
+        The swapchain is a ring of GPU images the compositor cycles through. You render
+        into one while the compositor is displaying another. This module queries what
+        the surface supports, picks sensible defaults, and creates the swapchain + per-image views.
+    </p>
+
+    <h3>Swapchain.zig — struct fields</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>handle: *vk.struct_VkSwapchainKHR_T</code></li>
+        <li><input type="checkbox"> <code>images: []vk.VkImage</code> — allocated with gpa, freed in deinit</li>
+        <li><input type="checkbox"> <code>views: []vk.VkImageView</code> — one per image, destroyed in deinit</li>
+        <li><input type="checkbox"> <code>format: vk.VkFormat</code> — chosen surface format</li>
+        <li><input type="checkbox"> <code>extent: vk.VkExtent2D</code> — chosen image dimensions</li>
+    </ul>
+
+    <h3>init() — query surface capabilities</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkGetPhysicalDeviceSurfaceCapabilitiesKHR</code> → <code>caps</code></li>
+        <li><input type="checkbox"> Image count: <code>caps.minImageCount + 1</code>, clamped to <code>caps.maxImageCount</code> if non-zero</li>
+        <li><input type="checkbox"> Extent: use <code>caps.currentExtent</code> if not <code>0xFFFFFFFF</code>; otherwise clamp requested <code>width/height</code> to <code>min/maxImageExtent</code></li>
+        <li><input type="checkbox"> Pre-transform: <code>caps.currentTransform</code></li>
+    </ul>
+
+    <h3>init() — pick surface format</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkGetPhysicalDeviceSurfaceFormatsKHR</code> (two-call pattern: get count, then fill slice)</li>
+        <li><input type="checkbox"> Prefer <code>VK_FORMAT_B8G8R8A8_SRGB</code> + <code>VK_COLOR_SPACE_SRGB_NONLINEAR_KHR</code></li>
+        <li><input type="checkbox"> Fall back to <code>formats[0]</code> if preferred not found</li>
+        <li><input type="checkbox"> Store chosen <code>format.format</code> in <code>self.format</code></li>
+    </ul>
+
+    <h3>init() — pick present mode</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkGetPhysicalDeviceSurfacePresentModesKHR</code> (two-call pattern)</li>
+        <li><input type="checkbox"> Prefer <code>VK_PRESENT_MODE_MAILBOX_KHR</code> — lowest latency without tearing</li>
+        <li><input type="checkbox"> Fall back to <code>VK_PRESENT_MODE_FIFO_KHR</code> — always available, vsync</li>
+    </ul>
+
+    <h3>init() — create VkSwapchainKHR</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>VkSwapchainCreateInfoKHR</code>: surface, minImageCount, imageFormat, imageColorSpace, imageExtent, imageArrayLayers=1, imageUsage=COLOR_ATTACHMENT</li>
+        <li><input type="checkbox"> <code>imageSharingMode = VK_SHARING_MODE_EXCLUSIVE</code> (graphics == present queue, which is already verified in Device.zig)</li>
+        <li><input type="checkbox"> <code>preTransform</code> from caps, <code>compositeAlpha = OPAQUE</code>, <code>presentMode</code>, <code>clipped = VK_TRUE</code></li>
+        <li><input type="checkbox"> <code>oldSwapchain = null</code> on first create (pass old handle when recreating on resize)</li>
+        <li><input type="checkbox"> <code>vkCreateSwapchainKHR</code> → <code>self.handle</code></li>
+    </ul>
+
+    <h3>init() — retrieve images + create image views</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkGetSwapchainImagesKHR</code> (two-call pattern) → allocate and fill <code>self.images</code></li>
+        <li><input type="checkbox"> For each image, create <code>VkImageView</code>:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> <code>viewType = VK_IMAGE_VIEW_TYPE_2D</code></li>
+                <li><input type="checkbox"> <code>format = self.format</code></li>
+                <li><input type="checkbox"> <code>components</code>: all four channels = <code>VK_COMPONENT_SWIZZLE_IDENTITY</code></li>
+                <li><input type="checkbox"> <code>subresourceRange</code>: aspectMask = COLOR, baseMipLevel=0, levelCount=1, baseArrayLayer=0, layerCount=1</li>
+            </ul>
+        </li>
+        <li><input type="checkbox"> Allocate <code>self.views</code> slice and store each image view</li>
+    </ul>
+
+    <h3>deinit()</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> Destroy each image view with <code>vkDestroyImageView</code></li>
+        <li><input type="checkbox"> Free <code>self.views</code> and <code>self.images</code> slices via gpa</li>
+        <li><input type="checkbox"> <code>vkDestroySwapchainKHR</code> — do NOT destroy the images themselves (swapchain owns them)</li>
+    </ul>
+
+    <div class="gotcha">
+        <strong>Do not destroy VkImage handles.</strong> Swapchain images are owned by the
+        swapchain. Calling <code>vkDestroyImage</code> on them is undefined behavior and will
+        crash or corrupt GPU state. Only destroy the <code>VkImageView</code> wrappers you created.
+    </div>
+
+    <div class="note">
+        <strong>Two-call pattern:</strong> Many Vulkan enumerate functions work the same way —
+        call once with a null pointer to get the count, allocate, call again to fill.
+        <code>vkGetSwapchainImagesKHR(dev, swapchain, &amp;count, null)</code> then
+        <code>vkGetSwapchainImagesKHR(dev, swapchain, &amp;count, images.ptr)</code>.
+        Same for surface formats and present modes.
+    </div>
+</div>
+
+
+<!-- PHASE 3 -->
+<div class="phase" id="phase3">
+    <div class="phase-label">Phase 3</div>
+    <h2>Render Pass <span class="tag tag-new">new</span></h2>
+    <p>
+        A render pass describes how the GPU transitions image memory during rendering.
+        This one has a single color attachment: clear it at the start, store the result,
+        then transition it to a layout the compositor can display.
+    </p>
+
+    <h3>RenderPass.zig — struct fields</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>handle: *vk.struct_VkRenderPass_T</code></li>
+    </ul>
+
+    <h3>init(device, format)</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>VkAttachmentDescription</code> for the color attachment:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> <code>format</code> = swapchain format (passed in)</li>
+                <li><input type="checkbox"> <code>samples = VK_SAMPLE_COUNT_1_BIT</code></li>
+                <li><input type="checkbox"> <code>loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR</code> — wipe on entry</li>
+                <li><input type="checkbox"> <code>storeOp = VK_ATTACHMENT_STORE_OP_STORE</code> — keep result</li>
+                <li><input type="checkbox"> <code>stencilLoadOp / stencilStoreOp = DONT_CARE</code> — no depth/stencil</li>
+                <li><input type="checkbox"> <code>initialLayout = VK_IMAGE_LAYOUT_UNDEFINED</code> — don't care about prior contents</li>
+                <li><input type="checkbox"> <code>finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR</code> — transition for presentation</li>
+            </ul>
+        </li>
+        <li><input type="checkbox"> <code>VkAttachmentReference</code>: <code>attachment = 0</code>, <code>layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL</code></li>
+        <li><input type="checkbox"> <code>VkSubpassDescription</code>: <code>pipelineBindPoint = GRAPHICS</code>, <code>colorAttachmentCount = 1</code>, <code>pColorAttachments = &amp;color_ref</code></li>
+        <li><input type="checkbox"> <code>VkSubpassDependency</code> — synchronize external writes before our color attachment write:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> <code>srcSubpass = VK_SUBPASS_EXTERNAL</code>, <code>dstSubpass = 0</code></li>
+                <li><input type="checkbox"> <code>srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT</code></li>
+                <li><input type="checkbox"> <code>srcAccessMask = 0</code></li>
+                <li><input type="checkbox"> <code>dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT</code></li>
+                <li><input type="checkbox"> <code>dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT</code></li>
+            </ul>
+        </li>
+        <li><input type="checkbox"> <code>vkCreateRenderPass</code> → <code>self.handle</code></li>
+    </ul>
+
+    <h3>deinit()</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkDestroyRenderPass(device, self.handle, null)</code></li>
+    </ul>
+
+    <div class="why">
+        <strong>Why the subpass dependency?</strong> Without it, the GPU may start the subpass
+        before previous frames have finished presenting. The dependency tells the driver:
+        wait for any outstanding <code>COLOR_ATTACHMENT_OUTPUT</code> operations before we
+        write to the color attachment. Without this, you get validation errors and potential
+        visual corruption.
+    </div>
+</div>
+
+
+<!-- PHASE 4 -->
+<div class="phase" id="phase4">
+    <div class="phase-label">Phase 4</div>
+    <h2>Framebuffers <span class="tag tag-new">new</span></h2>
+    <p>
+        A framebuffer binds a specific set of image views to a render pass's attachment
+        slots. One framebuffer per swapchain image — the render pass attachment description
+        stays the same, only the backing image changes per frame.
+    </p>
+
+    <h3>Framebuffer.zig — functions</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>pub fn init(gpa, device, render_pass, views, extent) ![]vk.VkFramebuffer</code></li>
+        <li><input type="checkbox"> For each image view, create <code>VkFramebufferCreateInfo</code>:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> <code>renderPass = render_pass</code></li>
+                <li><input type="checkbox"> <code>attachmentCount = 1</code>, <code>pAttachments = &amp;views[i]</code></li>
+                <li><input type="checkbox"> <code>width / height</code> from <code>extent</code></li>
+                <li><input type="checkbox"> <code>layers = 1</code></li>
+            </ul>
+        </li>
+        <li><input type="checkbox"> Allocate and return a <code>[]vk.VkFramebuffer</code> slice (caller owns, gpa allocated)</li>
+        <li><input type="checkbox"> <code>pub fn deinit(gpa, device, framebuffers: []vk.VkFramebuffer) void</code></li>
+        <li><input type="checkbox"> deinit: call <code>vkDestroyFramebuffer</code> for each entry, then <code>gpa.free(framebuffers)</code></li>
+    </ul>
+
+    <div class="note">
+        <strong>No struct wrapper needed.</strong> A framebuffer slice is simple enough to pass
+        directly. Wrapping it in a struct adds boilerplate for no benefit here — just pass
+        <code>framebuffers[current_image]</code> when beginning the render pass.
+    </div>
+</div>
+
+
+<!-- PHASE 5 -->
+<div class="phase" id="phase5">
+    <div class="phase-label">Phase 5</div>
+    <h2>Command Pool <span class="tag tag-new">new</span></h2>
+    <p>
+        Command buffers are where GPU work is recorded. A pool backs them. One command
+        buffer per frame-in-flight — each frame gets its own buffer so frame N can be
+        recording while frame N-1 is still executing on the GPU.
+    </p>
+
+    <h3>CommandPool.zig — struct fields</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>pool: *vk.struct_VkCommandPool_T</code></li>
+        <li><input type="checkbox"> <code>buffers: [frames_in_flight]vk.VkCommandBuffer</code></li>
+    </ul>
+
+    <h3>init(device, queue_family_index)</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>VkCommandPoolCreateInfo</code>:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> <code>flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT</code> — allows individual buffer reset</li>
+                <li><input type="checkbox"> <code>queueFamilyIndex</code> = graphics queue family from PhysicalDevice</li>
+            </ul>
+        </li>
+        <li><input type="checkbox"> <code>vkCreateCommandPool</code> → <code>self.pool</code></li>
+        <li><input type="checkbox"> <code>VkCommandBufferAllocateInfo</code>:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> <code>commandPool = self.pool</code></li>
+                <li><input type="checkbox"> <code>level = VK_COMMAND_BUFFER_LEVEL_PRIMARY</code></li>
+                <li><input type="checkbox"> <code>commandBufferCount = frames_in_flight</code></li>
+            </ul>
+        </li>
+        <li><input type="checkbox"> <code>vkAllocateCommandBuffers</code> → fills <code>self.buffers</code></li>
+    </ul>
+
+    <h3>deinit(device)</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkDestroyCommandPool(device, self.pool, null)</code> — automatically frees all buffers allocated from it</li>
+    </ul>
+
+    <div class="note">
+        <strong><code>frames_in_flight</code></strong> is a comptime constant. Define it once at the
+        top of <code>CommandPool.zig</code> (or <code>vulkan_renderer.zig</code>) and reference it
+        everywhere. Value: <code>2</code>. This is the CPU-GPU overlap depth —
+        2 is the standard sweet spot for most workloads.
+    </div>
+</div>
+
+
+<!-- PHASE 6 -->
+<div class="phase" id="phase6">
+    <div class="phase-label">Phase 6</div>
+    <h2>Sync Primitives <span class="tag tag-new">new</span></h2>
+    <p>
+        Three sync objects per frame-in-flight. Two semaphores for GPU→GPU signaling
+        (acquire → render → present), one fence for CPU to wait on the GPU before
+        reusing this frame's resources.
+    </p>
+
+    <h3>Sync.zig — FrameSync struct</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>image_available: *vk.struct_VkSemaphore_T</code> — signaled when swapchain image is ready to render into</li>
+        <li><input type="checkbox"> <code>render_finished: *vk.struct_VkSemaphore_T</code> — signaled when command buffer has finished executing</li>
+        <li><input type="checkbox"> <code>in_flight: *vk.struct_VkFence_T</code> — CPU waits on this before reusing this frame's command buffer</li>
+    </ul>
+
+    <h3>init(device) ![frames_in_flight]FrameSync</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> For each frame: create two semaphores with <code>VkSemaphoreCreateInfo{ .sType = ... }</code></li>
+        <li><input type="checkbox"> Create fence with <code>VkFenceCreateInfo{ .flags = VK_FENCE_CREATE_SIGNALED_BIT }</code></li>
+        <li><input type="checkbox"> Return array of <code>FrameSync</code></li>
+    </ul>
+
+    <h3>deinit(syncs: []FrameSync, device)</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> For each frame: <code>vkDestroySemaphore</code> × 2, <code>vkDestroyFence</code> × 1</li>
+    </ul>
+
+    <div class="gotcha">
+        <strong>Fence must start signaled.</strong> On frame 0, <code>beginFrame</code> calls
+        <code>vkWaitForFences</code> before any GPU work has been submitted. If the fence
+        starts unsignaled, this blocks forever. <code>VK_FENCE_CREATE_SIGNALED_BIT</code>
+        lets frame 0 pass through immediately.
+    </div>
+
+    <div class="why">
+        <strong>Why two semaphores per frame?</strong>
+        <code>image_available</code> is signaled by <code>vkAcquireNextImageKHR</code> — it tells
+        the GPU "this image is no longer being displayed, you can write to it." It gates the
+        render submission. <code>render_finished</code> is signaled by <code>vkQueueSubmit</code>
+        — it tells the GPU "rendering is done, you can present this image." It gates the present.
+        They cannot be collapsed into one because they signal at different points in the pipeline.
+    </div>
+</div>
+
+
+<!-- PHASE 7 -->
+<div class="phase" id="phase7">
+    <div class="phase-label">Phase 7</div>
+    <h2>Frame Loop — vulkan_renderer.zig <span class="tag tag-modify">modify</span></h2>
+    <p>
+        Wire all the new modules into <code>VulkanRenderer</code> and implement the four
+        frame methods. This is the payoff — after this, the engine renders a colored window.
+    </p>
+
+    <h3>New fields on VulkanRenderer</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>swapchain: Swapchain</code></li>
+        <li><input type="checkbox"> <code>render_pass: RenderPass</code></li>
+        <li><input type="checkbox"> <code>framebuffers: []vk.VkFramebuffer</code></li>
+        <li><input type="checkbox"> <code>cmd: CommandPool</code></li>
+        <li><input type="checkbox"> <code>sync: [frames_in_flight]Sync.FrameSync</code></li>
+        <li><input type="checkbox"> <code>clear_color: vk.VkClearColorValue</code> — default to black <code>{ .float32 = .{ 0, 0, 0, 1 } }</code></li>
+        <li><input type="checkbox"> <code>current_frame: u32 = 0</code></li>
+        <li><input type="checkbox"> <code>current_image: u32 = 0</code></li>
+    </ul>
+
+    <h3>Extend init()</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> After <code>Device.init</code>: call <code>Swapchain.init(gpa, dev.handle, &amp;phys_device, surface.handle, config.width, config.height)</code></li>
+        <li><input type="checkbox"> <code>RenderPass.init(dev.handle, swapchain.format)</code></li>
+        <li><input type="checkbox"> <code>Framebuffer.init(gpa, dev.handle, render_pass.handle, swapchain.views, swapchain.extent)</code></li>
+        <li><input type="checkbox"> <code>CommandPool.init(dev.handle, phys_device.queue_families.graphics)</code></li>
+        <li><input type="checkbox"> <code>Sync.init(dev.handle)</code></li>
+    </ul>
+
+    <h3>Extend deinit() — reverse order</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkDeviceWaitIdle(self.dev.handle)</code> first — ensure GPU is done before tearing down</li>
+        <li><input type="checkbox"> <code>Sync.deinit(&amp;self.sync, self.dev.handle)</code></li>
+        <li><input type="checkbox"> <code>self.cmd.deinit(self.dev.handle)</code></li>
+        <li><input type="checkbox"> <code>Framebuffer.deinit(self.gpa, self.dev.handle, self.framebuffers)</code></li>
+        <li><input type="checkbox"> <code>self.render_pass.deinit(self.dev.handle)</code></li>
+        <li><input type="checkbox"> <code>self.swapchain.deinit(self.dev.handle, self.gpa)</code></li>
+        <li><input type="checkbox"> Existing: gpu.deinit, surface.deinit, instance.deinit</li>
+    </ul>
+
+    <h3>setClearColor()</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> Store as <code>VkClearColorValue</code>: <code>self.clear_color = .{ .float32 = .{ color.r, color.g, color.b, color.a } };</code></li>
+    </ul>
+
+    <h3>beginFrame()</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkWaitForFences(self.dev.handle, 1, &amp;s.in_flight, VK_TRUE, maxInt(u64))</code></li>
+        <li><input type="checkbox"> <code>vkAcquireNextImageKHR(self.dev.handle, self.swapchain.handle, maxInt(u64), s.image_available, null, &amp;self.current_image)</code></li>
+        <li><input type="checkbox"> Handle return value: <code>VK_ERROR_OUT_OF_DATE_KHR</code> → return <code>error.SwapchainOutOfDate</code>; <code>VK_SUBOPTIMAL_KHR</code> → continue (present will handle it)</li>
+        <li><input type="checkbox"> <code>vkResetFences(self.dev.handle, 1, &amp;s.in_flight)</code> — reset after acquire (not before, to avoid reset before check)</li>
+        <li><input type="checkbox"> <code>vkResetCommandBuffer(cb, 0)</code></li>
+        <li><input type="checkbox"> <code>VkCommandBufferBeginInfo</code>: <code>flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT</code></li>
+        <li><input type="checkbox"> <code>vkBeginCommandBuffer(cb, &amp;begin_info)</code></li>
+        <li><input type="checkbox"> <code>VkRenderPassBeginInfo</code>:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> <code>renderPass = self.render_pass.handle</code></li>
+                <li><input type="checkbox"> <code>framebuffer = self.framebuffers[self.current_image]</code></li>
+                <li><input type="checkbox"> <code>renderArea = { .offset = {0,0}, .extent = self.swapchain.extent }</code></li>
+                <li><input type="checkbox"> <code>clearValueCount = 1</code>, <code>pClearValues = &amp;VkClearValue{ .color = self.clear_color }</code></li>
+            </ul>
+        </li>
+        <li><input type="checkbox"> <code>vkCmdBeginRenderPass(cb, &amp;rp_info, VK_SUBPASS_CONTENTS_INLINE)</code></li>
+    </ul>
+
+    <h3>endFrame()</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkCmdEndRenderPass(cb)</code></li>
+        <li><input type="checkbox"> <code>vkEndCommandBuffer(cb)</code></li>
+        <li><input type="checkbox"> <code>VkSubmitInfo</code>:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> <code>waitSemaphoreCount = 1</code>, <code>pWaitSemaphores = &amp;s.image_available</code></li>
+                <li><input type="checkbox"> <code>pWaitDstStageMask = &amp;VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT</code></li>
+                <li><input type="checkbox"> <code>commandBufferCount = 1</code>, <code>pCommandBuffers = &amp;cb</code></li>
+                <li><input type="checkbox"> <code>signalSemaphoreCount = 1</code>, <code>pSignalSemaphores = &amp;s.render_finished</code></li>
+            </ul>
+        </li>
+        <li><input type="checkbox"> <code>vkQueueSubmit(self.dev.graphics_queue, 1, &amp;submit_info, s.in_flight)</code></li>
+        <li><input type="checkbox"> <code>VkPresentInfoKHR</code>:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> <code>waitSemaphoreCount = 1</code>, <code>pWaitSemaphores = &amp;s.render_finished</code></li>
+                <li><input type="checkbox"> <code>swapchainCount = 1</code>, <code>pSwapchains = &amp;self.swapchain.handle</code></li>
+                <li><input type="checkbox"> <code>pImageIndices = &amp;self.current_image</code></li>
+            </ul>
+        </li>
+        <li><input type="checkbox"> <code>vkQueuePresentKHR(self.dev.present_queue, &amp;present_info)</code></li>
+        <li><input type="checkbox"> Handle <code>VK_ERROR_OUT_OF_DATE_KHR</code> or <code>VK_SUBOPTIMAL_KHR</code> → call <code>recreateSwapchain()</code></li>
+        <li><input type="checkbox"> <code>self.current_frame = (self.current_frame + 1) % frames_in_flight</code></li>
+    </ul>
+
+    <h3>Update types.zig</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> Add re-exports: <code>pub const Swapchain = @import("support/Swapchain.zig");</code> etc. for all five new modules</li>
+    </ul>
+
+    <div class="gotcha">
+        <strong>Reset fence AFTER acquire, not before.</strong> If you reset the fence before
+        <code>vkAcquireNextImageKHR</code> and acquire returns an error (<code>OUT_OF_DATE</code>),
+        you never re-signal the fence — the next frame waits forever. Acquire first, then reset
+        only on success.
+    </div>
+</div>
+
+
+<!-- PHASE 8 -->
+<div class="phase" id="phase8">
+    <div class="phase-label">Phase 8</div>
+    <h2>Resize — Swapchain Recreation <span class="tag tag-modify">modify</span></h2>
+    <p>
+        When the window is resized, the swapchain extent is stale. Vulkan signals this
+        via <code>VK_ERROR_OUT_OF_DATE_KHR</code> on acquire or present. The response:
+        wait for the GPU to finish, tear down the swapchain-dependent objects, and rebuild.
+    </p>
+
+    <h3>recreateSwapchain(width, height) — internal helper</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkDeviceWaitIdle(self.dev.handle)</code></li>
+        <li><input type="checkbox"> <code>Framebuffer.deinit(self.gpa, self.dev.handle, self.framebuffers)</code></li>
+        <li><input type="checkbox"> <code>self.swapchain.deinit(self.dev.handle, self.gpa)</code></li>
+        <li><input type="checkbox"> <code>self.swapchain = try Swapchain.init(..., width, height)</code></li>
+        <li><input type="checkbox"> <code>self.framebuffers = try Framebuffer.init(gpa, dev, render_pass, swapchain.views, swapchain.extent)</code></li>
+        <li><input type="checkbox"> RenderPass can be reused — it does not depend on swapchain extent or image count</li>
+        <li><input type="checkbox"> CommandPool and sync objects can be reused — they don't reference swapchain images</li>
+    </ul>
+
+    <h3>resize() — public API</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>pub fn resize(self: *Self, width: u32, height: u32) !void</code></li>
+        <li><input type="checkbox"> Call <code>recreateSwapchain(width, height)</code></li>
+        <li><input type="checkbox"> <code>renderer.zig</code> already has a <code>resize</code> stub that delegates to the backend — wire it through</li>
+    </ul>
+
+    <div class="note">
+        <strong>Not all objects need to be recreated on resize.</strong> The render pass,
+        command pool, and sync primitives are extent-independent and can survive swapchain
+        recreation. Only the swapchain, image views (inside Swapchain), and framebuffers
+        are tied to specific image dimensions.
+    </div>
+</div>
+
+
+<!-- VERIFICATION -->
+<div class="handoff" id="verify">
+    <h3>Verification</h3>
+    <p>In order:</p>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>zig build zixelart</code> compiles cleanly — no Vulkan validation errors at startup</li>
+        <li><input type="checkbox"> Window appears on screen filled with the default clear color (black)</li>
+        <li><input type="checkbox"> <code>setClearColor</code> changes the window color — visible on next frame</li>
+        <li><input type="checkbox"> Resize the window — no crash, colors still display correctly</li>
+        <li><input type="checkbox"> Close the window — clean shutdown, no GPU-side errors</li>
+    </ul>
+</div>
+
+
+<h2>Out of Scope (for now)</h2>
+<ul>
+    <li>Graphics pipeline, shaders, vertex buffers — no draw calls in this phase</li>
+    <li>Depth/stencil buffer — color-only for now</li>
+    <li>Multiple render passes or subpasses</li>
+    <li>Validation layer setup — useful but separate from the frame machinery</li>
+    <li>MSAA (multi-sample anti-aliasing)</li>
+    <li>Multiple windows or surfaces</li>
+    <li>Split graphics/present queue families — Device.zig already rejects this; not needed on modern desktop GPUs</li>
+</ul>
+
+<div class="principle" style="margin-top: 30px;">
+    <strong>What comes after:</strong> Once <code>beginFrame</code>/<code>endFrame</code> work,
+    all future rendering (geometry pipeline, texture sampling, UI) inserts draw calls between
+    them without touching this infrastructure. The swapchain, render pass, and sync primitives
+    become a stable foundation.
+</div>
+
+<script>
+    // Persist checkbox state in localStorage
+    document.querySelectorAll('input[type="checkbox"]').forEach((cb, i) => {
+        const key = 'vulkan-swapchain-plan-cb-' + i;
+        cb.checked = localStorage.getItem(key) === 'true';
+        cb.addEventListener('change', () => {
+            localStorage.setItem(key, cb.checked);
+            const li = cb.closest('li');
+            if (li) li.classList.toggle('done', cb.checked);
+        });
+        if (cb.checked) {
+            const li = cb.closest('li');
+            if (li) li.classList.add('done');
+        }
+    });
+</script>
+
+</body>
+</html>
