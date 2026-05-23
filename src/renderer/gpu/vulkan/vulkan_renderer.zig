@@ -3,6 +3,8 @@ const Instance = myvk.Instance;
 const Surface = myvk.Surface;
 const PhysicalDevice = myvk.PhysicalDevice;
 const Device = myvk.Device;
+const Swapchain = myvk.Swapchain;
+const RenderPass = myvk.RenderPass;
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -26,17 +28,33 @@ dev: Device,
 
 pub fn init(
     alloc: std.mem.Allocator,
-    io: std.Io,
+    _: std.Io,
     config: RenderConfig,
 ) !Self {
     const native_handle = config.native_handle orelse return error.MissingNativeHandle;
 
     // TODO: Comeback and deal w/ validation layers
     const instance = try Instance.init();
-    const surface = try Surface.init(instance.handle, native_handle);
-    const phys_device = try PhysicalDevice.init(alloc, instance.handle, surface.handle);
+    const surface = try Surface.init(
+        instance.handle,
+        native_handle,
+    );
+    const phys_device = try PhysicalDevice.init(
+        alloc,
+        instance.handle,
+        surface.handle,
+    );
     const dev = try Device.init(&phys_device);
-    _ = io;
+    const swapchain = try Swapchain.init(
+        alloc,
+        dev,
+        phys_device,
+        surface,
+        config.width,
+        config.height,
+    );
+    const render_pass = try RenderPass.init(dev, swapchain.format);
+    _ = render_pass;
 
     return .{
         .gpa = alloc,

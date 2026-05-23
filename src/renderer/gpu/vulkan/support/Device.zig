@@ -6,6 +6,10 @@ const PhysicalDevice = @import("PhysicalDevice.zig");
 
 const Self = @This();
 
+const device_extenstions = [_][*c]const u8{
+    "VK_KHR_swapchain",
+};
+
 handle: *vk.struct_VkDevice_T,
 graphics_queue: *vk.struct_VkQueue_T,
 present_queue: *vk.struct_VkQueue_T,
@@ -41,7 +45,8 @@ pub fn init(p_dev: *const PhysicalDevice) !Self {
     dev_create_info.pQueueCreateInfos = &queue_create_info;
     dev_create_info.queueCreateInfoCount = 1;
     dev_create_info.pEnabledFeatures = &dev_features;
-    dev_create_info.enabledExtensionCount = 0;
+    dev_create_info.enabledExtensionCount = device_extenstions.len;
+    dev_create_info.ppEnabledExtensionNames = &device_extenstions;
 
     if (vk.vkCreateDevice(p_dev.handle, &dev_create_info, null, &dev) == vk.VK_SUCCESS) {
         vk.vkGetDeviceQueue(
