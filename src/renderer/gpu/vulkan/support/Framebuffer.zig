@@ -15,7 +15,7 @@ pub fn init(
 
     for (views, 0..) |view, i| {
         var create_info: vk.VkFramebufferCreateInfo = .{};
-        create_info.sType = vk.VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO;
+        create_info.sType = vk.VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         create_info.renderPass = render_pass.handle;
         create_info.attachmentCount = 1;
         create_info.pAttachments = &view;

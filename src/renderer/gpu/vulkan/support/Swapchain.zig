@@ -55,7 +55,7 @@ pub fn init(alloc: Allocator, dev: Device, gpu: PhysicalDevice, surface: Surface
     };
 }
 
-pub fn deinit(self: *Self, dev: *const Device) void {
+pub fn deinit(self: *Self, dev: Device) void {
     for (self.views) |view| {
         vk.vkDestroyImageView(dev.handle, view, null);
     }

@@ -83,7 +83,7 @@ pub fn init(
 pub fn deinit(self: *Self) void {
     Framebuffer.deinit(self.gpa, self.dev, self.fb);
     self.rp.deinit(self.dev);
-    self.sc.deinit(&self.dev);
+    self.sc.deinit(self.dev);
     self.dev.deinit();
     self.gpu.deinit();
     self.surface.deinit(self.instance.handle);
