@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const vk = @import("c_bridge.zig").c;
 const myvk = @import("types.zig");
+const frames_in_flight = myvk.frames_in_flight;
 const CommandPool = myvk.CommandPool;
 const Device = myvk.Device;
 const Framebuffer = myvk.Framebuffer;
@@ -11,6 +12,8 @@ const PhysicalDevice = myvk.PhysicalDevice;
 const RenderPass = myvk.RenderPass;
 const Surface = myvk.Surface;
 const Swapchain = myvk.Swapchain;
+const Sync = myvk.Sync;
+const FrameSync = myvk.FrameSync;
 const RenderContext = @import("../../RenderContext.zig");
 const rend = @import("../../renderer.zig");
 const RenderConfig = rend.RendererConfig;
@@ -30,7 +33,8 @@ dev: Device,
 sc: Swapchain,
 rp: RenderPass,
 fb: []vk.VkFramebuffer,
-command_pool: CommandPool,
+cmd: CommandPool,
+syncs: [frames_in_flight]FrameSync,
 
 pub fn init(
     alloc: std.mem.Allocator,
@@ -50,7 +54,9 @@ pub fn init(
         instance.handle,
         surface.handle,
     );
+
     const dev = try Device.init(&phys_device);
+
     const swapchain = try Swapchain.init(
         alloc,
         dev,
@@ -59,6 +65,7 @@ pub fn init(
         config.width,
         config.height,
     );
+
     const render_pass = try RenderPass.init(dev, swapchain.format);
 
     const framebuffers = try Framebuffer.init(
@@ -71,6 +78,8 @@ pub fn init(
 
     const command_pool = try CommandPool.init(dev, phys_device);
 
+    const syncs = try Sync.init(dev);
+
     return .{
         .gpa = alloc,
         .instance = instance,
@@ -80,12 +89,14 @@ pub fn init(
         .sc = swapchain,
         .rp = render_pass,
         .fb = framebuffers,
-        .command_pool = command_pool,
+        .cmd = command_pool,
+        .syncs = syncs,
     };
 }
 
 pub fn deinit(self: *Self) void {
-    self.command_pool.deinit(self.dev);
+    Sync.deinit(self.syncs, self.dev);
+    self.cmd.deinit(self.dev);
     Framebuffer.deinit(self.gpa, self.dev, self.fb);
     self.rp.deinit(self.dev);
     self.sc.deinit(self.dev);

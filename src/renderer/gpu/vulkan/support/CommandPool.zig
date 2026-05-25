@@ -2,7 +2,7 @@ const vk = @import("../c_bridge.zig").c;
 const Device = @import("Device.zig");
 const PhysicalDevice = @import("PhysicalDevice.zig");
 
-const frames_in_flight = 2;
+const frames_in_flight = @import("constants.zig").frames_in_flight;
 
 pool: *vk.struct_VkCommandPool_T,
 buffers: [frames_in_flight]vk.VkCommandBuffer,
