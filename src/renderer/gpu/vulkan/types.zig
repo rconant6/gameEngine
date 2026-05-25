@@ -1,3 +1,4 @@
+pub const CommandPool = @import("support/CommandPool.zig");
 pub const Device = @import("support/Device.zig");
 pub const Framebuffer = @import("support/Framebuffer.zig");
 pub const Instance = @import("support/Instance.zig");

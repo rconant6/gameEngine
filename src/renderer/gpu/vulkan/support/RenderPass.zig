@@ -1,6 +1,4 @@
 const vk = @import("../c_bridge.zig").c;
-// const Surface = @import("Surface.zig");
-// const PhysicalDevice = @import("PhysicalDevice.zig");
 const Device = @import("Device.zig");
 
 const Self = @This();

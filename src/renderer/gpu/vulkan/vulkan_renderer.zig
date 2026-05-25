@@ -1,16 +1,16 @@
-const myvk = @import("types.zig");
-const Instance = myvk.Instance;
-const Surface = myvk.Surface;
-const PhysicalDevice = myvk.PhysicalDevice;
-const Device = myvk.Device;
-const Swapchain = myvk.Swapchain;
-const RenderPass = myvk.RenderPass;
-const Framebuffer = myvk.Framebuffer;
-const vk = @import("c_bridge.zig").c;
-
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
+const vk = @import("c_bridge.zig").c;
+const myvk = @import("types.zig");
+const CommandPool = myvk.CommandPool;
+const Device = myvk.Device;
+const Framebuffer = myvk.Framebuffer;
+const Instance = myvk.Instance;
+const PhysicalDevice = myvk.PhysicalDevice;
+const RenderPass = myvk.RenderPass;
+const Surface = myvk.Surface;
+const Swapchain = myvk.Swapchain;
 const RenderContext = @import("../../RenderContext.zig");
 const rend = @import("../../renderer.zig");
 const RenderConfig = rend.RendererConfig;
@@ -30,6 +30,7 @@ dev: Device,
 sc: Swapchain,
 rp: RenderPass,
 fb: []vk.VkFramebuffer,
+command_pool: CommandPool,
 
 pub fn init(
     alloc: std.mem.Allocator,
@@ -68,6 +69,8 @@ pub fn init(
         swapchain.extent,
     );
 
+    const command_pool = try CommandPool.init(dev, phys_device);
+
     return .{
         .gpa = alloc,
         .instance = instance,
@@ -77,10 +80,12 @@ pub fn init(
         .sc = swapchain,
         .rp = render_pass,
         .fb = framebuffers,
+        .command_pool = command_pool,
     };
 }
 
 pub fn deinit(self: *Self) void {
+    self.command_pool.deinit(self.dev);
     Framebuffer.deinit(self.gpa, self.dev, self.fb);
     self.rp.deinit(self.dev);
     self.sc.deinit(self.dev);
