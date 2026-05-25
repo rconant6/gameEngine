@@ -5,6 +5,8 @@ const PhysicalDevice = myvk.PhysicalDevice;
 const Device = myvk.Device;
 const Swapchain = myvk.Swapchain;
 const RenderPass = myvk.RenderPass;
+const Framebuffer = myvk.Framebuffer;
+const vk = @import("c_bridge.zig").c;
 
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -25,6 +27,9 @@ instance: Instance,
 surface: Surface,
 gpu: PhysicalDevice,
 dev: Device,
+sc: Swapchain,
+rp: RenderPass,
+fb: []vk.VkFramebuffer,
 
 pub fn init(
     alloc: std.mem.Allocator,
@@ -54,7 +59,14 @@ pub fn init(
         config.height,
     );
     const render_pass = try RenderPass.init(dev, swapchain.format);
-    _ = render_pass;
+
+    const framebuffers = try Framebuffer.init(
+        alloc,
+        dev,
+        render_pass,
+        swapchain.views,
+        swapchain.extent,
+    );
 
     return .{
         .gpa = alloc,
@@ -62,10 +74,17 @@ pub fn init(
         .surface = surface,
         .gpu = phys_device,
         .dev = dev,
+        .sc = swapchain,
+        .rp = render_pass,
+        .fb = framebuffers,
     };
 }
 
 pub fn deinit(self: *Self) void {
+    Framebuffer.deinit(self.gpa, self.dev, self.fb);
+    self.rp.deinit(self.dev);
+    self.sc.deinit(&self.dev);
+    self.dev.deinit();
     self.gpu.deinit();
     self.surface.deinit(self.instance.handle);
     self.instance.deinit();

@@ -73,5 +73,5 @@ pub fn init(p_dev: *const PhysicalDevice) !Self {
 }
 
 pub fn deinit(self: *Self) void {
-    vk.vkDestroyDevice(self.handle);
+    vk.vkDestroyDevice(self.handle, null);
 }
