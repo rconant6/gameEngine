@@ -14,6 +14,8 @@ const WlSurface = faces.WlSurface;
 const XdgSurface = faces.XdgSurface;
 const XdgToplevel = faces.XdgToplevel;
 const XdgWmBase = faces.XdgWmBase;
+const ZwpLinuxDmabuf = faces.ZwpLinuxDmabuf;
+const ZwpLinuxDmabufFeedback = faces.ZwpLinuxDmabufFeedback;
 const wire = @import("proxy.zig");
 const plat = @import("../../platform.zig");
 const Event = plat.Event;
@@ -33,19 +35,40 @@ pub const OutputInfo = struct {
     scale: i32 = 0,
 };
 
+pub const DmabufFormatEntry = extern struct {
+    format: u32,
+    padding: u32,
+    modifier: u64,
+};
+
+pub const DmabufFeedback = struct {
+    // Resolved feedback — populated after the done event
+    main_device: u64 = 0,
+    target_device: u64 = 0,
+    format_table: []const DmabufFormatEntry = &.{},
+    format_table_mapped_size: usize = 0,
+
+    // Transient state accumulated across a single tranche
+    current_tranche_device: u64 = 0,
+    current_tranche_flags: u32 = 0,
+    has_scanout_tranche: bool = false,
+};
+
 pub const WaylandState = struct {
     // raw c pointers
     display: *c.wl_display,
     registry: *c.wl_registry,
     // proxies hold the pointer
     compositor: BoundObject(WlCompositor),
+    dmabuf: BoundObject(ZwpLinuxDmabuf),
     xdg_wm_base: BoundObject(XdgWmBase),
     seat: BoundObject(WlSeat),
     output: BoundObject(WlOutput),
 
     has_pointer: bool = false,
     has_keyboard: bool = false,
-    output_info: OutputInfo,
+    output_info: OutputInfo = .{},
+    dmafeedback: DmabufFeedback = .{},
 };
 
 pub const WindowState = struct {
@@ -58,6 +81,8 @@ pub const WindowState = struct {
     should_close: bool = false,
     width: u32,
     height: u32,
+    configured_width: u32 = 0,
+    configured_height: u32 = 0,
     events: EventRingBuffer,
 };
 

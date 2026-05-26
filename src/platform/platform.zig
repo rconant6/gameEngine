@@ -211,6 +211,12 @@ pub fn getDisplays(allocator: std.mem.Allocator) ![]DisplayInfo {
     return PlatformImpl.getDisplays(allocator);
 }
 
+pub const WindowSize = struct { width: u32, height: u32 };
+
+pub fn getWindowSize(window: *Window) WindowSize {
+    return PlatformImpl.getWindowSize(window);
+}
+
 pub fn getWindowScaleFactor(window: *Window) f32 {
     return PlatformImpl.getWindowScaleFactor(window);
 }

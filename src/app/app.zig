@@ -55,10 +55,9 @@ pub const App = struct {
         );
 
         const scale_factor = plat.getWindowScaleFactor(window);
-        const f_width: f32 = @floatFromInt(config.width);
-        const f_height: f32 = @floatFromInt(config.height);
-        const scaled_width: u32 = @intFromFloat(f_width * scale_factor);
-        const scaled_height: u32 = @intFromFloat(f_height * scale_factor);
+        const window_size = plat.getWindowSize(window);
+        const scaled_width: u32 = @intFromFloat(@as(f32, @floatFromInt(window_size.width)) * scale_factor);
+        const scaled_height: u32 = @intFromFloat(@as(f32, @floatFromInt(window_size.height)) * scale_factor);
 
         const renderer = rend.Renderer.init(gpa, io, .{
             .width = scaled_width,
@@ -81,8 +80,8 @@ pub const App = struct {
             .kb = plat.getKeyboard(),
             .mouse = plat.getMouse(),
             .renderer = renderer,
-            .logical_width = config.width,
-            .logical_height = config.height,
+            .logical_width = window_size.width,
+            .logical_height = window_size.height,
         };
     }
 

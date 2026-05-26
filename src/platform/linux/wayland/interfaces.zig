@@ -19,3 +19,8 @@ const xdg = @import("xdg.zig");
 pub const XdgWmBase = xdg.XdgWmBase;
 pub const XdgToplevel = xdg.XdgToplevel;
 pub const XdgSurface = xdg.XdgSurface;
+
+const zwp = @import("zwp.zig");
+pub const ZwpLinuxDmabuf = zwp.ZwpLinuxDmabuf_v1;
+pub const ZwpLinuxBufferParams = zwp.ZwpLinuxBufferParams_v1;
+pub const ZwpLinuxDmabufFeedback = zwp.ZwpLinuxDmabufFeedback_v1;

@@ -20,6 +20,7 @@ var active_window: ?*Window = null;
 const WindowHandle = struct {
     display: *anyopaque,
     surface: *anyopaque,
+    drm_device: u64,
 };
 
 pub const Window = struct {
@@ -46,6 +47,7 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     _ = env;
     gpa = alloc;
     ws = try alloc.create(WaylandState);
+    ws.dmafeedback = .{}; // alloc.create doesn't zero-init
 
     ws.display = c.wl_display_connect(null) orelse return error.WaylandConnectFailed;
     log.info(.platform, "Wayland display connected", .{});
@@ -96,7 +98,17 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     ws.output.proxy = .{ .ptr = output_raw, .handler = handlers.onOutputEvent, .ctx = ws };
     ws.output.proxy.listen();
 
+    const dmabuf_raw = c.wl_registry_bind(
+        ws.registry,
+        ws.dmabuf.name,
+        &c.zwp_linux_dmabuf_v1_interface,
+        @min(ws.dmabuf.version, 4),
+    ) orelse return error.WaylandBindDmabufFailed;
+    ws.dmabuf.proxy = .{ .ptr = dmabuf_raw, .handler = handlers.onZwpLinuxDmabuf, .ctx = ws };
+    ws.dmabuf.proxy.listen();
+
     _ = c.wl_display_roundtrip(ws.display); // fires seat capabilities + output mode/scale
+
     log.info(.platform, "Wayland init complete", .{});
 }
 
@@ -113,6 +125,8 @@ pub fn createWindow(config: WindowConfig) !*Window {
     win.state.configure_serial = 0;
     win.state.configured = false;
     win.state.should_close = false;
+    win.state.configured_width = 0;
+    win.state.configured_height = 0;
     win.state.surface = .{};
     win.state.xdg_surface = .{};
     win.state.xdg_toplevel = .{};
@@ -122,6 +136,16 @@ pub fn createWindow(config: WindowConfig) !*Window {
     const surface = c.wl_compositor_create_surface(compositor) orelse return error.SurfaceCreateFailed;
     win.state.surface.proxy = .{ .ptr = @ptrCast(surface), .handler = handlers.onSurfaceEvent, .ctx = win };
     win.state.surface.proxy.listen();
+
+    const dmabuf_ptr: *c.zwp_linux_dmabuf_v1 = @ptrCast(@alignCast(ws.dmabuf.proxy.ptr));
+    const feedback_raw = c.zwp_linux_dmabuf_v1_get_surface_feedback(dmabuf_ptr, surface) orelse return error.DmabufFeedbackFailed;
+    var feedback_proxy = Proxy(wl.ZwpLinuxDmabufFeedback){
+        .ptr = @ptrCast(feedback_raw),
+        .handler = handlers.onZwpLInuxDmabufFeedback,
+        .ctx = ws,
+    };
+    feedback_proxy.listen();
+    _ = c.wl_display_roundtrip(ws.display); // receive dmabuf feedback → populates ws.dmafeedback.target_device
 
     const xdg_base: *c.xdg_wm_base = @ptrCast(@alignCast(ws.xdg_wm_base.proxy.ptr));
     const xdg_surf = c.xdg_wm_base_get_xdg_surface(xdg_base, surface) orelse return error.XdgSurfaceCreateFailed;
@@ -138,6 +162,9 @@ pub fn createWindow(config: WindowConfig) !*Window {
 
     c.wl_surface_commit(surface);
     _ = c.wl_display_roundtrip(ws.display); // compositor sends configure, handler stores serial
+
+    if (win.state.configured_width > 0) win.state.width = win.state.configured_width;
+    if (win.state.configured_height > 0) win.state.height = win.state.configured_height;
 
     active_window = win;
 
@@ -158,7 +185,14 @@ pub fn swapBuffers(window: *Window, offset: u32) void {
 
 pub fn pollNextEvent() ?Event {
     _ = c.wl_display_flush(ws.display);
-    _ = c.wl_display_dispatch_pending(ws.display);
+    const fd = c.wl_display_get_fd(ws.display);
+    var pfd = std.posix.pollfd{ .fd = fd, .events = std.posix.POLL.IN, .revents = 0 };
+    _ = std.posix.poll((&pfd)[0..1], 0) catch {};
+    if (pfd.revents & std.posix.POLL.IN != 0) {
+        _ = c.wl_display_dispatch(ws.display);
+    } else {
+        _ = c.wl_display_dispatch_pending(ws.display);
+    }
     return (active_window orelse return null).state.events.popFront();
 }
 
@@ -186,8 +220,13 @@ pub fn getNativeWindowHandle(window: *Window) *anyopaque {
     wh.* = .{
         .display = @ptrCast(ws.display),
         .surface = window.state.surface.proxy.ptr,
+        .drm_device = ws.dmafeedback.target_device,
     };
     return wh;
+}
+
+pub fn getWindowSize(window: *Window) plat.WindowSize {
+    return .{ .width = window.state.width, .height = window.state.height };
 }
 
 pub fn getWindowScaleFactor(window: *Window) f32 {

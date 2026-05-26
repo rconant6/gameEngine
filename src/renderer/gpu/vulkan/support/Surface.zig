@@ -8,6 +8,7 @@ handle: *vk.struct_VkSurfaceKHR_T,
 const WaylandHandles = struct {
     display: *anyopaque,
     surface: *anyopaque,
+    drm_device: u64,
 };
 
 pub fn init(

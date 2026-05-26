@@ -1,6 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const vk = @import("../c_bridge.zig").c;
+const log = @import("debug").log;
 const Surface = @import("Surface.zig");
 const PhysicalDevice = @import("PhysicalDevice.zig");
 const Device = @import("Device.zig");
@@ -39,6 +40,7 @@ pub fn init(alloc: Allocator, dev: Device, gpu: PhysicalDevice, surface: Surface
     create_info.clipped = vk.VK_TRUE;
     create_info.oldSwapchain = null;
 
+    log.info(.renderer, "swapchain extent={d}x{d} format={d}", .{ extent.width, extent.height, fmt.format });
     if (vk.vkCreateSwapchainKHR(dev.handle, &create_info, null, &handle) != vk.VK_SUCCESS)
         return error.SwapchainCreateFailed;
 

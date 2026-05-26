@@ -1,5 +1,6 @@
 const std = @import("std");
 const log = @import("debug").log;
+const c = @import("c.zig").c;
 const consts = @import("consts.zig");
 const faces = @import("interfaces.zig");
 const WlCompositor = faces.WlCompositor;
@@ -14,6 +15,8 @@ const WlSurface = faces.WlSurface;
 const XdgSurface = faces.XdgSurface;
 const XdgToplevel = faces.XdgToplevel;
 const XdgWmBase = faces.XdgWmBase;
+const ZwpLinuxDmabuf = faces.ZwpLinuxDmabuf;
+const ZwpLinuxDmabufFeedback = faces.ZwpLinuxDmabufFeedback;
 const state = @import("state.zig");
 const WindowState = state.WindowState;
 const WaylandState = state.WaylandState;
@@ -55,6 +58,9 @@ pub fn onRegistryEvent(event: WlRegistry.Event, s_ctx: *anyopaque) !void {
             } else if (std.mem.eql(u8, g.interface, consts.wl_output)) {
                 ws.output.name = g.name;
                 ws.output.version = g.version;
+            } else if (std.mem.eql(u8, g.interface, consts.zwp_linux_dmabuf_v1)) {
+                ws.dmabuf.name = g.name;
+                ws.dmabuf.version = g.version;
             }
         },
         .global_remove => {},
@@ -66,10 +72,10 @@ pub fn onCompositorEvent(_: WlCompositor.Event, _: *anyopaque) !void {}
 pub fn onSeatEvent(event: WlSeat.Event, s_ctx: *anyopaque) !void {
     const ws: *WaylandState = @ptrCast(@alignCast(s_ctx));
     switch (event) {
-        .capabilities => |c| {
-            log.info(.platform, "Seat capes: {d}", .{c.capes});
-            ws.has_pointer = (c.capes & WlSeatCape.pointer) != 0;
-            ws.has_keyboard = (c.capes & WlSeatCape.keyboard) != 0;
+        .capabilities => |cap| {
+            log.info(.platform, "Seat capes: {d}", .{cap.capes});
+            ws.has_pointer = (cap.capes & WlSeatCape.pointer) != 0;
+            ws.has_keyboard = (cap.capes & WlSeatCape.keyboard) != 0;
         },
         .name => |s| log.info(.platform, "Seat name: {s}", .{s.name}),
     }
@@ -105,9 +111,12 @@ pub fn onOutputEvent(event: WlOutput.Event, s_ctx: *anyopaque) !void {
 }
 
 pub fn onXdgWmBaseEvent(event: XdgWmBase.Event, s_ctx: *anyopaque) !void {
-    _ = s_ctx;
+    const ws: *WaylandState = @ptrCast(@alignCast(s_ctx));
     switch (event) {
-        .ping => |p| log.trace(.platform, "XdgBase PING serial: {d}", .{p.serial}),
+        .ping => |p| {
+            const xdg_wm_base: *c.xdg_wm_base = @ptrCast(@alignCast(ws.xdg_wm_base.proxy.ptr));
+            c.xdg_wm_base_pong(xdg_wm_base, p.serial);
+        },
     }
 }
 
@@ -176,35 +185,101 @@ pub fn onPointerEvent(event: WlPointer.Event, s_ctx: *anyopaque) !void {
     }
 }
 
+// MARK: Adding linux DMA-BUF support
+pub fn onZwpLinuxDmabuf(_: ZwpLinuxDmabuf.Event, _: *anyopaque) !void {}
+
+pub fn onZwpLInuxDmabufFeedback(event: ZwpLinuxDmabufFeedback.Event, s_ctx: *anyopaque) !void {
+    const ws: *WaylandState = @ptrCast(@alignCast(s_ctx));
+    switch (event) {
+        .format_table => |ft| {
+            if (ws.dmafeedback.format_table.len > 0) {
+                var raw: [*]align(std.heap.pageSize()) u8 = @ptrCast(
+                    @alignCast(@constCast(ws.dmafeedback.format_table.ptr)),
+                );
+                std.posix.munmap(raw[0..ws.dmafeedback.format_table_mapped_size]);
+            }
+            const mapped = try std.posix.mmap(
+                null,
+                ft.size,
+                .{ .READ = true },
+                .{ .TYPE = .PRIVATE },
+                ft.fd,
+                0,
+            );
+            _ = std.c.close(ft.fd);
+            const entry_count = ft.size / @sizeOf(state.DmabufFormatEntry);
+            ws.dmafeedback.format_table = std.mem.bytesAsSlice(
+                state.DmabufFormatEntry,
+                mapped,
+            )[0..entry_count];
+            ws.dmafeedback.format_table_mapped_size = ft.size;
+        },
+        .main_device => |md| {
+            ws.dmafeedback.main_device = std.mem.readInt(u64, md.device.data[0..8], .little);
+            log.info(.platform, "DmaBuf main device: {d}", .{ws.dmafeedback.main_device});
+        },
+        .tranche_target_device => |td| {
+            ws.dmafeedback.current_tranche_device = std.mem.readInt(u64, td.device.data[0..8], .little);
+        },
+        .tranche_flags => |tf| {
+            ws.dmafeedback.current_tranche_flags = tf.flags;
+        },
+        .tranche_formats => {}, // format/modifier done inside vulkan
+        .tranche_done => {
+            const is_scanout = (ws.dmafeedback.current_tranche_flags & 1) != 0;
+            if (!ws.dmafeedback.has_scanout_tranche or is_scanout) {
+                ws.dmafeedback.target_device = ws.dmafeedback.current_tranche_device;
+                if (is_scanout) ws.dmafeedback.has_scanout_tranche = true;
+            }
+            ws.dmafeedback.current_tranche_device = 0;
+            ws.dmafeedback.current_tranche_flags = 0;
+        },
+        .done => {
+            log.info(.platform, "DmaBuf feedback done, target device: {d}", .{ws.dmafeedback.target_device});
+        },
+    }
+}
+
 // MARK: Window Specific Handlers
 pub fn onSurfaceEvent(event: WlSurface.Event, w_ctx: *anyopaque) !void {
     const win: *WindowState = @ptrCast(@alignCast(w_ctx));
-    _ = win;
     switch (event) {
-        else => {
-            log.warn(.platform, "WlSurface Events are not handled", .{});
+        .enter => {
+            const surf: *c.wl_surface = @ptrCast(@alignCast(win.surface.proxy.ptr));
+            c.wl_surface_commit(surf);
+        },
+        .preferred_buffer_scale => |s| {
+            const surf: *c.wl_surface = @ptrCast(@alignCast(win.surface.proxy.ptr));
+            c.wl_surface_set_buffer_scale(surf, s.factor);
+            c.wl_surface_commit(surf);
+        },
+        else => |ev| {
+            log.warn(.platform, "WlSurface Event {t} is not implemented", .{ev});
         },
     }
 }
 
 pub fn onXdgToplevelEvent(event: XdgToplevel.Event, w_ctx: *anyopaque) !void {
     const win: *WindowState = @ptrCast(@alignCast(w_ctx));
-    _ = win;
-
     switch (event) {
-        else => {
-            log.warn(.platform, "XdgTopLevelEvents are not handled", .{});
+        .close => win.should_close = true,
+        .configure => |cfg| {
+            if (cfg.width > 0) win.configured_width = @intCast(cfg.width);
+            if (cfg.height > 0) win.configured_height = @intCast(cfg.height);
         },
+        .configure_bounds, .wm_capabilites => {},
     }
 }
 
 pub fn onXdgSurfaceEvent(event: XdgSurface.Event, w_ctx: *anyopaque) !void {
     const win: *WindowState = @ptrCast(@alignCast(w_ctx));
-
     switch (event) {
-        .configure => |c| {
-            log.trace(.platform, "XdgSurface CONFIG serial: {d}", .{c.serial});
-            win.configure_serial = c.serial;
+        .configure => |cfg| {
+            win.configure_serial = cfg.serial;
+            const xdg_surface: *c.xdg_surface = @ptrCast(@alignCast(win.xdg_surface.proxy.ptr));
+            c.xdg_surface_ack_configure(xdg_surface, cfg.serial);
+            const surf: *c.wl_surface = @ptrCast(@alignCast(win.surface.proxy.ptr));
+            c.wl_surface_commit(surf);
         },
     }
 }

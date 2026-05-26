@@ -17,6 +17,7 @@ pub const WlSurface = wl.WlSurface;
 pub const XdgWmBase = wl.XdgWmBase;
 pub const XdgToplevel = wl.XdgToplevel;
 pub const XdgSurface = wl.XdgSurface;
+pub const ZwpLinuxDmabufFeedback = wl.ZwpLinuxDmabufFeedback;
 
 const st = @import("wayland/state.zig");
 pub const WaylandState = st.WaylandState;
