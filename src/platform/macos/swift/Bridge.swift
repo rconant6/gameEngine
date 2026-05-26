@@ -72,6 +72,24 @@ public func get_window_get_scale_factor(window: OpaquePointer?) -> Float {
 
   return Float(gameWindow.backingScaleFactor)
 }
+
+@MainActor
+@_cdecl("get_window_size")
+public func get_window_size(
+  window: OpaquePointer?,
+  width: UnsafeMutablePointer<Int32>,
+  height: UnsafeMutablePointer<Int32>
+) {
+  guard let window = window,
+    let gameWindow = activeWindows[window]
+  else {
+    width.pointee = 0
+    height.pointee = 0
+    return
+  }
+  width.pointee = Int32(gameWindow.frame.width)
+  height.pointee = Int32(gameWindow.frame.height)
+}
 // TODO: This is not the right place to do this work?
 @MainActor
 @_cdecl("poll_events")

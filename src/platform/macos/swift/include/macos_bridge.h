@@ -25,6 +25,7 @@ void deinit();
 
 WindowHandle create_window(int32_t width, int32_t height, const char *title);
 void destroy_window(WindowHandle window);
+void get_window_size(WindowHandle window, int32_t *width, int32_t *height);
 float get_window_scale_factor(WindowHandle window);
 bool window_should_close(WindowHandle window);
 void swap_buffers(WindowHandle window, uint32_t offest);

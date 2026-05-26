@@ -134,6 +134,16 @@ pub fn getMetalLayer(window: *Window) ?*anyopaque {
     return c.get_metal_layer(window._handle);
 }
 
+pub fn getWindowSize(window: *Window) plat.WindowSize {
+    var w: i32 = 0;
+    var h: i32 = 0;
+    c.get_window_size(window._handle, &w, &h);
+    return .{
+        .width = @intCast(@max(0, w)),
+        .height = @intCast(@max(0, h)),
+    };
+}
+
 pub fn getWindowScaleFactor(window: *Window) f32 {
     return c.get_window_scale_factor(window._handle);
 }
