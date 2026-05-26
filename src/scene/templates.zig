@@ -121,7 +121,7 @@ pub const TemplateManager = struct {
     }
 
     pub fn loadTemplatesFromDirectory(self: *TemplateManager, dir_path: []const u8) !void {
-        var dir = try std.Io.Dir.cwd().openDir(self.io, dir_path, .{});
+        var dir = try std.Io.Dir.cwd().openDir(self.io, dir_path, .{ .iterate = true });
         defer dir.close(self.io);
 
         var iter = dir.iterate();
