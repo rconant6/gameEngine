@@ -160,6 +160,10 @@ pub fn createWindow(config: WindowConfig) !*Window {
     defer gpa.free(title_z);
     c.xdg_toplevel_set_title(toplevel, title_z.ptr);
 
+    if (true) {
+        c.xdg_toplevel_set_fullscreen(toplevel, null);
+    }
+
     c.wl_surface_commit(surface);
     _ = c.wl_display_roundtrip(ws.display); // compositor sends configure, handler stores serial
 
