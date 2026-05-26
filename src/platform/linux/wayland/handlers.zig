@@ -139,31 +139,64 @@ pub fn onKeyboardEvent(event: WlKeyboard.Event, s_ctx: *anyopaque) !void {
 }
 
 pub fn onPointerEvent(event: WlPointer.Event, s_ctx: *anyopaque) !void {
-    _ = s_ctx;
+    const ws: *WaylandState = @ptrCast(@alignCast(s_ctx));
     switch (event) {
-        .enter => |ent| log.trace(
-            .platform,
-            "PTR enter event serial {d}, surf {any}",
-            .{ ent.serial, ent.surface },
-        ),
-        .leave => |l| log.trace(
-            .platform,
-            "PTR leave event serial {d} surf {any}",
-            .{ l.serial, l.surface },
-        ),
-        .button => |b| log.trace(
-            .platform,
-            "PTR event button {d}",
-            .{b.button},
-        ),
-        .frame => log.trace(
-            .platform,
-            "PTR frame event",
-            .{},
-        ),
-        else => |e| {
-            log.warn(.platform, "PTR event not implemented: {any}", .{e});
+        .enter => |ent| {
+            ws.mouse_x = @intFromFloat(ent.surface_x.toF32());
+            ws.mouse_y = @intFromFloat(ent.surface_y.toF32());
         },
+        .leave => {},
+        .motion => |m| {
+            const new_x: i32 = @intFromFloat(m.surface_x.toF32());
+            const new_y: i32 = @intFromFloat(m.surface_y.toF32());
+            const events = ws.active_events orelse return;
+            events.push(.{ .MouseMove = .{
+                .x = new_x,
+                .y = new_y,
+                .delta_x = new_x - ws.mouse_x,
+                .delta_y = new_y - ws.mouse_y,
+            } });
+            ws.mouse_x = new_x;
+            ws.mouse_y = new_y;
+        },
+        .button => |b| {
+            const events = ws.active_events orelse return;
+            // Linux evdev button codes: BTN_LEFT=272 BTN_RIGHT=273 BTN_MIDDLE=274
+            const game_button: plat.MouseButton = switch (b.button) {
+                272 => .Left,
+                273 => .Right,
+                274 => .Middle,
+                275 => .Extra1,
+                276 => .Extra2,
+                else => return,
+            };
+            if (b.state != 0) {
+                events.push(.{ .MouseButtonPress = .{
+                    .button = game_button,
+                    .x = ws.mouse_x,
+                    .y = ws.mouse_y,
+                } });
+            } else {
+                events.push(.{ .MouseButtonRelease = .{
+                    .button = game_button,
+                    .x = ws.mouse_x,
+                    .y = ws.mouse_y,
+                } });
+            }
+        },
+        .axis => |a| {
+            const events = ws.active_events orelse return;
+            // Normalize: compositors typically send ~10.0 per scroll notch.
+            // Invert vertical so scroll-up = positive y.
+            const delta = a.value.toF32() / 10.0;
+            events.push(.{ .MouseWheel = switch (a.axis) {
+                0 => .{ .delta_x = 0.0, .delta_y = -delta },
+                1 => .{ .delta_x = delta, .delta_y = 0.0 },
+                else => return,
+            } });
+        },
+        .frame, .axis_source, .axis_stop, .axis_discrete,
+        .axis_value120, .axis_relative_direction => {},
     }
 }
 

@@ -65,9 +65,12 @@ pub const WaylandState = struct {
     seat: BoundObject(WlSeat),
     output: BoundObject(WlOutput),
     keyboard: BoundObject(WlKeyboard) = .{},
+    pointer: BoundObject(WlPointer) = .{},
 
     has_pointer: bool = false,
     has_keyboard: bool = false,
+    mouse_x: i32 = 0,
+    mouse_y: i32 = 0,
     output_info: OutputInfo = .{},
     dmafeedback: DmabufFeedback = .{},
     active_events: ?*EventRingBuffer = null,

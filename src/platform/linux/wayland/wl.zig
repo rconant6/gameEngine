@@ -24,8 +24,8 @@ pub const WlFixed = packed struct {
     integer: i24,
 
     pub fn toF32(self: WlFixed) f32 {
-        _ = self;
-        return 0.0;
+        const raw: i32 = @as(i32, self.integer) << 8 | @as(i32, @intCast(self.frac));
+        return @as(f32, @floatFromInt(raw)) / 256.0;
     }
 };
 

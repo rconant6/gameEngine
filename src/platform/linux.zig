@@ -56,6 +56,8 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     ws = try alloc.create(WaylandState);
     ws.dmafeedback = .{}; // alloc.create doesn't zero-init
     ws.active_events = null;
+    ws.mouse_x = 0;
+    ws.mouse_y = 0;
 
     ws.display = c.wl_display_connect(null) orelse return error.WaylandConnectFailed;
     log.info(.platform, "Wayland display connected", .{});
@@ -123,6 +125,12 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
         ws.keyboard.proxy = .{ .ptr = @ptrCast(keyboard_raw), .handler = handlers.onKeyboardEvent, .ctx = ws };
         ws.keyboard.proxy.listen();
     }
+    if (ws.has_pointer) {
+        const seat: *c.wl_seat = @ptrCast(@alignCast(ws.seat.proxy.ptr));
+        const pointer_raw = c.wl_seat_get_pointer(seat) orelse return error.WaylandGetPointerFailed;
+        ws.pointer.proxy = .{ .ptr = @ptrCast(pointer_raw), .handler = handlers.onPointerEvent, .ctx = ws };
+        ws.pointer.proxy.listen();
+    }
 
     log.info(.platform, "Wayland init complete", .{});
 }
@@ -136,6 +144,9 @@ pub fn deinit() void {
     }
     if (ws.has_keyboard) {
         c.wl_keyboard_release(@ptrCast(@alignCast(ws.keyboard.proxy.ptr)));
+    }
+    if (ws.has_pointer) {
+        c.wl_pointer_release(@ptrCast(@alignCast(ws.pointer.proxy.ptr)));
     }
     c.zwp_linux_dmabuf_v1_destroy(@ptrCast(@alignCast(ws.dmabuf.proxy.ptr)));
     c.wl_proxy_destroy(@ptrCast(@alignCast(ws.output.proxy.ptr)));
