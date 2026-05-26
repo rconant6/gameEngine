@@ -64,17 +64,20 @@ pub const WaylandState = struct {
     xdg_wm_base: BoundObject(XdgWmBase),
     seat: BoundObject(WlSeat),
     output: BoundObject(WlOutput),
+    keyboard: BoundObject(WlKeyboard) = .{},
 
     has_pointer: bool = false,
     has_keyboard: bool = false,
     output_info: OutputInfo = .{},
     dmafeedback: DmabufFeedback = .{},
+    active_events: ?*EventRingBuffer = null,
 };
 
 pub const WindowState = struct {
     surface: BoundObject(WlSurface),
     xdg_surface: BoundObject(XdgSurface),
     xdg_toplevel: BoundObject(XdgToplevel),
+    dmabuf_feedback: wire.Proxy(ZwpLinuxDmabufFeedback) = undefined,
 
     configure_serial: u32 = 0,
     configured: bool = false,
@@ -105,7 +108,7 @@ pub const EventRingBuffer = struct {
     }
 
     pub fn push(self: *EventRingBuffer, e: Event) void {
-        self.data[self.event_tail % 64] = e;
+        self.data[self.tail % 64] = e;
         self.tail += 1;
     }
     pub fn popFront(self: *EventRingBuffer) ?Event {

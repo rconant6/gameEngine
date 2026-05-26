@@ -89,6 +89,7 @@ pub const App = struct {
         log.info(.general, "App shutting down...", .{});
         self.renderer.deinit();
         self.window.deinit();
+        plat.deinit();
         Logger.deinit();
     }
 

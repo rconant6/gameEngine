@@ -25,11 +25,18 @@ const WindowHandle = struct {
 
 pub const Window = struct {
     state: WindowState,
+    handle: WindowHandle,
 
     pub fn deinit(self: *Window) void {
         self.state.events.deinit();
-        // TODO: destroy xdg_toplevel, xdg_surface, surface in reverse order
+
+        c.zwp_linux_dmabuf_feedback_v1_destroy(@ptrCast(@alignCast(self.state.dmabuf_feedback.ptr)));
+        c.xdg_toplevel_destroy(@ptrCast(@alignCast(self.state.xdg_toplevel.proxy.ptr)));
+        c.xdg_surface_destroy(@ptrCast(@alignCast(self.state.xdg_surface.proxy.ptr)));
+        c.wl_surface_destroy(@ptrCast(@alignCast(self.state.surface.proxy.ptr)));
+
         gpa.destroy(self);
+        log.info(.platform, "Linux Window deinit complete", .{});
     }
 
     pub fn shouldClose(self: *const Window) bool {
@@ -48,6 +55,7 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     gpa = alloc;
     ws = try alloc.create(WaylandState);
     ws.dmafeedback = .{}; // alloc.create doesn't zero-init
+    ws.active_events = null;
 
     ws.display = c.wl_display_connect(null) orelse return error.WaylandConnectFailed;
     log.info(.platform, "Wayland display connected", .{});
@@ -109,13 +117,37 @@ pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
 
     _ = c.wl_display_roundtrip(ws.display); // fires seat capabilities + output mode/scale
 
+    if (ws.has_keyboard) {
+        const seat: *c.wl_seat = @ptrCast(@alignCast(ws.seat.proxy.ptr));
+        const keyboard_raw = c.wl_seat_get_keyboard(seat) orelse return error.WaylandGetKeyboardFailed;
+        ws.keyboard.proxy = .{ .ptr = @ptrCast(keyboard_raw), .handler = handlers.onKeyboardEvent, .ctx = ws };
+        ws.keyboard.proxy.listen();
+    }
+
     log.info(.platform, "Wayland init complete", .{});
 }
 
 pub fn deinit() void {
-    // TODO: destroy bound objects in reverse order
+    if (ws.dmafeedback.format_table.len > 0) {
+        const raw: [*]align(std.heap.pageSize()) u8 = @ptrCast(
+            @alignCast(@constCast(ws.dmafeedback.format_table.ptr)),
+        );
+        std.posix.munmap(raw[0..ws.dmafeedback.format_table_mapped_size]);
+    }
+    if (ws.has_keyboard) {
+        c.wl_keyboard_release(@ptrCast(@alignCast(ws.keyboard.proxy.ptr)));
+    }
+    c.zwp_linux_dmabuf_v1_destroy(@ptrCast(@alignCast(ws.dmabuf.proxy.ptr)));
+    c.wl_proxy_destroy(@ptrCast(@alignCast(ws.output.proxy.ptr)));
+    c.wl_proxy_destroy(@ptrCast(@alignCast(ws.seat.proxy.ptr)));
+    c.xdg_wm_base_destroy(@ptrCast(@alignCast(ws.xdg_wm_base.proxy.ptr)));
+    c.wl_proxy_destroy(@ptrCast(@alignCast(ws.compositor.proxy.ptr)));
+    c.wl_registry_destroy(ws.registry);
     c.wl_display_disconnect(ws.display);
+
     gpa.destroy(ws);
+
+    log.info(.platform, "Wayland deinit complete", .{});
 }
 
 pub fn createWindow(config: WindowConfig) !*Window {
@@ -139,12 +171,12 @@ pub fn createWindow(config: WindowConfig) !*Window {
 
     const dmabuf_ptr: *c.zwp_linux_dmabuf_v1 = @ptrCast(@alignCast(ws.dmabuf.proxy.ptr));
     const feedback_raw = c.zwp_linux_dmabuf_v1_get_surface_feedback(dmabuf_ptr, surface) orelse return error.DmabufFeedbackFailed;
-    var feedback_proxy = Proxy(wl.ZwpLinuxDmabufFeedback){
+    win.state.dmabuf_feedback = .{
         .ptr = @ptrCast(feedback_raw),
         .handler = handlers.onZwpLInuxDmabufFeedback,
         .ctx = ws,
     };
-    feedback_proxy.listen();
+    win.state.dmabuf_feedback.listen();
     _ = c.wl_display_roundtrip(ws.display); // receive dmabuf feedback → populates ws.dmafeedback.target_device
 
     const xdg_base: *c.xdg_wm_base = @ptrCast(@alignCast(ws.xdg_wm_base.proxy.ptr));
@@ -170,7 +202,14 @@ pub fn createWindow(config: WindowConfig) !*Window {
     if (win.state.configured_width > 0) win.state.width = win.state.configured_width;
     if (win.state.configured_height > 0) win.state.height = win.state.configured_height;
 
+    win.handle = .{
+        .display = @ptrCast(ws.display),
+        .surface = win.state.surface.proxy.ptr,
+        .drm_device = ws.dmafeedback.target_device,
+    };
+
     active_window = win;
+    ws.active_events = &win.state.events;
 
     return win;
 }
@@ -215,18 +254,8 @@ pub fn setMouseCursorLocked(window: *Window, locked: bool) void {
     _ = locked;
 }
 
-/// Caller must destroy the returned handle
 pub fn getNativeWindowHandle(window: *Window) *anyopaque {
-    const wh = gpa.create(WindowHandle) catch |err| {
-        log.err(.platform, "Unable to get window handle: {}", .{err});
-        return undefined;
-    };
-    wh.* = .{
-        .display = @ptrCast(ws.display),
-        .surface = window.state.surface.proxy.ptr,
-        .drm_device = ws.dmafeedback.target_device,
-    };
-    return wh;
+    return &window.handle;
 }
 
 pub fn getWindowSize(window: *Window) plat.WindowSize {

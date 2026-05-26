@@ -1,6 +1,7 @@
 const std = @import("std");
 const log = @import("debug").log;
 const c = @import("c.zig").c;
+const plat = @import("../../platform.zig");
 const consts = @import("consts.zig");
 const faces = @import("interfaces.zig");
 const WlCompositor = faces.WlCompositor;
@@ -121,38 +122,19 @@ pub fn onXdgWmBaseEvent(event: XdgWmBase.Event, s_ctx: *anyopaque) !void {
 }
 
 pub fn onKeyboardEvent(event: WlKeyboard.Event, s_ctx: *anyopaque) !void {
-    _ = s_ctx;
+    const ws: *WaylandState = @ptrCast(@alignCast(s_ctx));
     switch (event) {
-        .enter => |ent| log.trace(
-            .platform,
-            "KB Enter event serial {d}, surf {any}",
-            .{ ent.serial, ent.surface },
-        ),
-        .leave => |l| log.trace(
-            .platform,
-            "KB Leave event serial {d} surf {any}",
-            .{ l.serial, l.surface },
-        ),
-        .keymap => |km| log.trace(
-            .platform,
-            "KB Keymap event format {d}",
-            .{km.format},
-        ),
-        .key => |k| log.trace(
-            .platform,
-            "KB Key event key {d}",
-            .{k.key},
-        ),
-        .modifiers => |mds| log.trace(
-            .platform,
-            "KB Modifiers event group {d}",
-            .{mds.group},
-        ),
-        .repeat_info => |ri| log.trace(
-            .platform,
-            "KB Repeat Info event rate {d}",
-            .{ri.rate},
-        ),
+        .key => |k| {
+            const events = ws.active_events orelse return;
+            const key = plat.mapToGameKeyCode(@intCast(k.key));
+            if (key == .Unused) return;
+            if (k.state != 0) {
+                events.push(.{ .KeyPress = .{ .key = key, .modifiers = .{} } });
+            } else {
+                events.push(.{ .KeyRelease = .{ .key = key, .modifiers = .{} } });
+            }
+        },
+        else => {},
     }
 }
 
