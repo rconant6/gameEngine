@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulkan Renderer — Geometry Rendering Plan</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #e8e6e3;
+            background: #1a1a1a;
+            padding: 20px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #f7931e;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #f7931e;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #f7931e;
+            font-size: 1.6em;
+            margin-top: 36px;
+            margin-bottom: 12px;
+            border-left: 4px solid #f7931e;
+            padding-left: 12px;
+        }
+
+        h3 {
+            color: #ffb347;
+            font-size: 1.2em;
+            margin-top: 22px;
+            margin-bottom: 8px;
+        }
+
+        h4 {
+            color: #ffd699;
+            font-size: 1.05em;
+            margin-top: 18px;
+            margin-bottom: 6px;
+        }
+
+        p, li { margin-bottom: 8px; }
+
+        ul, ol {
+            padding-left: 30px;
+            margin-bottom: 12px;
+        }
+
+        code {
+            background: #2a2a2a;
+            color: #ffd699;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.92em;
+        }
+
+        pre {
+            background: #2a2a2a;
+            border-left: 3px solid #f7931e;
+            padding: 12px 16px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 10px 0 16px 0;
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: #e8e6e3;
+        }
+
+        .intro {
+            font-style: italic;
+            color: #b8b8b8;
+            margin-bottom: 30px;
+            margin-top: 12px;
+        }
+
+        .phase {
+            background: #232323;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 18px 22px;
+            margin-bottom: 28px;
+        }
+
+        .phase h2 {
+            margin-top: 0;
+            border-left: none;
+            padding-left: 0;
+        }
+
+        .phase-label {
+            display: inline-block;
+            background: #f7931e;
+            color: #1a1a1a;
+            font-weight: bold;
+            font-size: 0.78em;
+            padding: 2px 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .phase-label.done-label {
+            background: #4caf50;
+        }
+
+        .checklist {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .checklist li {
+            padding: 5px 0 5px 32px;
+            position: relative;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .checklist li:last-child { border-bottom: none; }
+
+        .checklist li input[type="checkbox"] {
+            position: absolute;
+            left: 4px;
+            top: 8px;
+            accent-color: #f7931e;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .checklist li.done {
+            color: #666;
+            text-decoration: line-through;
+        }
+
+        .note {
+            background: #2a2520;
+            border-left: 3px solid #ffb347;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.95em;
+        }
+
+        .principle {
+            background: #1f2a1f;
+            border-left: 3px solid #4caf50;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+
+        .why {
+            background: #1f1f2e;
+            border-left: 3px solid #6495ed;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.95em;
+        }
+
+        .gotcha {
+            background: #2e1f1f;
+            border-left: 3px solid #e74c3c;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 3px;
+            font-size: 0.95em;
+        }
+
+        .file-tree {
+            background: #2a2a2a;
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.92em;
+            margin: 10px 0;
+            line-height: 1.7;
+        }
+
+        .file-tree .new    { color: #4caf50; }
+        .file-tree .modify { color: #6495ed; }
+        .file-tree .keep   { color: #888; }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 8px 0 14px 0;
+            font-size: 0.88em;
+        }
+
+        .legend span { display: flex; align-items: center; gap: 6px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .dot-new    { background: #4caf50; }
+        .dot-modify { background: #6495ed; }
+        .dot-keep   { background: #888; }
+
+        .diagram {
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 14px 0;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.82em;
+            line-height: 1.6;
+            overflow-x: auto;
+            color: #e8e6e3;
+            white-space: pre;
+        }
+
+        .toc {
+            background: #232323;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 14px 22px;
+            margin-bottom: 30px;
+        }
+        .toc h3 { margin-top: 0; color: #f7931e; }
+        .toc ol { margin-bottom: 0; }
+        .toc a { color: #ffb347; text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+
+        .handoff {
+            background: #1a2a1a;
+            border: 2px solid #4caf50;
+            border-radius: 6px;
+            padding: 14px 18px;
+            margin: 14px 0;
+        }
+        .handoff h3 { color: #4caf50; margin-top: 0; }
+
+        .sub-checklist {
+            list-style: none;
+            padding-left: 20px;
+            margin-top: 4px;
+        }
+        .sub-checklist li {
+            padding: 3px 0 3px 28px;
+            border-bottom: none;
+            font-size: 0.93em;
+            color: #b8b8b8;
+        }
+        .sub-checklist li input[type="checkbox"] {
+            position: absolute;
+            left: 4px;
+            top: 6px;
+            accent-color: #f7931e;
+            width: 14px;
+            height: 14px;
+        }
+
+        .tag {
+            display: inline-block;
+            font-size: 0.75em;
+            padding: 1px 7px;
+            border-radius: 8px;
+            margin-left: 6px;
+            vertical-align: middle;
+            font-weight: bold;
+        }
+        .tag-new    { background: #1f2a1f; color: #4caf50; border: 1px solid #4caf50; }
+        .tag-modify { background: #1f1f2e; color: #6495ed; border: 1px solid #6495ed; }
+        .tag-keep   { background: #2a2a2a; color: #888;    border: 1px solid #555; }
+        .tag-done   { background: #1f2a1f; color: #4caf50; border: 1px solid #4caf50; }
+
+        .done-block {
+            background: #1f2a1f;
+            border: 1px solid #2a3a2a;
+            border-radius: 6px;
+            padding: 18px 22px;
+            margin-bottom: 28px;
+            opacity: 0.75;
+        }
+        .done-block h2 { margin-top: 0; border-left: none; padding-left: 0; color: #4caf50; }
+
+        .vertex-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0 16px 0;
+            font-size: 0.92em;
+        }
+        .vertex-table th {
+            background: #333;
+            color: #ffb347;
+            padding: 6px 12px;
+            text-align: left;
+            border: 1px solid #444;
+        }
+        .vertex-table td {
+            padding: 5px 12px;
+            border: 1px solid #333;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+        }
+        .vertex-table tr:nth-child(even) td { background: #222; }
+    </style>
+</head>
+<body>
+
+<h1>Vulkan Renderer — Geometry Rendering</h1>
+<p class="intro">
+    Building on the working frame loop (clear color + present), this plan adds
+    everything needed to draw colored triangles and lines — rectangles, circles,
+    polygons, all of <code>drawShape</code>. The approach mirrors the Metal renderer's
+    batch-accumulate-flush pattern, adapted to Vulkan pipelines and host-visible vertex buffers.
+    Textures are out of scope for this pass.
+</p>
+
+<div class="toc">
+    <h3>Phases</h3>
+    <ol>
+        <li><a href="#done">Already Done</a> &nbsp;— frame loop, clear color, present</li>
+        <li><a href="#phase1">Phase 1 — Vertex Types &amp; Batch</a> &nbsp;<code>vertex.zig</code>, <code>geometry_batch.zig</code></li>
+        <li><a href="#phase2">Phase 2 — Graphics Pipeline</a> &nbsp;<code>support/Pipeline.zig</code></li>
+        <li><a href="#phase3">Phase 3 — Vertex Buffer</a> &nbsp;<code>support/VertexBuffer.zig</code></li>
+        <li><a href="#phase4">Phase 4 — Wire Up Renderer</a> &nbsp;<code>vulkan_renderer.zig</code></li>
+        <li><a href="#phase5">Phase 5 — Shader Build Step</a> &nbsp;<code>build.zig</code></li>
+    </ol>
+</div>
+
+<div class="principle">
+    <strong>Design goal:</strong> Match the Metal renderer's API exactly —
+    <code>drawShape</code> accumulates into a CPU-side batch, <code>endFrame</code>
+    uploads and flushes it. Nothing about the engine-level call sites changes.
+    Only the backend plumbing differs.
+</div>
+
+
+<!-- FILE LAYOUT -->
+<h2>File Layout</h2>
+
+<div class="legend">
+    <span><span class="dot dot-new"></span> new</span>
+    <span><span class="dot dot-modify"></span> modify</span>
+    <span><span class="dot dot-keep"></span> keep as-is</span>
+</div>
+
+<div class="file-tree">
+src/renderer/gpu/vulkan/
+  <span class="new">vertex.zig</span>              ← NEW — Vertex struct + Topology enum
+  <span class="new">geometry_batch.zig</span>      ← NEW — CPU-side batch accumulator (ported from Metal)
+  <span class="modify">types.zig</span>              ← MODIFY — re-export Pipeline, VertexBuffer, Vertex, Topology
+  <span class="modify">vulkan_renderer.zig</span>    ← MODIFY — add pipeline/buffer fields, wire drawShape + flush
+  shaders/
+    <span class="new">geometry.vert</span>          ← NEW — GLSL vertex shader (clip-space passthrough)
+    <span class="new">geometry.frag</span>          ← NEW — GLSL fragment shader (color passthrough)
+  support/
+    <span class="new">Pipeline.zig</span>           ← NEW — VkPipeline + VkPipelineLayout wrapper
+    <span class="new">VertexBuffer.zig</span>       ← NEW — host-coherent VkBuffer + persistent mapping
+    <span class="keep">CommandPool.zig</span>       ← keep ✅
+    <span class="keep">Device.zig</span>            ← keep ✅
+    <span class="keep">Framebuffer.zig</span>       ← keep ✅
+    <span class="keep">Instance.zig</span>          ← keep ✅
+    <span class="keep">PhysicalDevice.zig</span>    ← keep ✅
+    <span class="keep">RenderPass.zig</span>        ← keep ✅
+    <span class="keep">Surface.zig</span>           ← keep ✅
+    <span class="keep">Swapchain.zig</span>         ← keep ✅
+    <span class="keep">sync.zig</span>              ← keep ✅
+build.zig                    ← MODIFY — add glslc shader compilation step
+</div>
+
+
+<!-- ARCHITECTURE DIAGRAM -->
+<h2>Data Flow</h2>
+<div class="diagram">Per-frame lifecycle:
+
+beginFrame()
+  │  batch.clear()                        ← discard last frame's geometry
+  │  vkWaitForFences / vkAcquireNextImage
+  │  vkBeginCommandBuffer
+  └── vkCmdBeginRenderPass (clears color)
+
+  ↓ game code calls renderer.drawGeometry(...)
+
+drawShape(shape, transform, fill, stroke, ctx)
+  └── batch.addShape(...)                 ← tessellate + clip → Vertex slice
+
+endFrame()
+  │  flushBatch()
+  │    vertex_buffer.upload(batch.vertices)       ← memcpy to mapped GPU mem
+  │    vkCmdBindVertexBuffers(vertex_buffer)
+  │    for each draw_call in batch.draw_calls:
+  │      if topology changed → vkCmdBindPipeline (triangle or line)
+  │      vkCmdDraw(vertex_count, 1, vertex_start, 0)
+  │  vkCmdEndRenderPass
+  │  vkEndCommandBuffer
+  └── vkQueueSubmit → vkQueuePresentKHR</div>
+
+
+<!-- VERTEX FORMAT -->
+<h2>Vertex Format</h2>
+<p>Identical to the Metal renderer's <code>Vertex</code> struct — the batch code is shared logic.</p>
+
+<table class="vertex-table">
+    <tr>
+        <th>Field</th>
+        <th>Type</th>
+        <th>Offset</th>
+        <th>VkFormat</th>
+        <th>Location</th>
+    </tr>
+    <tr>
+        <td>position</td>
+        <td>[2]f32</td>
+        <td>0</td>
+        <td>VK_FORMAT_R32G32_SFLOAT</td>
+        <td>0</td>
+    </tr>
+    <tr>
+        <td>color</td>
+        <td>[4]f32</td>
+        <td>8</td>
+        <td>VK_FORMAT_R32G32B32A32_SFLOAT</td>
+        <td>1</td>
+    </tr>
+</table>
+<p>Stride: <code>@sizeOf(Vertex) = 24 bytes</code>. Use <code>extern struct</code> to guarantee no padding.</p>
+
+
+<!-- ALREADY DONE -->
+<div class="done-block" id="done">
+    <div class="phase-label done-label">Complete</div>
+    <h2>Already Done — Frame Loop</h2>
+    <p>Do not touch these during this plan. They form the stable base.</p>
+    <ul>
+        <li><code>beginFrame</code> / <code>endFrame</code> — acquire, record, submit, present</li>
+        <li><code>setClearColor</code> — <code>VkClearColorValue</code> applied at render pass begin</li>
+        <li>All Vulkan infrastructure: Instance, Surface, PhysicalDevice, Device, Swapchain, RenderPass, Framebuffers, CommandPool, sync primitives</li>
+        <li>Wayland surface + input (key, mouse) — fully working window</li>
+    </ul>
+    <p><code>drawShape</code> currently exists as a no-op stub. That's what this plan fills in.</p>
+</div>
+
+
+<!-- PHASE 1 -->
+<div class="phase" id="phase1">
+    <div class="phase-label">Phase 1</div>
+    <h2>Vertex Types &amp; Geometry Batch <span class="tag tag-new">new</span></h2>
+    <p>
+        Two new files. <code>vertex.zig</code> defines the shared data types used by
+        both the batch and the pipeline. <code>geometry_batch.zig</code> is a direct
+        port of Metal's batch accumulator — same tessellation logic, same draw call
+        structure, different primitive type enum.
+    </p>
+
+    <h3>vertex.zig</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>Vertex = extern struct { position: [2]f32, color: [4]f32 }</code></li>
+        <li><input type="checkbox"> <code>Topology = enum { triangle, line }</code></li>
+    </ul>
+
+    <div class="why">
+        <strong>Why a separate file?</strong> Both <code>Pipeline.zig</code> (in <code>support/</code>)
+        and <code>geometry_batch.zig</code> need the <code>Vertex</code> layout — Pipeline needs
+        it to describe binding/attribute descriptions, batch needs it to build vertex slices.
+        Putting it in a neutral file avoids any circular import risk between those two.
+    </div>
+
+    <h3>geometry_batch.zig — struct</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>DrawCall = struct { topology: Topology, vertex_start: u32, vertex_count: u32 }</code></li>
+        <li><input type="checkbox"> <code>GeometryBatch = struct { vertices: std.ArrayList(Vertex), draw_calls: std.ArrayList(DrawCall), gpa: Allocator }</code></li>
+        <li><input type="checkbox"> <code>init(gpa) GeometryBatch</code> — <code>.vertices = .empty</code>, <code>.draw_calls = .empty</code></li>
+        <li><input type="checkbox"> <code>deinit(self)</code> — deinit both lists</li>
+        <li><input type="checkbox"> <code>clear(self)</code> — <code>clearRetainingCapacity</code> on both lists</li>
+    </ul>
+
+    <h3>geometry_batch.zig — addShape dispatch</h3>
+    <p>
+        Port Metal's <code>geometry_batch.zig</code> verbatim, replacing
+        <code>MTLPrimitiveType</code> with <code>Topology</code> and
+        <code>primitive_type</code> with <code>topology</code> in <code>DrawCall</code>.
+        Everything else — the inline switch dispatch, <code>makeVertex</code>,
+        <code>makeScreenVertex</code>, and all shape handlers — is identical.
+    </p>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>addShape</code> — delegates to <code>addShapeDispatch</code></li>
+        <li><input type="checkbox"> <code>addShapeDispatch</code> — inline switch on <code>ShapeData</code> tag, calls <code>addLine</code>, <code>addTriangle</code>, <code>addRectangle</code>, <code>addCircle</code>, <code>addPolygon</code>, <code>addEllipse</code></li>
+        <li><input type="checkbox"> <code>makeVertex(point, xform, ctx, color) Vertex</code> — <code>transformPoint</code> + <code>worldToClipSpace</code></li>
+        <li><input type="checkbox"> <code>makeScreenVertex(point, xform, ctx, color) Vertex</code> — offset transform + <code>screenToClipSpace</code></li>
+        <li><input type="checkbox"> <code>addLine</code> — 2 vertices, <code>topology: .line</code></li>
+        <li><input type="checkbox"> <code>addTriangle</code> — 3 fill vertices (<code>.triangle</code>) + 6 outline vertices (<code>.line</code>)</li>
+        <li><input type="checkbox"> <code>addRectangle</code> — 6 fill vertices (2 tris) + 8 outline vertices (4 lines)</li>
+        <li><input type="checkbox"> <code>addCircle</code> — 32 segments, 3 fill vertices per segment, 2 outline vertices per segment</li>
+        <li><input type="checkbox"> <code>addPolygon</code> — uses <code>triangle_cache</code> for fill, iterates edges for outline</li>
+        <li><input type="checkbox"> <code>addEllipse</code> — stub (same as Metal, not yet implemented)</li>
+    </ul>
+
+    <div class="note">
+        <strong>Imports for geometry_batch.zig:</strong>
+        <code>@import("vertex.zig")</code> for Vertex/Topology,
+        <code>@import("../../renderer.zig")</code> for Color/Transform/ShapeData,
+        <code>@import("math")</code> for WorldPoint/ScreenPoint (module import, injected by build),
+        <code>@import("../../RenderContext.zig")</code>,
+        <code>@import("../../geometry_utils.zig")</code> for transform/clip helpers.
+    </div>
+</div>
+
+
+<!-- PHASE 2 -->
+<div class="phase" id="phase2">
+    <div class="phase-label">Phase 2</div>
+    <h2>Graphics Pipeline <span class="tag tag-new">new</span></h2>
+    <p>
+        <code>Pipeline.zig</code> wraps a <code>VkPipeline</code> + <code>VkPipelineLayout</code>.
+        One pipeline per topology — triangles use <code>VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST</code>,
+        lines use <code>VK_PRIMITIVE_TOPOLOGY_LINE_LIST</code>. Viewport and scissor are baked in
+        (not dynamic) — resize recreates the pipelines alongside the swapchain.
+    </p>
+
+    <h3>Pipeline.zig — struct fields</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>handle: *vk.struct_VkPipeline_T</code></li>
+        <li><input type="checkbox"> <code>layout: *vk.struct_VkPipelineLayout_T</code></li>
+    </ul>
+
+    <h3>init(dev, render_pass, vert_spv, frag_spv, topology, extent) !Self</h3>
+
+    <h4>Shader modules</h4>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>createShaderModule(dev, code: []const u8) !*VkShaderModule</code> — private helper</li>
+        <li><input type="checkbox"> <code>VkShaderModuleCreateInfo</code>: <code>codeSize = code.len</code>, <code>pCode = @ptrCast(@alignCast(code.ptr))</code></li>
+        <li><input type="checkbox"> Create vert and frag modules; defer destroy both before returning (modules consumed by pipeline creation)</li>
+        <li><input type="checkbox"> Two <code>VkPipelineShaderStageCreateInfo</code> entries: <code>VK_SHADER_STAGE_VERTEX_BIT</code> + <code>VK_SHADER_STAGE_FRAGMENT_BIT</code>, both with <code>pName = "main"</code></li>
+    </ul>
+
+    <h4>Vertex input state</h4>
+    <ul class="checklist">
+        <li><input type="checkbox"> One <code>VkVertexInputBindingDescription</code>:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> <code>binding = 0</code></li>
+                <li><input type="checkbox"> <code>stride = @sizeOf(Vertex)</code> (24 bytes)</li>
+                <li><input type="checkbox"> <code>inputRate = VK_VERTEX_INPUT_RATE_VERTEX</code></li>
+            </ul>
+        </li>
+        <li><input type="checkbox"> Two <code>VkVertexInputAttributeDescription</code>:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> location=0: <code>format = VK_FORMAT_R32G32_SFLOAT</code>, <code>offset = @offsetOf(Vertex, "position")</code></li>
+                <li><input type="checkbox"> location=1: <code>format = VK_FORMAT_R32G32B32A32_SFLOAT</code>, <code>offset = @offsetOf(Vertex, "color")</code></li>
+            </ul>
+        </li>
+    </ul>
+
+    <h4>Input assembly</h4>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>topology = switch (topology) { .triangle =&gt; VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, .line =&gt; VK_PRIMITIVE_TOPOLOGY_LINE_LIST }</code></li>
+        <li><input type="checkbox"> <code>primitiveRestartEnable = VK_FALSE</code></li>
+    </ul>
+
+    <h4>Viewport &amp; scissor state (baked)</h4>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>VkViewport</code>: x=0, y=0, width/height from <code>extent</code>, minDepth=0.0, maxDepth=1.0</li>
+        <li><input type="checkbox"> <code>VkRect2D</code> scissor: offset={0,0}, extent=extent</li>
+        <li><input type="checkbox"> <code>viewportCount = 1</code>, <code>scissorCount = 1</code></li>
+    </ul>
+
+    <h4>Rasterizer</h4>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>polygonMode = VK_POLYGON_MODE_FILL</code></li>
+        <li><input type="checkbox"> <code>cullMode = VK_CULL_MODE_NONE</code> — 2D geometry has no consistent winding</li>
+        <li><input type="checkbox"> <code>frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE</code></li>
+        <li><input type="checkbox"> <code>lineWidth = 1.0</code></li>
+        <li><input type="checkbox"> All depth clamp, bias, discard flags: <code>VK_FALSE</code></li>
+    </ul>
+
+    <h4>Multisample state</h4>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>rasterizationSamples = VK_SAMPLE_COUNT_1_BIT</code> — no MSAA</li>
+        <li><input type="checkbox"> <code>sampleShadingEnable = VK_FALSE</code></li>
+    </ul>
+
+    <h4>Color blend state (alpha blending)</h4>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>blendEnable = VK_TRUE</code></li>
+        <li><input type="checkbox"> <code>srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA</code></li>
+        <li><input type="checkbox"> <code>dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA</code></li>
+        <li><input type="checkbox"> <code>colorBlendOp = VK_BLEND_OP_ADD</code></li>
+        <li><input type="checkbox"> <code>srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE</code></li>
+        <li><input type="checkbox"> <code>dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO</code></li>
+        <li><input type="checkbox"> <code>alphaBlendOp = VK_BLEND_OP_ADD</code></li>
+        <li><input type="checkbox"> <code>colorWriteMask</code> = R | G | B | A</li>
+    </ul>
+
+    <h4>Pipeline layout (no descriptors)</h4>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>VkPipelineLayoutCreateInfo</code> with zero descriptor set layouts and zero push constant ranges</li>
+        <li><input type="checkbox"> <code>vkCreatePipelineLayout</code> → <code>self.layout</code></li>
+    </ul>
+
+    <h4>Pipeline creation</h4>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>pDepthStencilState = null</code> — render pass has no depth attachment</li>
+        <li><input type="checkbox"> <code>pTessellationState = null</code> — no tessellation</li>
+        <li><input type="checkbox"> <code>pDynamicState = null</code> — viewport baked in for now</li>
+        <li><input type="checkbox"> <code>renderPass = render_pass.handle</code>, <code>subpass = 0</code></li>
+        <li><input type="checkbox"> <code>basePipelineHandle = null</code> — no pipeline derivatives</li>
+        <li><input type="checkbox"> <code>vkCreateGraphicsPipelines(dev, null, 1, &amp;info, null, &amp;pipeline)</code></li>
+        <li><input type="checkbox"> On failure: destroy pipeline layout before returning error</li>
+    </ul>
+
+    <h3>deinit(dev)</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkDestroyPipeline(dev.handle, self.handle, null)</code></li>
+        <li><input type="checkbox"> <code>vkDestroyPipelineLayout(dev.handle, self.layout, null)</code></li>
+    </ul>
+
+    <div class="gotcha">
+        <strong>Shader modules can be destroyed immediately after pipeline creation.</strong>
+        Vulkan copies the SPIR-V bytecode into the pipeline at creation time. The
+        <code>VkShaderModule</code> handles can and should be destroyed right away —
+        keeping them alive wastes memory and requires extra cleanup. Use <code>defer</code>
+        to destroy them before <code>Pipeline.init</code> returns.
+    </div>
+
+    <div class="why">
+        <strong>Why two pipelines (triangle + line)?</strong> In Vulkan, primitive topology
+        is baked into the pipeline's input assembly state. You cannot switch between
+        triangle and line rendering mid-pipeline without dynamic state extensions (which
+        add driver complexity). Two small pipelines — one per topology — is the standard
+        approach and has zero runtime cost beyond a single <code>vkCmdBindPipeline</code>
+        call when topology changes in the draw call stream.
+    </div>
+</div>
+
+
+<!-- PHASE 3 -->
+<div class="phase" id="phase3">
+    <div class="phase-label">Phase 3</div>
+    <h2>Vertex Buffer <span class="tag tag-new">new</span></h2>
+    <p>
+        A persistently-mapped, host-coherent <code>VkBuffer</code>. Each frame,
+        <code>upload()</code> memcpys the batch's vertex slice into it. No staging buffer,
+        no explicit flush — <code>HOST_COHERENT</code> keeps CPU writes visible to the GPU
+        automatically.
+    </p>
+
+    <h3>VertexBuffer.zig — struct fields</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>handle: *vk.struct_VkBuffer_T</code></li>
+        <li><input type="checkbox"> <code>memory: *vk.struct_VkDeviceMemory_T</code></li>
+        <li><input type="checkbox"> <code>mapped: [*]u8</code> — persistent CPU pointer from <code>vkMapMemory</code></li>
+        <li><input type="checkbox"> <code>capacity: usize</code> — max bytes this buffer can hold</li>
+    </ul>
+
+    <h3>init(dev, gpu, size) !Self</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>VkBufferCreateInfo</code>: <code>size = size</code>, <code>usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT</code>, <code>sharingMode = VK_SHARING_MODE_EXCLUSIVE</code></li>
+        <li><input type="checkbox"> <code>vkCreateBuffer</code> → <code>handle</code></li>
+        <li><input type="checkbox"> <code>vkGetBufferMemoryRequirements</code> → <code>mem_reqs</code></li>
+        <li><input type="checkbox"> Find a memory type index that satisfies <code>mem_reqs.memoryTypeBits</code> and has both <code>VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT</code> and <code>VK_MEMORY_PROPERTY_HOST_COHERENT_BIT</code></li>
+        <li><input type="checkbox"> <code>VkMemoryAllocateInfo</code>: <code>allocationSize = mem_reqs.size</code>, <code>memoryTypeIndex</code> from above</li>
+        <li><input type="checkbox"> <code>vkAllocateMemory</code> → <code>memory</code></li>
+        <li><input type="checkbox"> <code>vkBindBufferMemory(dev, handle, memory, 0)</code></li>
+        <li><input type="checkbox"> <code>vkMapMemory(dev, memory, 0, VK_WHOLE_SIZE, 0, &amp;ptr)</code> → store as <code>self.mapped</code></li>
+        <li><input type="checkbox"> On error at any step: clean up already-created resources before returning the error</li>
+    </ul>
+
+    <h3>findMemoryType (private)</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkGetPhysicalDeviceMemoryProperties(gpu.handle, &amp;mem_props)</code></li>
+        <li><input type="checkbox"> Loop <code>0..mem_props.memoryTypeCount</code>: check bit <code>i</code> set in <code>type_filter</code> AND <code>propertyFlags &amp; required == required</code></li>
+        <li><input type="checkbox"> Return <code>?u32</code> — null if no suitable type found</li>
+    </ul>
+
+    <h3>upload(data: []const u8)</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>const len = @min(data.len, self.capacity)</code></li>
+        <li><input type="checkbox"> <code>@memcpy(self.mapped[0..len], data[0..len])</code></li>
+        <li><input type="checkbox"> No flush needed — <code>HOST_COHERENT</code> guarantees GPU visibility</li>
+    </ul>
+
+    <h3>deinit(dev)</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>vkUnmapMemory(dev.handle, self.memory)</code></li>
+        <li><input type="checkbox"> <code>vkFreeMemory(dev.handle, self.memory, null)</code></li>
+        <li><input type="checkbox"> <code>vkDestroyBuffer(dev.handle, self.handle, null)</code></li>
+    </ul>
+
+    <div class="note">
+        <strong>Buffer size:</strong> Use 12MB — same as the Metal renderer's vertex buffer.
+        Define as a const in <code>vulkan_renderer.zig</code>:
+        <code>const MAX_VERTEX_BUFFER_SIZE: usize = 1024 * 1024 * 12;</code>
+        The batch already clamps at this limit on the Metal side; the same cap applies here.
+    </div>
+
+    <div class="why">
+        <strong>Why HOST_COHERENT instead of a staging buffer?</strong>
+        A staging buffer would require a separate device-local buffer, a transfer command,
+        and pipeline barriers — significant complexity for geometry that changes every frame.
+        <code>HOST_COHERENT</code> memory is slightly slower on discrete GPUs (no VRAM cache),
+        but for 2D geometry batches it's negligible. Integrated GPUs (common on Linux dev
+        hardware) have unified memory so there's no penalty at all. Optimize with staging
+        if profiling shows it matters.
+    </div>
+</div>
+
+
+<!-- PHASE 4 -->
+<div class="phase" id="phase4">
+    <div class="phase-label">Phase 4</div>
+    <h2>Wire Up vulkan_renderer.zig <span class="tag tag-modify">modify</span></h2>
+    <p>
+        Add the pipeline, buffer, and batch fields. Extend <code>init</code> and
+        <code>deinit</code>. Implement <code>drawShape</code>. Add <code>flushBatch</code>
+        called from <code>endFrame</code>.
+    </p>
+
+    <h3>New imports</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>const Pipeline = myvk.Pipeline;</code></li>
+        <li><input type="checkbox"> <code>const VertexBuffer = myvk.VertexBuffer;</code></li>
+        <li><input type="checkbox"> <code>const Vertex = myvk.Vertex;</code></li>
+        <li><input type="checkbox"> <code>const Topology = myvk.Topology;</code></li>
+        <li><input type="checkbox"> <code>const GeometryBatch = @import("geometry_batch.zig").GeometryBatch;</code></li>
+        <li><input type="checkbox"> <code>const shaders = @import("vulkan_shaders");</code> — anonymous import created by build step</li>
+    </ul>
+
+    <h3>New fields on Self</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>triangle_pipeline: Pipeline</code></li>
+        <li><input type="checkbox"> <code>line_pipeline: Pipeline</code></li>
+        <li><input type="checkbox"> <code>vertex_buffer: VertexBuffer</code></li>
+        <li><input type="checkbox"> <code>batch: GeometryBatch</code></li>
+    </ul>
+
+    <h3>Extend init()</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> After sync primitives are created, add:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> <code>triangle_pipeline = try Pipeline.init(dev, render_pass, shaders.geometry_vert, shaders.geometry_frag, .triangle, swapchain.extent)</code></li>
+                <li><input type="checkbox"> <code>line_pipeline = try Pipeline.init(dev, render_pass, shaders.geometry_vert, shaders.geometry_frag, .line, swapchain.extent)</code></li>
+                <li><input type="checkbox"> <code>vertex_buffer = try VertexBuffer.init(dev, phys_device, MAX_VERTEX_BUFFER_SIZE)</code></li>
+                <li><input type="checkbox"> <code>batch = GeometryBatch.init(alloc)</code></li>
+            </ul>
+        </li>
+    </ul>
+
+    <h3>Extend deinit() — add before existing teardown</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>self.batch.deinit()</code></li>
+        <li><input type="checkbox"> <code>self.vertex_buffer.deinit(self.dev)</code></li>
+        <li><input type="checkbox"> <code>self.line_pipeline.deinit(self.dev)</code></li>
+        <li><input type="checkbox"> <code>self.triangle_pipeline.deinit(self.dev)</code></li>
+    </ul>
+
+    <h3>beginFrame() — add at top</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>self.batch.clear();</code> — discard last frame before acquiring next image</li>
+    </ul>
+
+    <h3>endFrame() — call flushBatch before vkCmdEndRenderPass</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> Insert <code>self.flushBatch();</code> after the render pass begins and before <code>vkCmdEndRenderPass</code></li>
+    </ul>
+
+    <h3>flushBatch() — private</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> Early return if <code>self.batch.draw_calls.items.len == 0</code></li>
+        <li><input type="checkbox"> Upload vertices: <code>self.vertex_buffer.upload(@as([*]const u8, @ptrCast(vertices.ptr))[0..byte_len])</code></li>
+        <li><input type="checkbox"> Bind vertex buffer: <code>vkCmdBindVertexBuffers(cmd, 0, 1, &amp;buf_handle, &amp;offset_zero)</code>
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> <code>var buf_handle: vk.VkBuffer = self.vertex_buffer.handle</code> (coerce <code>*T → ?*T</code>)</li>
+                <li><input type="checkbox"> <code>const offset_zero: vk.VkDeviceSize = 0</code></li>
+            </ul>
+        </li>
+        <li><input type="checkbox"> Iterate draw calls, binding pipeline only when topology changes:
+            <ul class="sub-checklist">
+                <li><input type="checkbox"> Track <code>var current_topology: ?Topology = null</code></li>
+                <li><input type="checkbox"> If <code>call.topology != current_topology</code>: <code>vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.handle)</code></li>
+                <li><input type="checkbox"> <code>vkCmdDraw(cmd, call.vertex_count, 1, call.vertex_start, 0)</code></li>
+            </ul>
+        </li>
+    </ul>
+
+    <h3>drawShape() — replace no-op stub</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>self.batch.addShape(shape, transform, fill_color, stroke_color, stroke_width, ctx) catch |err| log.err(...)</code></li>
+    </ul>
+
+    <h3>Update types.zig</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>pub const Pipeline = @import("support/Pipeline.zig");</code></li>
+        <li><input type="checkbox"> <code>pub const VertexBuffer = @import("support/VertexBuffer.zig");</code></li>
+        <li><input type="checkbox"> <code>const vtx = @import("vertex.zig"); pub const Vertex = vtx.Vertex; pub const Topology = vtx.Topology;</code></li>
+    </ul>
+
+    <div class="gotcha">
+        <strong>flushBatch goes inside the render pass.</strong> <code>vkCmdDraw</code> is only
+        valid while a render pass is active. The correct order in <code>endFrame</code> is:
+        <code>vkCmdBeginRenderPass</code> (in <code>beginFrame</code>) →
+        <code>flushBatch()</code> → <code>vkCmdEndRenderPass</code>.
+        Calling draw commands after <code>vkCmdEndRenderPass</code> is a validation error.
+    </div>
+
+    <div class="note">
+        <strong>vkCmdBindVertexBuffers needs a VkBuffer (nullable pointer), not the unwrapped handle.</strong>
+        <code>self.vertex_buffer.handle</code> is <code>*vk.struct_VkBuffer_T</code>.
+        Zig will not implicitly coerce it to <code>vk.VkBuffer</code> (<code>?*struct_VkBuffer_T</code>)
+        when taking the address of it. Store it in a local variable first:
+        <code>var buf: vk.VkBuffer = self.vertex_buffer.handle;</code>
+        then pass <code>&amp;buf</code>.
+    </div>
+</div>
+
+
+<!-- PHASE 5 -->
+<div class="phase" id="phase5">
+    <div class="phase-label">Phase 5</div>
+    <h2>Shader Build Step <span class="tag tag-modify">modify</span></h2>
+    <p>
+        <code>glslc</code> is available at <code>/usr/bin/glslc</code>. The build step
+        compiles both GLSL shaders to SPIR-V at build time, co-locates them with a
+        generated Zig wrapper, and injects the wrapper as an anonymous import
+        (<code>vulkan_shaders</code>) into the renderer module.
+    </p>
+
+    <h3>Shaders to create</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>src/renderer/gpu/vulkan/shaders/geometry.vert</code>
+            <pre><code>#version 450
+layout(location = 0) in vec2 inPosition;
+layout(location = 1) in vec4 inColor;
+layout(location = 0) out vec4 fragColor;
+void main() {
+    gl_Position = vec4(inPosition, 0.0, 1.0);
+    fragColor = inColor;
+}</code></pre>
+        </li>
+        <li><input type="checkbox"> <code>src/renderer/gpu/vulkan/shaders/geometry.frag</code>
+            <pre><code>#version 450
+layout(location = 0) in vec4 fragColor;
+layout(location = 0) out vec4 outColor;
+void main() { outColor = fragColor; }</code></pre>
+        </li>
+    </ul>
+
+    <h3>build.zig — add compileVulkanShaders function</h3>
+    <ul class="checklist">
+        <li><input type="checkbox"> Add at the bottom of <code>build.zig</code>:
+            <pre><code>fn compileVulkanShaders(
+    b: *std.Build,
+    renderer_module: *std.Build.Module,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) void {
+    const vert = b.addSystemCommand(&.{"glslc"});
+    vert.addFileArg(b.path("src/renderer/gpu/vulkan/shaders/geometry.vert"));
+    vert.addArg("-o");
+    const vert_spv = vert.addOutputFileArg("geometry_vert.spv");
+
+    const frag = b.addSystemCommand(&.{"glslc"});
+    frag.addFileArg(b.path("src/renderer/gpu/vulkan/shaders/geometry.frag"));
+    frag.addArg("-o");
+    const frag_spv = frag.addOutputFileArg("geometry_frag.spv");
+
+    const wf = b.addWriteFiles();
+    _ = wf.addCopyFile(vert_spv, "geometry_vert.spv");
+    _ = wf.addCopyFile(frag_spv, "geometry_frag.spv");
+    const shaders_zig = wf.add("shaders.zig",
+        \\pub const geometry_vert = @embedFile("geometry_vert.spv");
+        \\pub const geometry_frag = @embedFile("geometry_frag.spv");
+    );
+
+    renderer_module.addAnonymousImport("vulkan_shaders", .{
+        .root_source_file = shaders_zig,
+        .target = target,
+        .optimize = optimize,
+    });
+}</code></pre>
+        </li>
+        <li><input type="checkbox"> Call it from <code>build()</code> after <code>configurePlatformModule</code>:
+            <pre><code>if (target.result.os.tag == .linux and selected_renderer == .vulkan) {
+    compileVulkanShaders(b, modules[@intFromEnum(M.renderer)], target, optimize);
+}</code></pre>
+        </li>
+    </ul>
+
+    <div class="why">
+        <strong>How the anonymous import works:</strong>
+        <code>addWriteFiles</code> creates a temporary build-cache directory.
+        <code>wf.add("shaders.zig", ...)</code> writes the Zig wrapper into that directory.
+        <code>wf.addCopyFile(spv, "geometry_vert.spv")</code> copies the compiled SPIR-V into
+        the same directory. When Zig compiles <code>shaders.zig</code>, its <code>@embedFile</code>
+        calls resolve relative to that directory — finding the copied <code>.spv</code> files.
+        The result is accessible in <code>vulkan_renderer.zig</code> as
+        <code>@import("vulkan_shaders").geometry_vert</code> (a <code>[]const u8</code>).
+    </div>
+
+    <div class="note">
+        <strong>Only runs on Linux Vulkan builds.</strong> The <code>if</code> guard prevents
+        the <code>glslc</code> system command from running on macOS (Metal) builds where
+        <code>glslc</code> may not be installed.
+    </div>
+</div>
+
+
+<!-- VERIFICATION -->
+<div class="handoff" id="verify">
+    <h3>Verification</h3>
+    <p>In order:</p>
+    <ul class="checklist">
+        <li><input type="checkbox"> <code>zig build zixelart</code> compiles cleanly — no errors in new files</li>
+        <li><input type="checkbox"> Both <code>.spv</code> files are generated in the build cache (no glslc errors)</li>
+        <li><input type="checkbox"> Window opens and displays the clear color — existing behavior preserved</li>
+        <li><input type="checkbox"> A scene or tool that calls <code>drawGeometry</code> now renders visible geometry (rectangles, circles, etc.)</li>
+        <li><input type="checkbox"> Lines render correctly (outlines on rectangles, polygon edges)</li>
+        <li><input type="checkbox"> Alpha blending works — overlapping semi-transparent shapes composite correctly</li>
+        <li><input type="checkbox"> No Vulkan validation errors in the draw path</li>
+        <li><input type="checkbox"> Resize still works — the pipelines are swapchain-extent-dependent, so <code>resize()</code> will need to recreate them (see Out of Scope below)</li>
+    </ul>
+</div>
+
+
+<h2>Out of Scope (this pass)</h2>
+<ul>
+    <li><strong>Textures</strong> — <code>drawTextureQuad</code> stays a stub; requires descriptor sets, samplers, image layout transitions, and a texture pipeline</li>
+    <li><strong>Dynamic viewport</strong> — viewport and scissor are baked into each pipeline; resize requires pipeline recreation in addition to swapchain recreation</li>
+    <li><strong>Depth buffer</strong> — no depth testing for 2D rendering; add later if 3D or z-order sorting is needed</li>
+    <li><strong>Index buffers</strong> — not needed for the current tessellation output; a future optimization</li>
+    <li><strong>Multiple draw batches per frame</strong> — single upload per frame; sufficient for now</li>
+    <li><strong>Staging buffer upload</strong> — host-coherent mapping is adequate; optimize to staging + device-local if GPU profiling shows it's a bottleneck</li>
+</ul>
+
+<div class="principle" style="margin-top: 30px;">
+    <strong>What comes after:</strong> With geometry working, the natural next step is
+    textures — <code>drawTextureQuad</code> needs a second pipeline with UV coordinates,
+    a descriptor set layout binding a combined image sampler, and a staging upload path
+    for texture data. The batch infrastructure from this pass remains intact.
+</div>
+
+<script>
+    document.querySelectorAll('input[type="checkbox"]').forEach((cb, i) => {
+        const key = 'vulkan-geometry-plan-cb-' + i;
+        cb.checked = localStorage.getItem(key) === 'true';
+        cb.addEventListener('change', () => {
+            localStorage.setItem(key, cb.checked);
+            const li = cb.closest('li');
+            if (li) li.classList.toggle('done', cb.checked);
+        });
+        if (cb.checked) {
+            const li = cb.closest('li');
+            if (li) li.classList.add('done');
+        }
+    });
+</script>
+
+</body>
+</html>
