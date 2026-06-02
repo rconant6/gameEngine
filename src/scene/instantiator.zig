@@ -79,22 +79,22 @@ pub const InstantiatorError = error{
 };
 
 pub const Instantiator = struct {
-    gpa: Allocator,
+    persistent: Allocator,
     last_instantiated_entities: std.ArrayList(Entity),
     world: *World,
     assets: *AssetManager,
     in_screen_space: bool = false,
 
-    pub fn init(gpa: Allocator, world: *World, assets: *AssetManager) Instantiator {
+    pub fn init(persistent: Allocator, world: *World, assets: *AssetManager) Instantiator {
         return .{
-            .gpa = gpa,
+            .persistent = persistent,
             .last_instantiated_entities = .empty,
             .world = world,
             .assets = assets,
         };
     }
     pub fn deinit(self: *Instantiator) void {
-        self.last_instantiated_entities.deinit(self.gpa);
+        self.last_instantiated_entities.deinit(self.persistent);
     }
     pub fn clearLastInstantiated(self: *Instantiator, world: *World) void {
         for (self.last_instantiated_entities.items) |entity_id| {
@@ -155,7 +155,7 @@ pub const Instantiator = struct {
         entity_decl: *const EntityDeclaration,
     ) !void {
         const entity = try self.world.createEntity();
-        try self.last_instantiated_entities.append(self.gpa, entity);
+        try self.last_instantiated_entities.append(self.persistent, entity);
 
         for (entity_decl.components) |comp_decl| {
             switch (comp_decl) {
@@ -208,8 +208,8 @@ pub const Instantiator = struct {
             if (getProperty(props, "path")) |p| {
                 const path = try self.extractValueForType([]const u8, p.value) orelse
                     return InstantiatorError.NotOptionalValue;
-                const full = try std.fs.path.join(self.gpa, &.{ path, file });
-                defer self.gpa.free(full);
+                const full = try std.fs.path.join(self.persistent, &.{ path, file });
+                defer self.persistent.free(full);
                 try self.assets.loadFontFromPath(asset_decl.name, full);
             } else {
                 try self.assets.loadFont(asset_decl.name, file);
@@ -237,14 +237,14 @@ pub const Instantiator = struct {
                     p.value,
                 ) orelse return InstantiatorError.NotOptionalValue;
 
-                break :blk try std.fs.path.join(self.gpa, &.{ path, file });
+                break :blk try std.fs.path.join(self.persistent, &.{ path, file });
             } else {
-                break :blk try self.gpa.dupe(u8, file);
+                break :blk try self.persistent.dupe(u8, file);
             }
         } else {
             return InstantiatorError.MissingAssetPath;
         };
-        defer self.gpa.free(full_path);
+        defer self.persistent.free(full_path);
 
         try self.assets.loadZxl(asset_decl.name, full_path);
     }
@@ -265,7 +265,7 @@ pub const Instantiator = struct {
             const component = try self.buildTriggerComponent(Components.OnCollision, CollisionTrigger, comp_decl.generic);
             errdefer {
                 for (component.triggers) |trigger| {
-                    self.gpa.free(trigger.other_tag_pattern);
+                    self.persistent.free(trigger.other_tag_pattern);
                 }
             }
             try self.world.addComponent(entity, Components.OnCollision, component);
@@ -437,7 +437,7 @@ pub const Instantiator = struct {
     ) !Components.Sprite {
         var component = std.mem.zeroInit(Components.Sprite, .{});
         var owned_points: []const V2 = undefined;
-        defer self.gpa.free(owned_points);
+        defer self.persistent.free(owned_points);
         if (sprite.properties) |props| {
             for (props) |prop| {
                 if (std.mem.eql(u8, "points", prop.name)) {
@@ -466,7 +466,7 @@ pub const Instantiator = struct {
                 }
             }
         }
-        const polygon = try Shapes.Polygon(WorldPoint).init(self.gpa, owned_points);
+        const polygon = try Shapes.Polygon(WorldPoint).init(self.persistent, owned_points);
         component.geometry = ShapeRegistry.createShapeUnion(Shapes.Polygon(WorldPoint), polygon);
 
         return component;
@@ -477,7 +477,7 @@ pub const Instantiator = struct {
         comptime ColliderShapeType: type,
         collider_block: SpriteBlock,
     ) !Components.Collider {
-        var shape_data: ColliderShapeType = undefined;
+        var shape_data: ColliderShapeType = std.mem.zeroes(ColliderShapeType);
 
         if (collider_block.properties) |props| {
             for (props) |prop| {
@@ -510,19 +510,19 @@ pub const Instantiator = struct {
         comp: GenericBlock,
     ) !ComponentType {
         var triggers: std.ArrayList(TriggerType) = .empty;
-        errdefer triggers.deinit(self.gpa);
+        errdefer triggers.deinit(self.persistent);
 
         if (comp.nested_blocks) |blocks| {
             for (blocks) |*nested_block| {
                 if (std.mem.eql(u8, nested_block.name, "trigger")) {
                     const trigger = try self.buildTrigger(TriggerType, nested_block.*);
-                    try triggers.append(self.gpa, trigger);
+                    try triggers.append(self.persistent, trigger);
                 }
             }
         }
 
         return ComponentType{
-            .triggers = try triggers.toOwnedSlice(self.gpa),
+            .triggers = try triggers.toOwnedSlice(self.persistent),
         };
     }
 
@@ -567,17 +567,17 @@ pub const Instantiator = struct {
         }
 
         var actions: std.ArrayList(Action) = .empty;
-        errdefer actions.deinit(self.gpa);
+        errdefer actions.deinit(self.persistent);
         if (trigger_block.nested_blocks) |blocks| {
             for (blocks) |*nested_block| {
                 if (std.mem.eql(u8, nested_block.name, "action")) {
                     const action = try self.buildAction(nested_block.*);
-                    try actions.append(self.gpa, action);
+                    try actions.append(self.persistent, action);
                 }
             }
         }
 
-        trigger.actions = try actions.toOwnedSlice(self.gpa);
+        trigger.actions = try actions.toOwnedSlice(self.persistent);
         return trigger;
     }
 
@@ -605,7 +605,7 @@ pub const Instantiator = struct {
                         action_type = @unionInit(ActionType, field.name, {});
                     } else if (@typeInfo(field.type) == .@"struct") {
                         // Handle struct payloads spawn_entity, set_velocity...
-                        var payload: field.type = undefined;
+                        var payload: field.type = std.mem.zeroes(field.type);
                         inline for (std.meta.fields(field.type)) |payload_field| {
                             const field_value = if (getProperty(
                                 props,
@@ -686,7 +686,7 @@ pub const Instantiator = struct {
                 if (ptr_info.size == .slice and ptr_info.child == V2) {
                     return switch (value) {
                         .array => |arr| blk: {
-                            const points = try self.gpa.alloc(V2, arr.len);
+                            const points = try self.persistent.alloc(V2, arr.len);
                             for (arr, 0..) |val, i| {
                                 switch (val) {
                                     .vector => |v| {
@@ -696,7 +696,7 @@ pub const Instantiator = struct {
                                         };
                                     },
                                     else => {
-                                        self.gpa.free(points);
+                                        self.persistent.free(points);
                                         return InstantiatorError.ArrayTypeMismatch;
                                     },
                                 }

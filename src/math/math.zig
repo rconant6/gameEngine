@@ -50,3 +50,5 @@ pub const Rgba = @import("Rgba.zig").Rgba;
 pub const Hsva = @import("Hsva.zig").Hsva;
 
 pub const utils = @import("utils.zig");
+
+pub const GameMemory = @import("GameMemory.zig");

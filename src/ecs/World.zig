@@ -15,16 +15,16 @@ const Tag = comps.Tag;
 const debug = @import("debug");
 const log = debug.log;
 
-gpa: std.mem.Allocator,
+persistent: std.mem.Allocator,
 next_entity_id: usize,
 component_storages: Storages,
 template_manager: *TemplateManager = undefined, // gets set by engine on init
 
-pub fn init(gpa: Allocator) !Self {
+pub fn init(p_gpa: Allocator) !Self {
     return .{
-        .gpa = gpa,
+        .persistent = p_gpa,
         .next_entity_id = 1, // 0 is dummy/invalid entity
-        .component_storages = Storages.init(gpa),
+        .component_storages = Storages.init(p_gpa),
     };
 }
 
@@ -37,7 +37,7 @@ pub fn deinit(self: *Self) void {
     var storage_iter = self.component_storages.valueIterator();
     while (storage_iter.next()) |interface| {
         interface.vtable.deinit(interface.ptr);
-        interface.vtable.destroy(interface.ptr, self.gpa);
+        interface.vtable.destroy(interface.ptr, self.persistent);
     }
     self.component_storages.deinit();
 }
@@ -109,31 +109,39 @@ pub fn findEntityByTag(self: *Self, tag: []const u8) ?Entity {
     }
     return null;
 }
-pub fn findEntitiesByTag(self: *Self, tag: []const u8) []Entity {
+pub fn findEntitiesByTag(
+    self: *Self,
+    tag: []const u8,
+    f_gpa: Allocator,
+) []Entity {
     var entities: ArrayList(Entity) = .empty;
-    errdefer entities.deinit(self.gpa);
+    errdefer entities.deinit(f_gpa);
     var q = self.query(.{Tag});
     while (q.next()) |entry| {
         const tags = entry.get(0);
         if (tags.hasTag(tag))
-            entities.append(self.gpa, entry.entity) catch {
-                // TODO: logging
+            entities.append(f_gpa, entry.entity) catch |e| {
+                log.err(.ecs, "Unable to append entity(tag) {t}", .{e});
             };
     }
-    return entities.toOwnedSlice(self.gpa) catch &[_]Entity{};
+    return entities.toOwnedSlice(f_gpa) catch &[_]Entity{};
 }
-pub fn findEntitiesByPattern(self: *Self, pattern: []const u8) []Entity {
+pub fn findEntitiesByPattern(
+    self: *Self,
+    pattern: []const u8,
+    f_gpa: Allocator,
+) []Entity {
     var entities: ArrayList(Entity) = .empty;
-    errdefer entities.deinit(self.gpa);
+    errdefer entities.deinit(f_gpa);
     var q = self.query(.{Tag});
     while (q.next()) |entry| {
         const tags = entry.get(0);
         if (tags.matchesPattern(pattern))
-            entities.append(self.gpa, entry.entity) catch {
-                // TODO: logging
+            entities.append(f_gpa, entry.entity) catch |e| {
+                log.err(.ecs, "Unable to append entity(pattern) {t}", .{e});
             };
     }
-    return entities.toOwnedSlice(self.gpa) catch &[_]Entity{};
+    return entities.toOwnedSlice(f_gpa) catch &[_]Entity{};
 }
 
 pub fn query(self: *Self, comptime component_types: anytype) Query(buildStorageTupleType(component_types)) {
@@ -176,8 +184,8 @@ fn registerComponent(self: *Self, comptime T: type) !void {
     if (self.component_storages.contains(name)) return error.ComponentAlreadyRegistered;
 
     const StorageType = ComponentStorage(T);
-    const storage = try self.gpa.create(StorageType);
-    storage.* = try ComponentStorage(T).init(self.gpa);
+    const storage = try self.persistent.create(StorageType);
+    storage.* = try ComponentStorage(T).init(self.persistent);
 
     try self.component_storages.put(name, wrapStorage(T, storage));
 }

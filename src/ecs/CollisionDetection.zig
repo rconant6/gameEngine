@@ -7,5 +7,4 @@ pub const Collision = struct {
     point: V2,
     normal: V2,
     penetration: f32,
-    actions_fired: bool = false,
 };

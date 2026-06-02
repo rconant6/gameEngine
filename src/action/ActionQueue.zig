@@ -19,14 +19,14 @@ pub const QueuedAction = struct {
 };
 
 pub const ActionQueue = struct {
-    gpa: Allocator,
+    frame: Allocator,
     actions: ArrayList(QueuedAction),
 
-    pub fn init(gpa: Allocator) ActionQueue {
-        return .{ .gpa = gpa, .actions = .empty };
+    pub fn init(f_gpa: Allocator) ActionQueue {
+        return .{ .frame = f_gpa, .actions = .empty };
     }
     pub fn deinit(self: *ActionQueue) void {
-        self.actions.deinit(self.gpa);
+        self.actions.deinit(self.frame);
     }
 
     pub fn clear(self: *ActionQueue) void {
@@ -34,7 +34,7 @@ pub const ActionQueue = struct {
     }
     pub fn append(self: *ActionQueue, action: Action, context: ActionContext) !void {
         try self.actions.append(
-            self.gpa,
+            self.frame,
             .{ .action = action, .context = context },
         );
     }

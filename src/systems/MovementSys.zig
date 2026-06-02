@@ -19,8 +19,8 @@ pub fn run(world: *World, dt: f32, debug: *Debugger) void {
         transform.position.y += velocity.linear.y * dt;
         transform.rotation += velocity.angular * dt;
 
-        if (velocity.linear.x != 0 and velocity.linear.y != 0) {
-            const end = transform.position.add(velocity.linear.mul(velocity.linear.magnitude()).mul(0.12));
+        if (velocity.linear.x != 0 or velocity.linear.y != 0) {
+            const end = transform.position.add(velocity.linear.normalize().mul(1.5));
             debug.draw.addArrow(.{
                 .start = transform.position,
                 .end = end,

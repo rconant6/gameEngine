@@ -120,11 +120,11 @@ pub const Event = union(enum) {
 };
 
 pub fn init(
-    gpa: Allocator,
+    p_gpa: Allocator,
     io: std.Io,
     env: *std.process.Environ.Map,
 ) !void {
-    return PlatformImpl.init(gpa, io, env);
+    return PlatformImpl.init(p_gpa, io, env);
 }
 pub fn deinit() void {
     PlatformImpl.deinit();
@@ -207,8 +207,8 @@ pub fn getNativeWindowHandle(window: *Window) *anyopaque {
     return PlatformImpl.getNativeWindowHandle(window);
 }
 
-pub fn getDisplays(allocator: std.mem.Allocator) ![]DisplayInfo {
-    return PlatformImpl.getDisplays(allocator);
+pub fn getDisplays(p_gpa: Allocator) ![]DisplayInfo {
+    return PlatformImpl.getDisplays(p_gpa);
 }
 
 pub const WindowSize = struct { width: u32, height: u32 };
@@ -221,24 +221,32 @@ pub fn getWindowScaleFactor(window: *Window) f32 {
     return PlatformImpl.getWindowScaleFactor(window);
 }
 
-pub fn getClipboardText(allocator: std.mem.Allocator) ![]const u8 {
-    return PlatformImpl.getClipboardText(allocator);
+pub fn getClipboardText(p_gpa: Allocator) ![]const u8 {
+    return PlatformImpl.getClipboardText(p_gpa);
 }
 
 pub fn setClipboardText(text: []const u8) !void {
     return PlatformImpl.setClipboardText(text);
 }
 
-pub fn openFileDialog(allocator: std.mem.Allocator, title: []const u8, filters: []const []const u8) ?[]const u8 {
+pub fn openFileDialog(
+    p_gpa: Allocator,
+    title: []const u8,
+    filters: []const []const u8,
+) ?[]const u8 {
     if (@hasDecl(PlatformImpl, "openFileDialog")) {
-        return PlatformImpl.openFileDialog(allocator, title, filters);
+        return PlatformImpl.openFileDialog(p_gpa, title, filters);
     }
     return null;
 }
 
-pub fn saveFileDialog(allocator: std.mem.Allocator, title: []const u8, default_name: []const u8) ?[]const u8 {
+pub fn saveFileDialog(
+    p_gpa: Allocator,
+    title: []const u8,
+    default_name: []const u8,
+) ?[]const u8 {
     if (@hasDecl(PlatformImpl, "saveFileDialog")) {
-        return PlatformImpl.saveFileDialog(allocator, title, default_name);
+        return PlatformImpl.saveFileDialog(p_gpa, title, default_name);
     }
     return null;
 }

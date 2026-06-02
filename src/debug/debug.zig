@@ -13,12 +13,22 @@ pub const debug_enabled = builtin.mode == .Debug;
 
 // MARK: DebugManager
 const DebugManagerImpl = @import("DebugManager.zig");
-pub const DebugManager = if (debug_enabled) DebugManagerImpl else DebugManagerStub;
+pub const DebugManager = if (debug_enabled)
+    DebugManagerImpl
+else
+    DebugManagerStub;
+
 const DebugManagerStub = struct {
     draw: DebugDrawStub = .{},
     renderer: DebugRendererStub = .{},
-    pub fn init(allocator: Allocator, renderer: *Renderer, default_font: anytype) @This() {
-        _ = allocator;
+    pub fn init(
+        frame: Allocator,
+        persistent: Allocator,
+        renderer: *Renderer,
+        default_font: anytype,
+    ) @This() {
+        _ = frame;
+        _ = persistent;
         _ = renderer;
         _ = default_font;
         return .{};
@@ -26,7 +36,13 @@ const DebugManagerStub = struct {
     pub fn deinit(self: *@This()) void {
         _ = self;
     }
-
+    pub fn beginFrame(self: *@This()) void {
+        _ = self;
+    }
+    pub fn toggleCategory(self: *@This(), category: anytype) void {
+        _ = self;
+        _ = category;
+    }
     pub fn run(self: *@This(), dt: f32, ctx: RenderContext) void {
         _ = self;
         _ = dt;
@@ -36,7 +52,11 @@ const DebugManagerStub = struct {
 
 // MARK: DebugRender
 const DebugRendererImpl = @import("DebugRenderer.zig");
-pub const DebugRenderer = if (debug_enabled) DebugRendererImpl else DebugRendererStub;
+pub const DebugRenderer = if (debug_enabled)
+    DebugRendererImpl
+else
+    DebugRendererStub;
+
 const DebugRendererStub = struct {
     pub fn init(renderer: *Renderer, default_font: anytype) @This() {
         _ = renderer;
@@ -69,20 +89,24 @@ pub fn renderText(self: *@This(), text: DebugText) void {
 // MARK: DebugDraw
 const draw = @import("DebugDraw.zig");
 pub const DebugArrow = draw.DebugArrow;
+pub const DebugCategory = draw.DebugCategory;
 pub const DebugCircle = draw.DebugCircle;
 pub const DebugLine = draw.DebugLine;
 pub const DebugRect = draw.DebugRect;
 pub const DebugText = draw.DebugText;
 const DebugDrawImpl = draw.DebugDraw;
 const DebugCategoryEnum = draw.DebugCategoryEnum;
-pub const DebugDraw = if (debug_enabled) DebugDrawImpl else DebugDrawStub;
-pub const DebugCategory = draw.DebugCategory;
+pub const DebugDraw = if (debug_enabled)
+    DebugDrawImpl
+else
+    DebugDrawStub;
+
 const DebugDrawStub = struct {
     pub fn update(self: *@This(), dt: f32) void {
         _ = self;
         _ = dt;
     }
-    pub fn toggleCategory(self: *DebugDraw, category: DebugCategoryEnum) void {
+    pub fn toggleCategory(self: *DebugDraw, category: DebugCategory) void {
         _ = self;
         _ = category;
     }
@@ -93,8 +117,9 @@ const DebugDrawStub = struct {
         _ = self;
         _ = cat;
     }
-    pub fn init(allocator: std.mem.Allocator) @This() {
-        _ = allocator;
+    pub fn init(frame: std.mem.Allocator, persistent: std.mem.Allocator) @This() {
+        _ = frame;
+        _ = persistent;
         return .{};
     }
     pub fn deinit(self: *@This()) void {

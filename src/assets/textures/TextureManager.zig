@@ -17,17 +17,17 @@ pub const TextureAsset = struct {
 };
 
 pub const TextureManager = struct {
-    gpa: Allocator,
+    arena: Allocator,
     io: std.Io,
     renderer: *Renderer,
     assets: std.StringHashMap(TextureAsset),
 
-    pub fn init(gpa: Allocator, io: std.Io, renderer: *Renderer) TextureManager {
+    pub fn init(p_gpa: Allocator, io: std.Io, renderer: *Renderer) TextureManager {
         return .{
-            .gpa = gpa,
+            .arena = p_gpa,
             .io = io,
             .renderer = renderer,
-            .assets = std.StringHashMap(TextureAsset).init(gpa),
+            .assets = std.StringHashMap(TextureAsset).init(p_gpa),
         };
     }
 
@@ -35,26 +35,26 @@ pub const TextureManager = struct {
         var iter = self.assets.iterator();
         while (iter.next()) |entry| {
             entry.value_ptr.image.deinit();
-            entry.value_ptr.frame_textures.deinit(self.gpa);
-            self.gpa.free(entry.value_ptr.source_path);
-            self.gpa.free(entry.key_ptr.*);
+            entry.value_ptr.frame_textures.deinit(self.arena);
+            self.arena.free(entry.value_ptr.source_path);
+            self.arena.free(entry.key_ptr.*);
         }
         self.assets.deinit();
     }
 
     pub fn load(self: *TextureManager, name: []const u8, path: []const u8) !void {
-        const abs_path = try std.Io.Dir.cwd().realPathFileAlloc(self.io, path, self.gpa);
-        errdefer self.gpa.free(abs_path);
+        const abs_path = try std.Io.Dir.cwd().realPathFileAlloc(self.io, path, self.arena);
+        errdefer self.arena.free(abs_path);
 
         const mtime = statMtime(self.io, abs_path);
 
-        var image = try ZxlReader.fromFile(self.gpa, self.io, abs_path);
+        var image = try ZxlReader.fromFile(self.arena, self.io, abs_path);
         errdefer image.deinit();
 
         var frame_textures: std.ArrayList(?*Texture) = .empty;
-        errdefer frame_textures.deinit(self.gpa);
+        errdefer frame_textures.deinit(self.arena);
         for (0..image.frames.items.len) |_| {
-            try frame_textures.append(self.gpa, null);
+            try frame_textures.append(self.arena, null);
         }
 
         try self.store(name, image, frame_textures, abs_path, mtime);
@@ -83,7 +83,7 @@ pub const TextureManager = struct {
     pub fn reload(self: *TextureManager, name: []const u8) !void {
         const entry = self.assets.getPtr(name) orelse return error.AssetNotFound;
 
-        var new_image = try ZxlReader.fromFile(self.gpa, self.io, entry.source_path);
+        var new_image = try ZxlReader.fromFile(self.arena, self.io, entry.source_path);
         errdefer new_image.deinit();
 
         // Null out all cached textures (GPU textures will be re-created lazily)
@@ -93,7 +93,7 @@ pub const TextureManager = struct {
         const new_count = new_image.frames.items.len;
         entry.frame_textures.clearRetainingCapacity();
         for (0..new_count) |_| {
-            try entry.frame_textures.append(self.gpa, null);
+            try entry.frame_textures.append(self.arena, null);
         }
 
         entry.image.deinit();
@@ -116,8 +116,6 @@ pub const TextureManager = struct {
         }
     }
 
-    // --- internals ---
-
     fn store(
         self: *TextureManager,
         name: []const u8,
@@ -129,10 +127,10 @@ pub const TextureManager = struct {
         const gop = try self.assets.getOrPut(name);
         if (gop.found_existing) {
             gop.value_ptr.image.deinit();
-            gop.value_ptr.frame_textures.deinit(self.gpa);
-            self.gpa.free(gop.value_ptr.source_path);
+            gop.value_ptr.frame_textures.deinit(self.arena);
+            self.arena.free(gop.value_ptr.source_path);
         } else {
-            gop.key_ptr.* = try self.gpa.dupe(u8, name);
+            gop.key_ptr.* = try self.arena.dupe(u8, name);
         }
         gop.value_ptr.* = .{
             .image = image,

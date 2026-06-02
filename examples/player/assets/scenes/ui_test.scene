@@ -108,6 +108,10 @@
       stroke_color:color #ffffff
       stroke_width:f32 1.0
       visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 2.0
+      half_height:f32 1.0
     [Tag]
       tags:string "marker north"
 
@@ -140,6 +144,10 @@
       stroke_color:color #ffffff
       stroke_width:f32 1.0
       visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.0
+      half_height:f32 2.0
     [Tag]
       tags:string "marker east"
 

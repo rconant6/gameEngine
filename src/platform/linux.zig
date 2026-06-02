@@ -13,7 +13,7 @@ const Proxy = wl.Proxy;
 const handlers = wl.handlers;
 const c = wl.c;
 
-var gpa: Allocator = undefined;
+var persistent: Allocator = undefined;
 var ws: *WaylandState = undefined;
 var active_window: ?*Window = null;
 
@@ -35,7 +35,7 @@ pub const Window = struct {
         c.xdg_surface_destroy(@ptrCast(@alignCast(self.state.xdg_surface.proxy.ptr)));
         c.wl_surface_destroy(@ptrCast(@alignCast(self.state.surface.proxy.ptr)));
 
-        gpa.destroy(self);
+        persistent.destroy(self);
         log.info(.platform, "Linux Window deinit complete", .{});
     }
 
@@ -49,11 +49,11 @@ pub const Window = struct {
     }
 };
 
-pub fn init(alloc: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
+pub fn init(p_gpa: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
     _ = io;
     _ = env;
-    gpa = alloc;
-    ws = try alloc.create(WaylandState);
+    persistent = p_gpa;
+    ws = try p_gpa.create(WaylandState);
     ws.dmafeedback = .{}; // alloc.create doesn't zero-init
     ws.active_events = null;
     ws.mouse_x = 0;
@@ -156,13 +156,13 @@ pub fn deinit() void {
     c.wl_registry_destroy(ws.registry);
     c.wl_display_disconnect(ws.display);
 
-    gpa.destroy(ws);
+    persistent.destroy(ws);
 
     log.info(.platform, "Wayland deinit complete", .{});
 }
 
 pub fn createWindow(config: WindowConfig) !*Window {
-    const win = try gpa.create(Window);
+    const win = try persistent.create(Window);
     win.state.width = config.width;
     win.state.height = config.height;
     win.state.configure_serial = 0;
@@ -173,7 +173,7 @@ pub fn createWindow(config: WindowConfig) !*Window {
     win.state.surface = .{};
     win.state.xdg_surface = .{};
     win.state.xdg_toplevel = .{};
-    win.state.events = try @TypeOf(win.state.events).init(gpa);
+    win.state.events = try @TypeOf(win.state.events).init(persistent);
 
     const compositor: *c.wl_compositor = @ptrCast(@alignCast(ws.compositor.proxy.ptr));
     const surface = c.wl_compositor_create_surface(compositor) orelse return error.SurfaceCreateFailed;
@@ -199,8 +199,8 @@ pub fn createWindow(config: WindowConfig) !*Window {
     win.state.xdg_toplevel.proxy = .{ .ptr = @ptrCast(toplevel), .handler = handlers.onXdgToplevelEvent, .ctx = win };
     win.state.xdg_toplevel.proxy.listen();
 
-    const title_z = try gpa.dupeZ(u8, config.title);
-    defer gpa.free(title_z);
+    const title_z = try persistent.dupeZ(u8, config.title);
+    defer persistent.free(title_z);
     c.xdg_toplevel_set_title(toplevel, title_z.ptr);
 
     if (true) {

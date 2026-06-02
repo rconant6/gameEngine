@@ -2,6 +2,8 @@ const std = @import("std");
 const plat = @import("platform");
 const rend = @import("renderer");
 const debug = @import("debug");
+const math = @import("math");
+const Memory = math.GameMemory;
 const Logger = debug.Logger;
 const log = debug.log;
 
@@ -17,7 +19,7 @@ pub const AppConfig = struct {
 };
 
 pub const App = struct {
-    gpa: std.mem.Allocator,
+    mem: *Memory,
     io: std.Io,
     window: *plat.Window,
     kb: *const plat.Keyboard,
@@ -32,9 +34,12 @@ pub const App = struct {
         env: *std.process.Environ.Map,
         config: AppConfig,
     ) !App {
-        try Logger.init(gpa, io);
+        const mem = try gpa.create(Memory);
+        mem.init(gpa);
 
-        plat.init(gpa, io, env) catch |err| {
+        try Logger.init(mem.persistent, io);
+
+        plat.init(mem.persistent, io, env) catch |err| {
             log.fatal(.platform, "Failed to start platform layer: {any}", .{err});
             @panic("App: platform init failed");
         };
@@ -59,7 +64,7 @@ pub const App = struct {
         const scaled_width: u32 = @intFromFloat(@as(f32, @floatFromInt(window_size.width)) * scale_factor);
         const scaled_height: u32 = @intFromFloat(@as(f32, @floatFromInt(window_size.height)) * scale_factor);
 
-        const renderer = rend.Renderer.init(gpa, io, .{
+        const renderer = rend.Renderer.init(mem.persistent, io, .{
             .width = scaled_width,
             .height = scaled_height,
             .native_handle = plat.getNativeWindowHandle(window),
@@ -74,7 +79,7 @@ pub const App = struct {
         );
 
         return App{
-            .gpa = gpa,
+            .mem = mem,
             .io = io,
             .window = window,
             .kb = plat.getKeyboard(),
@@ -91,6 +96,9 @@ pub const App = struct {
         self.window.deinit();
         plat.deinit();
         Logger.deinit();
+        const backing = self.mem.persistent;
+        self.mem.deinit();
+        backing.destroy(self.mem);
     }
 
     pub fn isRunning(self: *const App) bool {
@@ -98,6 +106,7 @@ pub const App = struct {
     }
 
     pub fn beginFrame(self: *App) !void {
+        self.mem.tickFrame();
         plat.clearInputStates();
         while (plat.pollEvent()) |_| {}
         self.renderer.beginFrame() catch |err| {

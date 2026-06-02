@@ -30,7 +30,7 @@ pub const TriggerSystem = struct {
 
 // NOTE as more triggers are added this needs to expand with it
 pub const TriggerContext = struct {
-    collision_events: ?[]Collision = null,
+    collision_events: ?[]const Collision = null,
     input: ?*const Input = null,
     delta_time: ?f32 = null,
     action_queue: *ActionQueue,
@@ -51,24 +51,21 @@ pub const CollisionTrigger = struct {
     ) !void {
         const collision_events = ctx.collision_events orelse
             return error.NoCollisionEvents;
-        for (collision_events) |*collision| {
-            if (collision.actions_fired) continue;
+        for (collision_events) |collision| {
             try checkEntityCollisionTriggers(
                 world,
                 collision.entity_a,
                 collision.entity_b,
-                collision,
+                &collision,
                 ctx.action_queue,
             );
             try checkEntityCollisionTriggers(
                 world,
                 collision.entity_b,
                 collision.entity_a,
-                collision,
+                &collision,
                 ctx.action_queue,
             );
-
-            collision.actions_fired = true;
         }
     }
 

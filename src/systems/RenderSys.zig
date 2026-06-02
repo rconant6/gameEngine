@@ -3,8 +3,6 @@ const assets = @import("assets");
 const AssetManager = assets.AssetManager;
 const math = @import("math");
 const WorldPoint = math.WorldPoint;
-const db = @import("debug");
-const DebugManager = db.DebugManager;
 const ecs = @import("ecs");
 const Camera = ecs.Camera;
 const Destroy = ecs.Destroy;
@@ -27,12 +25,11 @@ pub fn run(
     asset_manager: *AssetManager,
     active_camera: Entity,
     dt: f32,
-    debugger: *DebugManager,
     logical_width: u32,
     logical_height: u32,
-) void {
-    const camera_loc = world.getComponent(active_camera, Transform) orelse return;
-    const camera = world.getComponent(active_camera, Camera) orelse return;
+) ?RenderContext {
+    const camera_loc = world.getComponent(active_camera, Transform) orelse return null;
+    const camera = world.getComponent(active_camera, Camera) orelse return null;
 
     // Context for world-space rendering (uses scaled/physical dimensions)
     const ctx: RenderContext = .{
@@ -180,5 +177,6 @@ pub fn run(
         );
     }
 
-    debugger.run(dt, ctx);
+    return ctx;
 }
+

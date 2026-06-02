@@ -115,7 +115,7 @@ test "World - findEntitiesByTag with multiple matches" {
     const player = try world.createEntity();
     try world.addComponent(player, Tag, .{ .tags = "player" });
 
-    const entities = world.findEntitiesByTag("enemy");
+    const entities = world.findEntitiesByTag("enemy", testing.allocator);
     defer testing.allocator.free(entities);
 
     try testing.expectEqual(3, entities.len);
@@ -144,7 +144,7 @@ test "World - findEntitiesByTag with no matches" {
     const entity = try world.createEntity();
     try world.addComponent(entity, Tag, .{ .tags = "npc" });
 
-    const entities = world.findEntitiesByTag("player");
+    const entities = world.findEntitiesByTag("player", testing.allocator);
     defer testing.allocator.free(entities);
 
     try testing.expectEqual(0, entities.len);
@@ -161,7 +161,7 @@ test "World - findEntitiesByTag with single match" {
     const enemy = try world.createEntity();
     try world.addComponent(enemy, Tag, .{ .tags = "enemy" });
 
-    const entities = world.findEntitiesByTag("player");
+    const entities = world.findEntitiesByTag("player", testing.allocator);
     defer testing.allocator.free(entities);
 
     try testing.expectEqual(1, entities.len);
@@ -185,7 +185,7 @@ test "World - findEntitiesByPattern with prefix wildcard" {
     const player = try world.createEntity();
     try world.addComponent(player, Tag, .{ .tags = "player" });
 
-    const entities = world.findEntitiesByPattern("enemy*");
+    const entities = world.findEntitiesByPattern("enemy*", testing.allocator);
     defer testing.allocator.free(entities);
 
     try testing.expectEqual(3, entities.len);
@@ -220,7 +220,7 @@ test "World - findEntitiesByPattern with suffix wildcard" {
     const grunt = try world.createEntity();
     try world.addComponent(grunt, Tag, .{ .tags = "enemy_grunt" });
 
-    const entities = world.findEntitiesByPattern("*_boss");
+    const entities = world.findEntitiesByPattern("*_boss", testing.allocator);
     defer testing.allocator.free(entities);
 
     try testing.expectEqual(2, entities.len);
@@ -249,7 +249,7 @@ test "World - findEntitiesByPattern with exact match" {
     const player2 = try world.createEntity();
     try world.addComponent(player2, Tag, .{ .tags = "player2" });
 
-    const entities = world.findEntitiesByPattern("player");
+    const entities = world.findEntitiesByPattern("player", testing.allocator);
     defer testing.allocator.free(entities);
 
     try testing.expectEqual(1, entities.len);
@@ -264,7 +264,7 @@ test "World - findEntitiesByPattern with no matches" {
     const entity = try world.createEntity();
     try world.addComponent(entity, Tag, .{ .tags = "npc" });
 
-    const entities = world.findEntitiesByPattern("enemy*");
+    const entities = world.findEntitiesByPattern("enemy*", testing.allocator);
     defer testing.allocator.free(entities);
 
     try testing.expectEqual(0, entities.len);
@@ -285,13 +285,13 @@ test "World - findEntitiesByPattern with multiple tags per entity" {
     try world.addComponent(entity3, Tag, .{ .tags = "player,friendly" });
 
     // Find all entities with "enemy*" pattern
-    const enemies = world.findEntitiesByPattern("enemy*");
+    const enemies = world.findEntitiesByPattern("enemy*", testing.allocator);
     defer testing.allocator.free(enemies);
 
     try testing.expectEqual(2, enemies.len);
 
     // Find all entities with "*hostile*" pattern
-    const hostiles = world.findEntitiesByPattern("*hostile");
+    const hostiles = world.findEntitiesByPattern("*hostile", testing.allocator);
     defer testing.allocator.free(hostiles);
 
     try testing.expectEqual(2, hostiles.len);
@@ -329,22 +329,22 @@ test "World - comprehensive query scenario" {
     try testing.expectEqual(player.id, found_player.?.id);
 
     // Test findEntitiesByTag - find all hostile entities
-    const hostiles = world.findEntitiesByTag("hostile");
+    const hostiles = world.findEntitiesByTag("hostile", testing.allocator);
     defer testing.allocator.free(hostiles);
     try testing.expectEqual(3, hostiles.len);
 
     // Test findEntitiesByPattern - find all enemies
-    const enemies = world.findEntitiesByPattern("enemy*");
+    const enemies = world.findEntitiesByPattern("enemy*", testing.allocator);
     defer testing.allocator.free(enemies);
     try testing.expectEqual(3, enemies.len);
 
     // Test findEntitiesByPattern - find all collectibles
-    const collectibles = world.findEntitiesByPattern("collectible*");
+    const collectibles = world.findEntitiesByPattern("collectible*", testing.allocator);
     defer testing.allocator.free(collectibles);
     try testing.expectEqual(2, collectibles.len);
 
     // Test findEntitiesByTag - find specific enemy type
-    const grunts = world.findEntitiesByTag("enemy_grunt");
+    const grunts = world.findEntitiesByTag("enemy_grunt", testing.allocator);
     defer testing.allocator.free(grunts);
     try testing.expectEqual(2, grunts.len);
 }

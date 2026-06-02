@@ -35,8 +35,12 @@ pub const Window = struct {
     }
 };
 
-pub fn init(gpa: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
-    _ = gpa;
+pub fn init(
+    p_gpa: Allocator,
+    io: std.Io,
+    env: *std.process.Environ.Map,
+) !void {
+    _ = p_gpa;
     _ = io;
     _ = env;
 

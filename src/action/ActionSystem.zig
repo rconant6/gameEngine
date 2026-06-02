@@ -12,8 +12,10 @@ const CollisionTrigger = triggers.CollisionTrigger;
 const ActionExecutor = @import("ActionExecutor.zig");
 const debug = @import("debug");
 const log = debug.log;
+const math = @import("math");
+const Memory = math.GameMemory;
 
-gpa: Allocator,
+persistent: Allocator,
 action_queue: ActionQueue,
 trigger_systems: ArrayList(TriggerSystem),
 
@@ -36,18 +38,18 @@ fn inputTriggerWrapper(
     try InputTrigger.process(world, ctx);
 }
 
-pub fn init(gpa: Allocator) !Self {
+pub fn init(mem: *Memory) !Self {
     var action_system = Self{
-        .gpa = gpa,
-        .action_queue = ActionQueue.init(gpa),
+        .persistent = mem.persistent,
+        .action_queue = ActionQueue.init(mem.frame),
         .trigger_systems = .empty,
     };
 
-    try action_system.trigger_systems.append(gpa, .{
+    try action_system.trigger_systems.append(mem.persistent, .{
         .sys = &dummy_state,
         .processFn = collisionTriggerWrapper,
     });
-    try action_system.trigger_systems.append(gpa, .{
+    try action_system.trigger_systems.append(mem.persistent, .{
         .sys = &dummy_state,
         .processFn = inputTriggerWrapper,
     });
@@ -56,10 +58,10 @@ pub fn init(gpa: Allocator) !Self {
 }
 pub fn deinit(self: *Self) void {
     log.info(.action, "Action System shutting down...", .{});
-    self.trigger_systems.deinit(self.gpa);
+    self.trigger_systems.deinit(self.persistent);
     self.action_queue.deinit();
 }
 
 pub fn registerTrigger(self: *Self, trigger_system: TriggerSystem) !void {
-    try self.trigger_systems.append(self.gpa, trigger_system);
+    try self.trigger_systems.append(self.persistent, trigger_system);
 }

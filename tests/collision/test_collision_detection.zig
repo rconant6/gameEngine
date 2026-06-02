@@ -282,7 +282,7 @@ test "CollisionDetection: detect collisions in world with two circles" {
     var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
     defer collisions.deinit(gpa);
 
-    try CollisionDetectionSys.detectCollisions(&world, &collisions);
+    try CollisionDetectionSys.detectCollisions(&world, &collisions, testing.allocator);
 
     try testing.expectEqual(@as(usize, 1), collisions.items.len);
     const collision = collisions.items[0];
@@ -320,7 +320,7 @@ test "CollisionDetection: detect no collisions when circles far apart" {
     var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
     defer collisions.deinit(gpa);
 
-    try CollisionDetectionSys.detectCollisions(&world, &collisions);
+    try CollisionDetectionSys.detectCollisions(&world, &collisions, testing.allocator);
 
     try testing.expectEqual(@as(usize, 0), collisions.items.len);
 }
@@ -363,7 +363,7 @@ test "CollisionDetection: detect multiple collisions" {
     var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
     defer collisions.deinit(gpa);
 
-    try CollisionDetectionSys.detectCollisions(&world, &collisions);
+    try CollisionDetectionSys.detectCollisions(&world, &collisions, testing.allocator);
 
     try testing.expectEqual(@as(usize, 2), collisions.items.len);
 }
@@ -393,7 +393,7 @@ test "CollisionDetection: ignore entities without collider" {
     var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
     defer collisions.deinit(gpa);
 
-    try CollisionDetectionSys.detectCollisions(&world, &collisions);
+    try CollisionDetectionSys.detectCollisions(&world, &collisions, testing.allocator);
 
     try testing.expectEqual(@as(usize, 0), collisions.items.len);
 }
@@ -426,7 +426,7 @@ test "CollisionDetection: collision events contain correct entity IDs" {
     var collisions: std.ArrayList(CollisionDetectionSys.Collision) = .empty;
     defer collisions.deinit(gpa);
 
-    try CollisionDetectionSys.detectCollisions(&world, &collisions);
+    try CollisionDetectionSys.detectCollisions(&world, &collisions, testing.allocator);
 
     try testing.expectEqual(@as(usize, 1), collisions.items.len);
     const collision = collisions.items[0];

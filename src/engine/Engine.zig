@@ -1,6 +1,5 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const ArrayList = std.ArrayList;
 const build_options = @import("build_options");
 const App = @import("app").App;
 const platform = @import("platform");
@@ -8,6 +7,7 @@ const Input = platform.Input;
 const KeyCode = platform.KeyCode;
 const math = @import("math");
 const V2 = math.V2;
+const Memory = math.GameMemory;
 const renderer = @import("renderer");
 const Color = renderer.Color;
 const Colors = renderer.Colors;
@@ -80,12 +80,12 @@ const PerformanceMetrics = struct {
 
 pub const Engine = struct {
     app: *App,
-    gpa: Allocator,
+    mem: *Memory,
     io: std.Io,
     input: Input,
     assets: assets.AssetManager,
     world: ecs.World,
-    collision_events: ArrayList(Collision),
+    collision_events: []const Collision,
     action_system: ActionSystem,
     running: bool,
 
@@ -99,7 +99,7 @@ pub const Engine = struct {
     active_camera_entity: Entity,
 
     pub fn init(app: *App) *Engine {
-        const gpa = app.gpa;
+        const mem = app.mem;
         const io = app.io;
         const width = app.logical_width;
         const height = app.logical_height;
@@ -107,12 +107,24 @@ pub const Engine = struct {
         const f_height: f32 = @floatFromInt(height);
         const aspect_ratio = f_width / f_height;
 
-        var world = World.init(gpa) catch |err| fatal("ECS World", err);
+        var world = World.init(mem.persistent) catch |e| fatal(
+            "ECS World",
+            e,
+        );
         log.info(.engine, "ECS(world) initialized", .{});
 
-        const camera = world.createEntity() catch |err| fatal("Main Camera Entity", err);
-        world.addComponent(camera, ActiveCamera, .{}) catch |err| fatal("ActiveCamera Component", err);
-        world.addComponent(camera, Transform, .{}) catch |err| fatal("Transform Component", err);
+        const camera = world.createEntity() catch |e| fatal(
+            "Main Camera Entity",
+            e,
+        );
+        world.addComponent(camera, ActiveCamera, .{}) catch |e| fatal(
+            "ActiveCamera Component",
+            e,
+        );
+        world.addComponent(camera, Transform, .{}) catch |e| fatal(
+            "Transform Component",
+            e,
+        );
         world.addComponent(camera, Camera, .{
             .ortho_size = 25.0,
             .viewport = .{
@@ -121,29 +133,38 @@ pub const Engine = struct {
                 .half_height = 1.0,
             },
             .priority = 1,
-        }) catch |err| fatal("Camera Component", err);
+        }) catch |e| fatal("Camera Component", e);
 
         // Renderer pointer is re-seated to &engine.renderer after engine.* is assigned below.
         // Pass undefined here — TextureManager never dereferences the renderer pointer until first
         // texture upload, which happens after init is complete.
-        const asset_manager = AssetManager.init(gpa, io, undefined) catch |err| fatal("Asset Manager", err);
+        const asset_manager = AssetManager.init(app.mem, io, undefined) catch |e| fatal(
+            "Asset Manager",
+            e,
+        );
         log.info(.engine, "ASSET MANAGER initialized", .{});
-        const action_system = ActionSystem.init(gpa) catch |err| fatal("Action System", err);
+        const action_system = ActionSystem.init(app.mem) catch |e| fatal(
+            "Action System",
+            e,
+        );
         log.info(.engine, "ACTIONS SYSTEM initialized", .{});
 
-        const engine = gpa.create(Engine) catch |err| fatal("Engine Memory Allocation", err);
+        const engine = mem.persistent.create(Engine) catch |e| fatal(
+            "Engine Memory Allocation",
+            e,
+        );
 
         engine.* = Engine{
             .app = app,
-            .gpa = gpa,
+            .mem = app.mem,
             .io = io,
             .input = .init(),
             .assets = asset_manager,
             .world = world,
             .running = true,
             .action_system = action_system,
-            .scene_manager = SceneManager.init(gpa, io),
-            .collision_events = .empty,
+            .scene_manager = SceneManager.init(mem.persistent, io),
+            .collision_events = &.{},
             .instantiator = undefined,
             .template_manager = undefined,
             .debugger = undefined,
@@ -152,12 +173,24 @@ pub const Engine = struct {
 
         // Re-seat the renderer pointer to the stable heap address now that engine.* is assigned
         engine.assets.textures.renderer = &engine.app.renderer;
-        engine.instantiator = .init(gpa, &engine.world, &engine.assets);
-        engine.template_manager = .init(gpa, io, &engine.instantiator);
+        engine.instantiator = .init(
+            mem.persistent,
+            &engine.world,
+            &engine.assets,
+        );
+        engine.template_manager = .init(mem.persistent, io, &engine.instantiator);
         engine.world.template_manager = &engine.template_manager;
 
-        const default_font = engine.assets.getFont("__default__") orelse fatal("Default Font Loading", error.FontNotFound);
-        engine.debugger = .init(gpa, &engine.app.renderer, default_font);
+        const default_font = engine.assets.getFont("__default__") orelse fatal(
+            "Default Font Loading",
+            error.FontNotFound,
+        );
+        engine.debugger = .init(
+            mem.frame,
+            mem.persistent,
+            &engine.app.renderer,
+            default_font,
+        );
 
         log.info(.engine, "Engine successfully started", .{});
         return engine;
@@ -178,9 +211,8 @@ pub const Engine = struct {
     }
 
     pub fn deinit(self: *Engine) void {
-        const gpa = self.gpa;
+        const mem = self.mem;
         self.action_system.deinit();
-        self.collision_events.deinit(self.gpa);
         self.scene_manager.deinit();
         self.assets.deinit();
         self.world.deinit();
@@ -188,7 +220,7 @@ pub const Engine = struct {
         self.template_manager.deinit();
         self.debugger.deinit();
         log.info(.engine, "All systems shutdown", .{});
-        gpa.destroy(self);
+        mem.persistent.destroy(self);
     }
 
     pub fn shouldClose(self: *const Engine) bool {
@@ -200,27 +232,27 @@ pub const Engine = struct {
             self.running = false;
         }
         if (self.input.isPressed(KeyCode.F1)) {
-            self.debugger.draw.toggleCategory(.collision);
+            self.debugger.toggleCategory(.collision);
             log.info(.debug, "{s} info toggled", .{@tagName(.collision)});
         }
         if (self.input.isPressed(KeyCode.F2)) {
-            self.debugger.draw.toggleCategory(.velocity);
+            self.debugger.toggleCategory(.velocity);
             log.info(.debug, "{s} info toggled", .{@tagName(.velocity)});
         }
         if (self.input.isPressed(KeyCode.F3)) {
-            self.debugger.draw.toggleCategory(.entity_info);
+            self.debugger.toggleCategory(.entity_info);
             log.info(.debug, "{s} info toggled", .{@tagName(.entity_info)});
         }
         if (self.input.isPressed(KeyCode.F4)) {
-            self.debugger.draw.toggleCategory(.fps);
+            self.debugger.toggleCategory(.fps);
             log.info(.debug, "{s} info toggled", .{@tagName(.fps)});
         }
         if (self.input.isPressed(KeyCode.F5)) {
-            self.debugger.draw.toggleCategory(.grid);
+            self.debugger.toggleCategory(.grid);
             log.info(.debug, "{s} info toggled", .{@tagName(.grid)});
         }
         if (self.input.isPressed(KeyCode.F6)) {
-            self.debugger.draw.toggleCategory(.custom);
+            self.debugger.toggleCategory(.custom);
             log.info(.debug, "{s} info toggled", .{@tagName(.custom)});
         }
     }
@@ -239,17 +271,20 @@ pub const Engine = struct {
             };
         }
 
+        self.collision_events = &.{};
         if (opts.movement) Systems.movementSystem(&self.world, dt, &self.debugger);
         if (opts.physics) Systems.physicsSystem(&self.world, dt);
-        if (opts.collision) Systems.collisionDetectionSystem(
-            &self.world,
-            &self.collision_events,
-            &self.debugger,
-        );
+        if (opts.collision) {
+            self.collision_events = Systems.collisionDetectionSystem(
+                &self.world,
+                self.mem.frame,
+                &self.debugger,
+            );
+        }
 
         if (opts.actions) {
             const context: TriggerContext = .{
-                .collision_events = self.collision_events.items,
+                .collision_events = self.collision_events,
                 .input = &self.input,
                 .delta_time = dt,
                 .action_queue = &self.action_system.action_queue,
@@ -262,31 +297,39 @@ pub const Engine = struct {
 
     // NOTE: helper for just rendering the current frame and state
     fn render(self: *Engine, dt: f32) void {
-        Systems.renderSystem(
+        const maybe_ctx = Systems.renderSystem(
             &self.app.renderer,
             &self.world,
             &self.assets,
             self.active_camera_entity,
             dt,
-            &self.debugger,
             self.app.logical_width,
             self.app.logical_height,
         );
-        if (debug_enabled) {
-            Systems.debugEntityInfoSystem(&self.world, &self.debugger);
-            var buf: [64]u8 = undefined;
-            const fps: f32 = self.performance_metrics.current_fps;
-            const color = if (fps > 55) Colors.GREEN else if (fps > 30 and fps < 55) Colors.YELLOW else Colors.RED;
-            const fps_text = std.fmt.bufPrint(&buf, "FPS: {d:.1}", .{fps}) catch "FPS: --";
-            self.debugger.draw.addText(.{
-                .text = self.gpa.dupe(u8, fps_text) catch "",
-                .position = .{ .x = 10.0, .y = 9.0 },
-                .color = color,
-                .size = 0.5,
-                .duration = null,
-                .cat = DebugCategory.single(.fps),
-                .owns_text = true,
-            });
+        if (maybe_ctx) |ctx| {
+            if (debug_enabled) {
+                Systems.debugEntityInfoSystem(
+                    &self.world,
+                    self.mem.frame,
+                    &self.debugger,
+                );
+                var buf: [64]u8 = undefined;
+                const fps: f32 = self.performance_metrics.current_fps;
+                const color = if (fps > 55) Colors.GREEN else if (fps > 30 and fps < 55) Colors.YELLOW else Colors.RED;
+                const fps_text = std.fmt.bufPrint(
+                    &buf,
+                    "FPS: {d:.1}",
+                    .{fps},
+                ) catch "FPS: --";
+                self.debugger.draw.addText(.{
+                    .text = self.mem.frameDupe(u8, fps_text) catch "",
+                    .position = .{ .x = 10.0, .y = 9.0 },
+                    .color = color,
+                    .size = 0.5,
+                    .cat = DebugCategory.single(.fps),
+                });
+            }
+            self.debugger.run(dt, ctx);
         }
     }
 
@@ -300,6 +343,8 @@ pub const Engine = struct {
         self.app.beginFrame() catch |err| {
             log.err(.engine, "BeginFrame failed: {any}", .{err});
         };
+        self.collision_events = &.{};
+        self.debugger.beginFrame();
         self.input.keyboard = platform.getKeyboard();
         self.input.mouse = platform.getMouse();
     }

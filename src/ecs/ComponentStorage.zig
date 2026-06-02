@@ -33,7 +33,7 @@ pub fn ComponentStorage(comptime T: type) type {
         sparse: ArrayList(?usize), // entity_id -> dense index
         dense: ArrayList(T), // component data
         entities: ArrayList(usize), // dense_index -> entity_id
-        gpa: Allocator,
+        persistent: Allocator,
 
         const DEFAULT_SPARSE_CAPACITY = 1024;
 
@@ -49,26 +49,26 @@ pub fn ComponentStorage(comptime T: type) type {
                 .sparse = sparse_arry,
                 .dense = .empty,
                 .entities = .empty,
-                .gpa = alloc,
+                .persistent = alloc,
             };
         }
         pub fn deinit(self: *@This()) void {
-            self.sparse.deinit(self.gpa);
-            self.dense.deinit(self.gpa);
-            self.entities.deinit(self.gpa);
+            self.sparse.deinit(self.persistent);
+            self.dense.deinit(self.persistent);
+            self.entities.deinit(self.persistent);
         }
 
         pub fn add(self: *@This(), entity_id: usize, component: T) !void {
             if (entity_id >= self.sparse.items.len) {
                 const old_len = self.sparse.items.len;
-                try self.sparse.resize(self.gpa, entity_id + 1);
+                try self.sparse.resize(self.persistent, entity_id + 1);
                 @memset(self.sparse.items[old_len..], null);
             }
             if (self.sparse.items[entity_id] != null) return error.ComponentAlreadyExists;
 
             const dense_index = self.dense.items.len;
-            try self.dense.append(self.gpa, component);
-            try self.entities.append(self.gpa, entity_id);
+            try self.dense.append(self.persistent, component);
+            try self.entities.append(self.persistent, entity_id);
             self.sparse.items[entity_id] = dense_index;
         }
         pub fn remove(self: *@This(), entity_id: usize) void {
@@ -85,7 +85,7 @@ pub fn ComponentStorage(comptime T: type) type {
                 if (deinit_fn.params.len == 1) {
                     self.dense.items[dense_index].deinit();
                 } else if (deinit_fn.params.len == 2) {
-                    self.dense.items[dense_index].deinit(self.gpa);
+                    self.dense.items[dense_index].deinit(self.persistent);
                 }
             }
 

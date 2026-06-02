@@ -6,6 +6,7 @@ const V2 = core.V2;
 const render = @import("renderer");
 const Color = render.Color;
 const Colors = render.Colors;
+const log = @import("log.zig");
 
 pub const Indefinate = std.math.inf(f32);
 // NOTE: This is the 'registry' for the debugger
@@ -44,7 +45,13 @@ fn GenerateDebugCategory(comptime CategoryEnum: type) type {
         field_attrs[field_count] = .{ .default_value_ptr = &zero_val };
     }
 
-    const PackedStruct = @Struct(.@"packed", null, &field_names, &field_types, &field_attrs);
+    const PackedStruct = @Struct(
+        .@"packed",
+        null,
+        &field_names,
+        &field_types,
+        &field_attrs,
+    );
 
     return struct {
         bits: PackedStruct,
@@ -114,7 +121,8 @@ fn GenerateDebugCategory(comptime CategoryEnum: type) type {
 }
 
 pub const DebugDraw = struct {
-    gpa: Allocator,
+    frame: Allocator,      // texts list backing, cleared each frame
+    persistent: Allocator, // shape list backing, survives frame arena reset
     arrows: ArrayList(DebugArrow),
     circles: ArrayList(DebugCircle),
     lines: ArrayList(DebugLine),
@@ -128,7 +136,7 @@ pub const DebugDraw = struct {
         updateShapeList(&self.circles, dt);
         updateShapeList(&self.lines, dt);
         updateShapeList(&self.rects, dt);
-        updateTextList(self, dt);
+        updateTextList(self);
     }
     fn updateShapeList(list: anytype, dt: f32) void {
         var i: usize = 0;
@@ -156,89 +164,10 @@ pub const DebugDraw = struct {
         }
     }
 
-    fn updateTextList(self: *DebugDraw, dt: f32) void {
-        var i: usize = 0;
-        while (i < self.texts.items.len) {
-            var text = &self.texts.items[i];
-
-            if (text.duration == null) {
-                if (text.owns_text) self.gpa.free(text.text);
-                _ = self.texts.swapRemove(i);
-                continue;
-            }
-
-            if (std.math.isInf(text.duration.?)) {
-                i += 1;
-                continue;
-            }
-
-            text.duration = text.duration.? - dt;
-
-            if (text.duration.? <= 0) {
-                if (text.owns_text) self.gpa.free(text.text);
-                _ = self.texts.swapRemove(i);
-                continue;
-            }
-
-            i += 1;
-        }
+    fn updateTextList(self: *DebugDraw) void {
+        self.texts.clearRetainingCapacity();
     }
 
-    pub fn toggleCategory(self: *DebugDraw, category: DebugCategoryEnum) void {
-        var cat_name: []const u8 = undefined;
-        var is_enabled: bool = undefined;
-
-        if (category == .collision) {
-            self.visible_categories.bits.collision = !self.visible_categories.bits.collision;
-            cat_name = "Collision";
-            is_enabled = self.visible_categories.bits.collision;
-        } else if (category == .velocity) {
-            self.visible_categories.bits.velocity = !self.visible_categories.bits.velocity;
-            cat_name = "Velocity";
-            is_enabled = self.visible_categories.bits.velocity;
-        } else if (category == .entity_info) {
-            self.visible_categories.bits.entity_info = !self.visible_categories.bits.entity_info;
-            cat_name = "Entity Info";
-            is_enabled = self.visible_categories.bits.entity_info;
-        } else if (category == .grid) {
-            self.visible_categories.bits.grid = !self.visible_categories.bits.grid;
-            cat_name = "Grid";
-            is_enabled = self.visible_categories.bits.grid;
-        } else if (category == .fps) {
-            self.visible_categories.bits.fps = !self.visible_categories.bits.fps;
-            cat_name = "FPS";
-            is_enabled = self.visible_categories.bits.fps;
-        } else if (category == .custom) {
-            self.visible_categories.bits.custom = !self.visible_categories.bits.custom;
-            cat_name = "Custom";
-            is_enabled = self.visible_categories.bits.custom;
-        } else {
-            return;
-        }
-
-        // Create notification message
-        const status = if (is_enabled) "ON" else "OFF";
-        const color = if (is_enabled) Colors.GREEN else Colors.RED;
-
-        const message = std.fmt.allocPrint(
-            self.gpa,
-            "{s}: {s}",
-            .{ cat_name, status },
-        ) catch return;
-
-        self.addText(.{
-            .text = message,
-            .position = .{ .x = 10, .y = 8 },
-            .color = color,
-            .size = 0.25,
-            .duration = 1.5,
-            .cat = DebugCategory.single(.custom),
-            .owns_text = true,
-        });
-        // }) catch {
-        //     self.gpa.free(message);
-        // };
-    }
     pub fn clear(self: *DebugDraw) void {
         self.arrows.clearRetainingCapacity();
         self.circles.clearRetainingCapacity();
@@ -265,24 +194,25 @@ pub const DebugDraw = struct {
     }
 
     pub fn addArrow(self: *DebugDraw, arrow: DebugArrow) void {
-        self.arrows.append(self.gpa, arrow) catch {};
+        self.arrows.append(self.persistent, arrow) catch {};
     }
     pub fn addCircle(self: *DebugDraw, circle: DebugCircle) void {
-        self.circles.append(self.gpa, circle) catch {};
+        self.circles.append(self.persistent, circle) catch {};
     }
     pub fn addLine(self: *DebugDraw, line: DebugLine) void {
-        self.lines.append(self.gpa, line) catch {};
+        self.lines.append(self.persistent, line) catch {};
     }
     pub fn addRect(self: *DebugDraw, rect: DebugRect) void {
-        self.rects.append(self.gpa, rect) catch {};
+        self.rects.append(self.persistent, rect) catch {};
     }
     pub fn addText(self: *DebugDraw, text: DebugText) void {
-        self.texts.append(self.gpa, text) catch {};
+        self.texts.append(self.frame, text) catch {};
     }
 
-    pub fn init(allocator: Allocator) DebugDraw {
+    pub fn init(frame: Allocator, persistent: Allocator) DebugDraw {
         return .{
-            .gpa = allocator,
+            .frame = frame,
+            .persistent = persistent,
             .arrows = .empty,
             .circles = .empty,
             .lines = .empty,
@@ -293,16 +223,11 @@ pub const DebugDraw = struct {
     }
 
     pub fn deinit(self: *DebugDraw) void {
-        self.arrows.deinit(self.gpa);
-        self.circles.deinit(self.gpa);
-        self.lines.deinit(self.gpa);
-        self.rects.deinit(self.gpa);
-        for (self.texts.items) |*ts| {
-            if (ts.owns_text) {
-                self.gpa.free(ts.text);
-            }
-        }
-        self.texts.deinit(self.gpa);
+        self.arrows.deinit(self.persistent);
+        self.circles.deinit(self.persistent);
+        self.lines.deinit(self.persistent);
+        self.rects.deinit(self.persistent);
+        self.texts.deinit(self.frame);
     }
 };
 
@@ -346,7 +271,5 @@ pub const DebugText = struct {
     position: V2,
     color: Color,
     size: f32,
-    duration: ?f32 = null,
     cat: DebugCategory,
-    owns_text: bool = false,
 };

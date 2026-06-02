@@ -43,7 +43,7 @@ test "E2E: create world, add entities, detect collisions" {
     var collision_events: std.ArrayList(Collision) = .empty;
     defer collision_events.deinit(gpa);
 
-    try CollisionDetectionSys.detectCollisions(&world, &collision_events);
+    try CollisionDetectionSys.detectCollisions(&world, &collision_events, testing.allocator);
 
     try testing.expectEqual(@as(usize, 1), collision_events.items.len);
     try testing.expectApproxEqAbs(@as(f32, 4.0), collision_events.items[0].penetration, 0.001);
@@ -95,7 +95,7 @@ test "E2E: physics simulation with collisions" {
     var collision_events: std.ArrayList(Collision) = .empty;
     defer collision_events.deinit(gpa);
 
-    try CollisionDetectionSys.detectCollisions(&world, &collision_events);
+    try CollisionDetectionSys.detectCollisions(&world, &collision_events, testing.allocator);
 
     // Ball should not be colliding yet (moved 0.5 units, gap is 10 - 4 = 6)
     try testing.expectEqual(@as(usize, 0), collision_events.items.len);
@@ -113,7 +113,7 @@ test "E2E: physics simulation with collisions" {
 
     // Now check for collision
     collision_events.clearRetainingCapacity();
-    try CollisionDetectionSys.detectCollisions(&world, &collision_events);
+    try CollisionDetectionSys.detectCollisions(&world, &collision_events, testing.allocator);
 
     // Should now be colliding
     try testing.expect(collision_events.items.len > 0);
@@ -160,7 +160,7 @@ test "E2E: multiple entities with different collision shapes" {
     var collision_events: std.ArrayList(Collision) = .empty;
     defer collision_events.deinit(gpa);
 
-    try CollisionDetectionSys.detectCollisions(&world, &collision_events);
+    try CollisionDetectionSys.detectCollisions(&world, &collision_events, testing.allocator);
 
     // Circle1 and Circle2 should be colliding (distance 5, radii sum 6)
     try testing.expect(collision_events.items.len >= 1);
@@ -196,7 +196,7 @@ test "E2E: scale affects collision detection" {
     var collision_events: std.ArrayList(Collision) = .empty;
     defer collision_events.deinit(gpa);
 
-    try CollisionDetectionSys.detectCollisions(&world, &collision_events);
+    try CollisionDetectionSys.detectCollisions(&world, &collision_events, testing.allocator);
 
     // Distance: 10, effective radii: 2.0 + 8.0 = 10.0, so touching
     try testing.expect(collision_events.items.len >= 1);
@@ -279,7 +279,7 @@ test "E2E: component removal and collision detection" {
     defer collision_events.deinit(gpa);
 
     // Should have collision
-    try CollisionDetectionSys.detectCollisions(&world, &collision_events);
+    try CollisionDetectionSys.detectCollisions(&world, &collision_events, testing.allocator);
     try testing.expect(collision_events.items.len > 0);
 
     // Remove collider from e2
@@ -287,7 +287,7 @@ test "E2E: component removal and collision detection" {
 
     // Clear and recheck
     collision_events.clearRetainingCapacity();
-    try CollisionDetectionSys.detectCollisions(&world, &collision_events);
+    try CollisionDetectionSys.detectCollisions(&world, &collision_events, testing.allocator);
 
     // Should have no collision
     try testing.expectEqual(@as(usize, 0), collision_events.items.len);
@@ -322,7 +322,7 @@ test "E2E: entity destruction and collision detection" {
     defer collision_events.deinit(gpa);
 
     // Should have collision
-    try CollisionDetectionSys.detectCollisions(&world, &collision_events);
+    try CollisionDetectionSys.detectCollisions(&world, &collision_events, testing.allocator);
     try testing.expect(collision_events.items.len > 0);
 
     // Destroy entity
@@ -330,7 +330,7 @@ test "E2E: entity destruction and collision detection" {
 
     // Clear and recheck
     collision_events.clearRetainingCapacity();
-    try CollisionDetectionSys.detectCollisions(&world, &collision_events);
+    try CollisionDetectionSys.detectCollisions(&world, &collision_events, testing.allocator);
 
     // Should have no collision
     try testing.expectEqual(@as(usize, 0), collision_events.items.len);
@@ -408,7 +408,7 @@ test "E2E: collision normal calculation with V2" {
     var collision_events: std.ArrayList(Collision) = .empty;
     defer collision_events.deinit(gpa);
 
-    try CollisionDetectionSys.detectCollisions(&world, &collision_events);
+    try CollisionDetectionSys.detectCollisions(&world, &collision_events, testing.allocator);
 
     try testing.expect(collision_events.items.len > 0);
 
@@ -450,7 +450,7 @@ test "E2E: stress test with many entities" {
     var collision_events: std.ArrayList(Collision) = .empty;
     defer collision_events.deinit(gpa);
 
-    try CollisionDetectionSys.detectCollisions(&world, &collision_events);
+    try CollisionDetectionSys.detectCollisions(&world, &collision_events, testing.allocator);
 
     // With spacing of 2.0 and radius 1.5, adjacent circles overlap
     // Should have many collisions

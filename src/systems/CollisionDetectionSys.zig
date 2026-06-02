@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const ecs = @import("ecs");
 const Collider = ecs.Collider;
@@ -10,6 +11,7 @@ pub const Collision = ecs.Collision;
 const db = @import("debug");
 const DebugCategory = db.DebugCategory;
 const DebugManager = db.DebugManager;
+const log = db.log;
 const rend = @import("renderer");
 const Colors = rend.Colors;
 const math = @import("math");
@@ -23,12 +25,12 @@ pub const CollisionData = struct {
 
 pub fn run(
     world: *World,
-    collisions: anytype,
+    frame: Allocator,
     debugger: *DebugManager,
-) void {
-    collisions.clearRetainingCapacity();
-    detectCollisions(world, collisions) catch {
-        // TODO: proper logging
+) []const Collision {
+    var events: std.ArrayList(Collision) = .empty;
+    detectCollisions(world, &events, frame) catch |e| {
+        log.err(.systems, "Failure in detect collisions: {t}", .{e});
     };
 
     // DEBUG
@@ -42,7 +44,7 @@ pub fn run(
                 debugger.draw.addCircle(.{
                     .origin = circle.origin.add(transform.position),
                     .radius = circle.radius * transform.scale,
-                    .color = Colors.GREEN,
+                    .color = Colors.PURPLE,
                     .filled = false,
                     .duration = null,
                     .cat = DebugCategory.single(.collision),
@@ -55,7 +57,7 @@ pub fn run(
                 debugger.draw.addRect(.{
                     .min = .{ .x = pos.x - hw, .y = pos.y - hh },
                     .max = .{ .x = pos.x + hw, .y = pos.y + hh },
-                    .color = Colors.GREEN,
+                    .color = Colors.PURPLE,
                     .filled = false,
                     .duration = null,
                     .cat = DebugCategory.single(.collision),
@@ -63,7 +65,7 @@ pub fn run(
             },
         }
     }
-    for (collisions.items) |collision| {
+    for (events.items) |collision| {
         debugger.draw.addCircle(.{
             .origin = collision.point,
             .radius = 0.1,
@@ -82,20 +84,23 @@ pub fn run(
             .cat = DebugCategory.single(.collision),
         });
     }
+
+    return events.toOwnedSlice(frame) catch &.{};
 }
 
 // MARK: Collision Detection Functions
 pub fn detectCollisions(
     world: *World,
     collision_events: *ArrayList(Collision),
+    frame: Allocator,
 ) !void {
     var query = world.query(.{ Transform, Collider });
     const QueryType = @TypeOf(query);
     const Entry = QueryType.Entry;
     var entities: ArrayList(Entry) = .empty;
-    defer entities.deinit(world.gpa);
+    defer entities.deinit(frame);
     while (query.next()) |entry| {
-        try entities.append(world.gpa, entry);
+        try entities.append(frame, entry);
     }
 
     for (entities.items, 0..) |entity_a, i| {
@@ -115,7 +120,7 @@ pub fn detectCollisions(
                                 shape_b,
                                 transform_b.*,
                             )) |hit| {
-                                try collision_events.append(world.gpa, .{
+                                try collision_events.append(frame, .{
                                     .entity_a = entity_a.entity,
                                     .entity_b = entity_b.entity,
                                     .point = hit.point,

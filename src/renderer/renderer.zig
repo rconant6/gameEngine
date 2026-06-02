@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const math = @import("math");
 pub const V2 = math.V2;
 pub const WorldPoint = math.WorldPoint;
@@ -81,8 +82,8 @@ pub const Renderer = struct {
     pub const Device = BackendImpl.Device;
     pub const Texture = BackendImpl.Texture;
 
-    pub fn init(gpa: std.mem.Allocator, io: std.Io, config: RendererConfig) !Renderer {
-        const backend = try BackendImpl.init(gpa, io, config);
+    pub fn init(p_gpa: Allocator, io: std.Io, config: RendererConfig) !Renderer {
+        const backend = try BackendImpl.init(p_gpa, io, config);
         return .{
             .backend = backend,
             .width = config.width,
