@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const ViewMap = std.StringArrayHashMapUnmanaged(RegionConfig);
 const WidgetNode = @import("widgets/WidgetNode.zig");
 const UIManager = @import("UIManager.zig");
@@ -18,7 +19,8 @@ pub const Region = struct {
     width: f32,
     height: f32,
 };
-pub const BuildFn = *const fn (std.mem.Allocator, ?*const anyopaque) *WidgetNode;
+
+pub const BuildFn = *const fn (Allocator, ?*const anyopaque) *WidgetNode;
 
 const RegionConfig = struct {
     layout: Region,
@@ -29,7 +31,7 @@ const RegionConfig = struct {
 
 pub const UILayer = struct {
     views: ViewMap,
-    gpa: std.mem.Allocator,
+    persistent: std.mem.Allocator,
 
     pub fn addView(
         self: *UILayer,
@@ -38,10 +40,10 @@ pub const UILayer = struct {
         builder: BuildFn,
         opts: struct { interactive: bool = true },
     ) void {
-        self.views.put(self.gpa, name, .{
+        self.views.put(self.persistent, name, .{
             .layout = layout,
             .builder = builder,
-            .manager = UIManager.init(self.gpa),
+            .manager = UIManager.init(self.persistent),
             .interactive = opts.interactive,
         }) catch |err| {
             log.err(.ui, "Unable to add view {s}: {any}", .{ name, err });
@@ -84,16 +86,16 @@ pub const UILayer = struct {
     }
 
     pub fn allocator(self: *const UILayer) std.mem.Allocator {
-        return self.gpa;
+        return self.persistent;
     }
-    pub fn init(gpa: std.mem.Allocator) UILayer {
+    pub fn init(persistent: std.mem.Allocator) UILayer {
         return .{
             .views = .empty,
-            .gpa = gpa,
+            .persistent = persistent,
         };
     }
     pub fn deinit(self: *UILayer) void {
         for (self.views.values()) |*v| v.manager.deinit();
-        self.views.deinit(self.gpa);
+        self.views.deinit(self.persistent);
     }
 };

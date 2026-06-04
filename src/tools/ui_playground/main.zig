@@ -70,6 +70,8 @@ pub fn main(init: std.process.Init) !void {
     defer test9.deinit();
     var test10 = ui.UIManager.init(gpa);
     defer test10.deinit();
+    var test11 = ui.UIManager.init(gpa);
+    defer test11.deinit();
 
     while (app.isRunning()) {
         try app.beginFrame();
@@ -369,6 +371,70 @@ pub fn main(init: std.process.Init) !void {
                 app.mouse.buttons.isReleased(.Left),
             );
             test10.render(&app.renderer, &font, ctx);
+        }
+
+        // ────────────────────────────────────────
+        // Test 11: ListItem — hierarchy list simulation
+        // Expect: vstack of list items, "Bouncer" highlighted
+        //         as selected, child entities indented,
+        //         hover/press states active
+        // ────────────────────────────────────────
+        test11.rebuild();
+        {
+            const a = test11.allocator();
+            const normal_colors: ui.ListItem.ListItemColors = .{
+                .normal = Colors.UI_BUTTON_NORMAL,
+                .hovered = Colors.UI_BUTTON_HOVER,
+                .selected = Colors.UI_BUTTON_PRESSED,
+                .text = Colors.UI_BUTTON_TEXT,
+                .text_selected = Colors.WHITE,
+            };
+            const selected_colors: ui.ListItem.ListItemColors = .{
+                .normal = Colors.UI_BUTTON_PRESSED,
+                .hovered = Colors.UI_BUTTON_PRESSED,
+                .selected = Colors.UI_BUTTON_PRESSED,
+                .text = Colors.WHITE,
+                .text_selected = Colors.WHITE,
+            };
+            test11.setRoot(
+                make.panel(a, make.vstack(a, &.{
+                    make.listItem(a, "li_scene", "GameScene", .{
+                        .colors = normal_colors,
+                        .indent = 0,
+                        .selected = false,
+                        .font_scale = 18.0,
+                    }),
+                    make.listItem(a, "li_bouncer", "Bouncer", .{
+                        .colors = selected_colors,
+                        .indent = 1,
+                        .selected = true,
+                        .font_scale = 18.0,
+                    }),
+                    make.listItem(a, "li_player", "Player", .{
+                        .colors = normal_colors,
+                        .indent = 1,
+                        .selected = false,
+                        .font_scale = 18.0,
+                    }),
+                    make.listItem(a, "li_ground", "Ground", .{
+                        .colors = normal_colors,
+                        .indent = 2,
+                        .selected = false,
+                        .font_scale = 18.0,
+                    }),
+                }, .{ .spacing = 2 }), .{
+                    .background = Colors.DARK_GRAY,
+                    .padding = ui.EdgeInsets.all(6),
+                }),
+            );
+            test11.layoutAt(880, 360, 220, 200);
+            test11.processInput(
+                app.mouse.position.x,
+                app.mouse.position.y,
+                app.mouse.buttons.isPressed(.Left),
+                app.mouse.buttons.isReleased(.Left),
+            );
+            test11.render(&app.renderer, &font, ctx);
         }
 
         try app.endFrame();

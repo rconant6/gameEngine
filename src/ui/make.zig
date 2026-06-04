@@ -18,6 +18,7 @@ const Divider = widgets.Divider;
 const Grid = widgets.Grid;
 const HStack = widgets.HStack;
 const Label = widgets.Label;
+const ListItem = widgets.ListItem;
 const Panel = widgets.Panel;
 const Slider = widgets.Slider;
 const Spacer = widgets.Spacer;
@@ -156,6 +157,37 @@ pub fn chicklet(arena: Allocator, name: []const u8, opts: ChickletOpts) *WidgetN
     });
 }
 
+// ── List Item ──
+pub const ListItemOps = struct {
+    colors: ListItem.ListItemColors = .{
+        .normal = Colors.UI_BUTTON_NORMAL,
+        .hovered = Colors.UI_BUTTON_HOVER,
+        .selected = Colors.UI_BUTTON_PRESSED,
+        .text = Colors.UI_BUTTON_TEXT,
+        .text_selected = Colors.WHITE,
+    },
+    font_scale: f32 = 24.0,
+    indent: u8 = 0,
+    selected: bool = false,
+};
+
+pub fn listItem(
+    arena: Allocator,
+    id: []const u8,
+    text: []const u8,
+    opts: ListItemOps,
+) *WidgetNode {
+    return alloc(arena, ListItem{
+        .id = id,
+        .text_info = .{
+            .text = text,
+            .font_scale = opts.font_scale,
+        },
+        .colors = opts.colors,
+        .indent = opts.indent,
+        .selected = opts.selected,
+    });
+}
 // ── Button ──
 
 pub const ButtonOpts = struct {

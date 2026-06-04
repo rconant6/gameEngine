@@ -23,6 +23,7 @@ pub const Divider = widgets.Divider;
 pub const Grid = widgets.Grid;
 pub const HStack = widgets.HStack;
 pub const Label = widgets.Label;
+pub const ListItem = widgets.ListItem;
 pub const Panel = widgets.Panel;
 pub const Slider = widgets.Slider;
 pub const Spacer = widgets.Spacer;
