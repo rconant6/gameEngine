@@ -25,6 +25,7 @@ pub const M = enum(u8) {
     registry,
     scene,
     ui,
+    game_state,
     systems,
     app,
     engine,
@@ -145,6 +146,14 @@ const module_defs = [_]ModuleDef{
             .{ "math", .math }, .{ "renderer", .renderer }, .{ "assets", .assets },
         },
     },
+    // GameState
+    .{
+        .name = "game_state",
+        .path = "src/gameState/state.zig",
+        .deps = &.{
+            .{ "systems", .systems }, .{ "math", .math },
+        },
+    },
     // Systems
     .{
         .name = "systems",
@@ -175,6 +184,7 @@ const module_defs = [_]ModuleDef{
             .{ "ecs", .ecs },                     .{ "scene-format", .scene_format },
             .{ "action", .action },               .{ "scene", .scene },
             .{ "registry", .registry },           .{ "systems", .systems },
+            .{ "game_state", .game_state },
         },
     },
     // ZXL
@@ -405,10 +415,47 @@ pub fn build(b: *std.Build) void {
     b.step("play", "Run the player").dependOn(&run_player.step);
 
     // ========================================
+    // Pong example
+    // ========================================
+    const pong_module = b.addModule("pong", .{
+        .root_source_file = b.path("examples/pong/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    pong_module.addImport("engine", m.get(&modules, .engine));
+
+    const pong_exe = b.addExecutable(.{
+        .name = "pong",
+        .root_module = pong_module,
+    });
+
+    const install_pong_assets = b.addInstallDirectory(.{
+        .source_dir = b.path("examples/pong/assets"),
+        .install_dir = .bin,
+        .install_subdir = "assets",
+    });
+    pong_exe.step.dependOn(&install_pong_assets.step);
+    const install_pong = b.addInstallArtifact(pong_exe, .{});
+    const run_pong = b.addRunArtifact(pong_exe);
+    run_pong.step.dependOn(&install_pong.step);
+    run_pong.setCwd(b.path("zig-out/bin"));
+    b.step("pong", "Run Pong").dependOn(&run_pong.step);
+
+    // ========================================
+    // Build all apps without running any
+    // ========================================
+    const build_all = b.step("build-all", "Build all apps and tools without running");
+    build_all.dependOn(&install_zixelart.step);
+    build_all.dependOn(&install_scene_editor.step);
+    build_all.dependOn(&install_ui_playground.step);
+    build_all.dependOn(&install_player.step);
+    build_all.dependOn(&install_pong.step);
+
+    // ========================================
     // Platform-specific linking (Swift runtime on macOS, xdg_ for linux, no-op elsewhere)
     // ========================================
     linkPlatformLibraries(
-        &.{ engine_lib, zixelart_exe, ui_playground_exe, player_exe, scene_editor_exe },
+        &.{ engine_lib, zixelart_exe, ui_playground_exe, player_exe, scene_editor_exe, pong_exe },
         swift_lib,
         target,
     );

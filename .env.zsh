@@ -1,5 +1,5 @@
 # ~/Developer/zig/gameEngine/.env.zsh
-alias build='zig build --error-style minimal_clear --summary all'
+alias build='zig build build-all --error-style minimal_clear --summary all'
 alias ui='zig build ui --error-style minimal_clear'
 alias test='zig build test --error-style minimal_clear'
 alias run='zig build play --error-style minimal_clear'
@@ -8,6 +8,7 @@ alias small='zig build play --error-style minimal_clear -Doptimize=ReleaseSmall'
 alias art='zig build zixelart --error-style minimal_clear'
 alias level='zig build sceneEdit --error-style minimal_clear'
 alias clean='zig build clean'
+alias watch='zig build build-all --watch --error-style minimal_clear'
 
 # NOTE: --fuzz (continuous mode) is broken in Zig 0.16.0 (builtin.StackTrace type mismatch bug).
 # These run a single deterministic seed pass instead — still catches panics and failed assertions.
@@ -16,3 +17,8 @@ alias test-full='zig build test --error-style minimal && zig build fuzz-lexer & 
 
 # Project dirs
 export ENGINE_ROOT=~/Developer/zig/gameEngine
+
+# Attach to or start the gameEngine Zellij session
+function zj() {
+    zellij attach gameEngine 2>/dev/null || zellij --session gameEngine
+}
