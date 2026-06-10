@@ -23,6 +23,7 @@ pub const AssetMemory = struct {
 
 // Private backing of the memory system not to be exposed or used
 // Should not be used outside of Memory.zig
+_game_arena: Arena,
 _temp_arena: Arena,
 
 // GameEngine Related
@@ -37,12 +38,14 @@ temp: Allocator, // reset by the caller (defer usage)
 // GameEngine Related
 frame: Allocator, // resets for each tickFrame() (endFrame/beginFrame)
 asset: AssetMemory,
+game: Allocator,
 
 pub fn init(self: *Self, backing: Allocator) void {
     self._frame_arena = .init(backing);
     self._temp_arena = .init(backing);
     self._font_arena = .init(backing);
     self._texture_arena = .init(backing);
+    self._game_arena = .init(backing);
     self.persistent = backing;
     self.frame = self._frame_arena.allocator();
     self.temp = self._temp_arena.allocator();
@@ -50,17 +53,22 @@ pub fn init(self: *Self, backing: Allocator) void {
         .fonts = self._font_arena.allocator(),
         .textures = self._texture_arena.allocator(),
     };
+    self.game = self._game_arena.allocator();
 }
 pub fn deinit(self: *Self) void {
     self._frame_arena.deinit();
     self._temp_arena.deinit();
     self._font_arena.deinit();
     self._texture_arena.deinit();
+    self._game_arena.deinit();
 }
 
 // GameEngine Related
 pub fn tickFrame(self: *Self) void {
     _ = self._frame_arena.reset(.retain_capacity);
+}
+pub fn resetGame(self: *Self) void {
+    _ = self._game_arena.reset(.retain_capacity);
 }
 
 // Requires the caller to destroy

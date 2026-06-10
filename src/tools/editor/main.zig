@@ -97,7 +97,7 @@ pub fn main(init: std.process.Init) !void {
         eng.beginFrame();
 
         eng.clear(Colors.DARK_GRAY);
-        eng.update(0, .{});
+        eng.update(0);
 
         if (app.kb.isPressed(.Esc)) break;
 

@@ -28,6 +28,17 @@ pub const lifetimeSystem = @import("LifetimeSys.zig").run;
 pub const renderSystem = @import("RenderSys.zig").run;
 pub const cameraTrackingSystem = @import("CameraTrackingSys.zig").run;
 
+// Allows control of what gets updated in simulations
+// use case is for the level editor vs. an actual game (want camera but nothing else)
+pub const SimulateOpts = struct {
+    movement: bool = true,
+    physics: bool = true,
+    collision: bool = true,
+    actions: bool = true,
+    camera: bool = true,
+    lifetime: bool = true,
+};
+
 pub fn debugEntityInfoSystem(
     world: *World,
     frame: Allocator,

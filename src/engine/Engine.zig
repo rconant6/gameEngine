@@ -32,17 +32,10 @@ const debug_enabled = debug.debug_enabled;
 const DebugCategory = debug.DebugCategory;
 const Debugger = debug.DebugManager;
 const Systems = @import("systems");
-
-// Allows control of what gets updated in simulations
-// use case is for the level editor vs. an actual game (want camera but nothing else)
-pub const SimulateOpts = struct {
-    movement: bool = true,
-    physics: bool = true,
-    collision: bool = true,
-    actions: bool = true,
-    camera: bool = true,
-    lifetime: bool = true,
-};
+const SimulateOpts = Systems.SimulateOpts;
+const gsm = @import("game_state");
+const GameStateManager = gsm.GameStateManager;
+pub const StateDescriptor = gsm.StateDescriptor;
 
 const PerformanceMetrics = struct {
     current_fps: f32 = 0,
@@ -87,6 +80,8 @@ pub const Engine = struct {
     world: ecs.World,
     collision_events: []const Collision,
     action_system: ActionSystem,
+    state_manager: GameStateManager,
+    active_systems: SimulateOpts,
     running: bool,
 
     scene_manager: SceneManager,
@@ -162,6 +157,7 @@ pub const Engine = struct {
             .assets = asset_manager,
             .world = world,
             .running = true,
+            .active_systems = .{},
             .action_system = action_system,
             .scene_manager = SceneManager.init(mem.persistent, io),
             .collision_events = &.{},
@@ -169,6 +165,7 @@ pub const Engine = struct {
             .template_manager = undefined,
             .debugger = undefined,
             .active_camera_entity = camera,
+            .state_manager = GameStateManager.init(app.mem),
         };
 
         // Re-seat the renderer pointer to the stable heap address now that engine.* is assigned
@@ -212,6 +209,7 @@ pub const Engine = struct {
 
     pub fn deinit(self: *Engine) void {
         const mem = self.mem;
+        self.state_manager.deinit();
         self.action_system.deinit();
         self.scene_manager.deinit();
         self.assets.deinit();
@@ -333,9 +331,8 @@ pub const Engine = struct {
         }
     }
 
-    // NOTE: Simple wrapper for actual games to do all
-    pub fn update(self: *Engine, dt: f32, opts: SimulateOpts) void {
-        self.simulate(dt, opts);
+    pub fn update(self: *Engine, dt: f32) void {
+        self.simulate(dt, self.active_systems);
         self.render(dt);
     }
 
@@ -347,6 +344,13 @@ pub const Engine = struct {
         self.debugger.beginFrame();
         self.input.keyboard = platform.getKeyboard();
         self.input.mouse = platform.getMouse();
+        if (self.state_manager.resolvePending()) |result| {
+            if (result.world_policy == .clear) {
+                // TODO: world.destroyAllExcept(active_camera_entity) — needs World method
+                log.info(.engine, "state transition: clear world (not yet implemented)", .{});
+            }
+            self.active_systems = result.systems;
+        }
     }
     pub fn endFrame(self: *Engine) void {
         self.app.endFrame() catch |err| {
@@ -445,4 +449,21 @@ pub const Engine = struct {
     const logger = @import("debug");
     const Logger = logger.Logger;
     pub const log = logger.log;
+
+    // MARK: Game State Management
+    pub const declareStates = @import("EngineState.zig").declareStates;
+    pub const declareChildren = @import("EngineState.zig").declareChildren;
+    pub const transitionTo = @import("EngineState.zig").transitionTo;
+    pub const pushState = @import("EngineState.zig").pushState;
+    pub const popState = @import("EngineState.zig").popState;
+    pub const advanceState = @import("EngineState.zig").advanceState;
+    pub const retreatState = @import("EngineState.zig").retreatState;
+    pub const descendState = @import("EngineState.zig").descendState;
+    pub const ascendState = @import("EngineState.zig").ascendState;
+    pub const restartState = @import("EngineState.zig").restartState;
+    pub const restartGame = @import("EngineState.zig").restartGame;
+    pub const state = @import("EngineState.zig").state;
+    pub const getCurrentStateName = @import("EngineState.zig").getCurrentStateName;
+    pub const setStateVar = @import("EngineState.zig").setStateVar;
+    pub const getStateVar = @import("EngineState.zig").getStateVar;
 };

@@ -89,3 +89,8 @@ const debug = @import("debug");
 pub const DebugCategory = debug.DebugCategory;
 pub const Debugger = debug.DebugManager;
 pub const log = debug.log;
+
+// MARK: Game State Types
+const gs = @import("game_state");
+pub const StateDescriptor = gs.StateDescriptor;
+pub const StateValue = gs.StateValue;
