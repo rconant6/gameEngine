@@ -1,0 +1,144 @@
+// Pong — world units: ~26.67 wide x 20.0 tall at ortho_size=10
+// Paddles are rectangles, ball is a circle, walls are invisible colliders
+
+[PongScene:scene]
+
+  // ── Ball ──
+  [Ball:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {7.0, 5.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 0.4
+      fill_color:color #FFFFFF
+      stroke_color:color #AAAAAA
+      stroke_width:f32 0.5
+      visible:bool true
+    [Collider:circle]
+      radius:f32 0.4
+    [Tag]
+      tags:string "ball"
+
+  // ── Left Paddle (W/S) ──
+  [PaddleLeft:entity]
+    [Transform]
+      position:vec3 {-12.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {0.0, 0.0}
+      angular:f32 0.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.4
+      half_height:f32 1.5
+      fill_color:color #4488FF
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.4
+      half_height:f32 1.5
+    [Tag]
+      tags:string "paddle paddle_left"
+    [OnInput]
+      [trigger]
+        key:string "W"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 10.0}
+          priority:i32 0
+      [trigger]
+        key:string "S"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, -10.0}
+          priority:i32 0
+
+  // ── Right Paddle (Up/Down) ──
+  [PaddleRight:entity]
+    [Transform]
+      position:vec3 {12.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {0.0, 0.0}
+      angular:f32 0.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.4
+      half_height:f32 1.5
+      fill_color:color #FF4444
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.4
+      half_height:f32 1.5
+    [Tag]
+      tags:string "paddle paddle_right"
+    [OnInput]
+      [trigger]
+        key:string "Up"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 10.0}
+          priority:i32 0
+      [trigger]
+        key:string "Down"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, -10.0}
+          priority:i32 0
+
+  // ── Top Wall ──
+  [WallTop:entity]
+    [Transform]
+      position:vec3 {0.0, 10.3, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 14.0
+      half_height:f32 0.3
+      fill_color:color #555555
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 14.0
+      half_height:f32 0.3
+    [Tag]
+      tags:string "wall"
+
+  // ── Bottom Wall ──
+  [WallBottom:entity]
+    [Transform]
+      position:vec3 {0.0, -10.3, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 14.0
+      half_height:f32 0.3
+      fill_color:color #555555
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 14.0
+      half_height:f32 0.3
+    [Tag]
+      tags:string "wall"
+
+  // ── Center Line (visual only) ──
+  [CenterLine:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.05
+      half_height:f32 10.0
+      fill_color:color #333333
+      visible:bool true
