@@ -197,12 +197,13 @@ pub const GameStateManager = struct {
         key: []const u8,
         val: StateValue,
     ) !void {
-        if (self.game_values.contains(key)) {
-            const old_key = self.game_values.getKey(key).?;
-            self.mem.game.free(old_key);
+        const gop = try self.game_values.getOrPut(key);
+        if (gop.found_existing) {
+            gop.value_ptr.* = val;
+        } else {
+            gop.key_ptr.* = try self.mem.game.dupe(u8, key);
+            gop.value_ptr.* = val;
         }
-        const new_key = try self.mem.game.dupe(u8, key);
-        try self.game_values.put(new_key, val);
     }
     pub fn getStateVar(self: *GameStateManager, key: []const u8) ?StateValue {
         return self.game_values.get(key);
