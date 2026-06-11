@@ -227,7 +227,7 @@ pub const DebugDraw = struct {
         self.circles.deinit(self.persistent);
         self.lines.deinit(self.persistent);
         self.rects.deinit(self.persistent);
-        self.texts.deinit(self.frame);
+        // texts is frame-backed and always reinit'd each beginFrame — no deinit needed
     }
 };
 

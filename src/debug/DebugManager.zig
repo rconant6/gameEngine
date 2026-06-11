@@ -49,7 +49,9 @@ pub fn init(
 }
 
 pub fn beginFrame(self: *Self) void {
-    self.draw.texts.clearRetainingCapacity();
+    // frame arena was just reset by tickFrame — reinit texts from the new frame allocator
+    // rather than retaining capacity (which would hold a dangling pointer into the old arena)
+    self.draw.texts = .empty;
 }
 
 pub fn deinit(self: *Self) void {
