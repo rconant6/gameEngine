@@ -72,6 +72,21 @@ pub fn executeActions(world: *World, action_queue: *ActionQueue) void {
                     std.log.warn("set_velocity: entity {d} has no Velocity component", .{target_entity.id});
                 }
             },
+            .reflect_velocity => |ref_data| {
+                const target_entity = switch (ref_data.target) {
+                    .self => queued.context.self_ent,
+                    .other => queued.context.other_ent orelse {
+                        std.log.warn("reflect_velocity target=other but no other_entity", .{});
+                        continue;
+                    },
+                };
+                if (world.getComponentMut(target_entity, Velocity)) |velocity| {
+                    if (ref_data.x) velocity.linear.x = -velocity.linear.x;
+                    if (ref_data.y) velocity.linear.y = -velocity.linear.y;
+                } else {
+                    std.log.warn("reflect_velocity: entity {d} has no Velocity component", .{target_entity.id});
+                }
+            },
             .debug_print => |t| std.debug.print("{s}", .{t}),
             .play_sound => |s| std.debug.print("play sound {s}", .{s}),
         }

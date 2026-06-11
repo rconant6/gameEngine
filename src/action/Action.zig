@@ -32,6 +32,11 @@ pub const ActionType = union(enum) {
         target: ActionTarget,
         velocity: V2,
     },
+    reflect_velocity: struct {
+        target: ActionTarget,
+        x: bool = false,
+        y: bool = false,
+    },
     debug_print: []const u8,
     play_sound: []const u8,
 };
