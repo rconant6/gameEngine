@@ -183,7 +183,9 @@ pub const GameStateManager = struct {
             .restart_game => |name| {
                 self.mem.resetGame();
                 self.game_values = .init(self.mem.game);
-                return self.applyTransition(name);
+                var result = self.applyTransition(name) orelse return null;
+                result.world_policy = .clear;
+                return result;
             },
             else => return null,
         }

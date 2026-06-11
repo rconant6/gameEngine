@@ -55,6 +55,12 @@ pub fn destroyEntity(self: *Self, entity: Entity) void {
         }
     }
 }
+pub fn destroyAllExcept(self: *Self, keep: Entity) void {
+    for (0..self.next_entity_id) |id| {
+        if (id == keep.id) continue;
+        self.destroyEntity(.{ .id = id });
+    }
+}
 pub fn createEntityFromTemplate(
     self: *Self,
     template: []const u8,

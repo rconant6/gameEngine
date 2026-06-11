@@ -346,8 +346,7 @@ pub const Engine = struct {
         self.input.mouse = platform.getMouse();
         if (self.state_manager.resolvePending()) |result| {
             if (result.world_policy == .clear) {
-                // TODO: world.destroyAllExcept(active_camera_entity) — needs World method
-                log.info(.engine, "state transition: clear world (not yet implemented)", .{});
+                self.world.destroyAllExcept(self.active_camera_entity);
             }
             self.active_systems = result.systems;
         }
