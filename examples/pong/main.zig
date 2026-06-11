@@ -87,7 +87,7 @@ pub fn main(init: std.process.Init) !void {
                 }
             },
             .playing => {
-                updateBall(game);
+                checkScore(game);
             },
             .scored => {
                 const sl = (game.getStateVar("score_left")  orelse engine.StateValue{ .int = 0 }).int;
@@ -126,44 +126,20 @@ fn clampPaddleVelocity(game: *engine.Engine, tag: []const u8) void {
     if (transform.position.y - half_h <= -bound_y and vel.linear.y < 0) vel.linear.y = 0;
 }
 
-fn updateBall(game: *engine.Engine) void {
+fn checkScore(game: *engine.Engine) void {
     const entity = game.findEntityByTag("ball") orelse return;
-    const vel = game.world.getComponentMut(entity, Velocity) orelse return;
     const transform = game.world.getComponent(entity, engine.Transform) orelse return;
     const pos = transform.position;
-
-    if (pos.y >= bound_y and vel.linear.y > 0) vel.linear.y = -vel.linear.y;
-    if (pos.y <= -bound_y and vel.linear.y < 0) vel.linear.y = -vel.linear.y;
-
-    if (vel.linear.x < 0 and checkPaddleHit(game, "paddle_left")) {
-        vel.linear.x = @min(@abs(vel.linear.x) + ball_speed_inc, max_ball_speed);
-    }
-    if (vel.linear.x > 0 and checkPaddleHit(game, "paddle_right")) {
-        vel.linear.x = @max(-(@abs(vel.linear.x) + ball_speed_inc), -max_ball_speed);
-    }
 
     if (pos.x < -bound_x) {
         const sr = (game.getStateVar("score_right") orelse engine.StateValue{ .int = 0 }).int;
         game.setStateVar("score_right", .{ .int = sr + 1 }) catch {};
         game.transitionTo(State, .scored) catch {};
-    }
-    if (pos.x > bound_x) {
+    } else if (pos.x > bound_x) {
         const sl = (game.getStateVar("score_left") orelse engine.StateValue{ .int = 0 }).int;
         game.setStateVar("score_left", .{ .int = sl + 1 }) catch {};
         game.transitionTo(State, .scored) catch {};
     }
-}
-
-fn checkPaddleHit(game: *engine.Engine, paddle_tag: []const u8) bool {
-    const ball_entity = game.findEntityByTag("ball") orelse return false;
-    const ball_t = game.world.getComponent(ball_entity, engine.Transform) orelse return false;
-    const paddle_entity = game.findEntityByTag(paddle_tag) orelse return false;
-    const paddle_t = game.world.getComponent(paddle_entity, engine.Transform) orelse return false;
-
-    const dx = @abs(ball_t.position.x - paddle_t.position.x);
-    const dy = @abs(ball_t.position.y - paddle_t.position.y);
-
-    return dx <= 0.8 and dy <= 1.9;
 }
 
 fn serveBall(game: *engine.Engine) void {

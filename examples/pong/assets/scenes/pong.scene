@@ -22,6 +22,23 @@
       radius:f32 0.4
     [Tag]
       tags:string "ball"
+    [OnCollision]
+      [trigger]
+        other_tag_pattern:string "wall"
+        [action]
+          type:string "reflect_velocity"
+          target:string "self"
+          x:bool false
+          y:bool true
+          priority:i32 0
+      [trigger]
+        other_tag_pattern:string "paddle"
+        [action]
+          type:string "reflect_velocity"
+          target:string "self"
+          x:bool true
+          y:bool false
+          priority:i32 0
 
   // ── Left Paddle (W/S) ──
   [PaddleLeft:entity]
