@@ -14,8 +14,13 @@ const debug = @import("debug");
 const log = debug.log;
 const math = @import("math");
 const Memory = math.GameMemory;
+const ActionRegistry = @import("ActionRegistry.zig").ActionRegistry;
+const EngineServices = @import("EngineServices.zig").EngineServices;
+const registerBuiltins = @import("builtin_actions.zig").registerBuiltins;
 
 persistent: Allocator,
+registry: ActionRegistry,
+services: *EngineServices = undefined,
 action_queue: ActionQueue,
 trigger_systems: ArrayList(TriggerSystem),
 
@@ -41,9 +46,13 @@ fn inputTriggerWrapper(
 pub fn init(mem: *Memory) !Self {
     var action_system = Self{
         .persistent = mem.persistent,
+        .registry = ActionRegistry.init(mem.persistent),
         .action_queue = ActionQueue.init(mem.frame),
         .trigger_systems = .empty,
     };
+
+    // engine builtins are always available; games add more via registerAction
+    try registerBuiltins(&action_system.registry);
 
     try action_system.trigger_systems.append(mem.persistent, .{
         .sys = &dummy_state,
@@ -58,6 +67,7 @@ pub fn init(mem: *Memory) !Self {
 }
 pub fn deinit(self: *Self) void {
     log.info(.action, "Action System shutting down...", .{});
+    self.registry.deinit();
     self.trigger_systems.deinit(self.persistent);
     self.action_queue.deinit();
 }

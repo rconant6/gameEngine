@@ -13,9 +13,13 @@ pub fn run(
         try system.processFn(system.sys, world, ctx);
     }
 
-    // Execute queued actions
-    ActionExecutor.executeActions(world, &action_system.action_queue);
-
-    // Clear queue for next frame
-    action_system.action_queue.clear();
+    // Execute queued actions (resolves behavior via the registry; clears the
+    // queue itself — no separate clear() needed).
+    ActionExecutor.executeActions(
+        world,
+        &action_system.action_queue,
+        &action_system.registry,
+        action_system.services,
+        ctx.delta_time orelse 0,
+    );
 }

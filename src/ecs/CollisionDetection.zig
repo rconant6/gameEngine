@@ -5,6 +5,6 @@ pub const Collision = struct {
     entity_a: Entity,
     entity_b: Entity,
     point: V2,
-    normal: V2,
+    normal: V2, // NOTE: detection is always A->B in all cases
     penetration: f32,
 };

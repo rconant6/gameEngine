@@ -61,10 +61,7 @@ const TimeBasedTriggerSystem = struct {
 };
 
 test "TimeTrigger - basic structure" {
-    const action = Action.Action{
-        .action_type = .{ .play_sound = "tick" },
-        .priority = 0,
-    };
+    const action = Action.Action{ .id = 0, .params = null, .priority = 0 };
 
     const trigger = TimeTrigger{
         .interval = 1.0,
@@ -110,10 +107,7 @@ test "TimeAccumulator - reset after threshold" {
 }
 
 test "OnTime - ActionBindings with TimeTrigger" {
-    const action = Action.Action{
-        .action_type = .{ .play_sound = "alarm" },
-        .priority = 0,
-    };
+    const action = Action.Action{ .id = 0, .params = null, .priority = 0 };
 
     const trigger = TimeTrigger{
         .interval = 2.0,
@@ -131,15 +125,9 @@ test "OnTime - ActionBindings with TimeTrigger" {
 }
 
 test "OnTime - multiple triggers with different intervals" {
-    const action1 = Action.Action{
-        .action_type = .{ .play_sound = "tick" },
-        .priority = 0,
-    };
+    const action1 = Action.Action{ .id = 0, .params = null, .priority = 0 };
 
-    const action2 = Action.Action{
-        .action_type = .{ .play_sound = "tock" },
-        .priority = 1,
-    };
+    const action2 = Action.Action{ .id = 0, .params = null, .priority = 1 };
 
     const trigger1 = TimeTrigger{
         .interval = 0.5,
@@ -169,10 +157,7 @@ test "TimeBasedTriggerSystem - process with delta_time" {
 
     const entity = try world.createEntity();
 
-    const action = Action.Action{
-        .action_type = .destroy_self,
-        .priority = 0,
-    };
+    const action = Action.Action{ .id = 0, .params = null, .priority = 0 };
 
     // Allocate actions array on heap for proper cleanup
     const actions = try gpa.alloc(Action.Action, 1);
@@ -227,10 +212,7 @@ test "TimeBasedTriggerSystem - multiple entities" {
     const entity1 = try world.createEntity();
     const entity2 = try world.createEntity();
 
-    const action = Action.Action{
-        .action_type = .{ .play_sound = "beep" },
-        .priority = 0,
-    };
+    const action = Action.Action{ .id = 0, .params = null, .priority = 0 };
 
     // Allocate for entity1
     const actions1 = try gpa.alloc(Action.Action, 1);

@@ -1,95 +1,32 @@
-const std = @import("std");
 const ecs = @import("ecs");
 const World = ecs.World;
-const Destroy = ecs.Destroy;
-const Velocity = ecs.Velocity;
-const Action = ecs.Action;
-const ActionType = ecs.ActionType;
-const ActionTarget = ecs.ActionTarget;
 const ActionQueue = @import("ActionQueue.zig").ActionQueue;
-const scene = @import("scene");
-const Template = scene.Template;
+const ActionRegistry = @import("ActionRegistry.zig").ActionRegistry;
+const EngineServices = @import("EngineServices.zig").EngineServices;
+const ActionRunContext = @import("Action.zig").ActionRunContext;
 
-pub fn executeActions(world: *World, action_queue: *ActionQueue) void {
+pub fn executeActions(
+    world: *World,
+    action_queue: *ActionQueue,
+    registry: *const ActionRegistry,
+    services: *EngineServices,
+    dt: f32,
+) void {
     action_queue.sortByPriority();
 
     for (action_queue.actions.items) |queued| {
-        const action = queued.action;
-        switch (action.action_type) {
-            .destroy_self => {
-                world.addComponent(queued.context.self_ent, Destroy, .{}) catch |err| {
-                    std.log.err(
-                        "destroy_self failed on entity-id: {d}    {any}",
-                        .{ queued.context.self_ent.id, err },
-                    );
-                };
-            },
-            .destroy_other => {
-                if (queued.context.other_ent) |other| {
-                    world.addComponent(other, Destroy, .{}) catch |err| {
-                        std.log.err(
-                            "destroy_self failed on entity-id: {d}   {any}",
-                            .{ queued.context.self_ent.id, err },
-                        );
-                    };
-                } else {
-                    std.log.warn("destroy_other action has no other_entity", .{});
-                }
-            },
-            .spawn_entity => |spawn_data| {
-                const name = spawn_data.template_name;
-                const offset = spawn_data.offset;
-                //BUG: this is wrong...need transform and sprite
-                const location = if (queued.context.collision_loc) |loc| blk: {
-                    break :blk loc.add(offset);
-                } else offset;
-
-                const entity = world.createEntityFromTemplate(
-                    name,
-                    location,
-                ) catch |err| {
-                    std.log.err("Unable to find template: {s} {any}", .{ name, err });
-                    continue;
-                };
-                std.log.info("Created entity: {d} from {s} at {any}", .{
-                    entity.id,
-                    name,
-                    location,
-                });
-            },
-            .set_velocity => |vel_data| {
-                const target_entity = switch (vel_data.target) {
-                    .self => queued.context.self_ent,
-                    .other => queued.context.other_ent orelse {
-                        std.log.warn("set_velocity target=other but no other_entity", .{});
-                        continue;
-                    },
-                };
-
-                if (world.getComponentMut(target_entity, Velocity)) |velocity| {
-                    velocity.linear = vel_data.velocity;
-                } else {
-                    std.log.warn("set_velocity: entity {d} has no Velocity component", .{target_entity.id});
-                }
-            },
-            .reflect_velocity => |ref_data| {
-                const target_entity = switch (ref_data.target) {
-                    .self => queued.context.self_ent,
-                    .other => queued.context.other_ent orelse {
-                        std.log.warn("reflect_velocity target=other but no other_entity", .{});
-                        continue;
-                    },
-                };
-                if (world.getComponentMut(target_entity, Velocity)) |velocity| {
-                    if (ref_data.x) velocity.linear.x = -velocity.linear.x;
-                    if (ref_data.y) velocity.linear.y = -velocity.linear.y;
-                } else {
-                    std.log.warn("reflect_velocity: entity {d} has no Velocity component", .{target_entity.id});
-                }
-            },
-            .debug_print => |t| std.debug.print("{s}", .{t}),
-            .play_sound => |s| std.debug.print("play sound {s}", .{s}),
-        }
+        var ctx = ActionRunContext{
+            .world = world,
+            .services = services,
+            .dt = dt,
+            .self_ent = queued.context.self_ent,
+            .other_ent = queued.context.other_ent,
+            .collision_loc = queued.context.collision_loc,
+            .collision_normal = queued.context.collision_normal,
+            .collision_penetration = queued.context.collision_penetration,
+        };
+        const entry = registry.get(queued.action.id);
+        entry.execute(queued.action.params, &ctx);
     }
 
     action_queue.clear();

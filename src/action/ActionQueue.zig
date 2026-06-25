@@ -11,6 +11,8 @@ pub const ActionContext = struct {
     self_ent: Entity,
     other_ent: ?Entity,
     collision_loc: ?V2,
+    collision_normal: ?V2 = null,
+    collision_penetration: ?f32 = null,
 };
 
 pub const QueuedAction = struct {

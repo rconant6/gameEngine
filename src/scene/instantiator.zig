@@ -41,8 +41,9 @@ const ScreenAnchor = rend.ScreenAnchor;
 const acts = @import("action");
 const Action = acts.Action;
 const ActionTarget = acts.ActionTarget;
-const ActionType = acts.ActionType;
+const ActionRegistry = acts.ActionRegistry;
 const InputTrigger = acts.InputTrigger;
+const log = @import("debug").log;
 const CollisionTrigger = acts.CollisionTrigger;
 
 pub const InstantiatorError = error{
@@ -55,6 +56,7 @@ pub const InstantiatorError = error{
     UnableToLoadFont,
     UnknownComponent,
     UnknownProperty,
+    UnknownActionType,
 
     ActionTargetTypeMismatch,
     ArrayTypeMismatch,
@@ -84,6 +86,10 @@ pub const Instantiator = struct {
     world: *World,
     assets: *AssetManager,
     in_screen_space: bool = false,
+    // late-bound by Engine.init (re-seat section): the action registry (decode
+    // source) and the game arena that decoded action params live in.
+    actions: *const ActionRegistry = undefined,
+    game: Allocator = undefined,
 
     pub fn init(persistent: Allocator, world: *World, assets: *AssetManager) Instantiator {
         return .{
@@ -585,65 +591,36 @@ pub const Instantiator = struct {
         self: *Instantiator,
         action_block: GenericBlock,
     ) !Action {
+        const props = action_block.properties orelse
+            return InstantiatorError.MissingRequiredField;
+
+        const type_str = if (getProperty(props, "type")) |type_prop|
+            try self.extractValueForType([]const u8, type_prop.value) orelse
+                return InstantiatorError.MissingRequiredField
+        else
+            return InstantiatorError.MissingRequiredField;
+
         var priority: i32 = 0;
-        var action_type: ?ActionType = null;
-
-        if (action_block.properties) |props| {
-            if (getProperty(props, "priority")) |priority_prop| {
-                priority = try self.extractValueForType(i32, priority_prop.value) orelse 0;
-            }
-            const type_str = if (getProperty(props, "type")) |type_prop|
-                try self.extractValueForType([]const u8, type_prop.value) orelse {
-                    return InstantiatorError.MissingRequiredField;
-                }
-            else {
-                return InstantiatorError.MissingRequiredField;
-            };
-            inline for (std.meta.fields(ActionType)) |field| {
-                if (std.mem.eql(u8, type_str, field.name)) {
-                    if (field.type == void) {
-                        action_type = @unionInit(ActionType, field.name, {});
-                    } else if (@typeInfo(field.type) == .@"struct") {
-                        // Handle struct payloads spawn_entity, set_velocity...
-                        var payload: field.type = std.mem.zeroes(field.type);
-                        inline for (std.meta.fields(field.type)) |payload_field| {
-                            const field_value = if (getProperty(
-                                props,
-                                payload_field.name,
-                            )) |prop|
-                                try self.extractValueForType(payload_field.type, prop.value)
-                            else if (@typeInfo(payload_field.type) == .optional)
-                                null
-                            else
-                                getDefaultValue(payload_field.type);
-
-                            @field(payload, payload_field.name) = field_value orelse {
-                                return InstantiatorError.MissingRequiredField;
-                            };
-                        }
-                        action_type = @unionInit(ActionType, field.name, payload);
-                    } else {
-                        // Handle simple payloads of supported types
-                        for (props) |prop| {
-                            if (!std.mem.eql(u8, "type", prop.name) and
-                                !std.mem.eql(u8, "priority", prop.name))
-                            {
-                                const value = try self.extractValueForType(field.type, prop.value) orelse {
-                                    return InstantiatorError.MissingRequiredField;
-                                };
-                                action_type = @unionInit(ActionType, field.name, value);
-                            }
-                        }
-                    }
-                    break;
-                }
-            }
+        if (getProperty(props, "priority")) |priority_prop| {
+            priority = try self.extractValueForType(i32, priority_prop.value) orelse 0;
         }
 
+        const id = self.actions.lookup(type_str) orelse {
+            log.err(
+                .scene,
+                "unknown action type '{s}' at line {d}",
+                .{ type_str, action_block.location.line },
+            );
+            return InstantiatorError.UnknownActionType;
+        };
+
+        // decode params into the GAME arena (per-playthrough, reclaimed on reset)
+        const entry = self.actions.get(id);
+        const params = try entry.decode(self.game, props);
+
         return Action{
-            .action_type = action_type orelse {
-                return InstantiatorError.UnknownProperty;
-            },
+            .id = id,
+            .params = params,
             .priority = priority,
         };
     }
@@ -835,9 +812,6 @@ fn getMouseButton(button_str: []const u8) ?MouseButton {
 }
 fn getActionTarget(target: []const u8) ?ActionTarget {
     return std.meta.stringToEnum(ActionTarget, target);
-}
-fn getActionType(action: []const u8) ?ActionType {
-    return std.meta.stringToEnum(ActionType, action);
 }
 fn getScreenAnchor(anchor: []const u8) ?ScreenAnchor {
     return std.meta.stringToEnum(ScreenAnchor, anchor);

@@ -80,10 +80,17 @@ pub const CollisionTrigger = struct {
             if (world.getComponent(other, Tag)) |other_tag| {
                 for (on_collision.triggers) |trigger| {
                     if (other_tag.matchesPattern(trigger.other_tag_pattern)) {
+                        const toward_self =
+                            if (self.id == collision.entity_a.id)
+                                collision.normal.negate()
+                            else
+                                collision.normal;
                         const context: ActionContext = .{
                             .self_ent = self,
                             .other_ent = other,
                             .collision_loc = collision.point,
+                            .collision_normal = toward_self,
+                            .collision_penetration = collision.penetration,
                         };
                         for (trigger.actions) |action| {
                             try action_queue.append(action, context);

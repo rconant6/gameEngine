@@ -1,3 +1,5 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const V2 = @import("math").V2;
 pub const action_bind = @import("ActionBindings.zig");
 pub const ActionBindings = action_bind.ActionBindings;
@@ -15,33 +17,34 @@ pub const TriggerContext = triggers.TriggerContext;
 pub const InputTrigger = triggers.InputTrigger;
 pub const CollisionTrigger = triggers.CollisionTrigger;
 pub const ActionSystem = @import("ActionSystem.zig");
+pub const EngineServices = @import("EngineServices.zig").EngineServices;
+pub const ActionRegistry = @import("ActionRegistry.zig").ActionRegistry;
+pub const builtins = @import("builtin_actions.zig");
+pub const registerBuiltins = builtins.registerBuiltins;
+const ecs = @import("ecs");
+const World = ecs.World;
+const Entity = ecs.Entity;
 
 pub const ActionTarget = enum {
     self,
     other,
 };
 
-pub const ActionType = union(enum) {
-    destroy_self: void,
-    destroy_other: void,
-    spawn_entity: struct {
-        template_name: []const u8,
-        offset: V2,
-    },
-    set_velocity: struct {
-        target: ActionTarget,
-        velocity: V2,
-    },
-    reflect_velocity: struct {
-        target: ActionTarget,
-        x: bool = false,
-        y: bool = false,
-    },
-    debug_print: []const u8,
-    play_sound: []const u8,
-};
+pub const ActionId = u32;
 
 pub const Action = struct {
-    action_type: ActionType,
+    id: ActionId, // logging debugging only id
+    params: ?*const anyopaque, // decoded param struct, owned by this action owned by the game
     priority: i32 = 0,
+};
+
+pub const ActionRunContext = struct {
+    world: *World,
+    services: *EngineServices,
+    self_ent: Entity,
+    other_ent: ?Entity = null,
+    collision_loc: ?V2 = null,
+    collision_normal: ?V2 = null, // always oriented toward self (coll: A -> B)
+    collision_penetration: ?f32 = null,
+    dt: f32 = 0,
 };

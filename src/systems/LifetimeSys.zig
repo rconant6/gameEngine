@@ -1,16 +1,23 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
 const ecs = @import("ecs");
-const World = ecs.World;
-const Lifetime = ecs.Lifetime;
 const Destroy = ecs.Destroy;
+const Entity = ecs.Entity;
+const Lifetime = ecs.Lifetime;
+const World = ecs.World;
 
-fn cleanup(world: *World) void {
+fn cleanup(world: *World, frame: Allocator) void {
+    var doomed: ArrayList(Entity) = .empty;
+    defer doomed.deinit(frame);
     var query = world.query(.{Destroy});
     while (query.next()) |entry| {
-        world.destroyEntity(entry.entity);
+        doomed.append(frame, entry.entity) catch {};
     }
+    for (doomed.items) |e| world.destroyEntity(e);
 }
 
-pub fn run(world: *World, dt: f32) void {
+pub fn run(world: *World, dt: f32, frame: Allocator) void {
     var query = world.query(.{Lifetime});
 
     while (query.next()) |entry| {
@@ -24,5 +31,5 @@ pub fn run(world: *World, dt: f32) void {
             };
         }
     }
-    cleanup(world);
+    cleanup(world, frame);
 }

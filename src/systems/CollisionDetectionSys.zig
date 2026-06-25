@@ -223,8 +223,8 @@ pub fn collideCircleColliderRectangleCollider(
     const closest_x = @max(left_x, @min(pos_a.x, right_x));
     const closest_y = @max(bottom, @min(pos_a.y, top));
 
-    const dx = pos_a.x - closest_x;
-    const dy = pos_a.y - closest_y;
+    const dx = closest_x - pos_a.x;
+    const dy = closest_y - pos_a.y;
 
     const dist_sq = (dx * dx) + (dy * dy);
     const radii_sq = radius_a * radius_a;
@@ -242,10 +242,16 @@ pub fn collideCircleColliderRectangleCollider(
         const d_bottom = @abs(pos_a.y - bottom);
         const min = @min(dl, @min(dr, @min(dt, d_bottom)));
 
-        if (min == dl) break :blk V2{ .x = -1, .y = 0 };
-        if (min == dr) break :blk V2{ .x = 1, .y = 0 };
-        if (min == dt) break :blk V2{ .x = 0, .y = 1 };
-        break :blk V2{ .x = 0, .y = -1 };
+        const outward: V2 =
+            if (min == dl)
+                .{ .x = -1, .y = 0 }
+            else if (min == dr)
+                .{ .x = 1, .y = 0 }
+            else if (min == dt)
+                .{ .x = 0, .y = 1 }
+            else
+                .{ .x = 0, .y = -1 };
+        break :blk outward.negate();
     };
 
     return .{

@@ -22,6 +22,7 @@ const Transform = ecs.Transform;
 const World = ecs.World;
 const action = @import("action");
 const ActionSystem = action.ActionSystem;
+const EngineServices = action.EngineServices;
 const TriggerContext = action.TriggerContext;
 const scene = @import("scene");
 const Instantiator = scene.Instantiator;
@@ -32,10 +33,11 @@ const debug_enabled = debug.debug_enabled;
 const DebugCategory = debug.DebugCategory;
 const Debugger = debug.DebugManager;
 const Systems = @import("systems");
-const SimulateOpts = Systems.SimulateOpts;
 const gsm = @import("game_state");
 const GameStateManager = gsm.GameStateManager;
+const SimulateOpts = gsm.SimulateOpts;
 pub const StateDescriptor = gsm.StateDescriptor;
+const EngineActionBridge = @import("EngineActionBridge.zig");
 
 const PerformanceMetrics = struct {
     current_fps: f32 = 0,
@@ -81,6 +83,7 @@ pub const Engine = struct {
     collision_events: []const Collision,
     action_system: ActionSystem,
     state_manager: GameStateManager,
+    services: EngineServices,
     active_systems: SimulateOpts,
     running: bool,
 
@@ -166,15 +169,24 @@ pub const Engine = struct {
             .debugger = undefined,
             .active_camera_entity = camera,
             .state_manager = GameStateManager.init(app.mem),
+            .services = EngineServices{
+                .ctx = undefined,
+                .vtable = &EngineActionBridge.services_vtable,
+            },
         };
 
-        // Re-seat the renderer pointer to the stable heap address now that engine.* is assigned
+        // Re-seat pointers to the stable heap address now that engine.* is assigned.
+        engine.services.ctx = engine; // engine is already *Engine
+        engine.action_system.services = &engine.services;
         engine.assets.textures.renderer = &engine.app.renderer;
         engine.instantiator = .init(
             mem.persistent,
             &engine.world,
             &engine.assets,
         );
+        // late-bind the instantiator's action decode dependencies
+        engine.instantiator.actions = &engine.action_system.registry;
+        engine.instantiator.game = mem.game;
         engine.template_manager = .init(mem.persistent, io, &engine.instantiator);
         engine.world.template_manager = &engine.template_manager;
 
@@ -290,7 +302,7 @@ pub const Engine = struct {
             Systems.actionSystem(&self.world, &self.action_system, context) catch {};
         }
         if (opts.camera) Systems.cameraTrackingSystem(&self.world, dt);
-        if (opts.lifetime) Systems.lifetimeSystem(&self.world, dt);
+        if (opts.lifetime) Systems.lifetimeSystem(&self.world, dt, self.mem.frame);
     }
 
     // NOTE: helper for just rendering the current frame and state

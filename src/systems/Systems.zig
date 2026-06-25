@@ -18,6 +18,7 @@ const rend = @import("renderer");
 const Colors = rend.Colors;
 const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
+const SimulateOpts = @import("game_state").SimulateOpts;
 
 pub const CollisionDetectionSys = @import("CollisionDetectionSys.zig");
 pub const movementSystem = @import("MovementSys.zig").run;
@@ -27,17 +28,6 @@ pub const actionSystem = @import("ActionSys.zig").run;
 pub const lifetimeSystem = @import("LifetimeSys.zig").run;
 pub const renderSystem = @import("RenderSys.zig").run;
 pub const cameraTrackingSystem = @import("CameraTrackingSys.zig").run;
-
-// Allows control of what gets updated in simulations
-// use case is for the level editor vs. an actual game (want camera but nothing else)
-pub const SimulateOpts = struct {
-    movement: bool = true,
-    physics: bool = true,
-    collision: bool = true,
-    actions: bool = true,
-    camera: bool = true,
-    lifetime: bool = true,
-};
 
 pub fn debugEntityInfoSystem(
     world: *World,
