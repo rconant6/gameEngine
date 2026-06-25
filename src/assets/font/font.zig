@@ -15,6 +15,7 @@ const TableEntry = font_data.TableEntry;
 const V2 = font_data.V2;
 
 const FontReader = @import("FontReader.zig").FontReader;
+const log = @import("debug").log;
 
 fn loadFile(gpa: std.mem.Allocator, io: std.Io, path: []const u8) ![]const u8 {
     return std.Io.Dir.cwd().readFileAllocOptions(io, path, gpa, .unlimited, .@"1", null);
@@ -355,9 +356,15 @@ pub const Font = struct {
         const temp_alloc = arena.allocator();
         var table_directory: std.array_hash_map.Auto(u32, TableEntry) = .{};
 
-        const raw_data = try loadFile(temp_alloc, io, path);
+        const raw_data = loadFile(temp_alloc, io, path) catch |err| {
+            log.err(.assets, "Font load failed: cannot read file '{s}': {s}", .{ path, @errorName(err) });
+            return err;
+        };
 
-        return try initFromData(gpa, temp_alloc, raw_data, &table_directory);
+        return initFromData(gpa, temp_alloc, raw_data, &table_directory) catch |err| {
+            log.err(.assets, "Font load failed: '{s}' is not a valid TrueType font: {s}", .{ path, @errorName(err) });
+            return err;
+        };
     }
 
     pub fn initFromMemory(gpa: std.mem.Allocator, data: []const u8) !Font {
@@ -368,7 +375,10 @@ pub const Font = struct {
         var table_directory: std.array_hash_map.Auto(u32, TableEntry) = .{};
 
         // Use the data directly without copying since @embedFile data is already in memory
-        return try initFromData(gpa, temp_alloc, data, &table_directory);
+        return initFromData(gpa, temp_alloc, data, &table_directory) catch |err| {
+            log.err(.assets, "Embedded font is not a valid TrueType font ({d} bytes): {s}", .{ data.len, @errorName(err) });
+            return err;
+        };
     }
 
     fn initFromData(
@@ -386,34 +396,34 @@ pub const Font = struct {
             try table_directory.put(temp_alloc, table_entry.tag, table_entry);
         }
 
-        const head_entry = getTable(table_directory, "head") orelse return error.HeadTableNotFound;
+        const head_entry = try requireTable(table_directory, "head", error.HeadTableNotFound);
         const head_table = try parseHeadTable(&reader, head_entry);
         const index_to_loc = head_table.index_to_loc_format;
         const units_per_em = head_table.units_per_em;
         _ = index_to_loc;
 
-        const maxp_entry = getTable(table_directory, "maxp") orelse return error.MaxpTableNotFound;
+        const maxp_entry = try requireTable(table_directory, "maxp", error.MaxpTableNotFound);
         const maxp_table = try parseMaxpTable(&reader, maxp_entry);
         const number_glyphs = maxp_table.num_glyphs;
 
-        const hhea_entry = getTable(table_directory, "hhea") orelse return error.HheaTableNotFound;
+        const hhea_entry = try requireTable(table_directory, "hhea", error.HheaTableNotFound);
         const hhea_table = try parseHheaTable(&reader, hhea_entry);
         const number_hMetrics = hhea_table.number_hMetrics;
 
-        const hmtx_entry = getTable(table_directory, "hmtx") orelse return error.HmtxTableNotFound;
+        const hmtx_entry = try requireTable(table_directory, "hmtx", error.HmtxTableNotFound);
         var hMetrics = try std.ArrayList(Hmetric).initCapacity(gpa, number_glyphs);
         errdefer hMetrics.deinit(gpa);
         try parseHmetrics(&reader, &hMetrics, hmtx_entry, number_glyphs, number_hMetrics);
 
-        const cmap_entry = getTable(table_directory, "cmap") orelse return error.CmapTableNotFound;
+        const cmap_entry = try requireTable(table_directory, "cmap", error.CmapTableNotFound);
         const cmap_format4_header = try parseCmapTable(&reader, cmap_entry);
         var map_indicies = std.AutoHashMap(u32, u16).init(gpa);
         errdefer map_indicies.deinit();
         try parseCmapFormatData(&reader, &map_indicies, temp_alloc, cmap_format4_header);
 
-        const glyph_entry = getTable(table_directory, "glyf") orelse return error.GlyfTableNotFound;
+        const glyph_entry = try requireTable(table_directory, "glyf", error.GlyfTableNotFound);
 
-        const loca_entry = getTable(table_directory, "loca") orelse return error.LocaTableNotFound;
+        const loca_entry = try requireTable(table_directory, "loca", error.LocaTableNotFound);
         var temp_alloc_mut = temp_alloc;
         const offsets = try parseLocaTable(&reader, &temp_alloc_mut, loca_entry, number_glyphs);
 
@@ -500,6 +510,19 @@ fn getBytesOfPadding(comptime T: type) usize {
 fn getTable(tables: *const std.array_hash_map.Auto(u32, TableEntry), name: []const u8) ?TableEntry {
     const tag = std.mem.readInt(u32, name[0..4], .big);
     return tables.get(tag);
+}
+
+/// Look up a required TrueType table, logging which one is missing before
+/// returning `err`. Keeps the per-table call sites in initFromData to one line.
+fn requireTable(
+    tables: *const std.array_hash_map.Auto(u32, TableEntry),
+    name: []const u8,
+    err: anyerror,
+) !TableEntry {
+    return getTable(tables, name) orelse {
+        log.err(.assets, "Font is missing the required '{s}' table", .{name});
+        return err;
+    };
 }
 
 fn printData(comptime T: type, value: T, label: []const u8) void {

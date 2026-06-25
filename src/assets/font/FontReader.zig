@@ -6,7 +6,10 @@ pub const FontReader = struct {
 
     pub fn readStruct(self: *FontReader, comptime T: type) T {
         const size = @sizeOf(T);
-        if (self.pos + size > self.data.len) @panic("Read past end of data");
+        if (self.pos + size > self.data.len) std.debug.panic(
+            "FontReader.readStruct({s}): read of {d} bytes at pos {d} exceeds data length {d}",
+            .{ @typeName(T), size, self.pos, self.data.len },
+        );
 
         const result = fromBigEndian(T, self.data[self.pos .. self.pos + size]);
         self.pos += size;
@@ -15,7 +18,10 @@ pub const FontReader = struct {
     }
 
     pub fn readU8(self: *FontReader) u8 {
-        if (self.pos + 1 > self.data.len) @panic("Read past end of data");
+        if (self.pos + 1 > self.data.len) std.debug.panic(
+            "FontReader.readU8: read at pos {d} exceeds data length {d}",
+            .{ self.pos, self.data.len },
+        );
 
         const result = self.data[self.pos];
         self.pos += 1;
@@ -23,7 +29,10 @@ pub const FontReader = struct {
         return result;
     }
     pub fn readU16BigEndian(self: *FontReader) u16 {
-        if (self.pos + 2 > self.data.len) @panic("Read past end of data");
+        if (self.pos + 2 > self.data.len) std.debug.panic(
+            "FontReader.readU16: read of 2 bytes at pos {d} exceeds data length {d}",
+            .{ self.pos, self.data.len },
+        );
 
         const bytes = self.data[self.pos .. self.pos + 2];
         const result = std.mem.bigToNative(u16, @bitCast(bytes[0..2].*));
@@ -34,7 +43,10 @@ pub const FontReader = struct {
     }
 
     pub fn readU32BigEndian(self: *FontReader) u32 {
-        if (self.pos + 4 > self.data.len) @panic("Read past end of data");
+        if (self.pos + 4 > self.data.len) std.debug.panic(
+            "FontReader.readU32: read of 4 bytes at pos {d} exceeds data length {d}",
+            .{ self.pos, self.data.len },
+        );
 
         const bytes = self.data[self.pos .. self.pos + 4];
         const result = std.mem.bigToNative(u32, @bitCast(bytes[0..4].*));
@@ -45,7 +57,10 @@ pub const FontReader = struct {
     }
 
     pub fn readI16BigEndian(self: *FontReader) i16 {
-        if (self.pos + 2 > self.data.len) @panic("Read past end of data");
+        if (self.pos + 2 > self.data.len) std.debug.panic(
+            "FontReader.readI16: read of 2 bytes at pos {d} exceeds data length {d}",
+            .{ self.pos, self.data.len },
+        );
 
         const bytes = self.data[self.pos .. self.pos + 2];
         const result = std.mem.bigToNative(i16, @bitCast(bytes[0..2].*));
@@ -56,7 +71,10 @@ pub const FontReader = struct {
     }
 
     pub fn readI32BigEndian(self: *FontReader) i32 {
-        if (self.pos + 4 > self.data.len) @panic("Read past end of data");
+        if (self.pos + 4 > self.data.len) std.debug.panic(
+            "FontReader.readI32: read of 4 bytes at pos {d} exceeds data length {d}",
+            .{ self.pos, self.data.len },
+        );
 
         const bytes = self.data[self.pos .. self.pos + 4];
         const result = std.mem.bigToNative(i32, @bitCast(bytes[0..4].*));
@@ -67,7 +85,10 @@ pub const FontReader = struct {
     }
 
     pub fn readU64BigEndian(self: *FontReader) u64 {
-        if (self.pos + 8 > self.data.len) @panic("Read past end of data");
+        if (self.pos + 8 > self.data.len) std.debug.panic(
+            "FontReader.readU64: read of 8 bytes at pos {d} exceeds data length {d}",
+            .{ self.pos, self.data.len },
+        );
 
         const bytes = self.data[self.pos .. self.pos + 8];
         const result = std.mem.bigToNative(u64, @bitCast(bytes[0..8].*));
@@ -78,16 +99,26 @@ pub const FontReader = struct {
     }
 
     pub fn seek(self: *FontReader, offset: usize) void {
-        if (offset > self.data.len) @panic("Read past end of data");
+        if (offset > self.data.len) std.debug.panic(
+            "FontReader.seek: offset {d} exceeds data length {d}",
+            .{ offset, self.data.len },
+        );
         self.pos = offset;
     }
 
     pub fn rewind(self: *FontReader, negOffset: usize) void {
+        if (negOffset > self.pos) std.debug.panic(
+            "FontReader.rewind: cannot back up {d} bytes from pos {d} (past start)",
+            .{ negOffset, self.pos },
+        );
         self.pos -= negOffset;
     }
 
     pub fn skip(self: *FontReader, bytes: usize) void {
-        if (self.pos + bytes > self.data.len) @panic("Read past end of data");
+        if (self.pos + bytes > self.data.len) std.debug.panic(
+            "FontReader.skip: skipping {d} bytes from pos {d} exceeds data length {d}",
+            .{ bytes, self.pos, self.data.len },
+        );
         self.pos += bytes;
 
         return;
@@ -109,7 +140,10 @@ pub const FontReader = struct {
         var pos: u32 = 0;
 
         self.seek(offset);
-        if (self.pos + length > self.data.len) @panic("Read past end of data");
+        if (self.pos + length > self.data.len) std.debug.panic(
+            "FontReader.calculateChecksum: range [{d}, {d}) exceeds data length {d}",
+            .{ self.pos, self.pos + length, self.data.len },
+        );
 
         while (pos + 4 <= length) {
             var value = self.readU32BigEndian();
