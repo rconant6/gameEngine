@@ -53,6 +53,7 @@ const module_defs = [_]ModuleDef{
             .{ "renderer", .renderer }, .{ "math", .math }, .{ "assets", .assets },
         },
     },
+    // Scene-format
     .{ .name = "scene-format", .path = "src/scene-format/lib.zig", .deps = &.{} },
     // Rendering
     .{
@@ -90,9 +91,11 @@ const module_defs = [_]ModuleDef{
             .{ "registry", .registry }, .{ "scene", .scene },
         },
     },
+    // Action
     .{ .name = "action", .path = "src/action/Action.zig", .deps = &.{
-        .{ "math", .math },   .{ "platform", .platform }, .{ "ecs", .ecs },
-        .{ "scene", .scene },
+        .{ "math", .math },             .{ "platform", .platform },
+        .{ "ecs", .ecs },               .{ "scene-format", .scene_format },
+        .{ "game_state", .game_state },
     } },
     // Registry
     .{
@@ -102,6 +105,7 @@ const module_defs = [_]ModuleDef{
             .{ "scene-format", .scene_format }, .{ "ecs", .ecs },
         },
     },
+    // Shapes
     .{
         .name = "shape_registry",
         .path = "src/registry/shape_registry.zig",
@@ -110,6 +114,7 @@ const module_defs = [_]ModuleDef{
             .{ "math", .math },
         },
     },
+    // Collider
     .{
         .name = "collider_shape_registry",
         .path = "src/registry/collider_shape_registry.zig",
@@ -117,6 +122,7 @@ const module_defs = [_]ModuleDef{
             .{ "ecs", .ecs },
         },
     },
+    // Registry
     .{
         .name = "registry",
         .path = "src/registry/registry.zig",
@@ -151,7 +157,7 @@ const module_defs = [_]ModuleDef{
         .name = "game_state",
         .path = "src/gameState/state.zig",
         .deps = &.{
-            .{ "systems", .systems }, .{ "math", .math },
+            .{ "math", .math },
         },
     },
     // Systems
@@ -161,7 +167,7 @@ const module_defs = [_]ModuleDef{
         .deps = &.{
             .{ "math", .math },         .{ "ecs", .ecs },
             .{ "renderer", .renderer }, .{ "assets", .assets },
-            .{ "action", .action },
+            .{ "action", .action },     .{ "game_state", .game_state },
         },
     },
     // App (window + renderer + input shell — used by tools and engine)

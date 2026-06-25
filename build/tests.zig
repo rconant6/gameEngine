@@ -100,6 +100,45 @@ pub fn addAllTests(
             .{ "Action", mod(modules, .action) },
             .{ "ecs", mod(modules, .ecs) },
         }, .link_engine = true },
+        .{ .name = "reflect-velocity-tests", .path = "tests/ecs/test_reflect_velocity.zig", .imports = &.{
+            .{ "math", mod(modules, .math) },
+            .{ "Action", mod(modules, .action) },
+            .{ "ecs", mod(modules, .ecs) },
+            .{ "game_state", mod(modules, .game_state) },
+        }, .link_engine = true },
+        .{ .name = "action-executor-tests", .path = "tests/ecs/test_action_executor.zig", .imports = &.{
+            .{ "math", mod(modules, .math) },
+            .{ "Action", mod(modules, .action) },
+            .{ "ecs", mod(modules, .ecs) },
+            .{ "game_state", mod(modules, .game_state) },
+        }, .link_engine = true },
+        .{ .name = "action-registry-tests", .path = "tests/ecs/test_action_registry.zig", .imports = &.{
+            .{ "math", mod(modules, .math) },
+            .{ "Action", mod(modules, .action) },
+            .{ "ecs", mod(modules, .ecs) },
+            .{ "scene-format", mod(modules, .scene_format) },
+        }, .link_engine = true },
+        .{ .name = "builtin-actions-tests", .path = "tests/ecs/test_builtin_actions.zig", .imports = &.{
+            .{ "math", mod(modules, .math) },
+            .{ "Action", mod(modules, .action) },
+            .{ "ecs", mod(modules, .ecs) },
+            .{ "game_state", mod(modules, .game_state) },
+        }, .link_engine = true },
+        .{ .name = "lifetime-system-tests", .path = "tests/ecs/test_lifetime_system.zig", .imports = &.{
+            .{ "math", mod(modules, .math) },
+            .{ "ecs", mod(modules, .ecs) },
+            .{ "systems", mod(modules, .systems) },
+        }, .link_engine = true },
+    };
+
+    // ========================================
+    // Layer 2C: Game State
+    // ========================================
+    const game_state_tests = [_]TestSpec{
+        .{ .name = "game-state-tests", .path = "tests/gameState/test_game_state_manager.zig", .imports = &.{
+            .{ "game_state", mod(modules, .game_state) },
+            .{ "math", mod(modules, .math) },
+        } },
     };
 
     // ========================================
@@ -142,6 +181,14 @@ pub fn addAllTests(
             .{ "assets", mod(modules, .assets) },
             .{ "math", mod(modules, .math) },
         }, .link_engine = true },
+        .{ .name = "action-instantiation-tests", .path = "tests/scene/test_action_instantiation.zig", .imports = &.{
+            .{ "scene-format", mod(modules, .scene_format) },
+            .{ "ecs", mod(modules, .ecs) },
+            .{ "scene", mod(modules, .scene) },
+            .{ "assets", mod(modules, .assets) },
+            .{ "math", mod(modules, .math) },
+            .{ "Action", mod(modules, .action) },
+        }, .link_engine = true },
     };
 
     // ========================================
@@ -161,6 +208,18 @@ pub fn addAllTests(
         .{ .name = "shapes-tests", .path = "tests/renderer/test_shapes.zig", .imports = &.{
             .{ "math", mod(modules, .math) },
             .{ "renderer", mod(modules, .renderer) },
+        }, .link_engine = true },
+    };
+
+    // ========================================
+    // Layer 4C2: Assets (fonts)
+    // ========================================
+    const asset_tests = [_]TestSpec{
+        .{ .name = "font-reader-tests", .path = "tests/assets/test_font_reader.zig", .anon_imports = &.{
+            .{ "FontReader", "src/assets/font/FontReader.zig" },
+        } },
+        .{ .name = "font-tests", .path = "tests/assets/test_font.zig", .imports = &.{
+            .{ "assets", mod(modules, .assets) },
         }, .link_engine = true },
     };
 
@@ -198,10 +257,12 @@ pub fn addAllTests(
         &core_tests,
         &ecs_tests,
         &action_tests,
+        &game_state_tests,
         &collision_tests,
         &scene_tests,
         &ui_tests,
         &renderer_tests,
+        &asset_tests,
         &zxl_tests,
         &integration_tests,
     };
