@@ -63,6 +63,7 @@
     [OnInput]
       [trigger]
         key:string "W"
+        phase:string "held"
         [action]
           type:string "set_velocity"
           target:string "self"
@@ -70,10 +71,27 @@
           priority:i32 0
       [trigger]
         key:string "S"
+        phase:string "held"
         [action]
           type:string "set_velocity"
           target:string "self"
           velocity:vec2 {0.0, -10.0}
+          priority:i32 0
+      [trigger]
+        key:string "W"
+        phase:string "released"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 0.0}
+          priority:i32 0
+      [trigger]
+        key:string "S"
+        phase:string "released"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 0.0}
           priority:i32 0
 
   // ── Right Paddle (Up/Down) ──
@@ -99,6 +117,7 @@
     [OnInput]
       [trigger]
         key:string "Up"
+        phase:string "held"
         [action]
           type:string "set_velocity"
           target:string "self"
@@ -106,10 +125,27 @@
           priority:i32 0
       [trigger]
         key:string "Down"
+        phase:string "held"
         [action]
           type:string "set_velocity"
           target:string "self"
           velocity:vec2 {0.0, -10.0}
+          priority:i32 0
+      [trigger]
+        key:string "Up"
+        phase:string "released"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 0.0}
+          priority:i32 0
+      [trigger]
+        key:string "Down"
+        phase:string "released"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 0.0}
           priority:i32 0
 
   // ── Top Wall ──

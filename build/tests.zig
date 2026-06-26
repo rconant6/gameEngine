@@ -94,6 +94,7 @@ pub fn addAllTests(
             .{ "math", mod(modules, .math) },
             .{ "Action", mod(modules, .action) },
             .{ "platform", mod(modules, .platform) },
+            .{ "ecs", mod(modules, .ecs) },
         }, .link_engine = true },
         .{ .name = "time-trigger-tests", .path = "tests/ecs/test_time_trigger.zig", .imports = &.{
             .{ "math", mod(modules, .math) },

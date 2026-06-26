@@ -104,10 +104,13 @@ pub const CollisionTrigger = struct {
 
 // MARK: Input Trigger System
 pub const InputTrigger = struct {
+    pub const Phase = enum { pressed, held, released };
+
     input: union(enum) {
         key: KeyCode,
         mouse: MouseButton,
     },
+    phase: Phase = .pressed,
     actions: []const Action,
 
     pub fn deinit(self: *InputTrigger, gpa: std.mem.Allocator) void {
@@ -126,8 +129,16 @@ pub const InputTrigger = struct {
 
             for (on_input.triggers) |trigger| {
                 const should_fire = switch (trigger.input) {
-                    .key => |keycode| input.isPressed(keycode),
-                    .mouse => |button| input.isPressed(button),
+                    .key => |k| switch (trigger.phase) {
+                        .pressed => input.isPressed(k),
+                        .held => input.isDown(k),
+                        .released => input.isReleased(k),
+                    },
+                    .mouse => |b| switch (trigger.phase) {
+                        .pressed => input.isPressed(b),
+                        .held => input.isDown(b),
+                        .released => input.isReleased(b),
+                    },
                 };
 
                 if (should_fire) {

@@ -58,25 +58,20 @@ pub const InstantiatorError = error{
     UnknownProperty,
     UnknownActionType,
 
-    ActionTargetTypeMismatch,
     ArrayTypeMismatch,
     BoolTypeMismatch,
     ColorTypeMismatch,
     EnumTypeMismatch,
     FloatTypeMismatch,
     IntTypeMismatch,
-    KeyCodeTypeMismatch,
-    MouseButtonTypeMismatch,
     OptionalTypeMismatch,
     PointerTypeMismatch,
-    ScreenAnchorMismatch,
     StringTypeMismatch,
     TypeMismatch,
     V2ITypeMismatch,
     V2TypeMismatch,
 
     Unimplemented,
-    UnimplementedAction,
     UnimplementedTopLevel,
 };
 
@@ -561,10 +556,13 @@ pub const Instantiator = struct {
                     }
                 } else {
                     if (getProperty(props, field.name)) |prop| {
-                        const value = try self.extractValueForType(field.type, prop.value) orelse {
+                        @field(trigger, field.name) = try self.extractValueForType(
+                            field.type,
+                            prop.value,
+                        ) orelse
                             return InstantiatorError.MissingRequiredField;
-                        };
-                        @field(trigger, field.name) = value;
+                    } else if (field.defaultValue()) |default| {
+                        @field(trigger, field.name) = default;
                     } else {
                         return InstantiatorError.MissingRequiredField;
                     }
@@ -727,20 +725,9 @@ pub const Instantiator = struct {
                 return InstantiatorError.OptionalTypeMismatch;
             },
             .@"enum" => {
-                if (T == ActionTarget)
-                    return getActionTarget(value.string) orelse
-                        return InstantiatorError.ActionTargetTypeMismatch;
-                if (T == KeyCode) {
-                    return getKeyCode(value.string) orelse
-                        return InstantiatorError.KeyCodeTypeMismatch;
-                }
-                if (T == MouseButton) {
-                    return getMouseButton(value.string) orelse
-                        return InstantiatorError.MouseButtonTypeMismatch;
-                }
-                if (T == ScreenAnchor) {
-                    return getScreenAnchor(value.string) orelse
-                        return InstantiatorError.ScreenAnchorMismatch;
+                if (value == .string) {
+                    return std.meta.stringToEnum(T, value.string) orelse
+                        InstantiatorError.EnumTypeMismatch;
                 }
                 return InstantiatorError.EnumTypeMismatch;
             },
@@ -802,17 +789,4 @@ fn getProperty(props: []const Property, property: []const u8) ?Property {
     }
 
     return null;
-}
-
-fn getKeyCode(key_str: []const u8) ?KeyCode {
-    return std.meta.stringToEnum(KeyCode, key_str);
-}
-fn getMouseButton(button_str: []const u8) ?MouseButton {
-    return std.meta.stringToEnum(MouseButton, button_str);
-}
-fn getActionTarget(target: []const u8) ?ActionTarget {
-    return std.meta.stringToEnum(ActionTarget, target);
-}
-fn getScreenAnchor(anchor: []const u8) ?ScreenAnchor {
-    return std.meta.stringToEnum(ScreenAnchor, anchor);
 }
