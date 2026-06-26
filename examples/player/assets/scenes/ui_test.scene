@@ -104,6 +104,17 @@
           target:string "self"
           velocity:vec2 {10.0, 0.0}
           priority:i32 0
+      // Space → fire a SpaceBullet (small circle, moves up, dies after 2s).
+      // NOTE: input triggers have no collision_loc, so spawn is at `offset`
+      // (world origin + offset), not at the player's position.
+      [trigger]
+        key:string "Space"
+        phase:string "pressed"
+        [action]
+          type:string "spawn_entity"
+          template_name:string "SpaceBullet"
+          offset:vec2 {0.0, 0.0}
+          priority:i32 0
 
   // Reference markers at known world positions
   // North marker (+Y)

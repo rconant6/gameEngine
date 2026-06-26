@@ -16,6 +16,16 @@ const core = @import("math");
 const V2 = core.V2;
 const GameMemory = core.GameMemory;
 
+const Action = @import("Action");
+const ActionRegistry = Action.ActionRegistry;
+const ActionQueue = Action.ActionQueue;
+const ActionContext = Action.ActionContext;
+const ActionExecutor = Action.ActionExecutor;
+const EngineServices = Action.EngineServices;
+const builtins = Action.builtins;
+const game_state = @import("game_state");
+const Tag = ecs.Tag;
+
 // These tests document the expected behavior of template instantiation
 // They will fail until the template system is implemented
 
@@ -527,4 +537,92 @@ test "TemplateInstantiation: directory load skips non-template files" {
 
     // Should not treat README.md as a template file
     try testing.expect(!template_manager.hasTemplate("README"));
+}
+
+// MARK: spawn_entity position precedence (the //BUG fix)
+//
+// spawn-origin precedence: collision_loc → firing entity's Transform → ZERO,
+// then + offset. This pins that an INPUT-triggered spawn (no collision_loc)
+// lands at the firing entity's position, not at world origin.
+
+// stub EngineServices — spawn_entity never calls into it, but executeActions
+// requires a non-null services pointer.
+fn svcNoop2(ctx: *anyopaque) void {
+    _ = ctx;
+}
+fn svcNoopName2(ctx: *anyopaque, name: []const u8) void {
+    _ = ctx;
+    _ = name;
+}
+fn svcSet2(ctx: *anyopaque, k: []const u8, v: game_state.StateValue) anyerror!void {
+    _ = ctx;
+    _ = k;
+    _ = v;
+}
+fn svcGet2(ctx: *anyopaque, k: []const u8) ?game_state.StateValue {
+    _ = ctx;
+    _ = k;
+    return null;
+}
+const spawn_vtable = EngineServices.VTable{
+    .set_state_var = svcSet2,
+    .get_state_var = svcGet2,
+    .transition_to = svcNoopName2,
+    .restart_state = svcNoop2,
+    .restart_game = svcNoopName2,
+};
+
+fn findByTag(world: *World, tag: []const u8) ?ecs.Entity {
+    return world.findEntityByTag(tag);
+}
+
+test "spawn_entity from an input trigger spawns at the firing entity's position" {
+    const gpa = testing.allocator;
+
+    var world = try World.init(gpa);
+    defer world.deinit();
+
+    var mem_backing: GameMemory = undefined;
+    mem_backing.init(gpa);
+    defer mem_backing.deinit();
+    const mem = &mem_backing;
+
+    var assets = try AssetManager.init(mem, std.testing.io, undefined);
+    defer assets.deinit();
+
+    var instantiator = Instantiator.init(mem.persistent, &world, &assets);
+    instantiator.game = mem.game;
+    defer instantiator.deinit();
+
+    var template_manager = TemplateManager.init(mem.persistent, std.testing.io, &instantiator);
+    defer template_manager.deinit();
+    try template_manager.loadTemplateFile("examples/player/assets/templates/projectiles.template");
+    world.template_manager = &template_manager;
+
+    var reg = ActionRegistry.init(gpa);
+    defer reg.deinit();
+    try Action.registerBuiltins(&reg);
+
+    // the firing entity at a known, non-origin position
+    const shooter = try world.createEntity();
+    try world.addComponent(shooter, Transform, .{ .position = .{ .x = 7, .y = -3 }, .rotation = 0, .scale = 1 });
+
+    // fire spawn_entity with NO collision_loc (input-trigger case) + an offset
+    const params = builtins.SpawnEntity{ .template_name = "SpaceBullet", .offset = .{ .x = 0, .y = 2 } };
+    const id = reg.lookup("spawn_entity").?;
+    const action = Action.Action{ .id = id, .params = &params, .priority = 0 };
+    const ctx = ActionContext{ .self_ent = shooter, .other_ent = null, .collision_loc = null };
+
+    var queue = ActionQueue.init(gpa);
+    defer queue.deinit();
+    try queue.append(action, ctx);
+
+    var services = EngineServices{ .ctx = undefined, .vtable = &spawn_vtable };
+    ActionExecutor.executeActions(&world, &queue, &reg, &services, 0.016);
+
+    // the spawned SpaceBullet should be at shooter.position + offset = (7, -1)
+    const bullet = findByTag(&world, "space_bullet") orelse return error.BulletNotSpawned;
+    const t = world.getComponent(bullet, Transform).?;
+    try testing.expectApproxEqAbs(@as(f32, 7.0), t.position.x, 0.0001);
+    try testing.expectApproxEqAbs(@as(f32, -1.0), t.position.y, 0.0001);
 }

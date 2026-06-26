@@ -181,6 +181,8 @@ pub fn addAllTests(
             .{ "scene", mod(modules, .scene) },
             .{ "assets", mod(modules, .assets) },
             .{ "math", mod(modules, .math) },
+            .{ "Action", mod(modules, .action) },
+            .{ "game_state", mod(modules, .game_state) },
         }, .link_engine = true },
         .{ .name = "action-instantiation-tests", .path = "tests/scene/test_action_instantiation.zig", .imports = &.{
             .{ "scene-format", mod(modules, .scene_format) },

@@ -92,9 +92,15 @@ fn destroyOther(ctx: *ActionRunContext, _: DestroyOther) void {
 }
 fn spawnEntity(ctx: *ActionRunContext, sd: SpawnEntity) void {
     const name = sd.template_name;
-    //BUG: this is wrong...need transform and sprite?
-    var loc = ctx.collision_loc orelse V2.ZERO;
-    loc = loc.add(sd.offset);
+    // Spawn-origin precedence: collision point (collision triggers) → the firing
+    // entity's position (input/timer triggers) → world origin. Then + offset.
+    const base = if (ctx.collision_loc) |loc|
+        loc
+    else if (ctx.world.getComponent(ctx.self_ent, Transform)) |t|
+        t.position
+    else
+        V2.ZERO;
+    const loc = base.add(sd.offset);
 
     const entity = ctx.world.createEntityFromTemplate(
         name,
