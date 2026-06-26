@@ -5,6 +5,7 @@ const ActionQueue = action_mod.ActionQueue;
 const ActionContext = action_mod.ActionContext;
 const OnCollision = action_mod.OnCollision;
 const OnInput = action_mod.OnInput;
+const OnTimer = action_mod.OnTimer;
 const platform = @import("platform");
 const KeyCode = platform.KeyCode;
 const MouseButton = platform.MouseButton;
@@ -154,6 +155,46 @@ pub const InputTrigger = struct {
                             context,
                         );
                     }
+                }
+            }
+        }
+    }
+};
+
+//MARK: TimeTrigger
+pub const TimeTrigger = struct {
+    interval: f32, // seconds...required from the scene (can't default)
+    repeat: bool = false, // false -> one-shot, true- multi shoot
+    elapsed: f32 = 0, // accumulator
+    fired: bool = false,
+    actions: []const Action,
+
+    pub fn deinit(self: *TimeTrigger, gpa: std.mem.Allocator) void {
+        gpa.free(self.actions);
+    }
+
+    pub fn process(world: *World, ctx: TriggerContext) !void {
+        const dt = ctx.delta_time orelse return error.NoDeltaTime;
+        const MAX_CATCHUP = 4; // cap fires per frame (avoids spiral after a hitch)
+        var query = world.query(.{OnTimer});
+        while (query.next()) |entry| {
+            for (entry.get(0).triggers) |*t| {
+                if (t.fired and !t.repeat) continue;
+                t.elapsed += dt;
+                var fires: u32 = 0;
+                while (t.elapsed >= t.interval and fires < MAX_CATCHUP) {
+                    t.elapsed -= t.interval;
+                    fires += 1;
+                    t.fired = true;
+                    const context: ActionContext = .{
+                        .self_ent = entry.entity,
+                        .other_ent = null,
+                        .collision_loc = null,
+                    };
+                    for (t.actions) |action| {
+                        try ctx.action_queue.append(action, context);
+                    }
+                    if (!t.repeat) break;
                 }
             }
         }

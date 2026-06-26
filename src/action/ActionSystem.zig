@@ -9,6 +9,7 @@ const TriggerSystem = triggers.TriggerSystem;
 const TriggerContext = triggers.TriggerContext;
 const InputTrigger = triggers.InputTrigger;
 const CollisionTrigger = triggers.CollisionTrigger;
+const TimeTrigger = triggers.TimeTrigger;
 const ActionExecutor = @import("ActionExecutor.zig");
 const debug = @import("debug");
 const log = debug.log;
@@ -42,6 +43,14 @@ fn inputTriggerWrapper(
     _ = ptr; // Stateless, don't need the pointer
     try InputTrigger.process(world, ctx);
 }
+fn timeTriggerWrapper(
+    ptr: *anyopaque,
+    world: *World,
+    ctx: TriggerContext,
+) anyerror!void {
+    _ = ptr;
+    try TimeTrigger.process(world, ctx);
+}
 
 pub fn init(mem: *Memory) !Self {
     var action_system = Self{
@@ -61,6 +70,10 @@ pub fn init(mem: *Memory) !Self {
     try action_system.trigger_systems.append(mem.persistent, .{
         .sys = &dummy_state,
         .processFn = inputTriggerWrapper,
+    });
+    try action_system.trigger_systems.append(mem.persistent, .{
+        .sys = &dummy_state,
+        .processFn = timeTriggerWrapper,
     });
 
     return action_system;

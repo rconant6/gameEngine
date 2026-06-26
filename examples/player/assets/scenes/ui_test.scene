@@ -45,6 +45,17 @@
       asset_name:string "TestSprite"
       pixel_scale:f32 2.0
 
+  // Timed-death sprite — appears lower-left, LifetimeSys destroys it after 2s
+  [DyingSprite:entity]
+    [Transform]
+      position:vec2 {-20.0, -15.0}
+      scale:f32 1.0
+    [ZxlSprite]
+      asset_name:string "TestSprite"
+      pixel_scale:f32 3.0
+    [Lifetime]
+      remaining:f32 2.0
+
   // Player - camera will follow this
   [Player:entity]
     [Transform]

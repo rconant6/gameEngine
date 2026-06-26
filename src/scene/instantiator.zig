@@ -43,8 +43,9 @@ const Action = acts.Action;
 const ActionTarget = acts.ActionTarget;
 const ActionRegistry = acts.ActionRegistry;
 const InputTrigger = acts.InputTrigger;
-const log = @import("debug").log;
 const CollisionTrigger = acts.CollisionTrigger;
+const TimeTrigger = acts.TimeTrigger;
+const log = @import("debug").log;
 
 pub const InstantiatorError = error{
     ShapeBuilding,
@@ -275,6 +276,11 @@ pub const Instantiator = struct {
         if (std.mem.eql(u8, comp_name, "OnInput")) {
             const component = try self.buildTriggerComponent(Components.OnInput, InputTrigger, comp_decl.generic);
             try self.world.addComponent(entity, Components.OnInput, component);
+            return;
+        }
+        if (std.mem.eql(u8, comp_name, "OnTimer")) {
+            const component = try self.buildTriggerComponent(Components.OnTimer, TimeTrigger, comp_decl.generic);
+            try self.world.addComponent(entity, Components.OnTimer, component);
             return;
         }
 

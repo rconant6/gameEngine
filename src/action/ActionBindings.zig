@@ -22,6 +22,8 @@ pub fn ActionBindings(comptime TriggerType: type) type {
 
 const CollisionTrigger = triggers.CollisionTrigger;
 const InputTrigger = triggers.InputTrigger;
+const TimeTrigger = triggers.TimeTrigger;
 
 pub const OnCollision = ActionBindings(CollisionTrigger);
 pub const OnInput = ActionBindings(InputTrigger);
+pub const OnTimer = ActionBindings(TimeTrigger);

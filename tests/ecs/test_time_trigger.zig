@@ -1,287 +1,132 @@
+//! Phase 4C — TimeTrigger / OnTimer.
+//!
+//! Drives the REAL Action.TimeTrigger.process() with dt frames and asserts
+//! firing cadence: accumulate across frames, fire at the interval, one-shot vs
+//! repeat, and the MAX_CATCHUP cap after a long frame.
+//!
+//! (Replaces the old phantom suite, which tested a local TimeTrigger copy.)
+
 const std = @import("std");
 const testing = std.testing;
+
 const Action = @import("Action");
-const V2 = @import("math").V2;
+const TimeTrigger = Action.TimeTrigger;
+const OnTimer = Action.OnTimer;
+const ActionQueue = Action.ActionQueue;
+const TriggerContext = Action.TriggerContext;
+
 const ecs = @import("ecs");
 const World = ecs.World;
 const Entity = ecs.Entity;
 
-// Custom time-based trigger type
-const TimeTrigger = struct {
-    interval: f32, // Time in seconds between triggers
-    actions: []const Action.Action,
-
-    pub fn deinit(self: *TimeTrigger, gpa: std.mem.Allocator) void {
-        gpa.free(self.actions);
-    }
-};
-
-// Component that holds time-based triggers
-const OnTime = Action.ActionBindings(TimeTrigger);
-
-// Component to track elapsed time for time-based triggers
-const TimeAccumulator = struct {
-    elapsed: []f32, // One elapsed time per trigger
-};
-
-// Trigger system that processes time-based triggers
-const TimeBasedTriggerSystem = struct {
-    pub fn process(
-        world: *World,
-        ctx: Action.TriggerContext,
-    ) !void {
-        const delta_time = ctx.delta_time orelse return error.NoDeltaTime;
-        var query = world.query(.{OnTime});
-
-        while (query.next()) |entry| {
-            const on_time = entry.get(0);
-
-            // Get or create time accumulator for this entity
-            var accumulator = world.getComponentMut(entry.entity, TimeAccumulator) orelse continue;
-
-            for (on_time.triggers, 0..) |trigger, i| {
-                accumulator.elapsed[i] += delta_time;
-
-                if (accumulator.elapsed[i] >= trigger.interval) {
-                    accumulator.elapsed[i] = 0.0;
-
-                    const context: Action.ActionContext = .{
-                        .self_ent = entry.entity,
-                        .other_ent = null,
-                        .collision_loc = null,
-                    };
-
-                    for (trigger.actions) |action| {
-                        try ctx.action_queue.append(action, context);
-                    }
-                }
-            }
-        }
-    }
-};
-
-test "TimeTrigger - basic structure" {
-    const action = Action.Action{ .id = 0, .params = null, .priority = 0 };
-
-    const trigger = TimeTrigger{
-        .interval = 1.0,
-        .actions = &[_]Action.Action{action},
-    };
-
-    try testing.expectEqual(@as(f32, 1.0), trigger.interval);
-    try testing.expectEqual(@as(usize, 1), trigger.actions.len);
+// placeholder handle — tests assert on FIRING count, not action behavior
+fn placeholder() Action.Action {
+    return .{ .id = 0, .params = null, .priority = 0 };
 }
 
-test "TimeAccumulator - tracking elapsed time" {
-    var elapsed = [_]f32{ 0.0, 0.0 };
-    var accumulator = TimeAccumulator{
-        .elapsed = &elapsed,
-    };
-
-    // Simulate time passing
-    accumulator.elapsed[0] += 0.3;
-    accumulator.elapsed[1] += 0.5;
-
-    try testing.expectEqual(@as(f32, 0.3), accumulator.elapsed[0]);
-    try testing.expectEqual(@as(f32, 0.5), accumulator.elapsed[1]);
-
-    // More time passes
-    accumulator.elapsed[0] += 0.7;
-    try testing.expectEqual(@as(f32, 1.0), accumulator.elapsed[0]);
+/// Add an OnTimer with one trigger of the given interval/repeat to `ent`.
+fn addTimer(world: *World, ent: Entity, interval: f32, repeat: bool) !void {
+    const actions = try testing.allocator.alloc(Action.Action, 1);
+    actions[0] = placeholder();
+    const triggers = try testing.allocator.alloc(TimeTrigger, 1);
+    triggers[0] = .{ .interval = interval, .repeat = repeat, .actions = actions };
+    try world.addComponent(ent, OnTimer, .{ .triggers = triggers });
 }
 
-test "TimeAccumulator - reset after threshold" {
-    var elapsed = [_]f32{0.8};
-    var accumulator = TimeAccumulator{
-        .elapsed = &elapsed,
-    };
-
-    const interval: f32 = 1.0;
-    accumulator.elapsed[0] += 0.3; // Now 1.1
-
-    if (accumulator.elapsed[0] >= interval) {
-        accumulator.elapsed[0] = 0.0; // Reset
-    }
-
-    try testing.expectEqual(@as(f32, 0.0), accumulator.elapsed[0]);
+/// Advance one frame by `dt`, return how many actions fired this frame.
+fn tick(world: *World, dt: f32) !usize {
+    var queue = ActionQueue.init(testing.allocator);
+    defer queue.deinit();
+    const ctx = TriggerContext{ .delta_time = dt, .action_queue = &queue };
+    try TimeTrigger.process(world, ctx);
+    return queue.actions.items.len;
 }
 
-test "OnTime - ActionBindings with TimeTrigger" {
-    const action = Action.Action{ .id = 0, .params = null, .priority = 0 };
+// MARK: accumulation
 
-    const trigger = TimeTrigger{
-        .interval = 2.0,
-        .actions = &[_]Action.Action{action},
-    };
-
-    var triggers_array = [_]TimeTrigger{trigger};
-    const time_bindings = OnTime{
-        .triggers = &triggers_array,
-    };
-
-    try testing.expect(time_bindings.hasTriggers());
-    try testing.expectEqual(@as(usize, 1), time_bindings.triggers.len);
-    try testing.expectEqual(@as(f32, 2.0), time_bindings.triggers[0].interval);
-}
-
-test "OnTime - multiple triggers with different intervals" {
-    const action1 = Action.Action{ .id = 0, .params = null, .priority = 0 };
-
-    const action2 = Action.Action{ .id = 0, .params = null, .priority = 1 };
-
-    const trigger1 = TimeTrigger{
-        .interval = 0.5,
-        .actions = &[_]Action.Action{action1},
-    };
-
-    const trigger2 = TimeTrigger{
-        .interval = 1.0,
-        .actions = &[_]Action.Action{action2},
-    };
-
-    var triggers_array = [_]TimeTrigger{ trigger1, trigger2 };
-    const time_bindings = OnTime{
-        .triggers = &triggers_array,
-    };
-
-    try testing.expectEqual(@as(usize, 2), time_bindings.triggers.len);
-    try testing.expectEqual(@as(f32, 0.5), time_bindings.triggers[0].interval);
-    try testing.expectEqual(@as(f32, 1.0), time_bindings.triggers[1].interval);
-}
-
-test "TimeBasedTriggerSystem - process with delta_time" {
-    const gpa = testing.allocator;
-
-    var world = try World.init(gpa);
+test "repeat timer accumulates across frames and fires at the interval" {
+    var world = try World.init(testing.allocator);
     defer world.deinit();
+    const e = try world.createEntity();
+    try addTimer(&world, e, 1.0, true);
 
-    const entity = try world.createEntity();
-
-    const action = Action.Action{ .id = 0, .params = null, .priority = 0 };
-
-    // Allocate actions array on heap for proper cleanup
-    const actions = try gpa.alloc(Action.Action, 1);
-    actions[0] = action;
-
-    const trigger = TimeTrigger{
-        .interval = 1.0,
-        .actions = actions,
-    };
-
-    // Allocate triggers array on heap for proper cleanup
-    const triggers = try gpa.alloc(TimeTrigger, 1);
-    triggers[0] = trigger;
-
-    try world.addComponent(entity, OnTime, .{
-        .triggers = triggers,
-    });
-
-    var elapsed = [_]f32{0.0};
-    try world.addComponent(entity, TimeAccumulator, .{
-        .elapsed = &elapsed,
-    });
-
-    var action_queue = Action.ActionQueue.init(gpa);
-    defer action_queue.deinit();
-
-    const ctx = Action.TriggerContext{
-        .delta_time = 0.5,
-        .action_queue = &action_queue,
-    };
-
-    // First tick - should not fire
-    try TimeBasedTriggerSystem.process(&world, ctx);
-    try testing.expectEqual(@as(usize, 0), action_queue.actions.items.len);
-
-    // Second tick - should fire (0.5 + 0.6 > 1.0)
-    const ctx2 = Action.TriggerContext{
-        .delta_time = 0.6,
-        .action_queue = &action_queue,
-    };
-    try TimeBasedTriggerSystem.process(&world, ctx2);
-    try testing.expectEqual(@as(usize, 1), action_queue.actions.items.len);
-    try testing.expectEqual(entity, action_queue.actions.items[0].context.self_ent);
+    // 0.4 + 0.4 = 0.8 < 1.0 → no fire yet
+    try testing.expectEqual(@as(usize, 0), try tick(&world, 0.4));
+    try testing.expectEqual(@as(usize, 0), try tick(&world, 0.4));
+    // +0.4 = 1.2 ≥ 1.0 → fires once, 0.2 carries over
+    try testing.expectEqual(@as(usize, 1), try tick(&world, 0.4));
+    // 0.2 + 0.4 = 0.6 < 1.0 → no fire
+    try testing.expectEqual(@as(usize, 0), try tick(&world, 0.4));
 }
 
-test "TimeBasedTriggerSystem - multiple entities" {
-    const gpa = testing.allocator;
-
-    var world = try World.init(gpa);
+test "repeat timer keeps firing every interval" {
+    var world = try World.init(testing.allocator);
     defer world.deinit();
+    const e = try world.createEntity();
+    try addTimer(&world, e, 0.5, true);
 
-    const entity1 = try world.createEntity();
-    const entity2 = try world.createEntity();
-
-    const action = Action.Action{ .id = 0, .params = null, .priority = 0 };
-
-    // Allocate for entity1
-    const actions1 = try gpa.alloc(Action.Action, 1);
-    actions1[0] = action;
-
-    const trigger1 = TimeTrigger{
-        .interval = 0.5,
-        .actions = actions1,
-    };
-
-    const triggers1 = try gpa.alloc(TimeTrigger, 1);
-    triggers1[0] = trigger1;
-
-    try world.addComponent(entity1, OnTime, .{
-        .triggers = triggers1,
-    });
-    var elapsed1 = [_]f32{0.0};
-    try world.addComponent(entity1, TimeAccumulator, .{
-        .elapsed = &elapsed1,
-    });
-
-    // Allocate for entity2
-    const actions2 = try gpa.alloc(Action.Action, 1);
-    actions2[0] = action;
-
-    const trigger2 = TimeTrigger{
-        .interval = 0.5,
-        .actions = actions2,
-    };
-
-    const triggers2 = try gpa.alloc(TimeTrigger, 1);
-    triggers2[0] = trigger2;
-
-    try world.addComponent(entity2, OnTime, .{
-        .triggers = triggers2,
-    });
-    var elapsed2 = [_]f32{0.0};
-    try world.addComponent(entity2, TimeAccumulator, .{
-        .elapsed = &elapsed2,
-    });
-
-    var action_queue = Action.ActionQueue.init(gpa);
-    defer action_queue.deinit();
-
-    const ctx = Action.TriggerContext{
-        .delta_time = 0.6,
-        .action_queue = &action_queue,
-    };
-
-    try TimeBasedTriggerSystem.process(&world, ctx);
-
-    // Both entities should have triggered
-    try testing.expectEqual(@as(usize, 2), action_queue.actions.items.len);
+    // each tick of exactly the interval fires once
+    try testing.expectEqual(@as(usize, 1), try tick(&world, 0.5));
+    try testing.expectEqual(@as(usize, 1), try tick(&world, 0.5));
+    try testing.expectEqual(@as(usize, 1), try tick(&world, 0.5));
 }
 
-test "TimeBasedTriggerSystem - error when no delta_time" {
-    const gpa = testing.allocator;
+// MARK: one-shot
 
-    var world = try World.init(gpa);
+test "one-shot timer fires once then never again" {
+    var world = try World.init(testing.allocator);
     defer world.deinit();
+    const e = try world.createEntity();
+    try addTimer(&world, e, 1.0, false);
 
-    var action_queue = Action.ActionQueue.init(gpa);
-    defer action_queue.deinit();
+    try testing.expectEqual(@as(usize, 0), try tick(&world, 0.5)); // not yet
+    try testing.expectEqual(@as(usize, 1), try tick(&world, 0.6)); // 1.1 ≥ 1.0 → fires
+    // stays fired: no more fires regardless of further time
+    try testing.expectEqual(@as(usize, 0), try tick(&world, 5.0));
+    try testing.expectEqual(@as(usize, 0), try tick(&world, 5.0));
+}
 
-    const ctx = Action.TriggerContext{
-        .delta_time = null,
-        .action_queue = &action_queue,
-    };
+// MARK: catch-up cap
 
-    const result = TimeBasedTriggerSystem.process(&world, ctx);
-    try testing.expectError(error.NoDeltaTime, result);
+test "a long frame fires multiple times, capped at MAX_CATCHUP" {
+    var world = try World.init(testing.allocator);
+    defer world.deinit();
+    const e = try world.createEntity();
+    try addTimer(&world, e, 0.1, true);
+
+    // dt of 1.0 with interval 0.1 = 10 intervals, but MAX_CATCHUP caps at 4
+    try testing.expectEqual(@as(usize, 4), try tick(&world, 1.0));
+}
+
+// MARK: multiple triggers / entities
+
+test "multiple timers on one entity fire independently" {
+    var world = try World.init(testing.allocator);
+    defer world.deinit();
+    const e = try world.createEntity();
+
+    const actions_a = try testing.allocator.alloc(Action.Action, 1);
+    actions_a[0] = placeholder();
+    const actions_b = try testing.allocator.alloc(Action.Action, 1);
+    actions_b[0] = placeholder();
+    const triggers = try testing.allocator.alloc(TimeTrigger, 2);
+    triggers[0] = .{ .interval = 0.5, .repeat = true, .actions = actions_a };
+    triggers[1] = .{ .interval = 1.0, .repeat = true, .actions = actions_b };
+    try world.addComponent(e, OnTimer, .{ .triggers = triggers });
+
+    // 0.5: only the first fires
+    try testing.expectEqual(@as(usize, 1), try tick(&world, 0.5));
+    // +0.5 = 1.0 total: first fires again AND second fires → 2
+    try testing.expectEqual(@as(usize, 2), try tick(&world, 0.5));
+}
+
+// MARK: structural
+
+test "TimeTrigger field defaults: repeat false, elapsed 0, fired false" {
+    const actions = [_]Action.Action{placeholder()};
+    const t = TimeTrigger{ .interval = 2.0, .actions = &actions };
+    try testing.expectEqual(@as(f32, 2.0), t.interval);
+    try testing.expect(!t.repeat); // one-shot by default
+    try testing.expectEqual(@as(f32, 0.0), t.elapsed);
+    try testing.expect(!t.fired);
 }

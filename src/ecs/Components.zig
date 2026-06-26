@@ -13,6 +13,7 @@ const action = @import("action");
 // MARK: Action Components (defined in action module, re-exported for ECS use)
 pub const OnCollision = action.OnCollision;
 pub const OnInput = action.OnInput;
+pub const OnTimer = action.OnTimer;
 
 // MARK: Spatial Components
 pub const Transform = struct {
