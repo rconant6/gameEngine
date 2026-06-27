@@ -130,6 +130,13 @@ pub fn addAllTests(
             .{ "ecs", mod(modules, .ecs) },
             .{ "systems", mod(modules, .systems) },
         }, .link_engine = true },
+        .{ .name = "state-text-system-tests", .path = "tests/systems/test_state_text_system.zig", .imports = &.{
+            .{ "math", mod(modules, .math) },
+            .{ "ecs", mod(modules, .ecs) },
+            .{ "systems", mod(modules, .systems) },
+            .{ "game_state", mod(modules, .game_state) },
+            .{ "renderer", mod(modules, .renderer) },
+        }, .link_engine = true },
     };
 
     // ========================================
