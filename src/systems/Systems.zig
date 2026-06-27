@@ -28,6 +28,7 @@ pub const actionSystem = @import("ActionSys.zig").run;
 pub const lifetimeSystem = @import("LifetimeSys.zig").run;
 pub const renderSystem = @import("RenderSys.zig").run;
 pub const cameraTrackingSystem = @import("CameraTrackingSys.zig").run;
+pub const stateTextSystem = @import("StateTextSys.zig").run;
 
 pub fn debugEntityInfoSystem(
     world: *World,

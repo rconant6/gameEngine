@@ -69,6 +69,7 @@ pub const InstantiatorError = error{
     PointerTypeMismatch,
     StringTypeMismatch,
     TypeMismatch,
+    UnionTypeMismatch,
     V2ITypeMismatch,
     V2TypeMismatch,
 
@@ -738,9 +739,9 @@ pub const Instantiator = struct {
                 return InstantiatorError.EnumTypeMismatch;
             },
             .@"union" => {
-                return InstantiatorError.TypeMismatch;
+                return InstantiatorError.UnionTypeMismatch;
             },
-            else => return InstantiatorError.UnionTypeMismatch,
+            else => return InstantiatorError.TypeMismatch,
         }
         return InstantiatorError.TypeMismatch;
     }

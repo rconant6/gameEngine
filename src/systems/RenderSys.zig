@@ -3,6 +3,7 @@ const assets = @import("assets");
 const AssetManager = assets.AssetManager;
 const math = @import("math");
 const WorldPoint = math.WorldPoint;
+const ScreenPoint = math.ScreenPoint;
 const ecs = @import("ecs");
 const Camera = ecs.Camera;
 const Destroy = ecs.Destroy;
@@ -18,6 +19,7 @@ const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
 const ShapeRegistry = rend.ShapeRegistry;
 const shapes = rend.Shapes;
+const log = @import("debug").log;
 
 pub fn run(
     renderer: *Renderer,
@@ -82,7 +84,15 @@ pub fn run(
         const transform = entry.get(0);
         const text = entry.get(1);
 
-        const font = asset_manager.getFont(text.font_name) orelse continue;
+        const font = asset_manager.getFont(text.font_name) orelse
+            asset_manager.getFont("__default__") orelse {
+            log.warn(
+                .assets,
+                "Text font '{s}' missing, no default",
+                .{text.font_name},
+            );
+            continue;
+        };
 
         renderer.drawText(
             font,
@@ -127,6 +137,34 @@ pub fn run(
             );
         }
         count += 1;
+    }
+
+    var ui_text_query = world.query(.{ UIElement, Text });
+    while (ui_text_query.next()) |entry| {
+        const ui_element = entry.get(0);
+        const text = entry.get(1);
+        const font = asset_manager.getFont(text.font_name) orelse
+            asset_manager.getFont("__default__") orelse {
+            log.warn(
+                .assets,
+                "Text font '{s}' missing, no default",
+                .{text.font_name},
+            );
+            continue;
+        };
+        const anchor_pos = rend.getAnchorPos(ui_element.anchor, ui_ctx);
+        const screen_pos = WorldPoint{
+            .x = anchor_pos.x + ui_element.offset.x,
+            .y = anchor_pos.y + ui_element.offset.y,
+        };
+        renderer.drawTextScreen(
+            font,
+            text.text,
+            ScreenPoint{ .x = screen_pos.x, .y = screen_pos.y },
+            text.size,
+            text.text_color,
+            ui_ctx,
+        );
     }
 
     var zxl_query = world.query(.{ Transform, ZxlSprite });
@@ -179,4 +217,3 @@ pub fn run(
 
     return ctx;
 }
-

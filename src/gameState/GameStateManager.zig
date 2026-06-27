@@ -31,6 +31,7 @@ pub const SimulateOpts = struct {
     actions: bool = true,
     camera: bool = true,
     lifetime: bool = true,
+    state_text: bool = true,
 };
 
 pub const StateDescriptor = struct {

@@ -5,6 +5,7 @@ pub const World = @import("World.zig");
 pub const comps = @import("Components.zig");
 pub const Transform = comps.Transform;
 pub const UIElement = comps.UIElement;
+pub const StateText = comps.StateText;
 pub const Velocity = comps.Velocity;
 pub const Sprite = comps.Sprite;
 pub const Text = comps.Text;

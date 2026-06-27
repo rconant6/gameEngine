@@ -47,10 +47,18 @@ pub const Sprite = struct {
 };
 pub const Text = struct {
     text: []const u8,
-    font_name: []const u8,
+    font_name: []const u8 = "__default__",
     size: f32,
     text_color: Color,
 };
+
+pub const StateText = struct {
+    key: []const u8,
+    prefix: []const u8 = "",
+    buf: [64]u8 = undefined,
+    len: usize = 0,
+};
+
 pub const RenderLayer = struct {
     z_order: i32 = 0,
 };

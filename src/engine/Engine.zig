@@ -313,6 +313,7 @@ pub const Engine = struct {
         }
         if (opts.camera) Systems.cameraTrackingSystem(&self.world, dt);
         if (opts.lifetime) Systems.lifetimeSystem(&self.world, dt, self.mem.frame);
+        if (opts.state_text) Systems.stateTextSystem(&self.world, &self.state_manager);
     }
 
     // NOTE: helper for just rendering the current frame and state
