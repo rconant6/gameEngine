@@ -7,6 +7,7 @@ alias release='zig build play --error-style minimal_clear -Doptimize=ReleaseFast
 alias small='zig build play --error-style minimal_clear -Doptimize=ReleaseSmall'
 alias art='zig build zixelart --error-style minimal_clear'
 alias level='zig build sceneEdit --error-style minimal_clear'
+alias pong='zig build pong --error-style minimal_clear'
 alias clean='zig build clean'
 alias watch='zig build build-all --watch --error-style minimal_clear'
 
