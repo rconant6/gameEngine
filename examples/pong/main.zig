@@ -42,19 +42,15 @@ pub fn main(init: std.process.Init) !void {
     try game.loadScene("game_over", "game_over");
 
     try game.declareStates(State, .{
-        .serve     = SD{ .world_policy = .preserve },
+        .serve     = SD{ .scene = "pong", .world_policy = .preserve },
         .playing   = SD{ .world_policy = .preserve },
         .scored    = SD{ .world_policy = .preserve },
-        .game_over = SD{ .world_policy = .clear },
+        .game_over = SD{ .scene = "game_over", .world_policy = .clear },
     });
 
+    // Engine instantiates the bound "pong" scene when this transition resolves on
+    // the next beginFrame; the ball reset then happens via stateEntered(.serve).
     try game.transitionTo(State, .serve);
-    try game.setActiveScene("pong");
-    try game.instantiateActiveScene();
-    game.setStateVar("score_left",   .{ .int = 0 })   catch {};
-    game.setStateVar("score_right",  .{ .int = 0 })   catch {};
-    game.setStateVar("pong_loaded",  .{ .bool = true }) catch {};
-    serveBall(game);
 
     var prev_ms: i64 = monoMillis();
 
@@ -68,19 +64,14 @@ pub fn main(init: std.process.Init) !void {
 
         if (game.isPressed(KeyCode.Esc)) break;
 
+        // Bound scene just (re)instantiated for .serve — reset the ball to center.
+        if (game.stateEntered(State, .serve)) serveBall(game);
+
         clampPaddleVelocity(game, "paddle_left");
         clampPaddleVelocity(game, "paddle_right");
 
         switch (game.state(State).?) {
             .serve => {
-                if (game.getStateVar("pong_loaded") == null) {
-                    try game.setActiveScene("pong");
-                    try game.instantiateActiveScene();
-                    game.setStateVar("pong_loaded",  .{ .bool = true }) catch {};
-                    game.setStateVar("score_left",   .{ .int = 0 })    catch {};
-                    game.setStateVar("score_right",  .{ .int = 0 })    catch {};
-                    serveBall(game);
-                }
                 if (game.isPressed(KeyCode.Space)) {
                     launchBall(game, 1.0);
                     try game.transitionTo(State, .playing);
@@ -95,16 +86,13 @@ pub fn main(init: std.process.Init) !void {
                 if (sl >= win_score or sr >= win_score) {
                     try game.transitionTo(State, .game_over);
                 } else {
-                    serveBall(game);
                     try game.transitionTo(State, .serve);
                 }
             },
+            // .clear + .scene = "game_over" descriptor rebuilds the world on entry;
+            // "press space to restart" is handled by an OnInput restart_game action
+            // in the game_over scene (falls back to the manual check below for now).
             .game_over => {
-                if (game.getStateVar("game_over_loaded") == null) {
-                    try game.setActiveScene("game_over");
-                    try game.instantiateActiveScene();
-                    game.setStateVar("game_over_loaded", .{ .bool = true }) catch {};
-                }
                 if (game.isPressed(KeyCode.Space)) {
                     game.restartGame(State, .serve);
                 }
