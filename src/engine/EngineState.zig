@@ -98,6 +98,17 @@ pub fn restartGame(
     self.state_manager.queueAction(.{ .restart_game = @tagName(s) });
 }
 
+pub fn stateEntered(self: *const Engine, comptime S: type, s: S) bool {
+    const t = self.frame_transition orelse return false;
+    return std.mem.eql(u8, t.next_state, @tagName(s));
+}
+
+pub fn stateExited(self: *const Engine, comptime S: type, s: S) bool {
+    const t = self.frame_transition orelse return false;
+    const prev = t.prev_state orelse return false;
+    return std.mem.eql(u8, prev, @tagName(s));
+}
+
 pub fn state(
     self: *Engine,
     comptime S: type,

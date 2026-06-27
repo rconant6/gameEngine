@@ -10,6 +10,18 @@ pub const WorldPolicy = enum {
     clear,
 };
 
+pub const TransitionKind = enum {
+    transition,
+    push,
+    pop,
+    advance,
+    retreat,
+    descend,
+    ascend,
+    restart,
+    restart_game,
+};
+
 // Allows control of what gets updated in simulations
 // use case is for the level editor vs. an actual game (want camera but nothing else)
 pub const SimulateOpts = struct {
@@ -22,6 +34,7 @@ pub const SimulateOpts = struct {
 };
 
 pub const StateDescriptor = struct {
+    scene: ?[]const u8 = null,
     world_policy: WorldPolicy = .preserve,
     systems: SimulateOpts = .{},
     user_data: ?*anyopaque = null,
@@ -53,6 +66,8 @@ pub const TransitionResult = struct {
     next_state: []const u8,
     world_policy: WorldPolicy,
     systems: SimulateOpts,
+    kind: TransitionKind,
+    scene: ?[]const u8,
 };
 
 pub const GameState = struct {
@@ -62,6 +77,7 @@ pub const GameState = struct {
     systems: SimulateOpts = .{},
     user_data: ?*anyopaque = null, // place for game maker to pass data
 
+    scene: ?[]const u8 = null,
     parent: ?*GameState = null,
     first_child: ?*GameState = null,
     next_sibling: ?*GameState = null,
@@ -117,6 +133,7 @@ pub const GameStateManager = struct {
             .world_policy = desc.world_policy,
             .systems = desc.systems,
             .user_data = desc.user_data,
+            .scene = if (desc.scene) |s| try self.mem.persistent.dupe(u8, s) else null,
             .parent = null,
             .first_child = null,
             .next_sibling = null,
@@ -153,6 +170,7 @@ pub const GameStateManager = struct {
             .world_policy = d.world_policy,
             .systems = d.systems,
             .user_data = d.user_data,
+            .scene = if (d.scene) |s| try self.mem.persistent.dupe(u8, s) else null,
             .parent = parent,
             .first_child = null,
             .next_sibling = null,
@@ -280,6 +298,9 @@ pub const GameStateManager = struct {
 
             .world_policy = gs.world_policy,
             .systems = gs.systems,
+
+            .scene = gs.scene,
+            .kind = .transition,
         };
     }
 
@@ -295,6 +316,9 @@ pub const GameStateManager = struct {
 
             .world_policy = new.world_policy,
             .systems = new.systems,
+
+            .scene = new.scene,
+            .kind = .advance,
         };
     }
     fn applyRetreat(self: *GameStateManager) ?TransitionResult {
@@ -309,6 +333,9 @@ pub const GameStateManager = struct {
 
             .world_policy = next.world_policy,
             .systems = next.systems,
+
+            .scene = next.scene,
+            .kind = .retreat,
         };
     }
 
@@ -324,6 +351,9 @@ pub const GameStateManager = struct {
 
             .world_policy = next.world_policy,
             .systems = next.systems,
+
+            .scene = next.scene,
+            .kind = .descend,
         };
     }
     fn applyAscend(self: *GameStateManager) ?TransitionResult {
@@ -338,6 +368,9 @@ pub const GameStateManager = struct {
 
             .world_policy = next.world_policy,
             .systems = next.systems,
+
+            .scene = next.scene,
+            .kind = .ascend,
         };
     }
 
@@ -359,8 +392,12 @@ pub const GameStateManager = struct {
         return .{
             .prev_state = if (prev) |p| p.name else null,
             .next_state = node.name,
+
             .world_policy = .preserve,
             .systems = node.systems,
+
+            .scene = node.scene,
+            .kind = .push,
         };
     }
     fn applyPop(self: *GameStateManager) ?TransitionResult {
@@ -375,8 +412,12 @@ pub const GameStateManager = struct {
         return .{
             .prev_state = if (prev) |p| p.name else null,
             .next_state = node.name,
+
             .world_policy = .preserve,
             .systems = node.systems,
+
+            .scene = node.scene,
+            .kind = .pop,
         };
     }
     fn applyRestartState(self: *GameStateManager) ?TransitionResult {
@@ -384,8 +425,12 @@ pub const GameStateManager = struct {
         return .{
             .next_state = cur.name,
             .prev_state = cur.name,
+
             .world_policy = cur.world_policy,
             .systems = cur.systems,
+
+            .scene = cur.scene,
+            .kind = .restart,
         };
     }
 
@@ -396,6 +441,7 @@ pub const GameStateManager = struct {
         self.game_values.clearRetainingCapacity();
         var result = self.applyTransition(gs) orelse return null;
         result.world_policy = .clear;
+        result.kind = .restart_game;
         return result;
     }
 
@@ -422,6 +468,9 @@ pub const GameStateManager = struct {
             child = next;
         }
         allocator.free(node.name);
+        if (node.scene) |s| {
+            allocator.free(s);
+        }
         allocator.destroy(node);
     }
 };

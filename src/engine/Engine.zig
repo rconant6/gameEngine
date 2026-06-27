@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
 const build_options = @import("build_options");
 const App = @import("app").App;
 const platform = @import("platform");
@@ -36,8 +37,10 @@ const Systems = @import("systems");
 const gsm = @import("game_state");
 const GameStateManager = gsm.GameStateManager;
 const SimulateOpts = gsm.SimulateOpts;
+const TransitionResult = gsm.TransitionResult;
 pub const StateDescriptor = gsm.StateDescriptor;
 const EngineActionBridge = @import("EngineActionBridge.zig");
+const EngineTransition = @import("EngineTransition.zig");
 
 const PerformanceMetrics = struct {
     current_fps: f32 = 0,
@@ -82,11 +85,13 @@ pub const Engine = struct {
     world: ecs.World,
     collision_events: []const Collision,
     action_system: ActionSystem,
-    state_manager: GameStateManager,
     services: EngineServices,
     active_systems: SimulateOpts,
     running: bool,
 
+    state_manager: GameStateManager,
+    frame_transition: ?TransitionResult = null,
+    overlay_batches: ArrayList([]Entity),
     scene_manager: SceneManager,
     template_manager: TemplateManager,
     instantiator: Instantiator,
@@ -173,6 +178,7 @@ pub const Engine = struct {
                 .ctx = undefined,
                 .vtable = &EngineActionBridge.services_vtable,
             },
+            .overlay_batches = .empty,
         };
 
         // Re-seat pointers to the stable heap address now that engine.* is assigned.
@@ -221,6 +227,10 @@ pub const Engine = struct {
 
     pub fn deinit(self: *Engine) void {
         const mem = self.mem;
+        for (self.overlay_batches.items) |batch| {
+            self.mem.persistent.free(batch);
+        }
+        self.overlay_batches.deinit(self.mem.persistent);
         self.state_manager.deinit();
         self.action_system.deinit();
         self.scene_manager.deinit();
@@ -356,11 +366,10 @@ pub const Engine = struct {
         self.debugger.beginFrame();
         self.input.keyboard = platform.getKeyboard();
         self.input.mouse = platform.getMouse();
+        self.frame_transition = null;
         if (self.state_manager.resolvePending()) |result| {
-            if (result.world_policy == .clear) {
-                self.world.destroyAllExcept(self.active_camera_entity);
-            }
-            self.active_systems = result.systems;
+            EngineTransition.applyStateTransition(self, result);
+            self.frame_transition = result;
         }
     }
     pub fn endFrame(self: *Engine) void {
@@ -368,20 +377,11 @@ pub const Engine = struct {
             log.err(.engine, "EndFrame failed: {any}", .{err});
         };
     }
+
     pub fn clear(self: *Engine, color: Color) void {
         self.app.renderer.setClearColor(color);
         self.app.renderer.clear();
     }
-
-    // Creating shapes by hand
-    // pub fn create(self: *Engine, comptime Data: type, args: anytype) Data {
-    //     return @call(.auto, Data.init, .{self.allocator} ++ args) catch |err| {
-    //         std.debug.panic(
-    //             "Engine.create({s}) failed: {}\n memory leaking or to large",
-    //             .{ @typeName(Data), err },
-    //         );
-    //     };
-    // }
 
     // MARK: Camera methods
     pub const createCamera = @import("EngineCamera.zig").createCamera;
@@ -477,4 +477,6 @@ pub const Engine = struct {
     pub const getCurrentStateName = @import("EngineState.zig").getCurrentStateName;
     pub const setStateVar = @import("EngineState.zig").setStateVar;
     pub const getStateVar = @import("EngineState.zig").getStateVar;
+    pub const stateEntered = @import("EngineState.zig").stateEntered;
+    pub const stateExited = @import("EngineState.zig").stateExited;
 };
