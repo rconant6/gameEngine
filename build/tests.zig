@@ -51,9 +51,9 @@ pub fn addAllTests(
         }, .anon_imports = &.{
             .{ "ComponentStorage", "src/ecs/ComponentStorage.zig" },
         } },
-        .{ .name = "tag-tests", .path = "tests/ecs/test_tag.zig", .anon_imports = &.{
-            .{ "Tag", "src/ecs/Tag.zig" },
-        } },
+        .{ .name = "tag-tests", .path = "tests/ecs/test_tag.zig", .imports = &.{
+            .{ "ecs", mod(modules, .ecs) },
+        }, .link_engine = true },
         .{ .name = "query-tests", .path = "tests/ecs/test_query.zig", .imports = &.{
             .{ "math", mod(modules, .math) },
             .{ "ecs", mod(modules, .ecs) },

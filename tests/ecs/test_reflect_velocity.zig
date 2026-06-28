@@ -200,6 +200,8 @@ fn addWallReflect(world: *World, ent: Entity) !void {
     const actions = try testing.allocator.alloc(Action.Action, 1);
     actions[0] = .{ .id = 0, .params = null, .priority = 0 }; // placeholder handle; tests assert on context, not execution
     const triggers = try testing.allocator.alloc(CollisionTrigger, 1);
+    // Hand-rolled trigger: pattern is a literal, pattern_owned defaults false, so
+    // deinit leaves it alone. (This is exactly the no-DSL dev path the flag enables.)
     triggers[0] = .{ .other_tag_pattern = "wall", .actions = actions };
     try world.addComponent(ent, OnCollision, .{ .triggers = triggers });
 }
@@ -212,7 +214,7 @@ test "CollisionTrigger orients normal toward self when self is entity_a" {
     try addWallReflect(&world, ball);
 
     const wall = try world.createEntity();
-    try world.addComponent(wall, Tag, Tag{ .tags = "wall" });
+    try world.addComponent(wall, Tag, Tag.init("wall"));
 
     // detection convention: normal points entity_a → entity_b. Here that's +y.
     // Oriented toward self (the ball, = entity_a) it must come back as -y.
@@ -246,7 +248,7 @@ test "CollisionTrigger keeps normal as-is when self is entity_b" {
     defer world.deinit();
 
     const wall = try world.createEntity(); // entity_a
-    try world.addComponent(wall, Tag, Tag{ .tags = "wall" });
+    try world.addComponent(wall, Tag, Tag.init("wall"));
 
     const ball = try world.createEntity(); // entity_b, carries the trigger
     try addWallReflect(&world, ball);

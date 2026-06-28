@@ -12,11 +12,11 @@ test "World - findEntityByTag with single match" {
 
     // Create entity with "player" tag
     const player = try world.createEntity();
-    try world.addComponent(player, Tag, .{ .tags = "player" });
+    try world.addComponent(player, Tag, Tag.init("player"));
 
     // Create entity with different tag
     const enemy = try world.createEntity();
-    try world.addComponent(enemy, Tag, .{ .tags = "enemy" });
+    try world.addComponent(enemy, Tag, Tag.init("enemy"));
 
     // Find player entity
     const found = world.findEntityByTag("player");
@@ -35,7 +35,7 @@ test "World - findEntityByTag with no match" {
     defer world.deinit();
 
     const entity = try world.createEntity();
-    try world.addComponent(entity, Tag, .{ .tags = "npc" });
+    try world.addComponent(entity, Tag, Tag.init("npc"));
 
     const found = world.findEntityByTag("player");
     try testing.expect(found == null);
@@ -47,7 +47,7 @@ test "World - findEntityByTag with multiple tags on entity" {
     defer world.deinit();
 
     const player = try world.createEntity();
-    try world.addComponent(player, Tag, .{ .tags = "player,controllable,visible" });
+    try world.addComponent(player, Tag, Tag.init("player,controllable,visible"));
 
     // Should find by any of the tags
     const found1 = world.findEntityByTag("player");
@@ -69,10 +69,10 @@ test "World - findEntityByTag returns first match" {
     defer world.deinit();
 
     const enemy1 = try world.createEntity();
-    try world.addComponent(enemy1, Tag, .{ .tags = "enemy" });
+    try world.addComponent(enemy1, Tag, Tag.init("enemy"));
 
     const enemy2 = try world.createEntity();
-    try world.addComponent(enemy2, Tag, .{ .tags = "enemy" });
+    try world.addComponent(enemy2, Tag, Tag.init("enemy"));
 
     // Should return one of the enemies (likely the first created)
     const found = world.findEntityByTag("enemy");
@@ -91,7 +91,7 @@ test "World - findEntityByTag ignores entities without Tag component" {
 
     // Create entity with Tag
     const tagged = try world.createEntity();
-    try world.addComponent(tagged, Tag, .{ .tags = "tagged" });
+    try world.addComponent(tagged, Tag, Tag.init("tagged"));
 
     const found = world.findEntityByTag("tagged");
     try testing.expect(found != null);
@@ -104,16 +104,16 @@ test "World - findEntitiesByTag with multiple matches" {
     defer world.deinit();
 
     const enemy1 = try world.createEntity();
-    try world.addComponent(enemy1, Tag, .{ .tags = "enemy" });
+    try world.addComponent(enemy1, Tag, Tag.init("enemy"));
 
     const enemy2 = try world.createEntity();
-    try world.addComponent(enemy2, Tag, .{ .tags = "enemy,grunt" });
+    try world.addComponent(enemy2, Tag, Tag.init("enemy,grunt"));
 
     const enemy3 = try world.createEntity();
-    try world.addComponent(enemy3, Tag, .{ .tags = "enemy,boss" });
+    try world.addComponent(enemy3, Tag, Tag.init("enemy,boss"));
 
     const player = try world.createEntity();
-    try world.addComponent(player, Tag, .{ .tags = "player" });
+    try world.addComponent(player, Tag, Tag.init("player"));
 
     const entities = world.findEntitiesByTag("enemy", testing.allocator);
     defer testing.allocator.free(entities);
@@ -142,7 +142,7 @@ test "World - findEntitiesByTag with no matches" {
     defer world.deinit();
 
     const entity = try world.createEntity();
-    try world.addComponent(entity, Tag, .{ .tags = "npc" });
+    try world.addComponent(entity, Tag, Tag.init("npc"));
 
     const entities = world.findEntitiesByTag("player", testing.allocator);
     defer testing.allocator.free(entities);
@@ -156,10 +156,10 @@ test "World - findEntitiesByTag with single match" {
     defer world.deinit();
 
     const player = try world.createEntity();
-    try world.addComponent(player, Tag, .{ .tags = "player" });
+    try world.addComponent(player, Tag, Tag.init("player"));
 
     const enemy = try world.createEntity();
-    try world.addComponent(enemy, Tag, .{ .tags = "enemy" });
+    try world.addComponent(enemy, Tag, Tag.init("enemy"));
 
     const entities = world.findEntitiesByTag("player", testing.allocator);
     defer testing.allocator.free(entities);
@@ -174,16 +174,16 @@ test "World - findEntitiesByPattern with prefix wildcard" {
     defer world.deinit();
 
     const grunt = try world.createEntity();
-    try world.addComponent(grunt, Tag, .{ .tags = "enemy_grunt" });
+    try world.addComponent(grunt, Tag, Tag.init("enemy_grunt"));
 
     const boss = try world.createEntity();
-    try world.addComponent(boss, Tag, .{ .tags = "enemy_boss" });
+    try world.addComponent(boss, Tag, Tag.init("enemy_boss"));
 
     const flyer = try world.createEntity();
-    try world.addComponent(flyer, Tag, .{ .tags = "enemy_flying" });
+    try world.addComponent(flyer, Tag, Tag.init("enemy_flying"));
 
     const player = try world.createEntity();
-    try world.addComponent(player, Tag, .{ .tags = "player" });
+    try world.addComponent(player, Tag, Tag.init("player"));
 
     const entities = world.findEntitiesByPattern("enemy*", testing.allocator);
     defer testing.allocator.free(entities);
@@ -212,13 +212,13 @@ test "World - findEntitiesByPattern with suffix wildcard" {
     defer world.deinit();
 
     const mini_boss = try world.createEntity();
-    try world.addComponent(mini_boss, Tag, .{ .tags = "mini_boss" });
+    try world.addComponent(mini_boss, Tag, Tag.init("mini_boss"));
 
     const final_boss = try world.createEntity();
-    try world.addComponent(final_boss, Tag, .{ .tags = "final_boss" });
+    try world.addComponent(final_boss, Tag, Tag.init("final_boss"));
 
     const grunt = try world.createEntity();
-    try world.addComponent(grunt, Tag, .{ .tags = "enemy_grunt" });
+    try world.addComponent(grunt, Tag, Tag.init("enemy_grunt"));
 
     const entities = world.findEntitiesByPattern("*_boss", testing.allocator);
     defer testing.allocator.free(entities);
@@ -244,10 +244,10 @@ test "World - findEntitiesByPattern with exact match" {
     defer world.deinit();
 
     const player = try world.createEntity();
-    try world.addComponent(player, Tag, .{ .tags = "player" });
+    try world.addComponent(player, Tag, Tag.init("player"));
 
     const player2 = try world.createEntity();
-    try world.addComponent(player2, Tag, .{ .tags = "player2" });
+    try world.addComponent(player2, Tag, Tag.init("player2"));
 
     const entities = world.findEntitiesByPattern("player", testing.allocator);
     defer testing.allocator.free(entities);
@@ -262,7 +262,7 @@ test "World - findEntitiesByPattern with no matches" {
     defer world.deinit();
 
     const entity = try world.createEntity();
-    try world.addComponent(entity, Tag, .{ .tags = "npc" });
+    try world.addComponent(entity, Tag, Tag.init("npc"));
 
     const entities = world.findEntitiesByPattern("enemy*", testing.allocator);
     defer testing.allocator.free(entities);
@@ -276,13 +276,13 @@ test "World - findEntitiesByPattern with multiple tags per entity" {
     defer world.deinit();
 
     const entity1 = try world.createEntity();
-    try world.addComponent(entity1, Tag, .{ .tags = "enemy_grunt,hostile,ai_controlled" });
+    try world.addComponent(entity1, Tag, Tag.init("enemy_grunt,hostile,ai_controlled"));
 
     const entity2 = try world.createEntity();
-    try world.addComponent(entity2, Tag, .{ .tags = "enemy_boss,hostile,tough" });
+    try world.addComponent(entity2, Tag, Tag.init("enemy_boss,hostile,tough"));
 
     const entity3 = try world.createEntity();
-    try world.addComponent(entity3, Tag, .{ .tags = "player,friendly" });
+    try world.addComponent(entity3, Tag, Tag.init("player,friendly"));
 
     // Find all entities with "enemy*" pattern
     const enemies = world.findEntitiesByPattern("enemy*", testing.allocator);
@@ -304,24 +304,24 @@ test "World - comprehensive query scenario" {
 
     // Create a player
     const player = try world.createEntity();
-    try world.addComponent(player, Tag, .{ .tags = "player,controllable" });
+    try world.addComponent(player, Tag, Tag.init("player,controllable"));
 
     // Create multiple enemy types
     const grunt1 = try world.createEntity();
-    try world.addComponent(grunt1, Tag, .{ .tags = "enemy_grunt,hostile" });
+    try world.addComponent(grunt1, Tag, Tag.init("enemy_grunt,hostile"));
 
     const grunt2 = try world.createEntity();
-    try world.addComponent(grunt2, Tag, .{ .tags = "enemy_grunt,hostile" });
+    try world.addComponent(grunt2, Tag, Tag.init("enemy_grunt,hostile"));
 
     const boss = try world.createEntity();
-    try world.addComponent(boss, Tag, .{ .tags = "enemy_boss,hostile,tough" });
+    try world.addComponent(boss, Tag, Tag.init("enemy_boss,hostile,tough"));
 
     // Create collectibles
     const coin = try world.createEntity();
-    try world.addComponent(coin, Tag, .{ .tags = "collectible_coin" });
+    try world.addComponent(coin, Tag, Tag.init("collectible_coin"));
 
     const powerup = try world.createEntity();
-    try world.addComponent(powerup, Tag, .{ .tags = "collectible_powerup" });
+    try world.addComponent(powerup, Tag, Tag.init("collectible_powerup"));
 
     // Test findEntityByTag - find the player
     const found_player = world.findEntityByTag("player");

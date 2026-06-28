@@ -1,11 +1,10 @@
 const std = @import("std");
 const testing = std.testing;
-const Tag = @import("Tag");
+const ecs = @import("ecs");
+const Tag = ecs.Tag;
 
 test "Tag - hasTag exact match" {
-    const tag = Tag{
-        .tags = "player,controllable,visible",
-    };
+    const tag = Tag.init("player,controllable,visible");
 
     try testing.expect(tag.hasTag("player"));
     try testing.expect(tag.hasTag("controllable"));
@@ -15,9 +14,7 @@ test "Tag - hasTag exact match" {
 }
 
 test "Tag - matchesPattern exact match" {
-    const tag = Tag{
-        .tags = "brick,destructible",
-    };
+    const tag = Tag.init("brick,destructible");
 
     try testing.expect(tag.matchesPattern("brick"));
     try testing.expect(tag.matchesPattern("destructible"));
@@ -26,9 +23,7 @@ test "Tag - matchesPattern exact match" {
 }
 
 test "Tag - matchesPattern prefix wildcard" {
-    const tag = Tag{
-        .tags = "enemy_grunt,enemy_boss,powerup",
-    };
+    const tag = Tag.init("enemy_grunt,enemy_boss,powerup");
 
     // Prefix wildcard should match
     try testing.expect(tag.matchesPattern("enemy*"));
@@ -41,9 +36,7 @@ test "Tag - matchesPattern prefix wildcard" {
 }
 
 test "Tag - matchesPattern suffix wildcard" {
-    const tag = Tag{
-        .tags = "mini_boss,final_boss,player",
-    };
+    const tag = Tag.init("mini_boss,final_boss,player");
 
     // Suffix wildcard should match
     try testing.expect(tag.matchesPattern("*_boss"));
@@ -56,9 +49,7 @@ test "Tag - matchesPattern suffix wildcard" {
 }
 
 test "Tag - matchesPattern mixed scenarios" {
-    const tag = Tag{
-        .tags = "enemy_flying_boss,collectible_coin",
-    };
+    const tag = Tag.init("enemy_flying_boss,collectible_coin");
 
     // Exact matches
     try testing.expect(tag.matchesPattern("enemy_flying_boss"));
@@ -78,9 +69,7 @@ test "Tag - matchesPattern mixed scenarios" {
 }
 
 test "Tag - empty tag list" {
-    const tag = Tag{
-        .tags = "",
-    };
+    const tag = Tag.init("");
 
     try testing.expect(!tag.hasTag("anything"));
     try testing.expect(!tag.matchesPattern("anything"));
@@ -89,9 +78,7 @@ test "Tag - empty tag list" {
 }
 
 test "Tag - single tag" {
-    const tag = Tag{
-        .tags = "solo",
-    };
+    const tag = Tag.init("solo");
 
     try testing.expect(tag.hasTag("solo"));
     try testing.expect(tag.matchesPattern("solo"));
