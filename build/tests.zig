@@ -94,6 +94,7 @@ pub fn addAllTests(
         .{ .name = "collision-trigger-tests", .path = "tests/ecs/test_collision_trigger.zig", .imports = &.{
             .{ "math", mod(modules, .math) },
             .{ "Action", mod(modules, .action) },
+            .{ "ecs", mod(modules, .ecs) },
         }, .link_engine = true },
         .{ .name = "input-trigger-tests", .path = "tests/ecs/test_input_trigger.zig", .imports = &.{
             .{ "math", mod(modules, .math) },

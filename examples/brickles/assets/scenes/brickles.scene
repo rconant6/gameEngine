@@ -29,8 +29,12 @@
     [Tag]
       tags:string "ball"
     [OnCollision]
+      // bounce is physics response — must fire EVERY overlapping frame, so phase
+      // "stay". (The default phase is "enter", fire-once-on-contact, which is for
+      // scoring/state actions like the gutter below.)
       [trigger]
         other_tag_pattern:string "wall"
+        phase:string "stay"
         [action]
           type:string "bounce"
           target:string "self"
@@ -39,6 +43,7 @@
           priority:i32 0
       [trigger]
         other_tag_pattern:string "paddle"
+        phase:string "stay"
         [action]
           type:string "bounce"
           target:string "self"
@@ -47,6 +52,7 @@
           priority:i32 0
       [trigger]
         other_tag_pattern:string "brick"
+        phase:string "stay"
         [action]
           type:string "bounce"
           target:string "self"
@@ -177,11 +183,23 @@
       half_height:f32 0.4
     [Tag]
       tags:string "gutter"
-    // NOTE: no OnCollision here. A collision trigger fires every frame the ball
-    // overlaps, which is fine for bounce (self-separating) but would decrement
-    // balls dozens of times and re-serve in a loop. Ball-loss is edge-detected
-    // once in main.zig instead (see checkGutter). This is friction finding #6:
-    // the DSL has no fire-once-on-enter collision semantic.
+    // Ball fell past the paddle: lose one ball, re-serve. phase "enter" (the
+    // default) fires these ONCE per ball-crossing — F1's whole point. Before
+    // OnCollisionEnter this fired every overlapping frame and drained balls to
+    // negative in a re-serve storm, so it had to be hand-rolled in main.zig.
+    [OnCollision]
+      [trigger]
+        other_tag_pattern:string "ball"
+        phase:string "enter"
+        [action]
+          type:string "add_state_int"
+          key:string "balls"
+          amount:i32 -1
+          priority:i32 0
+        [action]
+          type:string "transition_state"
+          name:string "serve"
+          priority:i32 1
 
   // ── HUD: SCORE and BALLS, bound to state vars via StateText ──
   [ScoreText:entity]

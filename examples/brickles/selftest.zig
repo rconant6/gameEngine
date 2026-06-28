@@ -17,7 +17,6 @@ const rowsForLevel = game_mod.rowsForLevel;
 const spawnBrickGrid = game_mod.spawnBrickGrid;
 const parkBall = game_mod.parkBall;
 const launchBall = game_mod.launchBall;
-const ballBelowGutter = game_mod.ballBelowGutter;
 const brick_cols = game_mod.brick_cols;
 const start_balls = game_mod.start_balls;
 const max_level = game_mod.max_level;
@@ -67,6 +66,34 @@ pub fn run(game: *engine.Engine) !void {
     while (hit_frames < 240 and stateInt(game, "score") == 0) : (hit_frames += 1) pump(game);
     log.info(.engine, "SELFTEST first hit after {d} frames: score={d}", .{ hit_frames, stateInt(game, "score") });
     std.debug.assert(stateInt(game, "score") > 0);
+
+    // --- GUTTER (F1 acceptance): the gutter's OnCollision is pure scene data now,
+    // phase "enter" -> balls-- + transition_state serve fire ONCE per crossing.
+    // Before OnCollisionEnter this fired every overlapping frame and drained balls
+    // to negative. Park the ball deep in the gutter, hold it there many frames,
+    // assert balls dropped by exactly 1 (not once-per-frame).
+    {
+        const gball = game.findEntityByTag("ball").?;
+        const gut = game.findEntityByTag("gutter").?;
+        const gy = game.world.getComponent(gut, engine.Transform).?.position.y;
+        const balls_before = stateInt(game, "balls");
+        // pin the ball inside the gutter for a stretch of frames
+        var f: usize = 0;
+        while (f < 30) : (f += 1) {
+            if (game.world.getComponentMut(gball, engine.Transform)) |t| t.position = .{ .x = 0, .y = gy };
+            if (game.world.getComponentMut(gball, engine.Velocity)) |v| v.linear = .{ .x = 0, .y = 0 };
+            pump(game);
+        }
+        const lost = balls_before - stateInt(game, "balls");
+        log.info(.engine, "SELFTEST gutter: balls {d}->{d} over 30 overlapping frames (expect -1)", .{ balls_before, stateInt(game, "balls") });
+        std.debug.assert(lost == 1); // exactly one ball lost, not ~30 — the F1 fix
+    }
+
+    // re-establish a clean playing state for the multi-level walk below
+    game.setStateVar("balls", .{ .int = start_balls }) catch {};
+    if (game.findEntityByTag("brick") == null) spawnBrickGrid(game);
+    try game.transitionTo(State, .playing);
+    pump(game);
 
     // --- MULTI-LEVEL WALK (the stress): clear each level by forcing bricks to 0,
     // advance, and assert the next level rebuilds bigger + faster. Exercises

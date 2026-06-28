@@ -94,11 +94,19 @@ pub fn main(init: std.process.Init) !void {
         // standing => a re-serve after losing a ball: leave the field alone.
         // (Keyed off entities, not the counter var — finding #3.)
         if (game.stateEntered(State, .serve)) {
-            if (game.findEntityByTag("brick") == null) {
+            // The gutter decrements balls + re-serves on a ball-loss (pure scene
+            // data now). If that emptied the last ball, the re-serve lands here
+            // with balls<=0 -> game over. (Checked at entry, not in .playing, so
+            // it never races the gutter's transition in the same frame.)
+            if (stateInt(game, "balls") <= 0) {
+                try game.transitionTo(State, .lose);
+            } else if (game.findEntityByTag("brick") == null) {
                 startLevelVars(game);
                 spawnBrickGrid(game);
+                parkBall(game);
+            } else {
+                parkBall(game);
             }
-            parkBall(game);
         }
 
         switch (game.state(State) orelse .attract) {
@@ -112,17 +120,11 @@ pub fn main(init: std.process.Init) !void {
                 }
             },
             .playing => {
-                // Ball fell past the paddle: lose one, re-serve (or lose the game).
-                // Edge-detected here rather than via a gutter OnCollision, which
-                // would fire every overlapping frame (finding #6).
-                if (ballBelowGutter(game)) {
-                    game.setStateVar("balls", .{ .int = stateInt(game, "balls") - 1 }) catch {};
-                    if (stateInt(game, "balls") <= 0) {
-                        try game.transitionTo(State, .lose);
-                    } else {
-                        try game.transitionTo(State, .serve);
-                    }
-                } else if (stateInt(game, "bricks") <= 0) {
+                // Ball-loss (balls-- + re-serve) is now pure scene data: the
+                // gutter's OnCollision (phase "enter") fires it once per crossing.
+                // main.zig only owns the level-clear check here, and the lose
+                // threshold at serve-entry above (the gutter can't read balls<=0).
+                if (stateInt(game, "bricks") <= 0) {
                     // Level cleared. More levels left -> advance + serve the next
                     // (harder) one; bricks gone means serve rebuilds the grid.
                     // Final level cleared -> the victory screen.
@@ -214,10 +216,3 @@ pub fn launchBall(game: *engine.Engine) void {
     }
 }
 
-const gutter_line: f32 = -9.5; // just below the paddle (paddle at y=-8.5)
-
-pub fn ballBelowGutter(game: *engine.Engine) bool {
-    const ball = game.findEntityByTag("ball") orelse return false;
-    const t = game.world.getComponent(ball, Transform) orelse return false;
-    return t.position.y < gutter_line;
-}

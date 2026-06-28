@@ -15,6 +15,7 @@ const Entity = ecs.Entity;
 const World = ecs.World;
 const Tag = ecs.Tag;
 const Collision = ecs.Collision;
+const log = @import("debug").log;
 
 pub const Trigger = struct {
     other_tag_pattern: []const u8,
@@ -39,12 +40,19 @@ pub const TriggerContext = struct {
 
 // MARK: Collision Trigger System
 pub const CollisionTrigger = struct {
+    pub const Phase = enum { enter, stay };
+    pub const MAX_CONTACTS: u32 = 8;
+
     other_tag_pattern: []const u8,
     actions: []const Action,
-    // The DSL instantiator dupes other_tag_pattern (borrowed from the scene AST)
-    // and sets this. A hand-rolled trigger built in Zig with a string literal
-    // leaves it false, so deinit never tries to free static memory.
     pattern_owned: bool = false,
+
+    // runtime contact tracing
+    contacts: [MAX_CONTACTS]usize = undefined, // other-entity ids touched last frame
+    contacts_next: [MAX_CONTACTS]usize = undefined, // accumulator of this frame
+    contact_count: u32 = 0,
+    next_count: u32 = 0,
+    phase: Phase = .enter,
 
     pub fn deinit(self: *CollisionTrigger, gpa: std.mem.Allocator) void {
         if (self.pattern_owned) gpa.free(self.other_tag_pattern);
@@ -56,7 +64,9 @@ pub const CollisionTrigger = struct {
         ctx: TriggerContext,
     ) !void {
         const collision_events = ctx.collision_events orelse
-            return error.NoCollisionEvents;
+            &.{};
+
+        // Events
         for (collision_events) |collision| {
             try checkEntityCollisionTriggers(
                 world,
@@ -73,6 +83,20 @@ pub const CollisionTrigger = struct {
                 ctx.action_queue,
             );
         }
+
+        // Post-pass accum into last frame
+        var accum = world.query(.{OnCollision});
+        while (accum.next()) |entry| {
+            const on_col = entry.get(0);
+            for (on_col.triggers) |*trigger| {
+                @memcpy(
+                    trigger.contacts[0..trigger.next_count],
+                    trigger.contacts_next[0..trigger.next_count],
+                );
+                trigger.contact_count = trigger.next_count;
+                trigger.next_count = 0;
+            }
+        }
     }
 
     fn checkEntityCollisionTriggers(
@@ -82,29 +106,58 @@ pub const CollisionTrigger = struct {
         collision: *const Collision,
         action_queue: *ActionQueue,
     ) !void {
-        if (world.getComponent(self, OnCollision)) |on_collision| {
-            if (world.getComponent(other, Tag)) |other_tag| {
-                for (on_collision.triggers) |trigger| {
-                    if (other_tag.matchesPattern(trigger.other_tag_pattern)) {
-                        const toward_self =
-                            if (self.id == collision.entity_a.id)
-                                collision.normal.negate()
-                            else
-                                collision.normal;
-                        const context: ActionContext = .{
-                            .self_ent = self,
-                            .other_ent = other,
-                            .collision_loc = collision.point,
-                            .collision_normal = toward_self,
-                            .collision_penetration = collision.penetration,
-                        };
-                        for (trigger.actions) |action| {
-                            try action_queue.append(action, context);
-                        }
-                    }
-                }
+        const on_collision = world.getComponentMut(self, OnCollision) orelse return;
+        const other_tag = world.getComponent(other, Tag) orelse return;
+
+        for (on_collision.triggers) |*trigger| {
+            if (!other_tag.matchesPattern(trigger.other_tag_pattern)) continue;
+
+            recordContact(trigger, other.id);
+
+            const fire = switch (trigger.phase) {
+                .stay => true,
+                .enter => !wasContacting(trigger, other.id),
+            };
+            if (!fire) continue;
+
+            const toward_self = if (self.id == collision.entity_a.id)
+                collision.normal.negate()
+            else
+                collision.normal;
+
+            const context: ActionContext = .{
+                .self_ent = self,
+                .other_ent = other,
+                .collision_loc = collision.point,
+                .collision_normal = toward_self,
+                .collision_penetration = collision.penetration,
+            };
+
+            for (trigger.actions) |action| {
+                try action_queue.append(action, context);
             }
         }
+    }
+
+    fn wasContacting(trigger: *const CollisionTrigger, id: usize) bool {
+        for (trigger.contacts[0..trigger.contact_count]) |c| if (c == id) return true;
+        return false;
+    }
+
+    fn recordContact(trigger: *CollisionTrigger, id: usize) void {
+        for (trigger.contacts_next[0..trigger.next_count]) |c| if (c == id) return;
+        if (trigger.next_count >= MAX_CONTACTS) {
+            log.warn(
+                .action,
+                "CollisionTrigger contact overflow (>{d}); treating as continuous",
+                .{MAX_CONTACTS},
+            );
+            return; // overflow not recorded: wasContacting() == false
+            // this will materialize as firing when you wouldn't want it
+
+        }
+        trigger.contacts_next[trigger.next_count] = id;
+        trigger.next_count += 1;
     }
 };
 

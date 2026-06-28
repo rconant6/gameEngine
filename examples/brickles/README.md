@@ -42,40 +42,43 @@ difficulty, and a `win` that loops back to play rather than ending.
 
 ## Frictions found (the point of this exercise)
 
-1. **No scene-level template instantiation.** The DSL can declare a template and
+> Status as of the friction-reduction pass — these map to `docs/friction-reduction-plan.html`:
+> **#5 RESOLVED** (F1 `OnCollisionEnter`), template path bug **RESOLVED** (F4),
+> the double-free **RESOLVED** (F6). The rest are still open.
+
+1. **No scene-level template instantiation.** *(open — plan F3)* The DSL can declare a template and
    define entities, but can't say "place template Brick at these N positions." So the
    brick grid's *placement* had to move into a `main.zig` loop calling
    `world.createEntityFromTemplate` — the brick's look/behavior stays pure-DSL
    (bricks.template), only the layout is in Zig. A `[spawn template=Brick at=...]` or
    grid directive would keep layout declarative.
 
-2. **`loadTemplates` path needs a trailing slash.** It concatenates `dir + filename`
-   with no separator, so `"assets/templates"` silently yields `FileNotFound` while
-   `"assets/templates/"` works. Undocumented sharp edge; should normalize or use a path join.
+2. **`loadTemplates` path needs a trailing slash.** *(RESOLVED — plan F4: now uses a
+   path join, so either form works.)* It used to concatenate `dir + filename` with no
+   separator, so `"assets/templates"` silently yielded `FileNotFound`.
 
-3. **"Rebuild bricks on new game, not on re-serve" can't key off the counter var.**
+3. **"Rebuild bricks on new game, not on re-serve" can't key off the counter var.** *(open — plan F9)*
    The `bricks` state var is initialized before any brick entities exist, so it can't
    distinguish a fresh game from a re-serve. Solved by checking for actual brick
    *entities* (`findEntityByTag("brick") == null`) instead — works, but it's a subtlety
    a beginner would trip on.
 
-4. **No centered/anchored world-space text.** All screen text is left-anchored from its
-   Transform, so every title/prompt has a hand-tuned negative-x nudge. (Known; tracked
-   as a 6A follow-up.)
+4. **No centered/anchored world-space text.** *(open — plan F5)* All screen text is
+   left-anchored from its Transform, so every title/prompt has a hand-tuned negative-x nudge.
 
-5. **Collision triggers are level-triggered, not edge-triggered (the big one).**
-   An `OnCollision` action fires *every frame the shapes overlap*, not once on
-   contact. Fine for `bounce` (it self-separates), but catastrophic for
-   `add_state_int` / `transition_state`: the gutter's "lose a ball + re-serve"
-   trigger fired ~11× per ball-crossing, draining `balls` to negative and
-   re-serving in a storm — this is what crashed live play. Worked around by
-   removing the gutter `OnCollision` and edge-detecting the ball crossing the
-   gutter line once in `main.zig` (`ballBelowGutter`). A real fix needs a
-   fire-once-on-enter collision semantic in the engine (an `OnCollisionEnter`, or
-   a per-trigger debounce). This is the single most important finding — any
-   counter/transition driven by collision hits the same trap.
+5. **Collision triggers were level-triggered, not edge-triggered (the big one).**
+   *(RESOLVED — plan F1 `OnCollisionEnter`.)* An `OnCollision` action used to fire
+   *every frame the shapes overlap*. Fine for `bounce` (it self-separates), but
+   catastrophic for `add_state_int` / `transition_state`: the gutter's "lose a ball +
+   re-serve" fired ~11× per ball-crossing, drained `balls` to negative in a re-serve
+   storm, and crashed live play. **Fix:** `CollisionTrigger` gained a `phase` field —
+   `enter` (default, fire once on contact) vs `stay` (every overlapping frame, what
+   `bounce` uses). The gutter is now pure scene data again (`phase:"enter"` →
+   `add_state_int{balls,-1}` + `transition_state "serve"`); `ballBelowGutter` and the
+   main.zig edge-detect are gone. The self-test pins the ball in the gutter for 30
+   overlapping frames and asserts balls drops by exactly 1.
 
-6. **No "solid collider" that blocks movement.** Collision detection only
+6. **No "solid collider" that blocks movement.** *(open — plan F2)* Collision detection only
    *reports* overlaps; only `bounce` reacts to them. So the paddle (collider, no
    bounce) slides straight through the side walls — and `parkBall` then spawns the
    ball at the paddle's now-off-field x, outside the play area. Pong worked around
@@ -83,6 +86,7 @@ difficulty, and a `win` that loops back to play rather than ending.
    clamp (not yet added — known open bug). A teen expects "this wall is solid" to
    just work; a static/blocking collider primitive would close this.
 
-7. **(Engine bug, flagged not fixed)** `TemplateManager.loadTemplatesFromDirectory`
-   (`src/scene/templates.zig:138`) has both an `errdefer` and a `defer` freeing
-   `full_path` → double-free on the `loadTemplateFile` error path.
+7. **Engine double-free in template loading.** *(RESOLVED — plan F6.)*
+   `TemplateManager.loadTemplatesFromDirectory` had both an `errdefer` and a `defer`
+   freeing `full_path` → double-free on the `loadTemplateFile` error path. The
+   redundant `errdefer` was dropped.

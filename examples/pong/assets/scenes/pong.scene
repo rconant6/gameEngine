@@ -25,6 +25,7 @@
     [OnCollision]
       [trigger]
         other_tag_pattern:string "wall"
+        phase:string "stay"
         [action]
           type:string "reflect_velocity"
           target:string "self"
@@ -33,6 +34,7 @@
           priority:i32 0
       [trigger]
         other_tag_pattern:string "paddle"
+        phase:string "stay"
         [action]
           type:string "reflect_velocity"
           target:string "self"
