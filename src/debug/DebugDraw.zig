@@ -165,15 +165,28 @@ pub const DebugDraw = struct {
     }
 
     fn updateTextList(self: *DebugDraw) void {
-        self.texts.clearRetainingCapacity();
+        clearFrameList(&self.texts, self.frame);
     }
 
     pub fn clear(self: *DebugDraw) void {
+        // Shape lists are persistent-backed: that memory survives the frame arena
+        // reset, so retaining capacity is valid and cheap.
         self.arrows.clearRetainingCapacity();
         self.circles.clearRetainingCapacity();
         self.lines.clearRetainingCapacity();
         self.rects.clearRetainingCapacity();
-        self.texts.clearRetainingCapacity();
+        // texts is frame-backed (per-frame arena, reset every frame). Retaining
+        // capacity would dangle into reclaimed memory and alias on the next grow
+        // (@memcpy panic in Debug, silent UB in release) — same bug as
+        // ActionQueue. Free + reset to empty so it re-grows fresh each frame.
+        clearFrameList(&self.texts, self.frame);
+    }
+
+    // Drop a frame-arena-backed list's buffer entirely (free keeps real allocators
+    // leak-clean; .empty drops the stale pointer that would alias post-reset).
+    fn clearFrameList(list: anytype, frame: Allocator) void {
+        list.deinit(frame);
+        list.* = .empty;
     }
     pub fn clearCategory(self: *DebugDraw, cat: DebugCategory) void {
         clearCategoryFromList(self.arrows, cat);

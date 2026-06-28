@@ -32,7 +32,15 @@ pub const ActionQueue = struct {
     }
 
     pub fn clear(self: *ActionQueue) void {
-        self.actions.clearRetainingCapacity();
+        // The backing allocator is the per-frame arena, reset every frame
+        // (GameMemory.tickFrame). clearRetainingCapacity would keep
+        // self.actions.items pointing into that reclaimed region; next frame's
+        // grow then reallocates at the SAME arena address and @memcpy aliases
+        // (Debug panic; silent UB in release). FREE the buffer and reset to
+        // empty so the list re-grows fresh next frame. (free() also keeps real,
+        // non-arena allocators — e.g. tests — leak-clean.)
+        self.actions.deinit(self.frame);
+        self.actions = .empty;
     }
     pub fn append(self: *ActionQueue, action: Action, context: ActionContext) !void {
         try self.actions.append(
