@@ -276,6 +276,9 @@ pub fn addAllTests(
             .{ "ecs", mod(modules, .ecs) },
             .{ "systems", mod(modules, .systems) },
         }, .link_engine = true },
+        .{ .name = "engine-api-smoke-tests", .path = "tests/engine/test_engine_api_smoke.zig", .imports = &.{
+            .{ "engine", mod(modules, .engine) },
+        }, .link_engine = true },
     };
 
     // Register all layers

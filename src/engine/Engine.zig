@@ -441,8 +441,6 @@ pub const Engine = struct {
     pub const zoomActiveCameraInc = @import("EngineCamera.zig").zoomActiveCameraInc;
     pub const zoomCameraSmooth = @import("EngineCamera.zig").zoomCameraSmooth;
     pub const zoomActiveCameraSmooth = @import("EngineCamera.zig").zoomActiveCameraSmooth;
-    pub const getCameraViewBounds = @import("EngineCamera.zig").getCameraViewBounds;
-    pub const getActiveCameraViewBounds = @import("EngineCamera.zig").getActiveCameraViewBounds;
     pub const setActiveCameraTrackingTarget = @import("EngineCamera.zig").setActiveCameraTrackingTarget;
     pub const enableActiveCameraTracking = @import("EngineCamera.zig").enableActiveCameraTracking;
     pub const disableActiveCameraTracking = @import("EngineCamera.zig").disableActiveCameraTracking;
@@ -474,8 +472,6 @@ pub const Engine = struct {
     pub const getBottomEdge = @import("EngineBounds.zig").getBottomEdge;
     pub const isInBounds = @import("EngineBounds.zig").isInBounds;
     pub const wrapPosition = @import("EngineBounds.zig").wrapPosition;
-    pub const normalizedToGame = @import("EngineBounds.zig").normalizedToGame;
-    pub const gameToNormalized = @import("EngineBounds.zig").gameToNormalized;
 
     // MARK: World/ECS methods
     pub const createEntity = @import("EngineWorld.zig").createEntity;

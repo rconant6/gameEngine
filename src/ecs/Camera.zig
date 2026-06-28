@@ -64,16 +64,6 @@ pub fn smoothZoom(world: *World, entity: Entity, delta: f32) void {
     new_size = if (new_size >= max_zoom) max_zoom else new_size;
     cam.ortho_size = new_size;
 }
-pub fn getViewBounds(world: *World, entity: Entity) Rect {
-    const cam = world.getComponent(entity, Self) orelse return; // TODO: Log error
-    const transform = world.getComponent(entity, Transform) orelse return;
-    const aspect = cam.viewport.half_width / cam.viewport.half_height;
-    return .{
-        .center = transform.position,
-        .half_height = cam.ortho_size,
-        .half_width = cam.ortho_size * aspect,
-    };
-}
 
 pub fn enableCameraTracking(world: *World, camera: Entity) void {
     if (!world.hasComponent(camera, CameraTracking)) {

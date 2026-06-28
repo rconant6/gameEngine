@@ -8,8 +8,6 @@ const Transform = ecs.Transform;
 const ActiveCamera = ecs.ActiveCamera;
 const core = @import("math");
 const V2 = core.V2;
-const renderer = @import("renderer");
-const Rectangle = renderer.Rectangle;
 
 pub fn createCamera(self: *Engine) !Entity {
     const camera = try self.world.createEntity();
@@ -82,14 +80,6 @@ pub fn zoomCameraSmooth(self: *Engine, camera: Entity, delta: f32) void {
 pub fn zoomActiveCameraSmooth(self: *Engine, factor: f32) void {
     const camera = self.active_camera_entity;
     Camera.smoothZoom(&self.world, camera, factor);
-}
-
-pub fn getCameraViewBounds(self: *Engine, camera: Entity) Rectangle {
-    return Camera.getViewBounds(&self.world, camera);
-}
-
-pub fn getActiveCameraViewBounds(self: *Engine) Rectangle {
-    return Camera.getViewBounds(&self.world, self.active_camera_entity);
 }
 
 pub fn setActiveCameraTrackingTarget(self: *Engine, target: Entity) void {
