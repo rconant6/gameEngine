@@ -105,10 +105,8 @@ pub const SceneManager = struct {
 
     pub fn setActiveScene(self: *SceneManager, name: []const u8) !void {
         if (!self.scenes.contains(name)) return SceneManagerError.SceneNotFound;
-
         if (self.active_scene_name) |old_name| self.persistent.free(old_name);
         self.active_scene_name = try self.persistent.dupe(u8, name);
-        try self.reloadActiveScene();
     }
     pub fn getActiveScene(self: *SceneManager) ?*const SceneFile {
         if (self.active_scene_name) |active_scene|

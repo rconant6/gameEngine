@@ -41,8 +41,13 @@ pub const TriggerContext = struct {
 pub const CollisionTrigger = struct {
     other_tag_pattern: []const u8,
     actions: []const Action,
+    // The DSL instantiator dupes other_tag_pattern (borrowed from the scene AST)
+    // and sets this. A hand-rolled trigger built in Zig with a string literal
+    // leaves it false, so deinit never tries to free static memory.
+    pattern_owned: bool = false,
 
     pub fn deinit(self: *CollisionTrigger, gpa: std.mem.Allocator) void {
+        if (self.pattern_owned) gpa.free(self.other_tag_pattern);
         gpa.free(self.actions);
     }
 

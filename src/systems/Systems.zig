@@ -75,7 +75,7 @@ pub fn debugEntityInfoSystem(
             indicators[idx] = 't';
             idx += 1;
             var buf: [64]u8 = undefined;
-            const tags = std.fmt.bufPrint(&buf, "t: {s}", .{tag.tags}) catch "ERROR";
+            const tags = std.fmt.bufPrint(&buf, "t: {s}", .{tag.tags()}) catch "ERROR";
             debugger.draw.addText(.{
                 .text = frame.dupe(u8, tags) catch "",
                 .position = .{

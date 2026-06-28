@@ -25,6 +25,13 @@ pub fn run(world: *World, states: *GameStateManager) void {
             .string => |v| appendStr(&st.buf, len, v),
         };
 
+        // Re-point text at our own buffer. If the instantiator handed this Text a
+        // duped (owned) string, free it once and drop the flag — from now on
+        // text.text lives in st.buf (not heap), so Text.deinit must not free it.
+        if (text.text_owned) {
+            world.persistent.free(text.text);
+            text.text_owned = false;
+        }
         st.len = len;
         text.text = st.buf[0..st.len]; // points INTO the owned buffer (load-bearing)
     }

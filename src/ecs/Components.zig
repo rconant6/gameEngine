@@ -1,3 +1,4 @@
+const std = @import("std");
 const math = @import("math");
 const V2 = math.V2;
 const registry = @import("registry");
@@ -50,6 +51,18 @@ pub const Text = struct {
     font_name: []const u8 = "__default__",
     size: f32,
     text_color: Color,
+    // Ownership of the two string fields, tracked separately. Scene-instantiated
+    // Text dupes both (the AST is not a durable owner); code-created Text with
+    // literals leaves both false and is never freed. StateTextSys takes over
+    // `text` (pointing it into its own buf) and flips text_owned=false after
+    // freeing the prior owned copy — see StateTextSys.run.
+    text_owned: bool = false,
+    font_owned: bool = false,
+
+    pub fn deinit(self: *Text, gpa: std.mem.Allocator) void {
+        if (self.text_owned) gpa.free(self.text);
+        if (self.font_owned) gpa.free(self.font_name);
+    }
 };
 
 pub const StateText = struct {
@@ -100,6 +113,13 @@ pub const ZxlSprite = struct {
     visible: bool = true,
     playing: bool = true, // advance animation each frame
     elapsed_ms: f32 = 0, // accumulator for frame timing
+    // asset_name is a borrowed AST slice when scene-instantiated; dupe + own so
+    // it survives the scene's lifetime. Code-created leaves it false.
+    asset_name_owned: bool = false,
+
+    pub fn deinit(self: *ZxlSprite, gpa: std.mem.Allocator) void {
+        if (self.asset_name_owned) gpa.free(self.asset_name);
+    }
 };
 
 // MARK: Tagging Comonents

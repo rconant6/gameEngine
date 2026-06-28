@@ -284,6 +284,19 @@ pub const Instantiator = struct {
             try self.world.addComponent(entity, Components.OnTimer, component);
             return;
         }
+        // Tag owns its string inline (Tag.init copies), so it can't flow through
+        // buildGenericComponent — that path looks for a `tags` field, which is now
+        // buf/len. Pull the scene's `tags` string out and hand it to Tag.init.
+        if (std.mem.eql(u8, comp_name, "Tag")) {
+            const props = comp_decl.generic.properties orelse
+                return InstantiatorError.MissingRequiredField;
+            const tag_prop = getProperty(props, "tags") orelse
+                return InstantiatorError.MissingRequiredField;
+            const tag_str = try self.extractValueForType([]const u8, tag_prop.value) orelse
+                return InstantiatorError.MissingRequiredField;
+            try self.world.addComponent(entity, Components.Tag, Components.Tag.init(tag_str));
+            return;
+        }
 
         switch (comp_decl.*) {
             .collider => |c| {
@@ -321,15 +334,40 @@ pub const Instantiator = struct {
                 inline for (ComponentRegistry.component_names, 0..) |_, i| {
                     if (comp_index == i) {
                         const ComponentType = ComponentRegistry.component_types[i];
-                        const component = try self.buildGenericComponent(
+                        var component = try self.buildGenericComponent(
                             ComponentType,
                             g,
                         );
+                        // String fields built by buildGenericComponent are borrowed
+                        // AST slices. For components that outlive the AST and own
+                        // their strings, dupe + set the owned flag here.
+                        try self.takeOwnershipOfStrings(ComponentType, &component);
                         try self.world.addComponent(entity, ComponentType, component);
                         return;
                     }
                 }
             },
+        }
+    }
+
+    // After buildGenericComponent, string fields are borrowed AST slices. For
+    // components that own their strings past the AST's lifetime, dupe into the
+    // persistent allocator and flag the copy. Anything not listed here keeps
+    // borrowing (fine for transient/each-frame-matched strings). deinit on each
+    // component frees only the flagged copies; ComponentStorage.remove invokes it.
+    fn takeOwnershipOfStrings(
+        self: *Instantiator,
+        comptime ComponentType: type,
+        component: *ComponentType,
+    ) !void {
+        if (ComponentType == Components.Text) {
+            component.text = try self.persistent.dupe(u8, component.text);
+            component.text_owned = true;
+            component.font_name = try self.persistent.dupe(u8, component.font_name);
+            component.font_owned = true;
+        } else if (ComponentType == Components.ZxlSprite) {
+            component.asset_name = try self.persistent.dupe(u8, component.asset_name);
+            component.asset_name_owned = true;
         }
     }
 
@@ -563,11 +601,21 @@ pub const Instantiator = struct {
                     }
                 } else {
                     if (getProperty(props, field.name)) |prop| {
-                        @field(trigger, field.name) = try self.extractValueForType(
+                        const extracted = try self.extractValueForType(
                             field.type,
                             prop.value,
                         ) orelse
                             return InstantiatorError.MissingRequiredField;
+                        // other_tag_pattern is a borrowed AST slice; the trigger
+                        // outlives the AST, so it must own its copy (freed in
+                        // CollisionTrigger.deinit). Other string fields are matched
+                        // against live data each frame and don't escape, but this
+                        // one is stored on the component.
+                        if (comptime std.mem.eql(u8, field.name, "other_tag_pattern")) {
+                            @field(trigger, field.name) = try self.persistent.dupe(u8, extracted);
+                        } else {
+                            @field(trigger, field.name) = extracted;
+                        }
                     } else if (field.defaultValue()) |default| {
                         @field(trigger, field.name) = default;
                     } else {
@@ -576,6 +624,19 @@ pub const Instantiator = struct {
                 }
             }
         }
+
+        // Mark the duped pattern as owned so deinit frees it (a hand-rolled
+        // trigger leaves this false and keeps its literal).
+        if (@hasField(TriggerType, "pattern_owned")) {
+            trigger.pattern_owned = true;
+        }
+
+        // If action-building fails below, the pattern we just duped would leak —
+        // the component never reaches storage so CollisionTrigger.deinit is never
+        // called. Free it on the error path.
+        errdefer if (@hasField(TriggerType, "other_tag_pattern")) {
+            if (trigger.pattern_owned) self.persistent.free(trigger.other_tag_pattern);
+        };
 
         var actions: std.ArrayList(Action) = .empty;
         errdefer actions.deinit(self.persistent);
