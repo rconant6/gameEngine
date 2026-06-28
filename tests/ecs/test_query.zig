@@ -4,6 +4,8 @@ const testing = std.testing;
 const entity = @import("ecs");
 const ComponentStorage = entity.ComponentStorage;
 const Query = entity.Query;
+// Used to simulate generations that would come from the World
+const test_gens = [_]u32{0} ** 128;
 
 // Test components
 const Position = struct {
@@ -44,7 +46,7 @@ test "Query - basic two component query" {
 
     // Query for entities with BOTH Position and Velocity
     const storages = .{ &positions, &velocities };
-    var query = Query(@TypeOf(storages)).init(storages);
+    var query = Query(@TypeOf(storages)).init(storages, &test_gens);
 
     var count: usize = 0;
     var found_0 = false;
@@ -82,7 +84,7 @@ test "Query - single component query" {
 
     // Query with just one component type
     const storages = .{&positions};
-    var query = Query(@TypeOf(storages)).init(storages);
+    var query = Query(@TypeOf(storages)).init(storages, &test_gens);
 
     var count: usize = 0;
     while (query.next()) |entry| {
@@ -124,7 +126,7 @@ test "Query - three component query" {
 
     // Query for all three components
     const storages = .{ &positions, &velocities, &healths };
-    var query = Query(@TypeOf(storages)).init(storages);
+    var query = Query(@TypeOf(storages)).init(storages, &test_gens);
 
     var count: usize = 0;
     while (query.next()) |entry| {
@@ -157,7 +159,7 @@ test "Query - no matching entities" {
     try velocities.add(1, .{ .dx = 0.1, .dy = 0.2 });
 
     const storages = .{ &positions, &velocities };
-    var query = Query(@TypeOf(storages)).init(storages);
+    var query = Query(@TypeOf(storages)).init(storages, &test_gens);
 
     var count: usize = 0;
     while (query.next()) |_| {
@@ -176,7 +178,7 @@ test "Query - empty storages" {
 
     // No components added at all
     const storages = .{ &positions, &velocities };
-    var query = Query(@TypeOf(storages)).init(storages);
+    var query = Query(@TypeOf(storages)).init(storages, &test_gens);
 
     try testing.expect(query.next() == null);
 }
@@ -199,7 +201,7 @@ test "Query - iterates smallest storage first" {
     try velocities.add(99, .{ .dx = 3.0, .dy = 3.0 });
 
     const storages = .{ &positions, &velocities };
-    var query = Query(@TypeOf(storages)).init(storages);
+    var query = Query(@TypeOf(storages)).init(storages, &test_gens);
 
     // Should only iterate 3 times (checking velocities, not positions)
     var count: usize = 0;
@@ -221,7 +223,7 @@ test "Query - component values are correct" {
     try velocities.add(42, .{ .dx = 7.0, .dy = 8.0 });
 
     const storages = .{ &positions, &velocities };
-    var query = Query(@TypeOf(storages)).init(storages);
+    var query = Query(@TypeOf(storages)).init(storages, &test_gens);
 
     if (query.next()) |entry| {
         try testing.expectEqual(@as(usize, 42), entry.entity.id);
@@ -247,12 +249,12 @@ test "Query - multiple iterations" {
     const storages = .{ &positions, &velocities };
 
     // First iteration
-    var query1 = Query(@TypeOf(storages)).init(storages);
+    var query1 = Query(@TypeOf(storages)).init(storages, &test_gens);
     var count1: usize = 0;
     while (query1.next()) |_| count1 += 1;
 
     // Second iteration (should work independently)
-    var query2 = Query(@TypeOf(storages)).init(storages);
+    var query2 = Query(@TypeOf(storages)).init(storages, &test_gens);
     var count2: usize = 0;
     while (query2.next()) |_| count2 += 1;
 
@@ -273,8 +275,8 @@ test "Query - order independence" {
     const storages_a = .{ &positions, &velocities };
     const storages_b = .{ &velocities, &positions };
 
-    var query_a = Query(@TypeOf(storages_a)).init(storages_a);
-    var query_b = Query(@TypeOf(storages_b)).init(storages_b);
+    var query_a = Query(@TypeOf(storages_a)).init(storages_a, &test_gens);
+    var query_b = Query(@TypeOf(storages_b)).init(storages_b, &test_gens);
 
     const result_a = query_a.next();
     const result_b = query_b.next();

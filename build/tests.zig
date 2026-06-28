@@ -63,6 +63,11 @@ pub fn addAllTests(
             .{ "scene", mod(modules, .scene) },
             .{ "ecs", mod(modules, .ecs) },
         }, .link_engine = true },
+        .{ .name = "entity-generation-tests", .path = "tests/ecs/test_entity_generations.zig", .imports = &.{
+            .{ "math", mod(modules, .math) },
+            .{ "scene", mod(modules, .scene) },
+            .{ "ecs", mod(modules, .ecs) },
+        }, .link_engine = true },
         .{ .name = "world-query-tests", .path = "tests/ecs/test_world_queries.zig", .imports = &.{
             .{ "math", mod(modules, .math) },
             .{ "scene", mod(modules, .scene) },
