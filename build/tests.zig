@@ -96,6 +96,11 @@ pub fn addAllTests(
             .{ "Action", mod(modules, .action) },
             .{ "ecs", mod(modules, .ecs) },
         }, .link_engine = true },
+        .{ .name = "solid-resolution-tests", .path = "tests/ecs/test_solid_resolution.zig", .imports = &.{
+            .{ "math", mod(modules, .math) },
+            .{ "ecs", mod(modules, .ecs) },
+            .{ "systems", mod(modules, .systems) },
+        }, .link_engine = true },
         .{ .name = "input-trigger-tests", .path = "tests/ecs/test_input_trigger.zig", .imports = &.{
             .{ "math", mod(modules, .math) },
             .{ "Action", mod(modules, .action) },
