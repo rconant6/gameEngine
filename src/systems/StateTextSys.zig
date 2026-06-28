@@ -49,8 +49,14 @@ fn appendStr(buf: []u8, start: usize, s: []const u8) usize {
 // Format into the tail of `buf` after `start`; truncate on overflow. bufPrint
 // gives no partial result on NoSpaceLeft, so the value is rendered into a small
 // stack scratch first, then copied in via appendStr (which truncates for us).
-fn appendFmt(buf: []u8, start: usize, comptime fmt: []const u8, args: anytype) usize {
+fn appendFmt(
+    buf: []u8,
+    start: usize,
+    comptime fmt: []const u8,
+    args: anytype,
+) usize {
     var scratch: [64]u8 = undefined;
     const rendered = std.fmt.bufPrint(&scratch, fmt, args) catch &scratch; // worst case: full scratch
+
     return appendStr(buf, start, rendered);
 }

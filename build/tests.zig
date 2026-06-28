@@ -101,6 +101,11 @@ pub fn addAllTests(
             .{ "ecs", mod(modules, .ecs) },
             .{ "systems", mod(modules, .systems) },
         }, .link_engine = true },
+        .{ .name = "text-align-tests", .path = "tests/ecs/test_text_align.zig", .imports = &.{
+            .{ "ecs", mod(modules, .ecs) },
+            .{ "renderer", mod(modules, .renderer) },
+            .{ "assets", mod(modules, .assets) },
+        }, .link_engine = true },
         .{ .name = "input-trigger-tests", .path = "tests/ecs/test_input_trigger.zig", .imports = &.{
             .{ "math", mod(modules, .math) },
             .{ "Action", mod(modules, .action) },

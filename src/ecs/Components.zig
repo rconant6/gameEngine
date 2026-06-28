@@ -46,11 +46,14 @@ pub const Sprite = struct {
         }
     }
 };
+pub const TextAlign = enum { left, center, right };
+
 pub const Text = struct {
     text: []const u8,
     font_name: []const u8 = "__default__",
     size: f32,
     text_color: Color,
+    alignment: TextAlign = .left,
     // Ownership of the two string fields, tracked separately. Scene-instantiated
     // Text dupes both (the AST is not a durable owner); code-created Text with
     // literals leaves both false and is never freed. StateTextSys takes over
@@ -58,6 +61,14 @@ pub const Text = struct {
     // freeing the prior owned copy — see StateTextSys.run.
     text_owned: bool = false,
     font_owned: bool = false,
+
+    pub fn alignOffsetX(self: Text, measured_width: f32) f32 {
+        return switch (self.alignment) {
+            .left => 0,
+            .center => -measured_width / 2.0,
+            .right => -measured_width,
+        };
+    }
 
     pub fn deinit(self: *Text, gpa: std.mem.Allocator) void {
         if (self.text_owned) gpa.free(self.text);

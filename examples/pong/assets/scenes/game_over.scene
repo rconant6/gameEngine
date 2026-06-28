@@ -1,27 +1,28 @@
 [GameOverScene:scene]
 
-  // Real text replaces the old gray placeholder rectangles. World-space [Text]
-  // renders from its Transform position (left-to-right), so x is nudged negative
-  // to roughly center each line — tune against the running window.
+  // Centered via alignment:"center" (F5) — at x=0 the renderer offsets by
+  // -measureText/2, so no hand-tuned -x nudges.
   [GameOverText:entity]
     [Transform]
-      position:vec3 {-5.0, 2.0, 0.0}
+      position:vec3 {0.0, 2.0, 0.0}
       scale:f32 1.0
     [Text]
       text:string "GAME OVER"
       size:f32 2.0
       text_color:color #FF4444
+      alignment:string "center"
     [Tag]
       tags:string "game_over_banner"
 
   [PressSpaceText:entity]
     [Transform]
-      position:vec3 {-4.5, -1.5, 0.0}
+      position:vec3 {0.0, -1.5, 0.0}
       scale:f32 1.0
     [Text]
       text:string "PRESS SPACE"
       size:f32 1.0
       text_color:color #FFFFFF
+      alignment:string "center"
     [Tag]
       tags:string "press_space_banner"
 

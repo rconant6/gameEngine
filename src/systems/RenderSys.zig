@@ -94,10 +94,15 @@ pub fn run(
             continue;
         };
 
+        const offset = text.alignOffsetX(font.measureText(text.text, text.size).x);
+
         renderer.drawText(
             font,
             text.text,
-            transform.position,
+            .{
+                .x = transform.position.x + offset,
+                .y = transform.position.y,
+            },
             text.size,
             text.text_color,
             ctx,

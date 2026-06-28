@@ -27,20 +27,41 @@ pub const ComponentData = blk: {
 };
 
 pub const ComponentRegistry = struct {
+    // A component is a STRUCT decl in Components. The module also holds field-type
+    // helpers (e.g. the TextAlign enum used by Text.alignment) — those are NOT
+    // components and must be skipped, or they pollute the union/tag enum below.
+    fn isComponentDecl(comptime name: []const u8) bool {
+        const field = @field(Components, name);
+        if (@TypeOf(field) != type) return false; // not a type at all
+        return @typeInfo(field) == .@"struct";
+    }
+
+    const component_count = blk: {
+        var n = 0;
+        for (@typeInfo(Components).@"struct".decls) |decl| {
+            if (isComponentDecl(decl.name)) n += 1;
+        }
+        break :blk n;
+    };
+
     pub const component_types = blk: {
-        const decls = @typeInfo(Components).@"struct".decls;
-        var types: [decls.len]type = undefined;
-        for (decls, 0..) |decl, i| {
+        var types: [component_count]type = undefined;
+        var i = 0;
+        for (@typeInfo(Components).@"struct".decls) |decl| {
+            if (!isComponentDecl(decl.name)) continue;
             types[i] = @field(Components, decl.name);
+            i += 1;
         }
         break :blk types;
     };
 
     pub const component_names = blk: {
-        const decls = @typeInfo(Components).@"struct".decls;
-        var names: [decls.len][]const u8 = undefined;
-        for (decls, 0..) |decl, i| {
+        var names: [component_count][]const u8 = undefined;
+        var i = 0;
+        for (@typeInfo(Components).@"struct".decls) |decl| {
+            if (!isComponentDecl(decl.name)) continue;
             names[i] = decl.name;
+            i += 1;
         }
         break :blk names;
     };
