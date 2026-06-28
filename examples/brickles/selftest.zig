@@ -123,7 +123,7 @@ pub fn run(game: *engine.Engine) !void {
         // real clear happens via destroy_self, leaving no brick entities), then
         // let the counter reflect it. The serve-entry "no bricks standing" check
         // is what triggers the next-level rebuild.
-        for (game.findEntitiesByTag("brick")) |b| game.destroyEntity(b);
+        game.clearEntitiesByTag("brick");
         game.setStateVar("bricks", .{ .int = 0 }) catch {};
         std.debug.assert(game.findEntityByTag("brick") == null);
 
@@ -182,13 +182,13 @@ pub fn run(game: *engine.Engine) !void {
     // and tear down the largest grid many times; assert entity counts stay exact
     // (no free-list corruption / leaked or aliased entities under repeated 7C churn).
     game.setStateVar("level", .{ .int = max_level }) catch {};
-    for (game.findEntitiesByTag("brick")) |b| game.destroyEntity(b); // clean slate
+    game.clearEntitiesByTag("brick"); // clean slate
     const big: usize = rowsForLevel(max_level) * brick_cols;
     var cycle: usize = 0;
     while (cycle < 50) : (cycle += 1) {
         spawnBrickGrid(game);
         std.debug.assert(game.findEntitiesByTag("brick").len == big); // exact, no aliasing
-        for (game.findEntitiesByTag("brick")) |b| game.destroyEntity(b);
+        game.clearEntitiesByTag("brick");
         std.debug.assert(game.findEntityByTag("brick") == null); // fully cleared
     }
     log.info(.engine, "SELFTEST churn: 50x build/destroy of {d}-brick grid clean", .{big});
