@@ -127,8 +127,6 @@ ActionSys → PhysicsSys → MovementSys → CollisionDetectionSys
 - **Scene format** — lexer → parser → AST → instantiator, with a component/shape
   registry mapping DSL type names to component constructors.
 
-A deeper tour lives in [`CLAUDE.md`](CLAUDE.md).
-
 ---
 
 ## Status
