@@ -132,6 +132,9 @@
     [Tag]
       tags:string "wall"
 
+  // Side walls are solid: they stop the PADDLE at the edges (replaces the paddle
+  // clamp the game never needed to hand-roll). The ball also bounces off them via
+  // its own bounce trigger; the extra solid separation is a negligible epsilon push.
   [WallLeft:entity]
     [Transform]
       position:vec3 {-17.4, 0.0, 0.0}
@@ -146,6 +149,7 @@
       center:vec2 {0.0, 0.0}
       half_width:f32 0.3
       half_height:f32 10.0
+      solid:bool true
     [Tag]
       tags:string "wall"
 
@@ -163,6 +167,7 @@
       center:vec2 {0.0, 0.0}
       half_width:f32 0.3
       half_height:f32 10.0
+      solid:bool true
     [Tag]
       tags:string "wall"
 

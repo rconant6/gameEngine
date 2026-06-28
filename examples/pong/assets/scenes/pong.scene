@@ -150,7 +150,8 @@
           velocity:vec2 {0.0, 0.0}
           priority:i32 0
 
-  // ── Top Wall ──
+  // ── Top Wall ── (solid: stops the paddles at the top edge — replaces the old
+  // clampPaddleVelocity in main.zig. The ball also gets clean separation here.)
   [WallTop:entity]
     [Transform]
       position:vec3 {0.0, 10.3, 0.0}
@@ -165,10 +166,11 @@
       center:vec2 {0.0, 0.0}
       half_width:f32 14.0
       half_height:f32 0.3
+      solid:bool true
     [Tag]
       tags:string "wall"
 
-  // ── Bottom Wall ──
+  // ── Bottom Wall ── (solid: stops the paddles at the bottom edge)
   [WallBottom:entity]
     [Transform]
       position:vec3 {0.0, -10.3, 0.0}
@@ -183,6 +185,7 @@
       center:vec2 {0.0, 0.0}
       half_width:f32 14.0
       half_height:f32 0.3
+      solid:bool true
     [Tag]
       tags:string "wall"
 

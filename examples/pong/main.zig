@@ -11,7 +11,6 @@ const logical_height = 1080;
 const State = enum { serve, playing, scored, game_over };
 const SD = engine.StateDescriptor;
 
-const bound_y: f32 = 9.6;
 const bound_x: f32 = 13.5;
 const max_ball_speed: f32 = 18.0;
 const ball_speed_inc: f32 = 0.5;
@@ -55,8 +54,7 @@ pub fn main(init: std.process.Init) !void {
         // Bound scene just (re)instantiated for .serve — reset the ball to center.
         if (game.stateEntered(State, .serve)) serveBall(game);
 
-        clampPaddleVelocity(game, "paddle_left");
-        clampPaddleVelocity(game, "paddle_right");
+        // (paddle bounds are now handled by the solid top/bottom walls — F2)
 
         switch (game.state(State).?) {
             .serve => {
@@ -92,15 +90,6 @@ pub fn main(init: std.process.Init) !void {
     }
 }
 
-fn clampPaddleVelocity(game: *engine.Engine, tag: []const u8) void {
-    const entity = game.findEntityByTag(tag) orelse return;
-    const vel = game.world.getComponentMut(entity, Velocity) orelse return;
-    const transform = game.world.getComponent(entity, engine.Transform) orelse return;
-
-    const half_h: f32 = 1.5;
-    if (transform.position.y + half_h >= bound_y and vel.linear.y > 0) vel.linear.y = 0;
-    if (transform.position.y - half_h <= -bound_y and vel.linear.y < 0) vel.linear.y = 0;
-}
 
 fn checkScore(game: *engine.Engine) void {
     const entity = game.findEntityByTag("ball") orelse return;

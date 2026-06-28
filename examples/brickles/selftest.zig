@@ -67,6 +67,23 @@ pub fn run(game: *engine.Engine) !void {
     log.info(.engine, "SELFTEST first hit after {d} frames: score={d}", .{ hit_frames, stateInt(game, "score") });
     std.debug.assert(stateInt(game, "score") > 0);
 
+    // --- SOLID WALLS (F2 acceptance): drive the paddle hard into the right wall;
+    // the solid collider must STOP it at the edge instead of letting it slide off
+    // the field (the bug F2 fixes — no more hand-rolled clampPaddleVelocity).
+    {
+        const pad = game.findEntityByTag("paddle").?;
+        // right wall center x=17.4, half_width 0.3 -> inner face ~17.1; paddle
+        // half_width 2.2 -> its center can't pass ~14.9. Definitely must stay < 16.
+        var k: usize = 0;
+        while (k < 120) : (k += 1) {
+            if (game.world.getComponentMut(pad, engine.Velocity)) |v| v.linear = .{ .x = 40.0, .y = 0 };
+            pump(game);
+        }
+        const px = game.world.getComponent(pad, engine.Transform).?.position.x;
+        log.info(.engine, "SELFTEST solid wall: paddle stopped at x={d:.2} (must be < ~15.5, not off-field)", .{px});
+        std.debug.assert(px < 16.0); // blocked by the solid wall, not slid through
+    }
+
     // --- GUTTER (F1 acceptance): the gutter's OnCollision is pure scene data now,
     // phase "enter" -> balls-- + transition_state serve fire ONCE per crossing.
     // Before OnCollisionEnter this fired every overlapping frame and drained balls
