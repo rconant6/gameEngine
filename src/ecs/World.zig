@@ -17,21 +17,34 @@ const log = debug.log;
 
 persistent: std.mem.Allocator,
 next_entity_id: usize,
+free_ids: ArrayList(usize), // recycled ids, LIFO
+generations: ArrayList(u32), // indexed by id; bumped when destroyed
+alive: ArrayList(bool),
 component_storages: Storages,
 template_manager: *TemplateManager = undefined, // gets set by engine on init
 
 pub fn init(p_gpa: Allocator) !Self {
-    return .{
+    var w: Self = .{
         .persistent = p_gpa,
         .next_entity_id = 1, // 0 is dummy/invalid entity
+        .generations = .empty,
+        .free_ids = .empty,
+        .alive = .empty,
         .component_storages = Storages.init(p_gpa),
     };
+    try w.generations.append(p_gpa, 0); // keep in sync w/ 0 being dummy entity
+    try w.alive.append(p_gpa, false); // keep in sync w/ 0 being dummy entity
+
+    return w;
 }
 
 pub fn deinit(self: *Self) void {
     log.info(.ecs, "ECS(world) shutting down...", .{});
-    for (0..self.next_entity_id) |entity_id| {
-        self.destroyEntity(Entity{ .id = entity_id });
+    for (0..self.next_entity_id) |id| {
+        // Sweep by occupancy, going straight to the raw destroy — a synthesized
+        // handle would either be rejected (gen 0) or double-free a free slot.
+        // This runs each live component's deinit before storage teardown below.
+        if (self.alive.items[id]) self.destroyById(id);
     }
 
     var storage_iter = self.component_storages.valueIterator();
@@ -39,26 +52,72 @@ pub fn deinit(self: *Self) void {
         interface.vtable.deinit(interface.ptr);
         interface.vtable.destroy(interface.ptr, self.persistent);
     }
+
+    self.generations.deinit(self.persistent);
+    self.free_ids.deinit(self.persistent);
+    self.alive.deinit(self.persistent);
+
     self.component_storages.deinit();
 }
 
 pub fn createEntity(self: *Self) !Entity {
-    const entity: Entity = .{ .id = self.next_entity_id };
+    if (self.free_ids.pop()) |id| {
+        self.alive.items[id] = true;
+        return .{
+            .id = id,
+            .gen = self.generations.items[id],
+        };
+    }
+    const id = self.next_entity_id;
     self.next_entity_id += 1;
-    return entity;
+    try self.generations.append(self.persistent, 0);
+    try self.alive.append(self.persistent, true);
+
+    return .{ .id = id, .gen = 0 };
 }
-pub fn destroyEntity(self: *Self, entity: Entity) void {
+
+// The single destroy implementation, keyed by raw id. Removes every component
+// (running their deinit via ComponentStorage.remove), frees the slot, and bumps
+// the generation. Both the public handle door (destroyEntity) and the bulk
+// sweeps (destroyAllExcept/deinit) route through here so storage is always
+// actually cleared — never just hidden behind the isAlive accessor guard.
+fn destroyById(self: *Self, id: usize) void {
     var iter = self.component_storages.valueIterator();
     while (iter.next()) |interface| {
-        if (interface.vtable.has(interface.ptr, entity.id)) {
-            interface.vtable.remove(interface.ptr, entity.id);
+        if (interface.vtable.has(interface.ptr, id)) {
+            interface.vtable.remove(interface.ptr, id);
         }
     }
+
+    self.alive.items[id] = false;
+    self.generations.items[id] +%= 1;
+    self.free_ids.append(self.persistent, id) catch |err| {
+        log.warn(
+            .ecs,
+            "Unable to append {d}, unable to recycle.  {any}",
+            .{ id, err },
+        );
+    };
 }
+
+pub fn destroyEntity(self: *Self, e: Entity) void {
+    if (!self.isAlive(e)) return;
+    self.destroyById(e.id);
+}
+
+pub fn isAlive(self: *const Self, e: Entity) bool {
+    return e.id != 0 and
+        e.id < self.generations.items.len and
+        self.alive.items[e.id] and // occupied — not merely gen-matched
+        self.generations.items[e.id] == e.gen;
+}
+
 pub fn destroyAllExcept(self: *Self, keep: Entity) void {
     for (0..self.next_entity_id) |id| {
         if (id == keep.id) continue;
-        self.destroyEntity(.{ .id = id });
+        if (!self.alive.items[id]) continue;
+
+        self.destroyById(id);
     }
 }
 pub fn createEntityFromTemplate(
@@ -69,42 +128,52 @@ pub fn createEntityFromTemplate(
     return self.template_manager.instantiate(template, offset);
 }
 
-pub fn addComponent(self: *Self, entity: Entity, comptime T: type, value: T) !void {
+pub fn addComponent(self: *Self, e: Entity, comptime T: type, value: T) !void {
+    if (!self.isAlive(e)) return error.EntityDoesNotExist;
+
     if (!self.component_storages.contains(@typeName(T))) {
         try self.registerComponent(T);
     }
 
     const storage = self.getStorage(T);
-    try storage.add(entity.id, value);
+    try storage.add(e.id, value);
 }
-pub fn removeComponent(self: *Self, entity: Entity, comptime T: type) void {
+pub fn removeComponent(self: *Self, e: Entity, comptime T: type) void {
+    if (!self.isAlive(e)) return;
+
     const name = @typeName(T);
     if (!self.component_storages.contains(name)) return;
 
     const storage = self.getStorage(T);
-    storage.remove(entity.id);
+    storage.remove(e.id);
 }
 
-pub fn hasComponent(self: *Self, entity: Entity, comptime T: type) bool {
+pub fn hasComponent(self: *Self, e: Entity, comptime T: type) bool {
+    if (!self.isAlive(e)) return false;
+
     const name = @typeName(T);
     if (!self.component_storages.contains(name)) return false;
 
     const storage = self.getStorage(T);
-    return storage.has(entity.id);
+    return storage.has(e.id);
 }
-pub fn getComponent(self: *const Self, entity: Entity, comptime T: type) ?*const T {
+pub fn getComponent(self: *const Self, e: Entity, comptime T: type) ?*const T {
+    if (!self.isAlive(e)) return null;
+
     const name = @typeName(T);
     if (!self.component_storages.contains(name)) return null;
 
     const storage = self.getStorage(T);
-    return storage.get(entity.id);
+    return storage.get(e.id);
 }
-pub fn getComponentMut(self: *Self, entity: Entity, comptime T: type) ?*T {
+pub fn getComponentMut(self: *Self, e: Entity, comptime T: type) ?*T {
+    if (!self.isAlive(e)) return null;
+
     const name = @typeName(T);
     if (!self.component_storages.contains(name)) return null;
 
     const storage = self.getStorage(T);
-    return storage.getMut(entity.id);
+    return storage.getMut(e.id);
 }
 
 pub fn findEntityByTag(self: *Self, tag: []const u8) ?Entity {
@@ -168,7 +237,7 @@ pub fn query(self: *Self, comptime component_types: anytype) Query(buildStorageT
         @field(storages, std.fmt.comptimePrint("{d}", .{i})) = self.getStorage(component_types[i]);
     }
 
-    return Query(StorageTupleType).init(storages);
+    return Query(StorageTupleType).init(storages, self.generations.items);
 }
 fn buildStorageTupleType(comptime component_types: anytype) type {
     const num = std.meta.fields(@TypeOf(component_types)).len;

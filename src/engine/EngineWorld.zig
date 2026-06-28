@@ -20,9 +20,11 @@ pub const Transform = ecs.Transform;
 pub const Velocity = ecs.Velocity;
 pub const World = ecs.World;
 const Engine = @import("../Engine.zig").Engine;
+const log = @import("debug").log;
 
 pub fn createEntity(self: *Engine) Entity {
-    return self.world.createEntity() catch {};
+    // OOMing here means we need to fail loudly
+    return self.world.createEntity() catch |e| Engine.fatal("createEntity", e);
 }
 
 pub fn destroyEntity(self: *Engine, entity: Entity) void {
@@ -35,15 +37,23 @@ pub fn addComponent(
     comptime T: type,
     value: T,
 ) void {
-    self.world.addComponent(entity, T, value) catch {};
+    self.world.addComponent(entity, T, value) catch |e| switch (e) {
+        error.EntityDoesNotExist => log.warn(
+            .ecs,
+            "addComponent({s}) on a non-live entity {d} — ignored",
+            .{ @typeName(T), entity.id },
+        ),
+        else => Engine.fatal("addComponent", e),
+    };
 }
 
 pub fn findEntityByTag(self: *Engine, tag: []const u8) ?Entity {
     return self.world.findEntityByTag(tag);
 }
-pub fn findEntitiesByTag(self: *Engine, tag: []const u8) ?Entity {
-    return self.world.findEntitiesByTag(tag);
+
+pub fn findEntitiesByTag(self: *Engine, tag: []const u8) []Entity {
+    return self.world.findEntitiesByTag(tag, self.mem.frame);
 }
-pub fn findEntitiesByPattern(self: *Engine, pattern: []const u8) ?Entity {
-    return self.world.findEntityByPattern(pattern);
+pub fn findEntitiesByPattern(self: *Engine, pattern: []const u8) []Entity {
+    return self.world.findEntitiesByPattern(pattern, self.mem.frame);
 }

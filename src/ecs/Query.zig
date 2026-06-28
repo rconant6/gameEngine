@@ -21,12 +21,14 @@ pub fn Query(comptime ComponentTypes: type) type {
         storages: ComponentTypes, // Tuple of storage pointers
         primary_index: usize, // Which storage to interate (smallest?)
         current_index: usize, // Current position in primary storage dense array
+        generations: []const u32, // borrowed from World. valid for lifetime
 
-        pub fn init(storages: ComponentTypes) @This() {
+        pub fn init(storages: ComponentTypes, generations: []const u32) @This() {
             return .{
                 .storages = storages,
                 .primary_index = 0,
                 .current_index = 0,
+                .generations = generations,
             };
         }
 
@@ -36,7 +38,10 @@ pub fn Query(comptime ComponentTypes: type) type {
 
             inline for (0..num_storages) |i| {
                 if (i == self.primary_index) {
-                    const primary_storage = @field(self.storages, std.fmt.comptimePrint("{d}", .{i}));
+                    const primary_storage = @field(self.storages, std.fmt.comptimePrint(
+                        "{d}",
+                        .{i},
+                    ));
 
                     while (self.current_index < primary_storage.dense.items.len) {
                         const entity_id = primary_storage.entities.items[self.current_index];
@@ -58,11 +63,17 @@ pub fn Query(comptime ComponentTypes: type) type {
                         inline for (std.meta.fields(ComponentTypes), 0..) |field, j| {
                             const store = @field(self.storages, field.name);
                             const ptr = store.getMut(entity_id).?;
-                            @field(component_ptrs, std.fmt.comptimePrint("{d}", .{j})) = ptr;
+                            @field(component_ptrs, std.fmt.comptimePrint(
+                                "{d}",
+                                .{j},
+                            )) = ptr;
                         }
 
                         return Entry{
-                            .entity = Entity{ .id = entity_id },
+                            .entity = Entity{
+                                .id = entity_id,
+                                .gen = self.generations[entity_id],
+                            },
                             .components = component_ptrs,
                         };
                     }
