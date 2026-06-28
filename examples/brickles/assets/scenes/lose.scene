@@ -1,0 +1,29 @@
+// Lose screen (ran out of balls). Final score shown live via StateText.
+[LoseScene:scene]
+
+  [Banner:entity]
+    [Transform]
+      position:vec3 {-6.0, 3.0, 0.0}
+    [Text]
+      text:string "GAME OVER"
+      size:f32 3.0
+      text_color:color #EF5350
+
+  [FinalScore:entity]
+    [Transform]
+      position:vec3 {-4.0, -0.5, 0.0}
+    [Text]
+      text:string "SCORE 0"
+      size:f32 1.4
+      text_color:color #FFFFFF
+    [StateText]
+      key:string "score"
+      prefix:string "SCORE "
+
+  [Prompt:entity]
+    [Transform]
+      position:vec3 {-7.5, -4.0, 0.0}
+    [Text]
+      text:string "PRESS SPACE TO PLAY AGAIN"
+      size:f32 1.0
+      text_color:color #FFFFFF

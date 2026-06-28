@@ -1,0 +1,218 @@
+// Brickles — the playfield. World is ~35.5 wide x 20 tall (ortho 10, 16:9):
+// x in [-17.7, 17.7], y in [-10, 10]. Bricks up top, paddle at the bottom,
+// gutter just below the paddle. All gameplay logic lives in scene actions:
+//   - ball: OnCollision bounce off wall/paddle/brick
+//   - paddle: OnInput held -> set_velocity, released -> stop
+//   - brick: (in bricks.template) destroy_self + score + bricks-- on ball hit
+//   - gutter: OnCollision ball -> balls-- + transition_state serve
+// main.zig only does serve/launch and win/lose detection on the state vars.
+
+[BricklesScene:scene]
+
+  // ── Ball ──
+  [Ball:entity]
+    [Transform]
+      position:vec3 {0.0, -6.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {0.0, 0.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 0.35
+      fill_color:color #FFFFFF
+      stroke_color:color #BBBBBB
+      stroke_width:f32 0.4
+      visible:bool true
+    [Collider:circle]
+      radius:f32 0.35
+    [Tag]
+      tags:string "ball"
+    [OnCollision]
+      [trigger]
+        other_tag_pattern:string "wall"
+        [action]
+          type:string "bounce"
+          target:string "self"
+          restitution:f32 1.0
+          separate:bool true
+          priority:i32 0
+      [trigger]
+        other_tag_pattern:string "paddle"
+        [action]
+          type:string "bounce"
+          target:string "self"
+          restitution:f32 1.0
+          separate:bool true
+          priority:i32 0
+      [trigger]
+        other_tag_pattern:string "brick"
+        [action]
+          type:string "bounce"
+          target:string "self"
+          restitution:f32 1.0
+          separate:bool true
+          priority:i32 0
+
+  // ── Paddle (Left/Right arrows) ──
+  [Paddle:entity]
+    [Transform]
+      position:vec3 {0.0, -8.5, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {0.0, 0.0}
+      angular:f32 0.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 2.2
+      half_height:f32 0.4
+      fill_color:color #66BB6A
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 2.2
+      half_height:f32 0.4
+    [Tag]
+      tags:string "paddle"
+    [OnInput]
+      [trigger]
+        key:string "Left"
+        phase:string "held"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {-16.0, 0.0}
+          priority:i32 0
+      [trigger]
+        key:string "Right"
+        phase:string "held"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {16.0, 0.0}
+          priority:i32 0
+      [trigger]
+        key:string "Left"
+        phase:string "released"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 0.0}
+          priority:i32 0
+      [trigger]
+        key:string "Right"
+        phase:string "released"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 0.0}
+          priority:i32 0
+
+  // ── Walls (top, left, right) — invisible-ish thin colliders tagged "wall" ──
+  [WallTop:entity]
+    [Transform]
+      position:vec3 {0.0, 9.7, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 18.0
+      half_height:f32 0.3
+      fill_color:color #444444
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 18.0
+      half_height:f32 0.3
+    [Tag]
+      tags:string "wall"
+
+  [WallLeft:entity]
+    [Transform]
+      position:vec3 {-17.4, 0.0, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.3
+      half_height:f32 10.0
+      fill_color:color #444444
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.3
+      half_height:f32 10.0
+    [Tag]
+      tags:string "wall"
+
+  [WallRight:entity]
+    [Transform]
+      position:vec3 {17.4, 0.0, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.3
+      half_height:f32 10.0
+      fill_color:color #444444
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.3
+      half_height:f32 10.0
+    [Tag]
+      tags:string "wall"
+
+  // ── Gutter (below the paddle) — ball falling past loses a ball, re-serves ──
+  [Gutter:entity]
+    [Transform]
+      position:vec3 {0.0, -10.6, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 18.0
+      half_height:f32 0.4
+      fill_color:color #2a0a0a
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 18.0
+      half_height:f32 0.4
+    [Tag]
+      tags:string "gutter"
+    // NOTE: no OnCollision here. A collision trigger fires every frame the ball
+    // overlaps, which is fine for bounce (self-separating) but would decrement
+    // balls dozens of times and re-serve in a loop. Ball-loss is edge-detected
+    // once in main.zig instead (see checkGutter). This is friction finding #6:
+    // the DSL has no fire-once-on-enter collision semantic.
+
+  // ── HUD: SCORE and BALLS, bound to state vars via StateText ──
+  [ScoreText:entity]
+    [Transform]
+      position:vec3 {-16.5, 8.7, 0.0}
+    [Text]
+      text:string "SCORE 0"
+      size:f32 1.0
+      text_color:color #FFFFFF
+    [StateText]
+      key:string "score"
+      prefix:string "SCORE "
+
+  [LevelText:entity]
+    [Transform]
+      position:vec3 {-2.0, 8.7, 0.0}
+    [Text]
+      text:string "LEVEL 1"
+      size:f32 1.0
+      text_color:color #FFD54F
+    [StateText]
+      key:string "level"
+      prefix:string "LEVEL "
+
+  [BallsText:entity]
+    [Transform]
+      position:vec3 {12.5, 8.7, 0.0}
+    [Text]
+      text:string "BALLS 3"
+      size:f32 1.0
+      text_color:color #FFFFFF
+    [StateText]
+      key:string "balls"
+      prefix:string "BALLS "

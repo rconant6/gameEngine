@@ -448,6 +448,33 @@ pub fn build(b: *std.Build) void {
     b.step("pong", "Run Pong").dependOn(&run_pong.step);
 
     // ========================================
+    // Brickles example
+    // ========================================
+    const brickles_module = b.addModule("brickles", .{
+        .root_source_file = b.path("examples/brickles/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    brickles_module.addImport("engine", m.get(&modules, .engine));
+
+    const brickles_exe = b.addExecutable(.{
+        .name = "brickles",
+        .root_module = brickles_module,
+    });
+
+    const install_brickles_assets = b.addInstallDirectory(.{
+        .source_dir = b.path("examples/brickles/assets"),
+        .install_dir = .bin,
+        .install_subdir = "assets",
+    });
+    brickles_exe.step.dependOn(&install_brickles_assets.step);
+    const install_brickles = b.addInstallArtifact(brickles_exe, .{});
+    const run_brickles = b.addRunArtifact(brickles_exe);
+    run_brickles.step.dependOn(&install_brickles.step);
+    run_brickles.setCwd(b.path("zig-out/bin"));
+    b.step("brickles", "Run Brickles").dependOn(&run_brickles.step);
+
+    // ========================================
     // Build all apps without running any
     // ========================================
     const build_all = b.step("build-all", "Build all apps and tools without running");
@@ -456,12 +483,13 @@ pub fn build(b: *std.Build) void {
     build_all.dependOn(&install_ui_playground.step);
     build_all.dependOn(&install_player.step);
     build_all.dependOn(&install_pong.step);
+    build_all.dependOn(&install_brickles.step);
 
     // ========================================
     // Platform-specific linking (Swift runtime on macOS, xdg_ for linux, no-op elsewhere)
     // ========================================
     linkPlatformLibraries(
-        &.{ engine_lib, zixelart_exe, ui_playground_exe, player_exe, scene_editor_exe, pong_exe },
+        &.{ engine_lib, zixelart_exe, ui_playground_exe, player_exe, scene_editor_exe, pong_exe, brickles_exe },
         swift_lib,
         target,
     );

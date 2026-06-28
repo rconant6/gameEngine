@@ -1,0 +1,228 @@
+// Brick templates. One ball-hit fires three actions on a single trigger:
+//   destroy_self        -> brick disappears
+//   add_state_int score -> +points
+//   add_state_int bricks -> -1 toward the win condition (bricks == 0)
+// The ball's own OnCollision handles the bounce, so bricks don't need to.
+// Position is supplied by spawn offset / the scene layout that instantiates them.
+
+[Brick:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+  [Sprite:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.4
+    half_height:f32 0.55
+    fill_color:color #4FC3F7
+    stroke_color:color #0288D1
+    stroke_width:f32 1.0
+    visible:bool true
+  [Collider:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.4
+    half_height:f32 0.55
+  [Tag]
+    tags:string "brick"
+  [OnCollision]
+    [trigger]
+      other_tag_pattern:string "ball"
+      [action]
+        type:string "add_state_int"
+        key:string "score"
+        amount:i32 100
+        priority:i32 0
+      [action]
+        type:string "add_state_int"
+        key:string "bricks"
+        amount:i32 -1
+        priority:i32 1
+      [action]
+        type:string "destroy_self"
+        priority:i32 2
+
+// A tougher brick worth more — same shape, different color/score. (Single hit
+// for v1; a hit-points mechanic would need a per-entity counter the DSL can't
+// express yet, so this is just a palette/score variant for now.)
+[BrickGold:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+  [Sprite:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.4
+    half_height:f32 0.55
+    fill_color:color #FFD54F
+    stroke_color:color #FFA000
+    stroke_width:f32 1.0
+    visible:bool true
+  [Collider:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.4
+    half_height:f32 0.55
+  [Tag]
+    tags:string "brick"
+  [OnCollision]
+    [trigger]
+      other_tag_pattern:string "ball"
+      [action]
+        type:string "add_state_int"
+        key:string "score"
+        amount:i32 250
+        priority:i32 0
+      [action]
+        type:string "add_state_int"
+        key:string "bricks"
+        amount:i32 -1
+        priority:i32 1
+      [action]
+        type:string "destroy_self"
+        priority:i32 2
+
+// Per-level color variants (different score values; stress the template +
+// owned-string instantiation paths with several distinct templates).
+
+[BrickGreen:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+  [Sprite:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.4
+    half_height:f32 0.55
+    fill_color:color #66BB6A
+    stroke_color:color #2E7D32
+    stroke_width:f32 1.0
+    visible:bool true
+  [Collider:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.4
+    half_height:f32 0.55
+  [Tag]
+    tags:string "brick"
+  [OnCollision]
+    [trigger]
+      other_tag_pattern:string "ball"
+      [action]
+        type:string "add_state_int"
+        key:string "score"
+        amount:i32 120
+        priority:i32 0
+      [action]
+        type:string "add_state_int"
+        key:string "bricks"
+        amount:i32 -1
+        priority:i32 1
+      [action]
+        type:string "destroy_self"
+        priority:i32 2
+
+[BrickOrange:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+  [Sprite:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.4
+    half_height:f32 0.55
+    fill_color:color #FFA726
+    stroke_color:color #EF6C00
+    stroke_width:f32 1.0
+    visible:bool true
+  [Collider:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.4
+    half_height:f32 0.55
+  [Tag]
+    tags:string "brick"
+  [OnCollision]
+    [trigger]
+      other_tag_pattern:string "ball"
+      [action]
+        type:string "add_state_int"
+        key:string "score"
+        amount:i32 150
+        priority:i32 0
+      [action]
+        type:string "add_state_int"
+        key:string "bricks"
+        amount:i32 -1
+        priority:i32 1
+      [action]
+        type:string "destroy_self"
+        priority:i32 2
+
+[BrickRed:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+  [Sprite:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.4
+    half_height:f32 0.55
+    fill_color:color #EF5350
+    stroke_color:color #C62828
+    stroke_width:f32 1.0
+    visible:bool true
+  [Collider:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.4
+    half_height:f32 0.55
+  [Tag]
+    tags:string "brick"
+  [OnCollision]
+    [trigger]
+      other_tag_pattern:string "ball"
+      [action]
+        type:string "add_state_int"
+        key:string "score"
+        amount:i32 200
+        priority:i32 0
+      [action]
+        type:string "add_state_int"
+        key:string "bricks"
+        amount:i32 -1
+        priority:i32 1
+      [action]
+        type:string "destroy_self"
+        priority:i32 2
+
+[BrickPurple:template]
+  [Transform]
+    position:vec2 {0.0, 0.0}
+    rotation:f32 0.0
+    scale:f32 1.0
+  [Sprite:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.4
+    half_height:f32 0.55
+    fill_color:color #AB47BC
+    stroke_color:color #6A1B9A
+    stroke_width:f32 1.0
+    visible:bool true
+  [Collider:rectangle]
+    center:vec2 {0.0, 0.0}
+    half_width:f32 1.4
+    half_height:f32 0.55
+  [Tag]
+    tags:string "brick"
+  [OnCollision]
+    [trigger]
+      other_tag_pattern:string "ball"
+      [action]
+        type:string "add_state_int"
+        key:string "score"
+        amount:i32 300
+        priority:i32 0
+      [action]
+        type:string "add_state_int"
+        key:string "bricks"
+        amount:i32 -1
+        priority:i32 1
+      [action]
+        type:string "destroy_self"
+        priority:i32 2

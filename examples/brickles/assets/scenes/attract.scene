@@ -1,0 +1,28 @@
+// Attract / title screen. Pure presentation — main.zig watches for Space to
+// start the game. World-space text is left-anchored from its Transform, so x is
+// nudged negative to roughly center each line (engine has no centered-text yet).
+[AttractScene:scene]
+
+  [Title:entity]
+    [Transform]
+      position:vec3 {-7.0, 3.0, 0.0}
+    [Text]
+      text:string "BRICKLES"
+      size:f32 3.0
+      text_color:color #4FC3F7
+
+  [Prompt:entity]
+    [Transform]
+      position:vec3 {-7.5, -2.0, 0.0}
+    [Text]
+      text:string "PRESS SPACE TO PLAY"
+      size:f32 1.2
+      text_color:color #FFFFFF
+
+  [Hint:entity]
+    [Transform]
+      position:vec3 {-6.5, -4.5, 0.0}
+    [Text]
+      text:string "ARROW KEYS MOVE PADDLE"
+      size:f32 0.8
+      text_color:color #888888
