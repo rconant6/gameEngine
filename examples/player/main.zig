@@ -10,11 +10,6 @@ const Colors = engine.Colors;
 const logical_width = 1920;
 const logical_height = 1080;
 
-fn monoMillis() i64 {
-    var ts: std.c.timespec = undefined;
-    _ = std.c.clock_gettime(std.c.CLOCK.MONOTONIC, &ts);
-    return ts.sec * 1000 + @divTrunc(ts.nsec, 1_000_000);
-}
 
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
@@ -237,8 +232,6 @@ pub fn main(init: std.process.Init) !void {
     // }
 
     // +++++++ GAME LOOP FOR NOW ++++++++++ //
-    var last_time = monoMillis();
-
     // Camera control settings
     const camera_pan_speed: f32 = 10.0; // units per second
     const zoom_in_factor: f32 = 0.9; // 10% closer each press
@@ -247,11 +240,9 @@ pub fn main(init: std.process.Init) !void {
     // Camera tracking tuning
     var camera_tracking_enabled = true;
     while (!game.shouldClose()) {
-        const current_time = monoMillis();
-        const dt: f32 = @as(f32, @floatFromInt(current_time - last_time)) / 1000.0;
-        last_time = current_time;
-
         game.beginFrame();
+        // Engine owns the clock now; grab this frame's dt for camera math.
+        const dt = game.deltaTime();
         game.clear(engine.Colors.DARK_GRAY);
 
         // ===== CAMERA TRACKING TOGGLE (T key) =====
@@ -319,7 +310,7 @@ pub fn main(init: std.process.Init) !void {
         }
         // ===== END CAMERA CONTROLS =====
 
-        game.update(dt);
+        game.tick();
 
         // Test screen-space text rendering
         const font = game.getFont("__default__") catch unreachable;

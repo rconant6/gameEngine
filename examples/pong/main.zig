@@ -17,12 +17,6 @@ const max_ball_speed: f32 = 18.0;
 const ball_speed_inc: f32 = 0.5;
 const win_score: i64 = 7;
 
-fn monoMillis() i64 {
-    var ts: std.c.timespec = undefined;
-    _ = std.c.clock_gettime(std.c.CLOCK.MONOTONIC, &ts);
-    return ts.sec * 1000 + @divTrunc(ts.nsec, 1_000_000);
-}
-
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
     const io = init.io;
@@ -52,13 +46,7 @@ pub fn main(init: std.process.Init) !void {
     // the next beginFrame; the ball reset then happens via stateEntered(.serve).
     try game.transitionTo(State, .serve);
 
-    var prev_ms: i64 = monoMillis();
-
     while (!game.shouldClose()) {
-        const now_ms = monoMillis();
-        const dt: f32 = @as(f32, @floatFromInt(now_ms - prev_ms)) / 1000.0;
-        prev_ms = now_ms;
-
         game.beginFrame();
         game.clear(Colors.BLACK);
 
@@ -99,7 +87,7 @@ pub fn main(init: std.process.Init) !void {
             },
         }
 
-        game.update(dt);
+        game.tick();
         game.endFrame();
     }
 }

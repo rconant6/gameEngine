@@ -99,6 +99,15 @@ pub const Engine = struct {
     debugger: Debugger,
     performance_metrics: PerformanceMetrics = .{},
 
+    // Engine-owned frame timing (7D). One clock drives dt for every system, so
+    // nothing computes its own timestep. dt is clamped to max_dt so a paused
+    // debugger or a dragged window doesn't teleport everything on resume, then
+    // scaled by time_scale (free slow-mo / fast-forward).
+    last_frame_ns: u64 = 0, // seeded on first beginFrame
+    dt: f32 = 0,
+    max_dt: f32 = 1.0 / 15.0,
+    time_scale: f32 = 1.0,
+
     active_camera_entity: Entity,
 
     pub fn init(app: *App) *Engine {
@@ -359,7 +368,30 @@ pub const Engine = struct {
         self.render(dt);
     }
 
+    // The engine-timed step: most games call tick() and never see dt. update(dt)
+    // stays for anyone who wants to drive their own timestep (fixed-step physics,
+    // replays, tests).
+    pub fn tick(self: *Engine) void {
+        self.update(self.dt);
+    }
+
+    pub fn deltaTime(self: *const Engine) f32 {
+        return self.dt;
+    }
+
     pub fn beginFrame(self: *Engine) void {
+        // Engine-owned dt: diff the monotonic clock since last frame, clamp the
+        // spike (debugger/window-drag), then scale. First frame seeds the clock
+        // and yields dt=0 so nothing integrates against a bogus startup gap.
+        const now_ns = platform.monotonicNanos();
+        if (self.last_frame_ns == 0) {
+            self.dt = 0;
+        } else {
+            const raw_s = @as(f32, @floatFromInt(now_ns - self.last_frame_ns)) / @as(f32, std.time.ns_per_s);
+            self.dt = @min(raw_s, self.max_dt) * self.time_scale;
+        }
+        self.last_frame_ns = now_ns;
+
         self.app.beginFrame() catch |err| {
             log.err(.engine, "BeginFrame failed: {any}", .{err});
         };

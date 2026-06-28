@@ -20,6 +20,26 @@ pub const mapToGameMouseButton = id.mapToGameMouseButton;
 // Input system
 pub const Input = @import("Input.zig");
 
+// Monotonic clock for frame timing — std.time.Timer was removed in 0.16, so we
+// read the OS monotonic clock directly. Windows uses QueryPerformanceCounter;
+// macOS/Linux share the POSIX clock_gettime path. Never goes backwards, so it's
+// safe to diff for a frame delta.
+pub fn monotonicNanos() u64 {
+    switch (builtin.os.tag) {
+        .windows => {
+            const w = std.os.windows;
+            const freq = w.QueryPerformanceFrequency();
+            const count = w.QueryPerformanceCounter();
+            return @intCast((@as(u128, count) * std.time.ns_per_s) / freq);
+        },
+        else => {
+            var ts: std.c.timespec = undefined;
+            _ = std.c.clock_gettime(std.c.CLOCK.MONOTONIC, &ts);
+            return @as(u64, @intCast(ts.sec)) * std.time.ns_per_s + @as(u64, @intCast(ts.nsec));
+        },
+    }
+}
+
 // Shared input state — owned here, updated by pollEvent().
 var keyboard_state: Keyboard = .{};
 var mouse_state: Mouse = .{
