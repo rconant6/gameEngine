@@ -480,6 +480,7 @@ pub const Engine = struct {
     pub const findEntityByTag = @import("EngineWorld.zig").findEntityByTag;
     pub const findEntitiesByTag = @import("EngineWorld.zig").findEntitiesByTag;
     pub const findEntitiesByPattern = @import("EngineWorld.zig").findEntitiesByPattern;
+    pub const clearEntitiesByTag = @import("EngineWorld.zig").clearEntitiesByTag;
 
     // MARK: Asset methods
     pub const getFont = @import("EngineAssets.zig").getFont;

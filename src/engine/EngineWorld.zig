@@ -57,3 +57,9 @@ pub fn findEntitiesByTag(self: *Engine, tag: []const u8) []Entity {
 pub fn findEntitiesByPattern(self: *Engine, pattern: []const u8) []Entity {
     return self.world.findEntitiesByPattern(pattern, self.mem.frame);
 }
+
+pub fn clearEntitiesByTag(self: *Engine, tag: []const u8) void {
+    for (self.world.findEntitiesByTag(tag, self.mem.frame)) |e| {
+        self.world.destroyEntity(e);
+    }
+}

@@ -43,7 +43,7 @@ const api = [_][]const u8{
     "getBottomEdge", "isInBounds", "wrapPosition",
     // world (EngineWorld.zig)
     "createEntity", "destroyEntity", "addComponent", "findEntityByTag",
-    "findEntitiesByTag", "findEntitiesByPattern",
+    "findEntitiesByTag", "findEntitiesByPattern", "clearEntitiesByTag",
     // assets (EngineAssets.zig)
     "getFont",
     // collision (EngineCollision.zig) — getCollisionEvents was the known-broken one
