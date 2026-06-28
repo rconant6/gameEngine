@@ -545,8 +545,19 @@ pub const Instantiator = struct {
             ColliderShapeType,
             shape_data,
         );
+
+        // `solid` is a Collider-level field (not part of the shape), so the
+        // shape-field loop above skips it — read it here. Optional; defaults false.
+        var solid = false;
+        if (collider_block.properties) |props| {
+            if (getProperty(props, "solid")) |prop| {
+                solid = (try self.extractValueForType(bool, prop.value)) orelse false;
+            }
+        }
+
         return Components.Collider{
             .collider = collider_data,
+            .solid = solid,
         };
     }
     fn buildTriggerComponent(

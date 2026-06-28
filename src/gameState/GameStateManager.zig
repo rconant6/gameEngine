@@ -28,6 +28,7 @@ pub const SimulateOpts = struct {
     movement: bool = true,
     physics: bool = true,
     collision: bool = true,
+    solid: bool = true,
     actions: bool = true,
     camera: bool = true,
     lifetime: bool = true,

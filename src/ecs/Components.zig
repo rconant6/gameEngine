@@ -92,6 +92,7 @@ pub const Physics = struct {
 // MARK: Collision Components
 pub const Collider = struct {
     collider: ColliderData,
+    solid: bool = false,
 };
 
 // MARK: Generic Game Components

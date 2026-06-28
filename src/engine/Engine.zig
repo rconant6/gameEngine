@@ -302,7 +302,9 @@ pub const Engine = struct {
 
         self.collision_events = &.{};
         if (opts.movement) Systems.movementSystem(&self.world, dt, &self.debugger);
+
         if (opts.physics) Systems.physicsSystem(&self.world, dt);
+
         if (opts.collision) {
             self.collision_events = Systems.collisionDetectionSystem(
                 &self.world,
@@ -310,6 +312,11 @@ pub const Engine = struct {
                 &self.debugger,
             );
         }
+
+        if (opts.solid) Systems.solidResolutionSystem(
+            &self.world,
+            self.collision_events,
+        );
 
         if (opts.actions) {
             const context: TriggerContext = .{
@@ -320,8 +327,11 @@ pub const Engine = struct {
             };
             Systems.actionSystem(&self.world, &self.action_system, context) catch {};
         }
+
         if (opts.camera) Systems.cameraTrackingSystem(&self.world, dt);
+
         if (opts.lifetime) Systems.lifetimeSystem(&self.world, dt, self.mem.frame);
+
         if (opts.state_text) Systems.stateTextSystem(&self.world, &self.state_manager);
     }
 
