@@ -98,7 +98,7 @@ pub fn main(init: std.process.Init) !void {
             .stroke_width = 3.0,
             .visible = true,
         });
-        game.addComponent(test_ui, engine.Tag, .{ .tags = "test-ui" });
+        game.addComponent(test_ui, engine.Tag, .init("test-ui"));
     }
     // ===== END MANUAL UI ELEMENT TEST =====
 
