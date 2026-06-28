@@ -129,12 +129,10 @@ pub const TemplateManager = struct {
             switch (entry.kind) {
                 .file => {
                     if (std.mem.endsWith(u8, entry.name, ".template")) {
-                        const full_path = try std.fmt.allocPrint(
+                        const full_path = try std.fs.path.join(
                             self.gpa,
-                            "{s}{s}",
-                            .{ dir_path, entry.name },
+                            &.{ dir_path, entry.name },
                         );
-                        errdefer self.gpa.free(full_path);
                         defer self.gpa.free(full_path);
                         try self.loadTemplateFile(full_path);
                     }
