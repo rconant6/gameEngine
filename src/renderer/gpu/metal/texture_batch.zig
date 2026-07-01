@@ -32,6 +32,24 @@ pub const TextureBatch = struct {
         self.draw_calls.clearRetainingCapacity();
     }
 
+    fn pushCall(
+        self: *TextureBatch,
+        tex: *MTLTexture,
+        start: u32,
+    ) !void {
+        if (self.draw_calls.items.len > 0) {
+            const last = &self.draw_calls.items[self.draw_calls.items.len - 1];
+            if (last.texture == tex) {
+                last.vertex_count += 6;
+                return;
+            }
+        }
+        try self.draw_calls.append(
+            self.gpa,
+            .{ .texture = tex, .vertex_start = start },
+        ); // only make new draw call for a new primitive type
+    }
+
     pub fn addSprite(
         self: *TextureBatch,
         texture: *MTLTexture,
@@ -69,9 +87,9 @@ pub const TextureBatch = struct {
             },
         };
         try self.vertices.appendSlice(self.gpa, &verts);
-        try self.draw_calls.append(self.gpa, .{
-            .texture = texture,
-            .vertex_start = vertex_start,
-        });
+        try self.pushCall(
+            texture,
+            vertex_start,
+        );
     }
 };

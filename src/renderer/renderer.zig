@@ -23,7 +23,6 @@ pub const Tone = col.Tone;
 pub const Family = col.Family;
 pub const TaggedColor = col.TaggedColor;
 pub const Generator = col.generators;
-
 const utils = @import("geometry_utils.zig");
 pub const Transform = utils.Transform;
 pub const ScreenAnchor = utils.ScreenAnchor;
@@ -56,7 +55,7 @@ else
 const OpenGLRenderer = if (build_options.backend == .opengl)
     @import("./gpu/opengl/opengl_renderer.zig").OpenGLRenderer
 else
-    unreachable;
+    @panic("TODO: OpenGL is not currently a viable renderer backend");
 
 pub const RendererConfig = struct {
     width: u32,
@@ -96,6 +95,7 @@ pub const Renderer = struct {
     }
 
     pub fn resize(self: *Renderer, width: u32, height: u32) !void {
+        log.warn(.renderer, "TODO: actually support resizing", .{});
         self.width = width;
         self.height = height;
         try self.backend.resize(width, height);

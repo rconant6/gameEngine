@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const types = @import("metal_types.zig");
 const Vertex = types.Vertex;
 const MTLPrimitiveType = types.MTLPrimitiveType;
@@ -27,7 +28,7 @@ pub const DrawCall = struct {
 pub const GeometryBatch = struct {
     vertices: std.ArrayList(Vertex),
     draw_calls: std.ArrayList(DrawCall),
-    gpa: std.mem.Allocator,
+    gpa: Allocator, // TODO: needs to be updated to be a frame?
 
     pub fn init(gpa: std.mem.Allocator) GeometryBatch {
         return .{
@@ -43,6 +44,25 @@ pub const GeometryBatch = struct {
     pub fn clear(self: *GeometryBatch) void {
         self.vertices.clearRetainingCapacity();
         self.draw_calls.clearRetainingCapacity();
+    }
+
+    fn pushCall(
+        self: *GeometryBatch,
+        prim: MTLPrimitiveType,
+        start: u32,
+        count: u32,
+    ) !void {
+        if (self.draw_calls.items.len > 0) {
+            const last = &self.draw_calls.items[self.draw_calls.items.len - 1];
+            if (last.primitive_type == prim and (last.vertex_start + last.vertex_count) == start) {
+                last.vertex_count += count;
+                return;
+            }
+        }
+        try self.draw_calls.append(
+            self.gpa,
+            .{ .primitive_type = prim, .vertex_start = start, .vertex_count = count },
+        ); // only make new draw call for a new primitive type
     }
 
     pub fn addShape(
@@ -167,13 +187,10 @@ pub const GeometryBatch = struct {
         const vertices = [_]Vertex{ start_vert, end_vert };
         try self.vertices.appendSlice(self.gpa, &vertices);
 
-        try self.draw_calls.append(
-            self.gpa,
-            .{
-                .primitive_type = .line,
-                .vertex_start = batch_offset,
-                .vertex_count = 2,
-            },
+        try self.pushCall(
+            .line,
+            batch_offset,
+            2,
         );
     }
     fn addTriangle(
@@ -224,13 +241,11 @@ pub const GeometryBatch = struct {
                 makeScreenVertex(tri.v2, transform, ctx, fc)
             else
                 makeVertex(tri.v2, transform, ctx, fc);
+
             const vertices = [_]Vertex{ v0, v1, v2 };
             try self.vertices.appendSlice(self.gpa, &vertices);
-            try self.draw_calls.append(self.gpa, .{
-                .primitive_type = .triangle,
-                .vertex_start = batch_offset,
-                .vertex_count = 3,
-            });
+
+            try self.pushCall(.triangle, batch_offset, 3);
             batch_offset += 3;
         }
 
@@ -247,12 +262,11 @@ pub const GeometryBatch = struct {
                 makeScreenVertex(tri.v2, transform, ctx, sc)
             else
                 makeVertex(tri.v2, transform, ctx, sc);
+
             self.vertices.appendSliceAssumeCapacity(&.{ v0, v1, v1, v2, v2, v0 });
-            self.draw_calls.appendSliceAssumeCapacity(&.{
-                .{ .primitive_type = .line, .vertex_start = batch_offset, .vertex_count = 2 },
-                .{ .primitive_type = .line, .vertex_start = batch_offset + 2, .vertex_count = 2 },
-                .{ .primitive_type = .line, .vertex_start = batch_offset + 4, .vertex_count = 2 },
-            });
+            try self.pushCall(.line, batch_offset, 2);
+            try self.pushCall(.line, batch_offset + 2, 2);
+            try self.pushCall(.line, batch_offset + 4, 2);
         }
     }
     fn addRectangle(
@@ -313,10 +327,8 @@ pub const GeometryBatch = struct {
                 // Tri 1    Tri 2
                 v0, v1, v2, v0, v2, v3,
             });
-            self.draw_calls.appendSliceAssumeCapacity(&.{
-                .{ .primitive_type = .triangle, .vertex_start = batch_offset, .vertex_count = 3 },
-                .{ .primitive_type = .triangle, .vertex_start = batch_offset + 3, .vertex_count = 3 },
-            });
+            try self.pushCall(.triangle, batch_offset, 3);
+            try self.pushCall(.triangle, batch_offset + 3, 3);
             batch_offset += 6;
         }
         if (has_outline) {
@@ -339,12 +351,10 @@ pub const GeometryBatch = struct {
             self.vertices.appendSliceAssumeCapacity(&.{
                 v0, v1, v1, v2, v2, v3, v3, v0,
             });
-            self.draw_calls.appendSliceAssumeCapacity(&.{
-                .{ .primitive_type = .line, .vertex_start = batch_offset, .vertex_count = 2 },
-                .{ .primitive_type = .line, .vertex_start = batch_offset + 2, .vertex_count = 2 },
-                .{ .primitive_type = .line, .vertex_start = batch_offset + 4, .vertex_count = 2 },
-                .{ .primitive_type = .line, .vertex_start = batch_offset + 6, .vertex_count = 2 },
-            });
+            try self.pushCall(.line, batch_offset, 2);
+            try self.pushCall(.line, batch_offset + 2, 2);
+            try self.pushCall(.line, batch_offset + 4, 2);
+            try self.pushCall(.line, batch_offset + 6, 2);
         }
     }
     fn addPolygon(
@@ -392,11 +402,7 @@ pub const GeometryBatch = struct {
                 self.vertices.appendSliceAssumeCapacity(&.{ v0, v1, v2 });
             }
 
-            self.draw_calls.appendAssumeCapacity(.{
-                .primitive_type = .triangle,
-                .vertex_start = @intCast(fill_start),
-                .vertex_count = @intCast(cache.len * 3),
-            });
+            try self.pushCall(.triangle, @intCast(fill_start), @intCast(cache.len * 3));
         }
 
         if (has_outline) {
@@ -412,11 +418,7 @@ pub const GeometryBatch = struct {
                 else
                     makeVertex(poly.points[v2_idx], transform, ctx, sc);
                 self.vertices.appendSliceAssumeCapacity(&.{ v1, v2 });
-                self.draw_calls.appendAssumeCapacity(.{
-                    .primitive_type = .line,
-                    .vertex_start = @intCast(edge_start),
-                    .vertex_count = 2,
-                });
+                try self.pushCall(.line, @intCast(edge_start), 2);
             }
         }
     }
@@ -486,11 +488,7 @@ pub const GeometryBatch = struct {
                     makeVertex(p2, transform, ctx, fc);
                 const current_offset: u32 = @intCast(self.vertices.items.len);
                 self.vertices.appendSliceAssumeCapacity(&.{ origin_vertex, v1, v2 });
-                self.draw_calls.appendAssumeCapacity(.{
-                    .primitive_type = .triangle,
-                    .vertex_start = current_offset,
-                    .vertex_count = 3,
-                });
+                try self.pushCall(.triangle, current_offset, 3);
             }
 
             if (has_outline) {
@@ -504,11 +502,7 @@ pub const GeometryBatch = struct {
                 else
                     makeVertex(p2, transform, ctx, sc);
                 self.vertices.appendSliceAssumeCapacity(&.{ v1, v2 });
-                self.draw_calls.appendAssumeCapacity(.{
-                    .primitive_type = .line,
-                    .vertex_start = current_offset,
-                    .vertex_count = 2,
-                });
+                try self.pushCall(.line, current_offset, 2);
             }
         }
     }
