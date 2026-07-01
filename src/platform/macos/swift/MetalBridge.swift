@@ -263,6 +263,11 @@
 
     guard let pf = MTLPixelFormat(rawValue: UInt(pixelFormat)) else { return nil }
     pipelineDesc.colorAttachments[0].pixelFormat = pf
+    pipelineDesc.colorAttachments[0].isBlendingEnabled = true
+    pipelineDesc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+    pipelineDesc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+    pipelineDesc.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
+    pipelineDesc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
 
     guard let pipeline = try? dev.makeRenderPipelineState(descriptor: pipelineDesc) else {
       return nil
