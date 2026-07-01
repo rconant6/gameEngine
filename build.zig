@@ -6,7 +6,7 @@ const windows = @import("build/windows.zig");
 const tests = @import("build/tests.zig");
 const fuzz = @import("build/fuzz.zig");
 
-pub const RendererBackend = enum { metal, vulkan, opengl, cpu };
+pub const RendererBackend = enum { metal, vulkan, opengl };
 
 /// Tool modules, used as indices into the modules array.
 /// NOTE: must be the same order in module_defs
@@ -224,14 +224,6 @@ pub fn build(b: *std.Build) void {
     ) orelse (optimize == .Debug);
 
     const selected_renderer = renderer_backend orelse defaultRendererForTarget(target.result.os.tag);
-
-    if (selected_renderer == .cpu) {
-        std.debug.print(
-            \\ERROR: CPU renderer is not currently supported.
-            \\      Use -Drenderer=metal for macOS or remove the -Drenderer flag.;
-        , .{});
-        return;
-    }
 
     // Build options (generated module)
     const renderer_options = b.addOptions();
@@ -475,6 +467,33 @@ pub fn build(b: *std.Build) void {
     b.step("brickles", "Run Brickles").dependOn(&run_brickles.step);
 
     // ========================================
+    // Asteroids example
+    // ========================================
+    const asteroids_module = b.addModule("asteroids", .{
+        .root_source_file = b.path("examples/asteroids/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    asteroids_module.addImport("engine", m.get(&modules, .engine));
+
+    const asteroids_exe = b.addExecutable(.{
+        .name = "asteroids",
+        .root_module = asteroids_module,
+    });
+
+    const install_asteroids_assets = b.addInstallDirectory(.{
+        .source_dir = b.path("examples/asteroids/assets"),
+        .install_dir = .bin,
+        .install_subdir = "assets",
+    });
+    asteroids_exe.step.dependOn(&install_asteroids_assets.step);
+    const install_asteroids = b.addInstallArtifact(asteroids_exe, .{});
+    const run_asteroids = b.addRunArtifact(asteroids_exe);
+    run_asteroids.step.dependOn(&install_asteroids.step);
+    run_asteroids.setCwd(b.path("zig-out/bin"));
+    b.step("asteroids", "Run Asteroids").dependOn(&run_asteroids.step);
+
+    // ========================================
     // Build all apps without running any
     // ========================================
     const build_all = b.step("build-all", "Build all apps and tools without running");
@@ -484,12 +503,13 @@ pub fn build(b: *std.Build) void {
     build_all.dependOn(&install_player.step);
     build_all.dependOn(&install_pong.step);
     build_all.dependOn(&install_brickles.step);
+    build_all.dependOn(&install_asteroids.step);
 
     // ========================================
     // Platform-specific linking (Swift runtime on macOS, xdg_ for linux, no-op elsewhere)
     // ========================================
     linkPlatformLibraries(
-        &.{ engine_lib, zixelart_exe, ui_playground_exe, player_exe, scene_editor_exe, pong_exe, brickles_exe },
+        &.{ engine_lib, zixelart_exe, ui_playground_exe, player_exe, scene_editor_exe, pong_exe, brickles_exe, asteroids_exe },
         swift_lib,
         target,
     );

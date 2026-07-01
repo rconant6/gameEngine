@@ -18,6 +18,5 @@ pub fn configureModule(
         },
         .opengl => @panic("OpenGL is not currently supported on Linux"),
         .metal => @panic("Metal is not available on Linux"),
-        .cpu => {},
     }
 }

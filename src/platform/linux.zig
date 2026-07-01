@@ -42,11 +42,6 @@ pub const Window = struct {
     pub fn shouldClose(self: *const Window) bool {
         return self.state.should_close;
     }
-
-    pub fn swapBuffers(self: *const Window, offset: u32) void {
-        _ = self;
-        _ = offset;
-    }
 };
 
 pub fn init(p_gpa: Allocator, io: std.Io, env: *std.process.Environ.Map) !void {
@@ -225,17 +220,6 @@ pub fn createWindow(config: WindowConfig) !*Window {
     return win;
 }
 
-pub fn setPixelBuffer(window: *Window, pixels: []const u8, width: u32, height: u32) void {
-    _ = window;
-    _ = pixels;
-    _ = width;
-    _ = height;
-}
-
-pub fn swapBuffers(window: *Window, offset: u32) void {
-    _ = window;
-    _ = offset;
-}
 
 pub fn pollNextEvent() ?Event {
     _ = c.wl_display_flush(ws.display);

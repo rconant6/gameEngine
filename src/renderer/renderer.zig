@@ -41,9 +41,6 @@ const Font = text_module.Font;
 const debug = @import("debug");
 const log = debug.log;
 
-// CPU renderer is currently disabled - code kept for reference
-// const CpuRenderer = if (build_options.backend == .cpu)
-//     @import("./cpu/CpuRenderer.zig");
 const MetalRenderer = if (build_options.backend == .metal)
     @import("./gpu/metal/MetalRenderer.zig")
 else
@@ -72,8 +69,6 @@ pub const Renderer = struct {
     height: u32,
 
     const BackendImpl = switch (build_options.backend) {
-        // .cpu => CpuRenderer, // CPU renderer disabled
-        .cpu => unreachable, // Should be caught by build.zig
         .metal => MetalRenderer,
         .vulkan => VulkanRenderer,
         .opengl => OpenGLRenderer,
@@ -197,26 +192,5 @@ pub const Renderer = struct {
         ctx: RenderContext,
     ) void {
         text_module.drawTextScreen(self, font, text, position, scale, color, ctx);
-    }
-
-    // TODO: All of these need to return errors/nil if called for the wrong backend
-    pub fn getPixelBufferPtr(self: *const Renderer) ?[*]const u8 {
-        if (build_options.backend == .cpu) {
-            const buffer = self.backend.getRawFrameBuffer();
-            return @ptrCast(buffer.ptr);
-        }
-        return null;
-    }
-    pub fn getRawFrameBuffer(self: *const Renderer) ?[]const Color {
-        if (build_options.backend == .cpu) {
-            return self.backend.getRawFrameBuffer();
-        }
-        return null;
-    }
-    pub fn getDisplayBufferOffset(self: *const Renderer) ?u32 {
-        if (build_options.backend == .cpu) {
-            return self.backend.getDisplayBufferOffset();
-        }
-        return null;
     }
 };

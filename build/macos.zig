@@ -25,10 +25,6 @@ pub fn configureModule(
             );
             module.linkSystemLibrary("MoltenVK", .{});
         },
-        .cpu => {
-            module.linkFramework("Metal", .{ .weak = true });
-            module.linkFramework("MetalKit", .{ .weak = true });
-        },
     }
 
     // Swift library paths — discovered dynamically so they survive Xcode/SDK updates
@@ -91,7 +87,7 @@ pub fn buildSwiftLibrary(
         "--scratch-path", swift_scratch,
         "-c",             config,
         "--arch",         arch,
-        "-Xswiftc",       if (renderer == .metal) "-DUSE_METAL" else "-DUSE_CPU",
+        "-Xswiftc",       "-DUSE_METAL",
     });
 
     // Clean the .build dir swift leaves behind

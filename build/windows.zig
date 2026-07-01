@@ -13,6 +13,5 @@ pub fn configureModule(
         .vulkan => module.linkSystemLibrary("vulkan-1", .{}),
         .opengl => module.linkSystemLibrary("opengl32", .{}),
         .metal => @panic("Metal is not available on Windows"),
-        .cpu => {},
     }
 }

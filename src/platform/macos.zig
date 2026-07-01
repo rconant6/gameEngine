@@ -29,10 +29,6 @@ pub const Window = struct {
     pub fn shouldClose(self: *const Window) bool {
         return c.window_should_close(self._handle);
     }
-
-    pub fn swapBuffers(self: *const Window, offset: u32) void {
-        c.swap_buffers(self._handle, offset);
-    }
 };
 
 pub fn init(
@@ -62,16 +58,6 @@ pub fn createWindow(options: WindowConfig) !*Window {
     window.* = Window{ ._handle = handle };
     window_height = @floatFromInt(options.height);
     return window;
-}
-
-pub fn setPixelBuffer(window: *Window, pixels: []const u8, width: u32, height: u32) void {
-    set_pixel_buffer(
-        window._handle,
-        pixels.ptr,
-        pixels.len,
-        @intCast(width),
-        @intCast(height),
-    );
 }
 
 // Returns one abstract Event per call.  Returns null when the OS queue is empty.
@@ -168,14 +154,5 @@ pub fn getMousePosition(window: *Window) V2I {
     unreachable;
 }
 
-extern fn set_pixel_buffer(
-    window: c.WindowHandle,
-    pixels: [*]const u8,
-    buffer_length: usize,
-    width: i32,
-    height: i32,
-) void;
-
-extern fn swap_buffers(window: c.WindowHandle, offset: usize) void;
 extern fn poll_key_event(keycode: *u16, is_down: *u8) bool;
 extern fn poll_mouse_event(x: *f32, y: *f32, scroll_x: *f32, scroll_y: *f32, button: *u8, isDown: *u8) bool;

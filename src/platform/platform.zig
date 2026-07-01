@@ -152,12 +152,6 @@ pub fn deinit() void {
 pub fn createWindow(config: WindowConfig) !*Window {
     return try PlatformImpl.createWindow(config);
 }
-pub fn setPixelBuffer(window: *Window, pixels: []const u8, width: u32, height: u32) void {
-    PlatformImpl.setPixelBuffer(window, pixels, width, height);
-}
-pub fn swapBuffers(window: *Window, offset: u32) void {
-    PlatformImpl.swapBuffers(window, offset);
-}
 
 // Drains one OS event, updates shared input state, and returns the event.
 // Callers should loop until null to process the full frame queue.
