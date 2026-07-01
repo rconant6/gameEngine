@@ -12,6 +12,8 @@ pub const MTLRenderCommandEncoder = opaque {};
 pub const MTLRenderPassDescriptor = opaque {};
 pub const MTLRenderPipelineState = opaque {};
 pub const MTLTexture = opaque {};
+pub const MetalFrameContext = opaque {};
+pub const MetalFrame = opaque {};
 
 const Color = @import("../../color.zig").Color;
 
@@ -32,6 +34,8 @@ pub const MetalError = error{
     DrawableUnavailable,
     TextureUnavailable,
     TextureCreationFailed,
+
+    FrameContextCreationFailed,
 
     RenderPassCreationFailed,
     RenderEncoderCreationFailed,

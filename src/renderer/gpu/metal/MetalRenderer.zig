@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const bridge = @import("metal_bridge.zig");
 const BridgeError = bridge.BridgeError;
-const MetalBridge = bridge.MetalBridge;
+const mb = bridge.MetalBridge;
 const GeometryBatch = @import("geometry_batch.zig").GeometryBatch;
 const TextureBatch = @import("texture_batch.zig").TextureBatch;
 const metal = @import("metal_types.zig");
@@ -24,11 +24,14 @@ const MTLError = metal.MetalError;
 const MTLLoadAction = metal.MTLLoadAction;
 const MTLStoreAction = metal.MTLStoreAction;
 const MTLTexture = metal.MTLTexture;
+const MetalFrameContext = metal.MetalFrameContext;
+const MetalFrame = metal.MetalFrame;
 const rend = @import("../../renderer.zig");
 const WorldPoint = rend.WorldPoint;
 const RenderConfig = rend.RendererConfig;
 const ShapeData = rend.ShapeData;
 const Color = @import("../../color.zig").Color;
+const Colors = @import("../../color.zig").Colors;
 const RenderContext = @import("../../RenderContext.zig");
 const utils = @import("../../geometry_utils.zig");
 const Transform = utils.Transform;
@@ -36,7 +39,9 @@ const debug = @import("debug");
 const log = debug.log;
 
 const Self = @This();
-const MAX_VERT_SIZE: usize = 1024 * 1024 * 12; // 12MB of vertices storage
+const SLOT_BYTES: usize = 2 * 1024 * 1024;
+const TEX_SLOT_BYTES: usize = 512 * 1024;
+const FRAMES_IN_FLIGHT: usize = 3;
 
 pub const Texture = MTLTexture;
 pub const Device = MTLDevice;
@@ -46,16 +51,16 @@ command_queue: *MTLCommandQueue,
 layer: *CAMetalLayer,
 
 pipeline_state: *MTLRenderPipelineState,
-vertex_buffer: *MTLBuffer,
-vertex_buffer_size: usize,
+
 batch: GeometryBatch,
 
 texture_pipeline_state: *MTLRenderPipelineState,
-texture_vertex_buffer: *MTLBuffer,
 texture_batch: TextureBatch,
 
-current_drawable: ?*CAMetalDrawable,
-current_command_buffer: ?*MTLCommandBuffer,
+frame_ctx: *MetalFrameContext,
+frame_index: u8, // ring cursor (0..2)
+vertex_buffers: [3]*MTLBuffer, // geometry ring
+texture_vertex_buffers: [3]*MTLBuffer, // sprite ring
 
 width: u32,
 height: u32,
@@ -67,41 +72,62 @@ last_frame_time: f64,
 
 persistent: Allocator,
 
-pub fn init(p_gpa: std.mem.Allocator, io: std.Io, config: RenderConfig) (MTLError || std.mem.Allocator.Error)!Self {
-    const layer = try MetalBridge.getLayerFromView(config.native_handle.?);
-    const device = try MetalBridge.createDevice();
-    const queue = try MetalBridge.createCommandQueue(device);
+pub fn init(
+    p_gpa: std.mem.Allocator,
+    io: std.Io,
+    config: RenderConfig,
+) (MTLError || std.mem.Allocator.Error)!Self {
+    const layer = try mb.getLayerFromView(config.native_handle.?);
+    const device = try mb.createDevice();
+    const queue = try mb.createCommandQueue(device);
 
     const shader_path = try getShaderPath(p_gpa, io);
     defer p_gpa.free(shader_path);
     const shader_path_z = try p_gpa.dupeZ(u8, shader_path);
     defer p_gpa.free(shader_path_z);
-    const library = try MetalBridge.createLibraryFromFile(device, shader_path_z);
-    const vertex_fn = try MetalBridge.createFunction(library, "vertex_main");
-    const fragment_fn = try MetalBridge.createFunction(library, "fragment_main");
-    const tex_vertex_fn = try MetalBridge.createFunction(library, "texture_vertex_main");
-    const tex_fragment_fn = try MetalBridge.createFunction(library, "texture_fragment_main");
+    const library = try mb.createLibraryFromFile(device, shader_path_z);
+    const vertex_fn = try mb.createFunction(library, "vertex_main");
+    const fragment_fn = try mb.createFunction(library, "fragment_main");
+    const tex_vertex_fn = try mb.createFunction(library, "texture_vertex_main");
+    const tex_fragment_fn = try mb.createFunction(library, "texture_fragment_main");
 
-    const vertex_size = @sizeOf(Vertex);
-    const buffer_size = MAX_VERT_SIZE * vertex_size;
-    const options = @intFromEnum(MTLResourceOptions.storageModeShared);
-    const vertex_buffer = try MetalBridge.createBuffer(device, buffer_size, options);
-    const batch = GeometryBatch.init(p_gpa);
-    const pipeline_state = try MetalBridge.createRenderPipelineState(
+    const pipeline_state = try mb.createRenderPipelineState(
         device,
         vertex_fn,
         fragment_fn,
         MTLPixelFormat.bgra8Unorm,
     );
-
-    const tex_buffer_size = 256 * 1024; // 256KB
-    const tex_vertex_buffer = try MetalBridge.createBuffer(device, tex_buffer_size, options);
-    const tex_batch = TextureBatch.init(p_gpa);
-    const texture_pipeline_state = try MetalBridge.createTexturePipelineState(
+    const texture_pipeline_state = try mb.createTexturePipelineState(
         device,
         tex_vertex_fn,
         tex_fragment_fn,
         MTLPixelFormat.bgra8Unorm,
+    );
+
+    // CPU-side batches
+    const batch = GeometryBatch.init(p_gpa);
+    const tex_batch = TextureBatch.init(p_gpa);
+
+    // Vertex buffers: rings of FRAMES_IN_FLIGHT
+    const options = @intFromEnum(MTLResourceOptions.storageModeShared);
+    var vertex_buffers: [3]*MTLBuffer = undefined;
+    var texture_vertex_buffers: [3]*MTLBuffer = undefined;
+    for (&vertex_buffers) |*b| b.* = try mb.createBuffer(
+        device,
+        SLOT_BYTES,
+        options,
+    );
+    for (&texture_vertex_buffers) |*b| b.* = try mb.createBuffer(
+        device,
+        TEX_SLOT_BYTES,
+        options,
+    );
+
+    const frame_ctx = try mb.frameContextCreate(
+        device,
+        queue,
+        layer,
+        FRAMES_IN_FLIGHT,
     );
 
     return Self{
@@ -109,20 +135,19 @@ pub fn init(p_gpa: std.mem.Allocator, io: std.Io, config: RenderConfig) (MTLErro
         .command_queue = queue,
         .layer = layer,
         .pipeline_state = pipeline_state,
-        .vertex_buffer = vertex_buffer,
-        .vertex_buffer_size = buffer_size,
         .batch = batch,
         .texture_pipeline_state = texture_pipeline_state,
-        .texture_vertex_buffer = tex_vertex_buffer,
         .texture_batch = tex_batch,
-        .current_drawable = null,
-        .current_command_buffer = null,
+        .frame_ctx = frame_ctx,
+        .frame_index = 0,
+        .vertex_buffers = vertex_buffers,
+        .texture_vertex_buffers = texture_vertex_buffers,
         .width = config.width,
         .height = config.height,
-        .scale_factor = 1.0, // TODO: get from platform
-        .clear_color = Color.initRgba(255, 0, 255, 255), // black for now
+        .scale_factor = 1.0, // need to get from platform?
+        .clear_color = Colors.MAGENTA,
         .frame_number = 0,
-        .start_time = 0.0, // TODO: get time from platform
+        .start_time = 0.0,
         .last_frame_time = 0.0,
         .persistent = p_gpa,
     };
@@ -141,11 +166,17 @@ fn getShaderPath(gpa: std.mem.Allocator, io: std.Io) ![]const u8 {
 pub fn deinit(self: *Self) void {
     self.batch.deinit();
     self.texture_batch.deinit();
-    // TODO: Release all the MTL resources
+
+    for (self.vertex_buffers) |b| mb.release(b);
+    for (self.texture_vertex_buffers) |tb| mb.release(tb);
+
+    mb.release(self.pipeline_state);
+    mb.release(self.texture_pipeline_state);
+    mb.frameContextDestroy(self.frame_ctx);
 }
 
 pub fn createTexture(self: *Self, width: u32, height: u32) !*MTLTexture {
-    return MetalBridge.createTexture(self.device, width, height);
+    return mb.createTexture(self.device, width, height);
 }
 
 pub fn uploadTextureData(
@@ -156,7 +187,7 @@ pub fn uploadTextureData(
     data: [*]const u8,
     bytes_per_row: u32,
 ) void {
-    MetalBridge.uploadTextureData(texture, width, height, data, bytes_per_row);
+    mb.uploadTextureData(texture, width, height, data, bytes_per_row);
 }
 
 pub fn resize(self: *Self, width: u32, height: u32) !void {
@@ -236,12 +267,6 @@ pub fn drawShape(
     stroke_width: f32,
     ctx: RenderContext,
 ) void {
-    // NOTE: Check if batch is getting too full, flush early to prevent overflow of 12MB
-    const estimated_vertices_per_shape = 96;
-    if (self.batch.vertices.items.len + estimated_vertices_per_shape > MAX_VERT_SIZE) {
-        log.warn(.renderer, "Warning: Failed to flush batch before adding shape", .{});
-    }
-
     self.batch.addShape(
         shape,
         transform,
@@ -257,79 +282,54 @@ pub fn drawShape(
 pub fn beginFrame(self: *Self) !void {
     self.batch.clear();
     self.texture_batch.clear();
-
-    self.current_drawable = try MetalBridge.nextDrawable(self.layer);
-    self.current_command_buffer = try MetalBridge.createCommandBuffer(self.command_queue);
-
+    self.frame_index +%= 1;
     self.frame_number += 1;
 }
 
 pub fn endFrame(self: *Self) !void {
-    const render_pass = try MetalBridge.createRenderPassDescriptor();
-    const drawable_texture = try MetalBridge.getDrawableTexture(self.current_drawable.?);
-    MetalBridge.setColorAttachment(
-        render_pass,
-        drawable_texture,
-        MTLLoadAction.clear,
-        MTLStoreAction.store,
+    const frame = mb.frameBegin(
+        self.frame_ctx,
         ClearColor.fromColor(self.clear_color),
-    );
+    ) orelse return;
 
-    const encoder = try MetalBridge.createRenderEncoder(self.current_command_buffer.?, render_pass);
+    const idx = @mod(self.frame_index, 3);
+    const enc = mb.frameEncoder(frame);
 
-    try self.flushGeometryBatch(encoder);
-    try self.flushTextureBatch(encoder);
+    try self.flushGeometryBatch(enc, idx);
+    try self.flushTextureBatch(enc, idx);
 
-    MetalBridge.endEncoding(encoder);
-
-    if (self.current_command_buffer) |cmd_buf| {
-        if (self.current_drawable) |drawable| {
-            MetalBridge.presentDrawable(cmd_buf, drawable);
-        }
-        MetalBridge.commitCommandBuffer(cmd_buf);
-    }
-    self.current_drawable = null;
-    self.current_command_buffer = null;
+    mb.frameEnd(self.frame_ctx, frame);
 }
 
-fn flushGeometryBatch(self: *Self, encoder: *MTLRenderCommandEncoder) !void {
+fn flushGeometryBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !void {
     const vertices = self.batch.vertices.items;
     if (vertices.len == 0) return;
 
-    const buffer_ptr = try MetalBridge.getBufferContents(self.vertex_buffer);
+    const buffer = self.vertex_buffers[idx];
+    const buffer_ptr = try mb.getBufferContents(buffer);
     const vertex_size = @sizeOf(Vertex);
     const bytes_to_copy = vertices.len * vertex_size;
 
-    if (bytes_to_copy > self.vertex_buffer_size) {
+    const copy_bytes = if (bytes_to_copy > SLOT_BYTES) blk: {
+        const clamped = (SLOT_BYTES / vertex_size) * vertex_size;
         log.err(
             .renderer,
-            "Vertex buffer overflow: trying to copy {d} bytes but buffer size is {d} bytes ({d} vertices vs {d} max)",
-            .{
-                bytes_to_copy,
-                self.vertex_buffer_size,
-                vertices.len,
-                self.vertex_buffer_size / vertex_size,
-            },
+            "Geometry overflow: {d}B > slot {d} B; truncated to {d} verts",
+            .{ bytes_to_copy, SLOT_BYTES, clamped / vertex_size },
         );
-        const clamped_bytes = self.vertex_buffer_size;
-        const clamped_vertices = clamped_bytes / vertex_size;
-        @memcpy(
-            @as([*]u8, @ptrCast(buffer_ptr))[0..clamped_bytes],
-            @as([*]const u8, @ptrCast(vertices.ptr))[0..clamped_bytes],
-        );
-        log.warn(.renderer, "Rendering truncated to {d} vertices", .{clamped_vertices});
-    } else {
-        @memcpy(
-            @as([*]u8, @ptrCast(buffer_ptr))[0..bytes_to_copy],
-            @as([*]const u8, @ptrCast(vertices.ptr))[0..bytes_to_copy],
-        );
-    }
+        break :blk clamped;
+    } else bytes_to_copy;
 
-    MetalBridge.setPipelineState(encoder, self.pipeline_state);
-    MetalBridge.setVertexBuffer(encoder, self.vertex_buffer, 0, 0);
+    @memcpy(
+        @as([*]u8, @ptrCast(buffer_ptr))[0..copy_bytes],
+        @as([*]const u8, @ptrCast(vertices.ptr))[0..copy_bytes],
+    );
+
+    mb.setPipelineState(encoder, self.pipeline_state);
+    mb.setVertexBuffer(encoder, buffer, 0, 0);
 
     for (self.batch.draw_calls.items) |call| {
-        MetalBridge.drawPrimitives(
+        mb.drawPrimitives(
             encoder,
             call.primitive_type,
             call.vertex_start,
@@ -338,29 +338,33 @@ fn flushGeometryBatch(self: *Self, encoder: *MTLRenderCommandEncoder) !void {
     }
 }
 
-fn flushTextureBatch(self: *Self, encoder: *MTLRenderCommandEncoder) !void {
+fn flushTextureBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !void {
     const vertices = self.texture_batch.vertices.items;
     if (vertices.len == 0) return;
 
-    const buffer_ptr = try MetalBridge.getBufferContents(self.texture_vertex_buffer);
+    const buffer = self.texture_vertex_buffers[idx];
+    const buffer_ptr = try mb.getBufferContents(buffer);
     const vertex_size = @sizeOf(TextureVertex);
     const bytes_to_copy = vertices.len * vertex_size;
 
+    const copy_bytes = if (bytes_to_copy > TEX_SLOT_BYTES) blk: {
+        const clamped = (TEX_SLOT_BYTES / vertex_size) * vertex_size;
+        log.err(.renderer, "Texture overflow: {d} B > slot {d} B; truncating to {d} verts", .{
+            bytes_to_copy, TEX_SLOT_BYTES, clamped / vertex_size,
+        });
+        break :blk clamped;
+    } else bytes_to_copy;
+
     @memcpy(
-        @as([*]u8, @ptrCast(buffer_ptr))[0..bytes_to_copy],
-        @as([*]const u8, @ptrCast(vertices.ptr))[0..bytes_to_copy],
+        @as([*]u8, @ptrCast(buffer_ptr))[0..copy_bytes],
+        @as([*]const u8, @ptrCast(vertices.ptr))[0..copy_bytes],
     );
 
-    MetalBridge.setPipelineState(encoder, self.texture_pipeline_state);
-    MetalBridge.setVertexBuffer(encoder, self.texture_vertex_buffer, 0, 0);
+    mb.setPipelineState(encoder, self.texture_pipeline_state);
+    mb.setVertexBuffer(encoder, buffer, 0, 0);
 
     for (self.texture_batch.draw_calls.items) |call| {
-        MetalBridge.setFragmentTexture(encoder, call.texture, 0);
-        MetalBridge.drawPrimitives(
-            encoder,
-            .triangle,
-            call.vertex_start,
-            call.vertex_count,
-        );
+        mb.setFragmentTexture(encoder, call.texture, 0);
+        mb.drawPrimitives(encoder, .triangle, call.vertex_start, call.vertex_count);
     }
 }

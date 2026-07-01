@@ -18,6 +18,26 @@ const MTLRenderPipelineState = metal.MTLRenderPipelineState;
 const MTLStoreAction = metal.MTLStoreAction;
 const MTLTexture = metal.MTLTexture;
 const MTLError = metal.MetalError;
+const MetalFrameContext = metal.MetalFrameContext;
+const MetalFrame = metal.MetalFrame;
+
+extern fn metal_frame_context_create(
+    device: *MTLDevice,
+    queue: *MTLCommandQueue,
+    layer: *CAMetalLayer,
+    max_frames_in_flight: u32, // 3
+) ?*MetalFrameContext;
+extern fn metal_frame_context_destroy(ctx: *MetalFrameContext) void;
+extern fn metal_frame_begin(
+    ctx: *MetalFrameContext,
+    clear_r: f64,
+    clear_g: f64,
+    clear_b: f64,
+    clear_a: f64,
+) ?*MetalFrame;
+extern fn metal_frame_encoder(frame: *MetalFrame) *MTLRenderCommandEncoder;
+extern fn metal_frame_end(ctx: *MetalFrameContext, frame: *MetalFrame) void;
+extern fn metal_release(ptr: *anyopaque) void;
 
 extern fn metal_create_device() ?*MTLDevice;
 extern fn metal_create_command_queue(device: *MTLDevice) ?*MTLCommandQueue;
@@ -118,6 +138,31 @@ extern fn metal_create_texture_pipeline_state(
 
 // MARK: Zig wrappers for extern functions
 pub const MetalBridge = struct {
+    pub fn frameContextCreate(
+        device: *MTLDevice,
+        queue: *MTLCommandQueue,
+        layer: *CAMetalLayer,
+        max_frames_in_flight: u32, // 3
+    ) MTLError!*MetalFrameContext {
+        return metal_frame_context_create(device, queue, layer, max_frames_in_flight) orelse
+            MTLError.FrameContextCreationFailed;
+    }
+    pub fn frameContextDestroy(ctx: *MetalFrameContext) void {
+        metal_frame_context_destroy(ctx);
+    }
+    pub fn frameBegin(ctx: *MetalFrameContext, clear: ClearColor) ?*MetalFrame {
+        return metal_frame_begin(ctx, clear.r, clear.g, clear.b, clear.a);
+    }
+    pub fn frameEncoder(frame: *MetalFrame) *MTLRenderCommandEncoder {
+        return metal_frame_encoder(frame);
+    }
+    pub fn frameEnd(ctx: *MetalFrameContext, frame: *MetalFrame) void {
+        metal_frame_end(ctx, frame);
+    }
+    pub fn release(ptr: *anyopaque) void {
+        metal_release(ptr);
+    }
+
     pub fn createDevice() !*MTLDevice {
         return metal_create_device() orelse MTLError.DeviceCreationFailed;
     }

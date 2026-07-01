@@ -3,6 +3,110 @@
   import MetalKit
   import QuartzCore
 
+  final class MetalFrameContext {
+    let device: MTLDevice
+    let queue: MTLCommandQueue
+    let layer: CAMetalLayer
+    let inflight: DispatchSemaphore  // init value = maxFramesInFlight (3)
+    var msaa: MTLTexture?  // TODO: nil for now
+    var sampleCount: Int = 1
+
+    init(device: MTLDevice, queue: MTLCommandQueue, layer: CAMetalLayer, maxInFlight: Int) {
+      self.device = device
+      self.queue = queue
+      self.layer = layer
+      self.inflight = DispatchSemaphore(value: maxInFlight)
+    }
+  }
+
+  final class MetalFrame {
+    let drawable: CAMetalDrawable
+    let commandBuffer: MTLCommandBuffer
+    let encoder: MTLRenderCommandEncoder
+
+    init(_ d: CAMetalDrawable, _ cb: MTLCommandBuffer, _ e: MTLRenderCommandEncoder) {
+      self.drawable = d
+      self.commandBuffer = cb
+      self.encoder = e
+    }
+  }
+
+  // MARK: new wrapping FFI layer functions
+  @_cdecl("metal_frame_context_create")
+  public func metal_frame_context_create(
+    device: OpaquePointer, queue: OpaquePointer,
+    layer: OpaquePointer, maxInFlight: UInt32
+  ) -> OpaquePointer? {
+    let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
+    let q = Unmanaged<MTLCommandQueue>.fromOpaque(UnsafeRawPointer(queue)).takeUnretainedValue()
+    let l = Unmanaged<CAMetalLayer>.fromOpaque(UnsafeRawPointer(layer)).takeUnretainedValue()
+
+    let ctx = MetalFrameContext(device: dev, queue: q, layer: l, maxInFlight: Int(maxInFlight))
+
+    return OpaquePointer(Unmanaged.passRetained(ctx).toOpaque())
+  }
+  @_cdecl("metal_frame_context_destroy")
+  public func metal_frame_context_destroy(ctx: OpaquePointer) {
+    Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).release()
+  }
+  @_cdecl("metal_frame_begin")
+  public func metal_frame_begin(
+    ctx: OpaquePointer,
+    clear_r: Double,
+    clear_g: Double,
+    clear_b: Double,
+    clear_a: Double,
+  ) -> OpaquePointer? {
+    let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
+    c.inflight.wait()
+    return autoreleasepool {
+      guard let drawable = c.layer.nextDrawable() else {
+        c.inflight.signal()
+        return nil
+      }
+      guard let cb = c.queue.makeCommandBuffer() else {
+        c.inflight.signal()
+        return nil
+      }
+      let rpd = MTLRenderPassDescriptor()
+      let target = c.msaa ?? drawable.texture
+      rpd.colorAttachments[0].texture = target
+      rpd.colorAttachments[0].loadAction = .clear
+      rpd.colorAttachments[0].clearColor = MTLClearColor(red: clear_r, green: clear_g, blue: clear_b, alpha: clear_a)
+      rpd.colorAttachments[0].storeAction = (c.msaa != nil) ? .multisampleResolve : .store
+      if c.msaa != nil { rpd.colorAttachments[0].resolveTexture = drawable.texture }
+      guard let enc = cb.makeRenderCommandEncoder(descriptor: rpd) else {
+        c.inflight.signal()
+        return nil
+      }
+      let frame = MetalFrame(drawable, cb, enc)
+      return OpaquePointer(Unmanaged.passRetained(frame).toOpaque())
+    }
+  }
+
+  @_cdecl("metal_frame_encoder")
+  public func metal_frame_encoder(frame: OpaquePointer) -> OpaquePointer {
+    let f = Unmanaged<MetalFrame>.fromOpaque(UnsafeRawPointer(frame)).takeUnretainedValue()
+    return OpaquePointer(Unmanaged<MTLCommandEncoder>.passUnretained(f.encoder).toOpaque())
+  }
+  @_cdecl("metal_frame_end")
+  public func metal_frame_end(ctx: OpaquePointer, frame: OpaquePointer) {
+    let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
+    let f = Unmanaged<MetalFrame>.fromOpaque(UnsafeRawPointer(frame)).takeUnretainedValue()
+
+    f.encoder.endEncoding()
+    f.commandBuffer.present(f.drawable)
+    let sem = c.inflight
+    f.commandBuffer.addCompletedHandler{ _ in sem.signal() }
+    f.commandBuffer.commit()
+    Unmanaged<MetalFrame>.fromOpaque(UnsafeRawPointer(frame)).release()
+  }
+
+  @_cdecl("metal_release")
+  public func metal_release(ptr: OpaquePointer) {
+    Unmanaged<AnyObject>.fromOpaque(UnsafeRawPointer(ptr)).release()
+  }
+
   // MARK: Device and queue creation
   @_cdecl("metal_create_device")
   public func metal_create_device() -> OpaquePointer? {
