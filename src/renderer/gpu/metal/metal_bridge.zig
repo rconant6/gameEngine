@@ -38,6 +38,7 @@ extern fn metal_frame_begin(
 extern fn metal_frame_encoder(frame: *MetalFrame) *MTLRenderCommandEncoder;
 extern fn metal_frame_end(ctx: *MetalFrameContext, frame: *MetalFrame) void;
 extern fn metal_release(ptr: *anyopaque) void;
+extern fn metal_frame_context_wait_idle(ctx: *MetalFrameContext) void;
 
 extern fn metal_create_device() ?*MTLDevice;
 extern fn metal_create_command_queue(device: *MTLDevice) ?*MTLCommandQueue;
@@ -161,6 +162,9 @@ pub const MetalBridge = struct {
     }
     pub fn release(ptr: *anyopaque) void {
         metal_release(ptr);
+    }
+    pub fn frameContextWaitIdle(ctx: *MetalFrameContext) void {
+        metal_frame_context_wait_idle(ctx);
     }
 
     pub fn createDevice() !*MTLDevice {

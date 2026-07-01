@@ -8,6 +8,7 @@
     let queue: MTLCommandQueue
     let layer: CAMetalLayer
     let inflight: DispatchSemaphore  // init value = maxFramesInFlight (3)
+    let maxInFlight: Int
     var msaa: MTLTexture?  // TODO: nil for now
     var sampleCount: Int = 1
 
@@ -15,6 +16,7 @@
       self.device = device
       self.queue = queue
       self.layer = layer
+      self.maxInFlight = maxInFlight
       self.inflight = DispatchSemaphore(value: maxInFlight)
     }
   }
@@ -105,6 +107,17 @@
   @_cdecl("metal_release")
   public func metal_release(ptr: OpaquePointer) {
     Unmanaged<AnyObject>.fromOpaque(UnsafeRawPointer(ptr)).release()
+  }
+  @_cdecl("metal_frame_context_wait_idle")
+  public func metal_frame_context_wait_idle(ctx: OpaquePointer) {
+    let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
+
+    for _ in 0..<c.maxInFlight {
+      c.inflight.wait() // let gpu get to idle
+    }
+    for _ in 0..<c.maxInFlight {
+      c.inflight.signal() // get back to 3 available frames in flight so Swift can deinit
+    }
   }
 
   // MARK: Device and queue creation

@@ -164,6 +164,8 @@ fn getShaderPath(gpa: std.mem.Allocator, io: std.Io) ![]const u8 {
 }
 
 pub fn deinit(self: *Self) void {
+    mb.frameContextWaitIdle(self.frame_ctx);
+
     self.batch.deinit();
     self.texture_batch.deinit();
 
@@ -319,6 +321,7 @@ fn flushGeometryBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !
         );
         break :blk clamped;
     } else bytes_to_copy;
+    const copied_vertex_count = copy_bytes / vertex_size;
 
     @memcpy(
         @as([*]u8, @ptrCast(buffer_ptr))[0..copy_bytes],
@@ -329,6 +332,8 @@ fn flushGeometryBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !
     mb.setVertexBuffer(encoder, buffer, 0, 0);
 
     for (self.batch.draw_calls.items) |call| {
+        if (call.vertex_start + call.vertex_count > copied_vertex_count) break;
+
         mb.drawPrimitives(
             encoder,
             call.primitive_type,
@@ -354,6 +359,7 @@ fn flushTextureBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !v
         });
         break :blk clamped;
     } else bytes_to_copy;
+    const copied_vertex_count = copy_bytes / vertex_size;
 
     @memcpy(
         @as([*]u8, @ptrCast(buffer_ptr))[0..copy_bytes],
@@ -364,6 +370,8 @@ fn flushTextureBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !v
     mb.setVertexBuffer(encoder, buffer, 0, 0);
 
     for (self.texture_batch.draw_calls.items) |call| {
+        if (call.vertex_start + call.vertex_count > copied_vertex_count) break;
+
         mb.setFragmentTexture(encoder, call.texture, 0);
         mb.drawPrimitives(encoder, .triangle, call.vertex_start, call.vertex_count);
     }
