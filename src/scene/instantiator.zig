@@ -412,10 +412,6 @@ pub const Instantiator = struct {
         if (ShapeType == Shapes.Polygon(WorldPoint) or ShapeType == Shapes.Polygon(ScreenPoint)) {
             return try self.buildPolygonSprite(sprite);
         }
-        if (ShapeType == Shapes.Ellipse(WorldPoint) or ShapeType == Shapes.Ellipse(ScreenPoint)) {
-            return InstantiatorError.Unimplemented;
-        }
-
         var component = std.mem.zeroInit(Components.Sprite, .{});
         var shape = std.mem.zeroInit(ShapeType, .{});
 
