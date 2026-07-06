@@ -43,7 +43,7 @@ pub const MetalError = error{
 
 pub const MetalVertex = extern struct {
     position: [2]f32, // x, y, in clip space [-1, 1]
-    color: [4]f32, // r, g, b, a in range [0, 1]
+    color: u32, // packed unorm4x8
 };
 pub const MetalTextureVertex = extern struct {
     position: [2]f32, // clip space x,y
@@ -121,13 +121,8 @@ pub const TexKey = struct {
     }
 };
 
-// Unpack u32 -> [4]f32, inverse of Rgba.pack = (r<<24)|(g<<16)|(b<<8)|a.
 pub fn makeVertex(pos: [2]f32, color: u32) MetalVertex {
-    const r: f32 = @floatFromInt((color >> 24) & 0xFF);
-    const g: f32 = @floatFromInt((color >> 16) & 0xFF);
-    const b: f32 = @floatFromInt((color >> 8) & 0xFF);
-    const a: f32 = @floatFromInt(color & 0xFF);
-    return .{ .position = pos, .color = .{ r / 255.0, g / 255.0, b / 255.0, a / 255.0 } };
+    return .{ .position = pos, .color = @byteSwap(color) };
 }
 
 pub const PipelineConfig = struct {

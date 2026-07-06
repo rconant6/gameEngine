@@ -74,7 +74,8 @@
       let target = c.msaa ?? drawable.texture
       rpd.colorAttachments[0].texture = target
       rpd.colorAttachments[0].loadAction = .clear
-      rpd.colorAttachments[0].clearColor = MTLClearColor(red: clear_r, green: clear_g, blue: clear_b, alpha: clear_a)
+      rpd.colorAttachments[0].clearColor = MTLClearColor(
+        red: clear_r, green: clear_g, blue: clear_b, alpha: clear_a)
       rpd.colorAttachments[0].storeAction = (c.msaa != nil) ? .multisampleResolve : .store
       if c.msaa != nil { rpd.colorAttachments[0].resolveTexture = drawable.texture }
       guard let enc = cb.makeRenderCommandEncoder(descriptor: rpd) else {
@@ -99,7 +100,7 @@
     f.encoder.endEncoding()
     f.commandBuffer.present(f.drawable)
     let sem = c.inflight
-    f.commandBuffer.addCompletedHandler{ _ in sem.signal() }
+    f.commandBuffer.addCompletedHandler { _ in sem.signal() }
     f.commandBuffer.commit()
     Unmanaged<MetalFrame>.fromOpaque(UnsafeRawPointer(frame)).release()
   }
@@ -113,10 +114,10 @@
     let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
 
     for _ in 0..<c.maxInFlight {
-      c.inflight.wait() // let gpu get to idle
+      c.inflight.wait()  // let gpu get to idle
     }
     for _ in 0..<c.maxInFlight {
-      c.inflight.signal() // get back to 3 available frames in flight so Swift can deinit
+      c.inflight.signal()  // get back to 3 available frames in flight so Swift can deinit
     }
   }
 
@@ -249,11 +250,11 @@
     vertexDesc.attributes[0].offset = 0
     vertexDesc.attributes[0].bufferIndex = 0
 
-    vertexDesc.attributes[1].format = .float4
+    vertexDesc.attributes[1].format = .uchar4Normalized
     vertexDesc.attributes[1].offset = 8
     vertexDesc.attributes[1].bufferIndex = 0
 
-    vertexDesc.layouts[0].stride = 24
+    vertexDesc.layouts[0].stride = 12
     vertexDesc.layouts[0].stepFunction = .perVertex
 
     let pipelineDesc = MTLRenderPipelineDescriptor()
