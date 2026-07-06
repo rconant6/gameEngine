@@ -1,13 +1,7 @@
 const std = @import("std");
-const renderer = @import("renderer");
-const Shapes = renderer.Shapes;
+const Shapes = @import("shapes");
 const math = @import("math");
-const WorldPoint = math.WorldPoint;
-const ScreenPoint = math.ScreenPoint;
-
-pub const CoordinateSpace = enum { WorldSpace, ScreenSpace };
-pub const point_types = .{ WorldPoint, ScreenPoint };
-pub const point_type_names = .{ "World", "Screen" };
+const V2 = math.V2;
 
 pub const ShapeData = blk: {
     const registry = ShapeRegistry;
@@ -15,21 +9,19 @@ pub const ShapeData = blk: {
 
     var enum_names: [len][]const u8 = undefined;
     var enum_values: [len]u8 = undefined;
-    for (registry.shape_names, 0..) |name, i| {
-        enum_names[i] = name;
-        enum_values[i] = i;
-    }
-    const TagEnum = @Enum(u8, .exhaustive, &enum_names, &enum_values);
-
     var union_names: [len][]const u8 = undefined;
     var union_types: [len]type = undefined;
     var union_attrs: [len]std.builtin.Type.UnionField.Attributes = undefined;
+
     for (registry.shape_types, registry.shape_names, 0..) |shape_type, name, i| {
-        union_names[i] = name;
+        enum_names[i] = name;
+        enum_values[i] = i;
         union_types[i] = shape_type;
+        union_names[i] = name;
         union_attrs[i] = .{};
     }
 
+    const TagEnum = @Enum(u8, .exhaustive, &enum_names, &enum_values);
     break :blk @Union(.auto, TagEnum, &union_names, &union_types, &union_attrs);
 };
 
@@ -37,15 +29,9 @@ pub const ShapeRegistry = struct {
     pub const shape_types = blk: {
         const decls = @typeInfo(Shapes).@"struct".decls;
         const decls_len = decls.len;
-        const point_types_count = point_types.len;
-        const total_size = decls_len * point_types_count;
-        var types: [total_size]type = undefined;
+        var types: [decls_len]type = undefined;
         for (decls, 0..) |decl, i| {
-            if (@typeInfo(@TypeOf(@field(Shapes, decl.name))) == .@"fn") {
-                for (point_types, 0..) |point_type, j| {
-                    types[i * point_types_count + j] = @field(Shapes, decl.name)(point_type);
-                }
-            }
+            types[i] = @field(Shapes, decl.name);
         }
         break :blk types;
     };
@@ -53,42 +39,17 @@ pub const ShapeRegistry = struct {
     pub const shape_names = blk: {
         const decls = @typeInfo(Shapes).@"struct".decls;
         const decls_len = decls.len;
-        const point_types_count = point_types.len;
-        const total_size = decls_len * point_types_count;
-        var names: [total_size][]const u8 = undefined;
+        var names: [decls_len][]const u8 = undefined;
         for (decls, 0..) |decl, i| {
-            if (@typeInfo(@TypeOf(@field(Shapes, decl.name))) == .@"fn") {
-                for (point_type_names, 0..) |type_name, j| {
-                    names[i * point_types_count + j] = decl.name ++ type_name;
-                }
-            }
+            names[i] = decl.name;
         }
         break :blk names;
     };
 
-    pub fn getShapeIndex(name: []const u8, coord_space: CoordinateSpace) ?usize {
-        return switch (coord_space) {
-            .WorldSpace => getWorldShapeIndex(name),
-            .ScreenSpace => getScreenShapeIndex(name),
-        };
-    }
-    fn getWorldShapeIndex(name: []const u8) ?usize {
+    pub fn getShapeIndex(name: []const u8) ?usize {
         inline for (shape_names, 0..) |shape_name, i| {
-            if (std.ascii.startsWithIgnoreCase(shape_name, name) and
-                std.mem.endsWith(u8, shape_name, "World"))
-            {
+            if (std.ascii.eqlIgnoreCase(shape_name, name))
                 return i;
-            }
-        }
-        return null;
-    }
-    fn getScreenShapeIndex(name: []const u8) ?usize {
-        inline for (shape_names, 0..) |shape_name, i| {
-            if (std.ascii.startsWithIgnoreCase(shape_name, name) and
-                std.mem.endsWith(u8, shape_name, "Screen"))
-            {
-                return i;
-            }
         }
         return null;
     }
@@ -102,21 +63,12 @@ pub const ShapeRegistry = struct {
         return null;
     }
 
-    // TRANSITIONAL: `space` disambiguates the World/Screen variant, since ScreenPoint==V2
-    // makes Circle(V2) match BOTH TriangleWorld and TriangleScreen by type. Once the union
-    // collapses to one variant per shape (V2-only), there's nothing to disambiguate and this
-    // arg is DELETED — space then lives only in the draw call's ClipMap choice.
     pub fn createShapeUnion(
         comptime ShapeType: type,
         shape: ShapeType,
-        comptime space: CoordinateSpace,
     ) ShapeData {
-        const suffix = comptime switch (space) {
-            .WorldSpace => "World",
-            .ScreenSpace => "Screen",
-        };
         inline for (shape_names, 0..) |name, i| {
-            if (ShapeType == shape_types[i] and comptime std.mem.endsWith(u8, name, suffix)) {
+            if (ShapeType == shape_types[i]) {
                 return @unionInit(ShapeData, name, shape);
             }
         }

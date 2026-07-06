@@ -64,7 +64,7 @@ pub fn init(
 
     self.pixels = try self.allocator.alloc(PixelCell, pixel_count * pixel_count);
 
-    const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse {
+    const ScreenRect = rend.ShapeRegistry.getShapeType("Rectangle") orelse {
         log.err(.application, "Canvas works with Screen Rectangles only", .{});
         return error.InvalidCanvasShape;
     };
@@ -81,7 +81,6 @@ pub fn init(
                         .{ .x = @floatFromInt(loc_x), .y = @floatFromInt(loc_y) },
                         @floatFromInt(self.pixel_size),
                     ),
-                    .ScreenSpace,
                 ),
                 .color = Colors.LIGHT_GRAY,
             };

@@ -64,17 +64,22 @@ pub fn run(
         const geo = sprite.geometry orelse continue;
 
         if (sprite.visible) {
-            renderer.drawGeometry(
-                geo,
+            renderer.render(
                 .{
-                    .offset = transform.position,
-                    .rotation = transform.rotation,
-                    .scale = transform.scale,
+                    .shape = geo,
+                    .transform = .{
+                        .offset = transform.position,
+                        .rotation = transform.rotation,
+                        .scale = transform.scale,
+                    },
+                    .style = .{
+                        .fill = sprite.fill_color,
+                        .stroke = sprite.stroke_color,
+                        .stroke_width = sprite.stroke_width,
+                    },
+                    .space = sprite.space,
                 },
-                sprite.fill_color,
-                sprite.stroke_color,
-                sprite.stroke_width,
-                ctx,
+                if (sprite.space == .screen) ui_ctx else ctx,
             );
         }
     }
@@ -120,10 +125,7 @@ pub fn run(
             const anchor_pos = rend.getAnchorPos(ui_element.anchor, ui_ctx);
 
             // Apply offset from anchor
-            const screen_pos = WorldPoint{
-                .x = anchor_pos.x + ui_element.offset.x,
-                .y = anchor_pos.y + ui_element.offset.y,
-            };
+            const screen_pos = anchor_pos.add(ui_element.offset);
 
             // Create transform for positioning the UI element
             const ui_transform = rend.Transform{
@@ -132,13 +134,18 @@ pub fn run(
                 .scale = null,
             };
 
-            renderer.drawGeometry(
-                geo,
-                ui_transform,
-                sprite.fill_color,
-                sprite.stroke_color,
-                sprite.stroke_width,
-                ui_ctx,
+            renderer.render(
+                .{
+                    .shape = geo,
+                    .transform = ui_transform,
+                    .style = .{
+                        .fill = sprite.fill_color,
+                        .stroke = sprite.stroke_color,
+                        .stroke_width = sprite.stroke_width,
+                    },
+                    .space = sprite.space,
+                },
+                if (sprite.space == .screen) ui_ctx else ctx,
             );
         }
         count += 1;

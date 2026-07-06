@@ -1,10 +1,26 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const math = @import("math");
+const WorldPoint = math.WorldPoint;
 const bridge = @import("metal_bridge.zig");
 const BridgeError = bridge.BridgeError;
 const mb = bridge.MetalBridge;
 const Batch = @import("../../batch.zig").Batch;
 const tess = @import("../../tess.zig");
+const LocalXTransform = tess.LocalXform;
+const ClipMap = tess.ClipMap;
+const rt = @import("../../render_types.zig");
+const DrawStyle = rt.DrawStyle;
+const Renderable = rt.Renderable;
+const RenderConfig = rt.RendererConfig;
+const RenderContext = rt.RenderContext;
+const Transform = rt.Transform;
+const col = @import("../../color.zig");
+const Color = col.Color;
+const Colors = col.Colors;
+const ShapeData = @import("registry").ShapeData;
+const log = @import("debug").log;
+
 const metal = @import("metal_types.zig");
 const MTLDevice = metal.MTLDevice;
 const MTLRenderCommandEncoder = metal.MTLRenderCommandEncoder;
@@ -26,17 +42,6 @@ const MTLStoreAction = metal.MTLStoreAction;
 const MTLTexture = metal.MTLTexture;
 const MetalFrameContext = metal.MetalFrameContext;
 const MetalFrame = metal.MetalFrame;
-const rend = @import("../../renderer.zig");
-const WorldPoint = rend.WorldPoint;
-const RenderConfig = rend.RendererConfig;
-const ShapeData = rend.ShapeData;
-const Color = @import("../../color.zig").Color;
-const Colors = @import("../../color.zig").Colors;
-const RenderContext = @import("../../RenderContext.zig");
-const utils = @import("../../geometry_utils.zig");
-const Transform = utils.Transform;
-const debug = @import("debug");
-const log = debug.log;
 
 const Self = @This();
 const SLOT_BYTES: usize = 2 * 1024 * 1024;
@@ -281,39 +286,22 @@ fn addSprite(
     for (verts) |v| try self.texture_batch.vertex(v);
     try self.texture_batch.pushCall(.{ .tex = texture }, start, 6);
 }
-pub fn drawShape(
-    self: *Self,
-    shape: ShapeData,
-    transform: ?Transform,
-    fill_color: ?Color,
-    stroke_color: ?Color,
-    stroke_width: f32,
-    ctx: RenderContext,
-) void {
-    const xf = tess.LocalXform.from(transform);
-    const is_screen = tess.isScreenSpace(shape);
+
+pub fn render(self: *Self, r: Renderable, ctx: RenderContext) void {
+    const xf = tess.LocalXform.from(r.transform);
+    const is_screen = r.space == .screen;
     const px_per_unit =
         if (is_screen) 1.0 else @as(
             f32,
             @floatFromInt(ctx.height),
         ) / (2.0 * ctx.ortho_size);
     const map = if (is_screen)
-        tess.ClipMap.fromScreen(ctx)
+        ClipMap.fromScreen(ctx)
     else
-        tess.ClipMap.fromWorld(ctx);
-    // stroke_width is authored in PIXELS. Screen shapes are already in px; world
-    // shapes convert px→world so strokes stay constant-thickness under any zoom.
-    // px_per_unit = height / (2 * ortho_size).
-    const half = stroke_width / 2.0;
+        ClipMap.fromWorld(ctx);
+    const half = r.style.stroke_width / 2.0;
     const hw: f32 = if (is_screen) half else blk: {
-        // const fh: f32 = @floatFromInt(ctx.height);
-        // const px_per_unit = fh / (2.0 * ctx.ortho_size);
         break :blk half / px_per_unit;
-    };
-    const style = tess.DrawStyle{
-        .fill = fill_color,
-        .stroke = stroke_color,
-        .stroke_width = stroke_width,
     };
     tess.tessellate(
         MetalVertex,
@@ -321,14 +309,14 @@ pub fn drawShape(
         &self.batch,
         metal.makeVertex,
         .{ .prim = .triangle },
-        shape,
+        r.shape,
         xf,
-        style,
+        r.style,
         map,
         hw,
         px_per_unit,
     ) catch {
-        log.err(.renderer, "Failed to tessellate shape {any}", .{@TypeOf(shape)});
+        log.err(.renderer, "Failed to tessellate shape {any}", .{@TypeOf(r.shape)});
     };
 }
 

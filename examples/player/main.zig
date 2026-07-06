@@ -10,7 +10,6 @@ const Colors = engine.Colors;
 const logical_width = 1920;
 const logical_height = 1080;
 
-
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
     const io = init.io;
@@ -73,7 +72,7 @@ pub fn main(init: std.process.Init) !void {
     // ===== MANUAL UI ELEMENT TEST =====
     // Create a hardcoded UIElement to test if the rendering pipeline works
     {
-        const RectScreen = engine.Rectangle(engine.ScreenPoint);
+        const RectScreen = engine.Rectangle;
         const test_ui = game.createEntity();
         game.addComponent(test_ui, engine.UIElement, .{
             .anchor = .TopRight,
@@ -87,7 +86,6 @@ pub fn main(init: std.process.Init) !void {
                     .half_width = 50,
                     .half_height = 50,
                 },
-                .ScreenSpace,
             ),
             .fill_color = Colors.NEON_MAGENTA,
             .stroke_color = Colors.WHITE,

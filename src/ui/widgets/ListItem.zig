@@ -92,16 +92,15 @@ pub fn render(self: *Self, ri: RenderInfo) void {
     const measured = ri.font.measureText(self.text_info.text, self.text_info.font_scale);
     const ascent = (ascender / per_em) * self.text_info.font_scale;
     const text_y = bounds.y + ascent + (bounds.height - measured.y) / 2;
-    const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse
+    const Rectangle = rend.ShapeRegistry.getShapeType("Rectangle") orelse
         return;
     const bg_shape = rend.ShapeRegistry.createShapeUnion(
-        ScreenRect,
-        ScreenRect.initFromTopLeft(
+        Rectangle,
+        Rectangle.initFromTopLeft(
             .{ .x = bounds.x, .y = bounds.y },
             bounds.width,
             bounds.height,
         ),
-        .ScreenSpace,
     );
     const state = ListItemState{ .bits = self.state orelse {
         log.err(.ui, "Invalid ListItem State {s}", .{self.id});
@@ -115,14 +114,13 @@ pub fn render(self: *Self, ri: RenderInfo) void {
     const text_color = if (self.selected) self.colors.text_selected else self.colors.text;
     const indent_offset: f32 = @as(f32, @floatFromInt(self.indent)) * @as(f32, @floatFromInt(self.indent_size));
 
-    ri.renderer.drawGeometry(
-        bg_shape,
-        null,
-        bg_color,
-        null,
-        1,
-        ri.ctx,
-    );
+    ri.renderer.render(.{
+        .shape = bg_shape,
+        .style = .{
+            .fill = bg_color,
+        },
+        .space = .screen,
+    }, ri.ctx);
 
     ri.renderer.drawTextScreen(
         font,

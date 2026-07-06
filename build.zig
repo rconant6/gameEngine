@@ -31,6 +31,8 @@ pub const M = enum(u8) {
     engine,
     zxl,
     build_options,
+    triangulation,
+    shapes,
 };
 
 /// Module definition: source file path + dependencies (by enum).
@@ -62,6 +64,7 @@ const module_defs = [_]ModuleDef{
         .deps = &.{
             .{ "math", .math },                   .{ "registry", .registry },
             .{ "build_options", .build_options }, .{ "assets", .assets },
+            .{ "shapes", .shapes },               .{ "triangulation", .triangulation },
         },
     },
     // Assets
@@ -110,7 +113,7 @@ const module_defs = [_]ModuleDef{
         .name = "shape_registry",
         .path = "src/registry/shape_registry.zig",
         .deps = &.{
-            .{ "scene-format", .scene_format }, .{ "renderer", .renderer },
+            .{ "scene-format", .scene_format }, .{ "shapes", .shapes },
             .{ "math", .math },
         },
     },
@@ -129,7 +132,8 @@ const module_defs = [_]ModuleDef{
         .deps = &.{
             .{ "math", .math },         .{ "component_registry", .component_registry },
             .{ "ecs", .ecs },           .{ "collider_shape_registry", .collider_shape_registry },
-            .{ "renderer", .renderer }, .{ "shape_registry", .shape_registry },
+            .{ "shapes", .shapes },     .{ "shape_registry", .shape_registry },
+            .{ "scene-format", .scene_format },
         },
     },
     // Scene
@@ -203,6 +207,22 @@ const module_defs = [_]ModuleDef{
     },
     // Generated (no source file)
     .{ .name = "build_options", .path = null, .deps = &.{} },
+    // Triangulation (leaf: math only)
+    .{
+        .name = "triangulation",
+        .path = "src/renderer/triangulation.zig",
+        .deps = &.{
+            .{ "math", .math },
+        },
+    },
+    // Shapes (near-leaf: math + triangulation; debug auto-injected)
+    .{
+        .name = "shapes",
+        .path = "src/renderer/shapes.zig",
+        .deps = &.{
+            .{ "math", .math }, .{ "triangulation", .triangulation },
+        },
+    },
 };
 
 /// Resolved module pointers, indexed by M enum.

@@ -4,13 +4,14 @@ const cols = @import("color.zig");
 const Color = cols.Color;
 const math = @import("math");
 const V2 = math.V2;
-const RenderContext = @import("RenderContext.zig");
-const gu = @import("geometry_utils.zig");
-const Transform = gu.Transform;
 const reg = @import("registry");
 const ShapeData = reg.ShapeData;
-const Shapes = @import("shapes.zig");
+const Shapes = @import("shapes");
 const Batch = @import("batch.zig").Batch;
+const rt = @import("render_types.zig");
+const DrawStyle = rt.DrawStyle;
+const RenderContext = rt.RenderContext;
+const Transform = rt.Transform;
 
 const seg_buckets = [_]u32{ 8, 12, 16, 24, 32, 48, 64, 96 };
 // NOTE: ensure seg_buckets is ascending, will cause unusual display behavior
@@ -23,11 +24,6 @@ comptime {
 const MAX_SEG: usize = seg_buckets[seg_buckets.len - 1];
 const CHORD_GAP_PX: f32 = 0.33; // its subpixel you 'can't see'
 
-pub const DrawStyle = struct {
-    fill: ?Color = null,
-    stroke: ?Color = null,
-    stroke_width: f32 = 1.0, // world units world-side, px screen-side
-};
 pub const ClipMap = struct {
     scale: [2]f32 = .{0} ** 2,
     offset: [2]f32 = .{0} ** 2,
@@ -185,7 +181,7 @@ fn Tess(comptime V: type, comptime K: type) type {
             );
         }
 
-        fn circle(self: Self, c: Shapes.Circle(V2), style: DrawStyle) !void {
+        fn circle(self: Self, c: Shapes.Circle, style: DrawStyle) !void {
             if (style.fill == null and style.stroke == null) return;
 
             const num_steps: usize = 32; // update to be better than always 32
@@ -220,7 +216,7 @@ fn Tess(comptime V: type, comptime K: type) type {
                 try self.strokeRing(&pts, style);
             }
         }
-        fn ellipse(self: Self, e: Shapes.Ellipse(V2), style: DrawStyle) !void {
+        fn ellipse(self: Self, e: Shapes.Ellipse, style: DrawStyle) !void {
             if (style.fill == null and style.stroke == null) return;
 
             const num_steps: usize = 32; // update to be better than always 32
@@ -253,7 +249,7 @@ fn Tess(comptime V: type, comptime K: type) type {
                 try self.strokeRing(&pts, style);
             }
         }
-        fn line(self: Self, l: Shapes.Line(V2), style: DrawStyle) !void {
+        fn line(self: Self, l: Shapes.Line, style: DrawStyle) !void {
             if (style.stroke) |_| {
                 try self.stroke(
                     &.{.{ l.start, l.end }},
@@ -261,7 +257,7 @@ fn Tess(comptime V: type, comptime K: type) type {
                 );
             }
         }
-        fn poly(self: Self, p: Shapes.Polygon(V2), style: DrawStyle) !void {
+        fn poly(self: Self, p: Shapes.Polygon, style: DrawStyle) !void {
             if (style.fill) |fc| {
                 const cache = p.triangle_cache orelse return error.InvalidPolygon;
                 const c = fc.pack();
@@ -277,7 +273,7 @@ fn Tess(comptime V: type, comptime K: type) type {
                 try self.strokeRing(p.points, style);
             }
         }
-        fn rect(self: Self, r: Shapes.Rectangle(V2), style: DrawStyle) !void {
+        fn rect(self: Self, r: Shapes.Rectangle, style: DrawStyle) !void {
             const corners = r.getCorners();
             if (style.fill) |fc| {
                 const c = fc.pack();
@@ -304,7 +300,7 @@ fn Tess(comptime V: type, comptime K: type) type {
                 );
             }
         }
-        fn tri(self: Self, t: Shapes.Triangle(V2), style: DrawStyle) !void {
+        fn tri(self: Self, t: Shapes.Triangle, style: DrawStyle) !void {
             if (style.fill) |fc| {
                 const c = fc.pack();
                 const start = self.batch.mark();
@@ -342,7 +338,7 @@ pub fn tessellate(
     hw: f32, // stroke half-width, already resolved into the shape's space by caller
     px_per_unit: f32,
 ) !void {
-    const t = Tess(V, K){
+    const ts = Tess(V, K){
         .batch = batch,
         .makeVertex = makeVertex,
         .xf = xf,
@@ -352,49 +348,12 @@ pub fn tessellate(
         .px_per_unit = px_per_unit,
     };
 
-    // A3 fix (interim — Option A): one arm over the comptime-generated union.
-    // Tags are suffixed World/Screen; strip the suffix to pick the base shape,
-    // and coerce the shape's points to V2 (world passes through; screen is the
-    // same {x,y} floats). The ClipMap for the space was already chosen by the
-    // caller. NOTE: collapses to 6 V2-only variants in the follow-up step.
-    // ScreenPoint == V2, so a shape over either point type is the SAME type — the
-    // union variant `s` is already the V2-typed shape the methods want, no coercion.
-    // The World/Screen suffix is still stripped to pick the method (variants are
-    // named by point-space); the ClipMap for the space was chosen by the caller.
     switch (shape) {
-        inline else => |s, tag| {
-            const base = comptime stripSpaceSuffix(@tagName(tag));
-            if (comptime std.mem.eql(u8, base, "Circle")) {
-                try t.circle(s, style);
-            } else if (comptime std.mem.eql(u8, base, "Ellipse")) {
-                try t.ellipse(s, style);
-            } else if (comptime std.mem.eql(u8, base, "Rectangle")) {
-                try t.rect(s, style);
-            } else if (comptime std.mem.eql(u8, base, "Triangle")) {
-                try t.tri(s, style);
-            } else if (comptime std.mem.eql(u8, base, "Polygon")) {
-                try t.poly(s, style);
-            } else if (comptime std.mem.eql(u8, base, "Line")) {
-                try t.line(s, style);
-            } else {
-                @compileError("tessellate: unhandled shape base '" ++ base ++ "'");
-            }
-        },
+        .Circle => |c| try ts.circle(c, style),
+        .Ellipse => |e| try ts.ellipse(e, style),
+        .Rectangle => |r| try ts.rect(r, style),
+        .Triangle => |t| try ts.tri(t, style),
+        .Polygon => |p| try ts.poly(p, style),
+        .Line => |l| try ts.line(l, style),
     }
 }
-
-fn stripSpaceSuffix(comptime tag: []const u8) []const u8 {
-    if (std.mem.endsWith(u8, tag, "World")) return tag[0 .. tag.len - 5];
-    if (std.mem.endsWith(u8, tag, "Screen")) return tag[0 .. tag.len - 6];
-    return tag;
-}
-
-// The caller uses this to pick fromScreen vs fromWorld before calling tessellate.
-pub fn isScreenSpace(shape: ShapeData) bool {
-    switch (shape) {
-        inline else => |_, tag| {
-            return comptime std.mem.endsWith(u8, @tagName(tag), "Screen");
-        },
-    }
-}
-

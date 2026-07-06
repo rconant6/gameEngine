@@ -1,210 +1,200 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const hf = @import("math").utils;
-const tris = @import("triangulation.zig");
+const math = @import("math");
+const V2 = math.V2;
+const hf = math.utils;
+const tris = @import("triangulation");
 const log = @import("debug").log;
 // NOTE: These need to stay in this order in the file to keep collision working? (maybe)
 // Circle => 0
 // Rectangle => 1
 
-pub fn Circle(comptime PointType: type) type {
-    return struct {
-        origin: PointType,
-        radius: f32,
-    };
-}
+pub const Circle = struct {
+    origin: V2,
+    radius: f32,
+};
 
-pub fn Rectangle(comptime PointType: type) type {
-    return struct {
-        center: PointType,
-        half_height: f32,
-        half_width: f32,
+pub const Rectangle = struct {
+    center: V2,
+    half_height: f32,
+    half_width: f32,
 
-        pub fn init(
-            x: f32,
-            y: f32,
-            w: f32,
-            h: f32,
-        ) !@This() {
-            return .{
-                .center = .{ .x = x - w / 2, .y = y - h / 2 },
-                .half_width = w / 2,
-                .half_height = h / 2,
-            };
-        }
+    pub fn init(
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+    ) !@This() {
+        return .{
+            .center = .{ .x = x - w / 2, .y = y - h / 2 },
+            .half_width = w / 2,
+            .half_height = h / 2,
+        };
+    }
 
-        pub fn initSquare(center: PointType, size: f32) @This() {
-            return .{
-                .center = center,
-                .half_width = size * 0.5,
-                .half_height = size * 0.5,
-            };
-        }
+    pub fn initSquare(center: V2, size: f32) @This() {
+        return .{
+            .center = center,
+            .half_width = size * 0.5,
+            .half_height = size * 0.5,
+        };
+    }
 
-        pub fn initFromCenter(
-            center: PointType,
-            width: f32,
-            height: f32,
-        ) @This() {
-            return .{
-                .center = center,
-                .half_width = width * 0.5,
-                .half_height = height * 0.5,
-            };
-        }
+    pub fn initFromCenter(
+        center: V2,
+        width: f32,
+        height: f32,
+    ) @This() {
+        return .{
+            .center = center,
+            .half_width = width * 0.5,
+            .half_height = height * 0.5,
+        };
+    }
 
-        pub fn initFromTopLeft(
-            top_left: PointType,
-            width: f32,
-            height: f32,
-        ) @This() {
-            return .{
-                .center = .{
-                    .x = top_left.x + width * 0.5,
-                    .y = top_left.y + height * 0.5,
-                },
-                .half_width = width / 2,
-                .half_height = height / 2,
-            };
-        }
+    pub fn initFromTopLeft(
+        top_left: V2,
+        width: f32,
+        height: f32,
+    ) @This() {
+        return .{
+            .center = .{
+                .x = top_left.x + width * 0.5,
+                .y = top_left.y + height * 0.5,
+            },
+            .half_width = width / 2,
+            .half_height = height / 2,
+        };
+    }
 
-        pub fn getWidth(self: @This()) f32 {
-            return self.half_width * 2;
-        }
+    pub fn getWidth(self: @This()) f32 {
+        return self.half_width * 2;
+    }
 
-        pub fn getHeight(self: @This()) f32 {
-            return self.half_height * 2;
-        }
+    pub fn getHeight(self: @This()) f32 {
+        return self.half_height * 2;
+    }
 
-        pub fn getCorners(self: *const @This()) [4]PointType {
-            const XType = @TypeOf(self.center.x);
+    pub fn getCorners(self: *const @This()) [4]V2 {
+        const XType = @TypeOf(self.center.x);
 
-            const hw = if (XType == i32) @as(
-                i32,
-                @intFromFloat(self.half_width),
-            ) else self.half_width;
+        const hw = if (XType == i32) @as(
+            i32,
+            @intFromFloat(self.half_width),
+        ) else self.half_width;
 
-            const hh = if (XType == i32) @as(
-                i32,
-                @intFromFloat(self.half_height),
-            ) else self.half_height;
+        const hh = if (XType == i32) @as(
+            i32,
+            @intFromFloat(self.half_height),
+        ) else self.half_height;
 
-            const top_left: PointType = .{
-                .x = self.center.x - hw,
-                .y = self.center.y + hh,
-            };
-            const top_right: PointType = .{
-                .x = self.center.x + hw,
-                .y = self.center.y + hh,
-            };
-            const bottom_right: PointType = .{
-                .x = self.center.x + hw,
-                .y = self.center.y - hh,
-            };
-            const bottom_left: PointType = .{
-                .x = self.center.x - hw,
-                .y = self.center.y - hh,
-            };
-            return .{ top_left, top_right, bottom_right, bottom_left };
-        }
-    };
-}
+        const top_left: V2 = .{
+            .x = self.center.x - hw,
+            .y = self.center.y + hh,
+        };
+        const top_right: V2 = .{
+            .x = self.center.x + hw,
+            .y = self.center.y + hh,
+        };
+        const bottom_right: V2 = .{
+            .x = self.center.x + hw,
+            .y = self.center.y - hh,
+        };
+        const bottom_left: V2 = .{
+            .x = self.center.x - hw,
+            .y = self.center.y - hh,
+        };
+        return .{ top_left, top_right, bottom_right, bottom_left };
+    }
+};
 
-pub fn Triangle(comptime PointType: type) type {
-    return struct {
-        v0: PointType,
-        v1: PointType,
-        v2: PointType,
+pub const Triangle = struct {
+    v0: V2,
+    v1: V2,
+    v2: V2,
 
-        pub fn init(
-            points: []const PointType,
-        ) @This() {
-            log.err(
-                .renderer,
-                "Triangle creation without 3 points {d}",
-                .{points.len},
-            );
-            var verts = [3]PointType{ points[0], points[1], points[2] };
-            std.mem.sort(PointType, &verts, {}, hf.sortPointByYThenX);
-            return .{
-                .v0 = verts[0],
-                .v1 = verts[1],
-                .v2 = verts[2],
-            };
-        }
-    };
-}
+    pub fn init(
+        points: []const V2,
+    ) @This() {
+        log.err(
+            .renderer,
+            "Triangle creation without 3 points {d}",
+            .{points.len},
+        );
+        var verts = [3]V2{ points[0], points[1], points[2] };
+        std.mem.sort(V2, &verts, {}, hf.sortPointByYThenX);
+        return .{
+            .v0 = verts[0],
+            .v1 = verts[1],
+            .v2 = verts[2],
+        };
+    }
+};
 
-pub fn Line(comptime PointType: type) type {
-    return struct {
-        start: PointType,
-        end: PointType,
-    };
-}
+pub const Line = struct {
+    start: V2,
+    end: V2,
+};
 
-pub fn Polygon(comptime PointType: type) type {
-    return struct {
+pub const Polygon = struct {
+    gpa: Allocator,
+    points: []const V2,
+    center: V2 = .{ .x = 0, .y = 0 },
+    fill_call_count: usize = 0,
+    outline_call_count: usize = 0,
+    triangle_cache: ?[][3]V2 = null,
+    vertex_count: usize = 0,
+
+    pub fn init(
         gpa: Allocator,
-        points: []const PointType,
-        center: PointType = .{ .x = 0, .y = 0 },
-        fill_call_count: usize = 0,
-        outline_call_count: usize = 0,
-        triangle_cache: ?[][3]PointType = null,
-        vertex_count: usize = 0,
+        points: []const V2,
+    ) !@This() {
+        const owned_points = try gpa.dupe(V2, points);
+        errdefer gpa.free(owned_points);
 
-        pub fn init(
-            gpa: Allocator,
-            points: []const PointType,
-        ) !@This() {
-            const owned_points = try gpa.dupe(PointType, points);
-            errdefer gpa.free(owned_points);
-
-            const area = tris.signedArea(owned_points);
-            if (area < 0) {
-                std.mem.reverse(PointType, owned_points);
-            }
-
-            const center = hf.calculateCentroid(owned_points);
-
-            var poly: @This() = .{
-                .gpa = gpa,
-                .points = owned_points,
-                .center = center,
-                .triangle_cache = null,
-            };
-
-            const cache = try poly.getTriangles();
-            const fill_vertex_count = cache.len * 3;
-            const outline_count = points.len * 2;
-
-            poly.triangle_cache = cache;
-            poly.vertex_count = fill_vertex_count + outline_count;
-            poly.fill_call_count = 1;
-            poly.outline_call_count = outline_count;
-
-            return poly;
+        const area = tris.signedArea(owned_points);
+        if (area < 0) {
+            std.mem.reverse(V2, owned_points);
         }
 
-        pub fn deinit(self: *@This()) void {
-            if (self.triangle_cache) |triangles| self.gpa.free(triangles);
-            self.gpa.free(self.points);
-        }
+        const center = hf.calculateCentroid(owned_points);
 
-        pub fn getTriangles(self: *@This()) ![][3]PointType {
-            if (self.triangle_cache) |triangles| return triangles;
+        var poly: @This() = .{
+            .gpa = gpa,
+            .points = owned_points,
+            .center = center,
+            .triangle_cache = null,
+        };
 
-            const triangles = try tris.triangulate(self.gpa, self.points);
+        const cache = try poly.getTriangles();
+        const fill_vertex_count = cache.len * 3;
+        const outline_count = points.len * 2;
 
-            self.triangle_cache = triangles;
-            return triangles;
-        }
-    };
-}
+        poly.triangle_cache = cache;
+        poly.vertex_count = fill_vertex_count + outline_count;
+        poly.fill_call_count = 1;
+        poly.outline_call_count = outline_count;
 
-pub fn Ellipse(comptime PointType: type) type {
-    return struct {
-        origin: PointType,
-        semi_minor: f32,
-        semi_major: f32,
-    };
-}
+        return poly;
+    }
+
+    pub fn deinit(self: *@This()) void {
+        if (self.triangle_cache) |triangles| self.gpa.free(triangles);
+        self.gpa.free(self.points);
+    }
+
+    pub fn getTriangles(self: *@This()) ![][3]V2 {
+        if (self.triangle_cache) |triangles| return triangles;
+
+        const triangles = try tris.triangulate(self.gpa, self.points);
+
+        self.triangle_cache = triangles;
+        return triangles;
+    }
+};
+
+pub const Ellipse = struct {
+    origin: V2,
+    semi_minor: f32,
+    semi_major: f32,
+};

@@ -14,12 +14,12 @@ const Surface = myvk.Surface;
 const Swapchain = myvk.Swapchain;
 const Sync = myvk.Sync;
 const FrameSync = myvk.FrameSync;
-const RenderContext = @import("../../RenderContext.zig");
 const rend = @import("../../renderer.zig");
 const RenderConfig = rend.RendererConfig;
 const Color = rend.Color;
 const ShapeData = rend.ShapeData;
 const Transform = rend.Transform;
+const RenderContext = rend.RenderContext;
 const log = @import("debug").log;
 
 const Self = @This();

@@ -29,25 +29,22 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
 
 pub fn render(self: *Self, ri: RenderInfo) void {
     const bounds = ri.bounds;
-    const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse return;
+    const Rectangle = rend.ShapeRegistry.getShapeType("Rectangle") orelse return;
     const rect = switch (self.axis) {
-        .horizontal => ScreenRect.initFromTopLeft(
+        .horizontal => Rectangle.initFromTopLeft(
             .{ .x = bounds.x, .y = bounds.y },
             bounds.width,
             self.size,
         ),
-        .vertical => ScreenRect.initFromTopLeft(
+        .vertical => Rectangle.initFromTopLeft(
             .{ .x = bounds.x, .y = bounds.y },
             self.size,
             bounds.height,
         ),
     };
-    ri.renderer.drawGeometry(
-        rend.ShapeRegistry.createShapeUnion(ScreenRect, rect, .ScreenSpace),
-        null,
-        self.color,
-        null,
-        1,
-        ri.ctx,
-    );
+    ri.renderer.render(.{
+        .shape = rend.ShapeRegistry.createShapeUnion(Rectangle, rect),
+        .style = .{ .fill = self.color },
+        .space = .screen,
+    }, ri.ctx);
 }

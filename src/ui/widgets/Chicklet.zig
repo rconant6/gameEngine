@@ -88,30 +88,28 @@ pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
 }
 pub fn render(self: *Self, ri: RenderInfo) void {
     const bounds = ri.bounds;
-    const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse
+    const Rectangle = rend.ShapeRegistry.getShapeType("Rectangle") orelse
         return;
     const bg_shape = rend.ShapeRegistry.createShapeUnion(
-        ScreenRect,
-        ScreenRect.initFromTopLeft(
+        Rectangle,
+        Rectangle.initFromTopLeft(
             .{ .x = bounds.x, .y = bounds.y },
             bounds.width,
             bounds.height,
         ),
-        .ScreenSpace,
     );
     const state = ChickletState{ .bits = self.state orelse {
         log.err(.ui, "Invalid Button State {s}", .{self.id});
         return;
     } };
-    const bg_color = if (self.selected) self.colors.selected
-        else self.colors.not_selected;
+    const bg_color = if (self.selected) self.colors.selected else self.colors.not_selected;
 
-    ri.renderer.drawGeometry(
-        bg_shape,
-        null,
-        bg_color,
-        if (state.isHovered() or self.selected) Colors.WHITE else null,
-        1,
-        ri.ctx,
-    );
+    ri.renderer.render(.{
+        .shape = bg_shape,
+        .style = .{
+            .fill = bg_color,
+            .stroke = if (state.isHovered() or self.selected) Colors.WHITE else null,
+        },
+        .space = .screen,
+    }, ri.ctx);
 }

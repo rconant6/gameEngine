@@ -105,7 +105,7 @@ pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
 
 pub fn render(self: *Self, ri: RenderInfo) void {
     const bounds = ri.bounds;
-    const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse
+    const Rectangle = rend.ShapeRegistry.getShapeType("Rectangle") orelse
         return;
 
     // Read current value, compute normalized position
@@ -124,60 +124,54 @@ pub fn render(self: *Self, ri: RenderInfo) void {
 
     // TRACK (full width, background)
     const track_shape = rend.ShapeRegistry.createShapeUnion(
-        ScreenRect,
-        ScreenRect.initFromTopLeft(
+        Rectangle,
+        Rectangle.initFromTopLeft(
             .{ .x = bounds.x, .y = track_y },
             bounds.width,
             4,
         ),
-        .ScreenSpace,
     );
-    ri.renderer.drawGeometry(
-        track_shape,
-        null,
-        self.track_color,
-        null,
-        1,
-        ri.ctx,
-    );
+    ri.renderer.render(.{
+        .shape = track_shape,
+        .style = .{
+            .fill = self.track_color,
+        },
+        .space = .screen,
+    }, ri.ctx);
 
     // FILL (from left edge to thumb position)
     if (normalized > 0) {
         const fill_shape = rend.ShapeRegistry.createShapeUnion(
-            ScreenRect,
-            ScreenRect.initFromTopLeft(
+            Rectangle,
+            Rectangle.initFromTopLeft(
                 .{ .x = bounds.x, .y = track_y },
                 thumb_x - bounds.x,
                 4,
             ),
-            .ScreenSpace,
         );
-        ri.renderer.drawGeometry(
-            fill_shape,
-            null,
-            self.fill_color,
-            null,
-            1,
-            ri.ctx,
-        );
+        ri.renderer.render(.{
+            .shape = fill_shape,
+            .style = .{
+                .fill = self.fill_color,
+            },
+            .space = .screen,
+        }, ri.ctx);
     }
 
     // THUMB (vertical bar at value position)
     const thumb_shape = rend.ShapeRegistry.createShapeUnion(
-        ScreenRect,
-        ScreenRect.initFromTopLeft(
+        Rectangle,
+        Rectangle.initFromTopLeft(
             .{ .x = thumb_x - 2, .y = bounds.y },
             4,
             bounds.height,
         ),
-        .ScreenSpace,
     );
-    ri.renderer.drawGeometry(
-        thumb_shape,
-        null,
-        self.thumb_color,
-        null,
-        1,
-        ri.ctx,
-    );
+    ri.renderer.render(.{
+        .shape = thumb_shape,
+        .style = .{
+            .fill = self.thumb_color,
+        },
+        .space = .screen,
+    }, ri.ctx);
 }

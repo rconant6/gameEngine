@@ -9,6 +9,7 @@ const rend = @import("renderer");
 const ScreenAnchor = rend.ScreenAnchor;
 const Color = rend.Color;
 const Shape = rend.Shape;
+const CoordinateSpace = rend.CoordinateSpace;
 const action = @import("action");
 
 // MARK: Action Components (defined in action module, re-exported for ECS use)
@@ -33,6 +34,7 @@ pub const Sprite = struct {
     fill_color: ?Color = null,
     stroke_color: ?Color = null,
     stroke_width: f32 = 1,
+    space: CoordinateSpace = .world,
     visible: bool = true,
 
     pub fn deinit(self: *Sprite) void {

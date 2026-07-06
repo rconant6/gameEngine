@@ -47,26 +47,26 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
 }
 
 pub fn render(self: *Self, ri: RenderInfo) void {
-    const ScreenRect = rend.ShapeRegistry.getShapeType("RectangleScreen") orelse
+    const Rectangle = rend.ShapeRegistry.getShapeType("Rectangle") orelse
         return;
     const bounds = ri.bounds;
     const bg_shape = rend.ShapeRegistry.createShapeUnion(
-        ScreenRect,
-        ScreenRect.initFromTopLeft(
+        Rectangle,
+        Rectangle.initFromTopLeft(
             .{ .x = bounds.x, .y = bounds.y },
             bounds.width,
             bounds.height,
         ),
-        .ScreenSpace,
     );
-    ri.renderer.drawGeometry(
-        bg_shape,
-        null,
-        self.background,
-        self.border_color,
-        self.border_width,
-        ri.ctx,
-    );
+    ri.renderer.render(.{
+        .shape = bg_shape,
+        .style = .{
+            .fill = self.background,
+            .stroke = self.border_color,
+            .stroke_width = self.border_width,
+        },
+        .space = .screen,
+    }, ri.ctx);
 
     self.child.render(.{
         .renderer = ri.renderer,

@@ -4,13 +4,12 @@ const math = @import("math");
 pub const V2 = math.V2;
 pub const WorldPoint = math.WorldPoint;
 pub const ScreenPoint = math.ScreenPoint;
-const shapes_module = @import("shapes.zig");
+const shapes_module = @import("shapes");
 pub const Shapes = shapes_module;
 const registry = @import("registry");
 pub const ShapeRegistry = registry.ShapeRegistry;
 pub const ShapeData = registry.ShapeData;
-pub const CoordinateSpace = registry.CoordinateSpace;
-pub const triangulation = @import("triangulation.zig");
+pub const triangulation = @import("triangulation");
 const build_options = @import("build_options");
 const col = @import("color.zig");
 pub const Color = col.Color;
@@ -23,23 +22,25 @@ pub const Tone = col.Tone;
 pub const Family = col.Family;
 pub const TaggedColor = col.TaggedColor;
 pub const Generator = col.generators;
-const utils = @import("geometry_utils.zig");
-pub const Transform = utils.Transform;
-pub const ScreenAnchor = utils.ScreenAnchor;
-pub const getAnchorPos = utils.getAnchorPosition;
-pub const RenderContext = @import("RenderContext.zig");
 const batch = @import("batch.zig");
 pub const Batch = batch.Batch;
 pub const DrawCall = batch.DrawCall;
 const tess = @import("tess.zig");
-pub const DrawStyle = tess.DrawStyle;
 pub const ClipMap = tess.ClipMap;
 pub const LocalXform = tess.LocalXform;
 pub const VertexSink = tess.VertexSink;
 const text_module = @import("text.zig");
 const Font = text_module.Font;
-const debug = @import("debug");
-const log = debug.log;
+const rt = @import("render_types.zig");
+pub const CoordinateSpace = rt.CoordinateSpace;
+pub const DrawStyle = rt.DrawStyle;
+pub const Renderable = rt.Renderable;
+pub const RenderConfig = rt.RendererConfig;
+pub const RenderContext = rt.RenderContext;
+pub const ScreenAnchor = rt.ScreenAnchor;
+pub const Transform = rt.Transform;
+pub const getAnchorPos = rt.getAnchorPosition;
+const log = @import("debug").log;
 
 const MetalRenderer = if (build_options.backend == .metal)
     @import("./gpu/metal/MetalRenderer.zig")
@@ -54,15 +55,6 @@ const OpenGLRenderer = if (build_options.backend == .opengl)
 else
     @panic("TODO: OpenGL is not currently a viable renderer backend");
 
-pub const RendererConfig = struct {
-    width: u32,
-    height: u32,
-
-    native_handle: ?*anyopaque = null,
-    enable_validation: bool = false,
-    vsync: bool = true,
-};
-
 pub const Renderer = struct {
     backend: BackendImpl,
     width: u32,
@@ -76,7 +68,11 @@ pub const Renderer = struct {
     pub const Device = BackendImpl.Device;
     pub const Texture = BackendImpl.Texture;
 
-    pub fn init(p_gpa: Allocator, io: std.Io, config: RendererConfig) !Renderer {
+    pub fn render(self: *Renderer, r: Renderable, ctx: RenderContext) void {
+        self.backend.render(r, ctx);
+    }
+
+    pub fn init(p_gpa: Allocator, io: std.Io, config: RenderConfig) !Renderer {
         const backend = try BackendImpl.init(p_gpa, io, config);
         return .{
             .backend = backend,
@@ -152,24 +148,6 @@ pub const Renderer = struct {
         );
     }
 
-    pub fn drawGeometry(
-        self: *Renderer,
-        shape_data: ShapeData,
-        transform: ?Transform,
-        fill_color: ?Color,
-        stroke_color: ?Color,
-        stroke_width: f32,
-        ctx: RenderContext,
-    ) void {
-        self.backend.drawShape(
-            shape_data,
-            transform,
-            fill_color,
-            stroke_color,
-            stroke_width,
-            ctx,
-        );
-    }
     pub fn drawText(
         self: *Renderer,
         font: *const Font,

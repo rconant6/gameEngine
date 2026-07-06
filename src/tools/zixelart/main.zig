@@ -194,14 +194,14 @@ pub fn main(init: std.process.Init) !void {
         }
 
         for (state.canvas.pixels) |cell| {
-            app.renderer.drawGeometry(
-                cell.shape,
-                null,
-                cell.color,
-                Colors.BLACK,
-                1.0,
-                ctx,
-            );
+            app.renderer.render(.{
+                .shape = cell.shape,
+                .style = .{
+                    .fill = cell.color,
+                    .stroke = Colors.ASH_GRAY,
+                },
+                .space = .screen,
+            }, ctx);
         }
         ui_layer.update(
             &state,

@@ -312,9 +312,7 @@ pub const Instantiator = struct {
                 }
             },
             .sprite => |s| {
-                defer self.in_screen_space = false;
-                const coord_space: CoordinateSpace = if (self.in_screen_space) .ScreenSpace else .WorldSpace;
-                const shape_index = ShapeRegistry.getShapeIndex(s.shape_type, coord_space) orelse
+                const shape_index = ShapeRegistry.getShapeIndex(s.shape_type) orelse
                     return InstantiatorError.UnknownComponent;
                 inline for (ShapeRegistry.shape_names, 0..) |_, i| {
                     if (shape_index == i) {
@@ -409,7 +407,7 @@ pub const Instantiator = struct {
         comptime ShapeType: type,
         sprite: SpriteBlock,
     ) !Components.Sprite {
-        if (ShapeType == Shapes.Polygon(WorldPoint) or ShapeType == Shapes.Polygon(ScreenPoint)) {
+        if (ShapeType == Shapes.Polygon) {
             return try self.buildPolygonSprite(sprite);
         }
         var component = std.mem.zeroInit(Components.Sprite, .{});
@@ -417,7 +415,7 @@ pub const Instantiator = struct {
 
         // For screen space shapes, geometry should be centered at (0,0)
         // and positioning comes from the entity's UIElement component
-        const is_screen_space = self.in_screen_space;
+        const is_screen_space: bool = self.in_screen_space;
 
         if (sprite.properties) |props| {
             for (props) |prop| {
@@ -469,11 +467,9 @@ pub const Instantiator = struct {
                 }
             }
         }
-        // space is comptime for @unionInit, but scene-parsed space is runtime → branch.
-        component.geometry = if (self.in_screen_space)
-            ShapeRegistry.createShapeUnion(ShapeType, shape, .ScreenSpace)
-        else
-            ShapeRegistry.createShapeUnion(ShapeType, shape, .WorldSpace);
+        // the entity's authored coordinate space (from a [UIElement] block → screen)
+        component.space = if (self.in_screen_space) .screen else .world;
+        component.geometry = ShapeRegistry.createShapeUnion(ShapeType, shape);
 
         return component;
     }
@@ -512,9 +508,9 @@ pub const Instantiator = struct {
                 }
             }
         }
-        const polygon = try Shapes.Polygon(WorldPoint).init(self.persistent, owned_points);
+        const polygon = try Shapes.Polygon.init(self.persistent, owned_points);
         // this build path is world-only by construction (Polygon(WorldPoint) hardcoded)
-        component.geometry = ShapeRegistry.createShapeUnion(Shapes.Polygon(WorldPoint), polygon, .WorldSpace);
+        component.geometry = ShapeRegistry.createShapeUnion(Shapes.Polygon, polygon);
 
         return component;
     }

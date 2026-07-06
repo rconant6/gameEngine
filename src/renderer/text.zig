@@ -121,13 +121,18 @@ fn drawGlyph(
         const t1 = WorldPoint{ .x = p1.x * scale + pos.x, .y = p1.y * scale + pos.y };
         const t2 = WorldPoint{ .x = p2.x * scale + pos.x, .y = p2.y * scale + pos.y };
 
-        const triangle: Shapes.Triangle(WorldPoint) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
-        renderer.drawGeometry(
-            ShapeRegistry.createShapeUnion(Shapes.Triangle(WorldPoint), triangle, .WorldSpace),
-            .{},
-            color,
-            null,
-            1.0,
+        const triangle: Shapes.Triangle = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
+
+        renderer.render(
+            .{
+                .shape = ShapeRegistry.createShapeUnion(Shapes.Triangle, triangle),
+                .style = .{
+                    .fill = color,
+                    .stroke = null,
+                    .stroke_width = 1.0,
+                },
+                .space = .world,
+            },
             ctx,
         );
     }
@@ -161,13 +166,17 @@ fn drawGlyphScreen(
         const t1 = ScreenPoint{ .x = p1.x * scale + x_pos, .y = -p1.y * scale + y_pos };
         const t2 = ScreenPoint{ .x = p2.x * scale + x_pos, .y = -p2.y * scale + y_pos };
 
-        const triangle: Shapes.Triangle(ScreenPoint) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
-        renderer.drawGeometry(
-            ShapeRegistry.createShapeUnion(Shapes.Triangle(ScreenPoint), triangle, .ScreenSpace),
-            .{},
-            color,
-            null,
-            1.0,
+        const triangle: Shapes.Triangle = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
+        renderer.render(
+            .{
+                .shape = ShapeRegistry.createShapeUnion(Shapes.Triangle, triangle),
+                .style = .{
+                    .fill = color,
+                    .stroke = null,
+                    .stroke_width = 1.0,
+                },
+                .space = .screen,
+            },
             ctx,
         );
     }
