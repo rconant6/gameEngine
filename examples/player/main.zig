@@ -44,14 +44,14 @@ pub fn main(init: std.process.Init) !void {
     log.info(.scene, "Loading {s}.scene", .{"camera_test"});
     try game.setActiveScene("camera");
 
-    // UI test scene - tests screen-space HUD elements
-    try game.loadScene("ui", "ui_test.scene");
-    log.info(.scene, "Loading {s}.scene", .{"ui_test"});
-    try game.setActiveScene("ui");
+    // Render test scene - full shape/sprite/HUD rendering showcase
+    try game.loadScene("render_test", "render_test.scene");
+    log.info(.scene, "Loading {s}.scene", .{"render_test"});
+    try game.setActiveScene("render_test");
 
     // NOTE loading all scenes and setting to active to see where/when something breaks
     try game.instantiateActiveScene();
-    log.info(.scene, "Instantiated ui_test-scene as the active scene", .{});
+    log.info(.scene, "Instantiated render_test-scene as the active scene", .{});
 
     try game.loadTemplates("assets/templates/");
 

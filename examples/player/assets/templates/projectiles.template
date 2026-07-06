@@ -85,7 +85,7 @@
     remaining:f32 1.0
 
 [SpaceBullet:template]
-  // Fired on Space in ui_test — small circle, drifts up, auto-dies at 2s
+  // Fired on Space in render_test — small circle, drifts up, auto-dies at 2s
   [Transform]
     position:vec2 {0.0, 0.0}
     rotation:f32 0.0

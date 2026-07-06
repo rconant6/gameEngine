@@ -6,7 +6,7 @@
   path:string "assets/sprites/"
   filename:string "test_2x2.zxl"
 
-[UITestScene:scene]
+[RenderTestScene:scene]
   // Background grid helper
   [Background:entity]
     [Transform]
@@ -55,6 +55,36 @@
       pixel_scale:f32 3.0
     [Lifetime]
       remaining:f32 2.0
+
+  // Ellipse opposite ZxlTest (upper-right sprite → mirrored to the left)
+  [EllipseBoth:entity]
+    [Transform]
+      position:vec3 {-3.0, 3.0, 0.0}
+      scale:f32 1.0
+    [Sprite:ellipse]
+      origin:vec2 {0.0, 0.0}
+      semi_major:f32 1.6
+      semi_minor:f32 0.9
+      fill_color:color #FF00AA
+      stroke_color:color #FFFFFF
+      stroke_width:f32 1.5
+      visible:bool true
+
+  // Timed-death ellipse — mirrors DyingSprite to the opposite (upper-right) corner
+  [EllipseTimed:entity]
+    [Transform]
+      position:vec3 {20.0, 15.0, 0.0}
+      scale:f32 1.0
+    [Sprite:ellipse]
+      origin:vec2 {0.0, 0.0}
+      semi_major:f32 1.4
+      semi_minor:f32 1.0
+      fill_color:color #00CCFF
+      stroke_color:color #FFFF00
+      stroke_width:f32 2.0
+      visible:bool true
+    [Lifetime]
+      remaining:f32 3.0
 
   // Player - camera will follow this
   [Player:entity]
