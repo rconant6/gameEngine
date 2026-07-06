@@ -38,6 +38,13 @@ pub fn normalize(self: V2) V2 {
     return self.div(self.magnitude());
 }
 
+pub fn perp(self: V2) V2 {
+    return .{
+        .x = -self.y,
+        .y = self.x,
+    };
+}
+
 pub fn distance(self: V2, other: V2) f32 {
     return (self.sub(other)).magnitude();
 }

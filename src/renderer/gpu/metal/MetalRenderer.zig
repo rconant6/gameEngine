@@ -3,8 +3,8 @@ const Allocator = std.mem.Allocator;
 const bridge = @import("metal_bridge.zig");
 const BridgeError = bridge.BridgeError;
 const mb = bridge.MetalBridge;
-const GeometryBatch = @import("geometry_batch.zig").GeometryBatch;
-const TextureBatch = @import("texture_batch.zig").TextureBatch;
+const Batch = @import("../../batch.zig").Batch;
+const tess = @import("../../tess.zig");
 const metal = @import("metal_types.zig");
 const MTLDevice = metal.MTLDevice;
 const MTLRenderCommandEncoder = metal.MTLRenderCommandEncoder;
@@ -17,8 +17,8 @@ const MTLBuffer = metal.MTLBuffer;
 const MTLLibrary = metal.MTLLibrary;
 const MTLPixelFormat = metal.MTLPixelFormat;
 const ClearColor = metal.ClearColor;
-const Vertex = metal.Vertex;
-const TextureVertex = metal.TextureVertex;
+const MetalVertex = metal.MetalVertex;
+const MetalTextureVertex = metal.MetalTextureVertex;
 const MTLResourceOptions = metal.MTLResourceOptions;
 const MTLError = metal.MetalError;
 const MTLLoadAction = metal.MTLLoadAction;
@@ -52,10 +52,10 @@ layer: *CAMetalLayer,
 
 pipeline_state: *MTLRenderPipelineState,
 
-batch: GeometryBatch,
+batch: Batch(MetalVertex, metal.GeomKey),
 
 texture_pipeline_state: *MTLRenderPipelineState,
-texture_batch: TextureBatch,
+texture_batch: Batch(MetalTextureVertex, metal.TexKey),
 
 frame_ctx: *MetalFrameContext,
 frame_index: u8, // ring cursor (0..2)
@@ -105,8 +105,8 @@ pub fn init(
     );
 
     // CPU-side batches
-    const batch = GeometryBatch.init(p_gpa);
-    const tex_batch = TextureBatch.init(p_gpa);
+    const batch = Batch(MetalVertex, metal.GeomKey).init(p_gpa);
+    const tex_batch = Batch(MetalTextureVertex, metal.TexKey).init(p_gpa);
 
     // Vertex buffers: rings of FRAMES_IN_FLIGHT
     const options = @intFromEnum(MTLResourceOptions.storageModeShared);
@@ -224,22 +224,20 @@ pub fn drawTextureQuad(
     const half_h = height / 2;
     const ox = (origin[0] - 0.5) * width;
     const oy = (origin[1] - 0.5) * height;
-    var tl: WorldPoint = .{ .x = -half_w - ox, .y = half_h - oy };
-    var tr: WorldPoint = .{ .x = half_w - ox, .y = half_h - oy };
-    var bl: WorldPoint = .{ .x = -half_w - ox, .y = -half_h - oy };
-    var br: WorldPoint = .{ .x = half_w - ox, .y = -half_h - oy };
+    const tl: WorldPoint = .{ .x = -half_w - ox, .y = half_h - oy };
+    const tr: WorldPoint = .{ .x = half_w - ox, .y = half_h - oy };
+    const bl: WorldPoint = .{ .x = -half_w - ox, .y = -half_h - oy };
+    const br: WorldPoint = .{ .x = half_w - ox, .y = -half_h - oy };
 
-    if (transform) |t| {
-        tl = utils.transformPoint(tl, t);
-        tr = utils.transformPoint(tr, t);
-        bl = utils.transformPoint(bl, t);
-        br = utils.transformPoint(br, t);
-    }
-
-    const clip_tl = utils.worldToClipSpace(tl, ctx);
-    const clip_tr = utils.worldToClipSpace(tr, ctx);
-    const clip_bl = utils.worldToClipSpace(bl, ctx);
-    const clip_br = utils.worldToClipSpace(br, ctx);
+    // Same local→clip pipeline as tess.emit: LocalXform (scale/rotate/translate)
+    // then ClipMap. Sprites are always world-space. Keeps sprites and shapes on
+    // one transform path so 2.2's camera-on-GPU move only touches one place.
+    const xf = tess.LocalXform.from(transform);
+    const map = tess.ClipMap.fromWorld(ctx);
+    const clip_tl = map.apply(xf.apply(tl));
+    const clip_tr = map.apply(xf.apply(tr));
+    const clip_bl = map.apply(xf.apply(bl));
+    const clip_br = map.apply(xf.apply(br));
 
     const u_tl: f32 = if (flip_h) 1.0 else 0.0;
     const u_tr: f32 = if (flip_h) 0.0 else 1.0;
@@ -251,7 +249,7 @@ pub fn drawTextureQuad(
     const v_bl: f32 = if (flip_v) 0.0 else 1.0;
     const v_br: f32 = if (flip_v) 0.0 else 1.0;
 
-    self.texture_batch.addSprite(texture, .{ clip_tl, clip_tr, clip_bl, clip_br }, .{
+    self.addSprite(texture, .{ clip_tl, clip_tr, clip_bl, clip_br }, .{
         .{ u_tl, v_tl },
         .{ u_tr, v_tr },
         .{ u_bl, v_bl },
@@ -259,6 +257,29 @@ pub fn drawTextureQuad(
     }) catch |err| {
         log.err(.renderer, "Failed to batch textured sprite {any}", .{err});
     };
+}
+
+// Emits a textured quad (2 tris, 6 verts) into the texture batch. Metal-specific
+// sprite geometry — lives with the renderer that owns MetalTextureVertex/TexKey.
+fn addSprite(
+    self: *Self,
+    texture: *MTLTexture,
+    clip_corners: [4][2]f32, // TL, TR, BL, BR in clip space
+    uvs: [4][2]f32, // TL, TR, BL, BR in uv coords
+) !void {
+    const start: u32 = self.texture_batch.mark();
+    const verts = [6]MetalTextureVertex{
+        // TRI 1
+        .{ .position = clip_corners[0], .texcoord = uvs[0] },
+        .{ .position = clip_corners[1], .texcoord = uvs[1] },
+        .{ .position = clip_corners[2], .texcoord = uvs[2] },
+        // TRI 2
+        .{ .position = clip_corners[1], .texcoord = uvs[1] },
+        .{ .position = clip_corners[3], .texcoord = uvs[3] },
+        .{ .position = clip_corners[2], .texcoord = uvs[2] },
+    };
+    for (verts) |v| try self.texture_batch.vertex(v);
+    try self.texture_batch.pushCall(.{ .tex = texture }, start, 6);
 }
 pub fn drawShape(
     self: *Self,
@@ -269,15 +290,39 @@ pub fn drawShape(
     stroke_width: f32,
     ctx: RenderContext,
 ) void {
-    self.batch.addShape(
+    const xf = tess.LocalXform.from(transform);
+    const is_screen = tess.isScreenSpace(shape);
+    const map = if (is_screen)
+        tess.ClipMap.fromScreen(ctx)
+    else
+        tess.ClipMap.fromWorld(ctx);
+    // stroke_width is authored in PIXELS. Screen shapes are already in px; world
+    // shapes convert px→world so strokes stay constant-thickness under any zoom.
+    // px_per_unit = height / (2 * ortho_size).
+    const half = stroke_width / 2.0;
+    const hw: f32 = if (is_screen) half else blk: {
+        const fh: f32 = @floatFromInt(ctx.height);
+        const px_per_unit = fh / (2.0 * ctx.ortho_size);
+        break :blk half / px_per_unit;
+    };
+    const style = tess.DrawStyle{
+        .fill = fill_color,
+        .stroke = stroke_color,
+        .stroke_width = stroke_width,
+    };
+    tess.tessellate(
+        MetalVertex,
+        metal.GeomKey,
+        &self.batch,
+        metal.makeVertex,
+        .{ .prim = .triangle },
         shape,
-        transform,
-        fill_color,
-        stroke_color,
-        stroke_width,
-        ctx,
+        xf,
+        style,
+        map,
+        hw,
     ) catch {
-        log.err(.renderer, "Failed to batch shape {any}", .{@TypeOf(shape)});
+        log.err(.renderer, "Failed to tessellate shape {any}", .{@TypeOf(shape)});
     };
 }
 
@@ -309,7 +354,7 @@ fn flushGeometryBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !
 
     const buffer = self.vertex_buffers[idx];
     const buffer_ptr = try mb.getBufferContents(buffer);
-    const vertex_size = @sizeOf(Vertex);
+    const vertex_size = @sizeOf(MetalVertex);
     const bytes_to_copy = vertices.len * vertex_size;
 
     const copy_bytes = if (bytes_to_copy > SLOT_BYTES) blk: {
@@ -336,7 +381,7 @@ fn flushGeometryBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !
 
         mb.drawPrimitives(
             encoder,
-            call.primitive_type,
+            call.key.prim,
             call.vertex_start,
             call.vertex_count,
         );
@@ -349,7 +394,7 @@ fn flushTextureBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !v
 
     const buffer = self.texture_vertex_buffers[idx];
     const buffer_ptr = try mb.getBufferContents(buffer);
-    const vertex_size = @sizeOf(TextureVertex);
+    const vertex_size = @sizeOf(MetalTextureVertex);
     const bytes_to_copy = vertices.len * vertex_size;
 
     const copy_bytes = if (bytes_to_copy > TEX_SLOT_BYTES) blk: {
@@ -372,7 +417,7 @@ fn flushTextureBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !v
     for (self.texture_batch.draw_calls.items) |call| {
         if (call.vertex_start + call.vertex_count > copied_vertex_count) break;
 
-        mb.setFragmentTexture(encoder, call.texture, 0);
+        mb.setFragmentTexture(encoder, call.key.tex, 0);
         mb.drawPrimitives(encoder, .triangle, call.vertex_start, call.vertex_count);
     }
 }

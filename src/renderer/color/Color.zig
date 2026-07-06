@@ -91,6 +91,10 @@ pub const Color = struct {
         }
     }
 
+    pub fn pack(self: Color) u32 {
+        return self.rgba.pack();
+    }
+
     pub fn withRgb(c: Color, r: u8, g: u8, b: u8) Color {
         return Color.initRgba(r, g, b, c.rgba.a);
     }

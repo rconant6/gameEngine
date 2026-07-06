@@ -41,11 +41,11 @@ pub const MetalError = error{
     RenderEncoderCreationFailed,
 };
 
-pub const Vertex = extern struct {
+pub const MetalVertex = extern struct {
     position: [2]f32, // x, y, in clip space [-1, 1]
     color: [4]f32, // r, g, b, a in range [0, 1]
 };
-pub const TextureVertex = extern struct {
+pub const MetalTextureVertex = extern struct {
     position: [2]f32, // clip space x,y
     texcoord: [2]f32, // u, v in [0,1]
 };
@@ -105,6 +105,30 @@ pub const MTLPrimitiveType = enum(u64) {
     triangle = 3,
     triangleStrip = 4,
 };
+
+// --- Batch draw-call keys + vertex builder (Q1 unpack lives here) ---
+// Grouping keys for Batch(V, K).pushCall merge logic.
+pub const GeomKey = struct {
+    prim: MTLPrimitiveType,
+    pub fn eql(a: GeomKey, b: GeomKey) bool {
+        return a.prim == b.prim;
+    }
+};
+pub const TexKey = struct {
+    tex: *MTLTexture,
+    pub fn eql(a: TexKey, b: TexKey) bool {
+        return a.tex == b.tex;
+    }
+};
+
+// Unpack u32 -> [4]f32, inverse of Rgba.pack = (r<<24)|(g<<16)|(b<<8)|a.
+pub fn makeVertex(pos: [2]f32, color: u32) MetalVertex {
+    const r: f32 = @floatFromInt((color >> 24) & 0xFF);
+    const g: f32 = @floatFromInt((color >> 16) & 0xFF);
+    const b: f32 = @floatFromInt((color >> 8) & 0xFF);
+    const a: f32 = @floatFromInt(color & 0xFF);
+    return .{ .position = pos, .color = .{ r / 255.0, g / 255.0, b / 255.0, a / 255.0 } };
+}
 
 pub const PipelineConfig = struct {
     vertex_function_name: []const u8,

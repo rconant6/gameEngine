@@ -12,11 +12,10 @@ const Circle = Shapes.Circle(WorldPoint);
 const Ellipse = Shapes.Ellipse(WorldPoint);
 
 test "Line: init with start and end points" {
-    const gpa = testing.allocator;
     const start = V2{ .x = 0, .y = 0 };
     const end = V2{ .x = 10, .y = 10 };
 
-    const line = try Line.init(gpa, start, end);
+    const line: Line = .{ .start = start, .end = end };
 
     try testing.expectEqual(@as(f32, 0), line.start.x);
     try testing.expectEqual(@as(f32, 0), line.start.y);
@@ -25,21 +24,19 @@ test "Line: init with start and end points" {
 }
 
 test "Line: horizontal line" {
-    const gpa = testing.allocator;
     const start = V2{ .x = 0, .y = 5 };
     const end = V2{ .x = 10, .y = 5 };
 
-    const line = try Line.init(gpa, start, end);
+    const line: Line = .{ .start = start, .end = end };
 
     try testing.expectEqual(line.start.y, line.end.y);
 }
 
 test "Line: vertical line" {
-    const gpa = testing.allocator;
     const start = V2{ .x = 5, .y = 0 };
     const end = V2{ .x = 5, .y = 10 };
 
-    const line = try Line.init(gpa, start, end);
+    const line: Line = .{ .start = start, .end = end };
 
     try testing.expectEqual(line.start.x, line.end.x);
 }
@@ -74,14 +71,13 @@ test "Rectangle: dimensions are consistent" {
 }
 
 test "Triangle: init with three points" {
-    const gpa = testing.allocator;
     const points = [_]V2{
         V2{ .x = 0, .y = 0 },
         V2{ .x = 10, .y = 0 },
         V2{ .x = 5, .y = 10 },
     };
 
-    const tri = try Triangle.init(gpa, &points);
+    const tri = Triangle.init(&points);
 
     // Triangle should have 3 vertices
     // Note: vertices are sorted by Y then X
@@ -90,14 +86,13 @@ test "Triangle: init with three points" {
 }
 
 test "Triangle: vertices are sorted" {
-    const gpa = testing.allocator;
     const points = [_]V2{
         V2{ .x = 5, .y = 10 }, // Top
-        V2{ .x = 0, .y = 0 },  // Bottom-left
+        V2{ .x = 0, .y = 0 }, // Bottom-left
         V2{ .x = 10, .y = 0 }, // Bottom-right
     };
 
-    const tri = try Triangle.init(gpa, &points);
+    const tri = Triangle.init(&points);
 
     // After sorting, lowest Y should be first
     try testing.expectEqual(@as(f32, 0), tri.v0.y);
@@ -105,13 +100,24 @@ test "Triangle: vertices are sorted" {
 }
 
 test "Circle: basic properties" {
-    // Circle tests would depend on the Circle implementation
-    // Placeholder for when Circle is defined in core_shapes
+    const circle: Circle = .{ .origin = .{ .x = 3, .y = -4 }, .radius = 7 };
+
+    try testing.expectEqual(@as(f32, 3), circle.origin.x);
+    try testing.expectEqual(@as(f32, -4), circle.origin.y);
+    try testing.expectEqual(@as(f32, 7), circle.radius);
 }
 
 test "Ellipse: basic properties" {
-    // Ellipse tests would depend on the Ellipse implementation
-    // Placeholder for when Ellipse is defined in core_shapes
+    const ellipse: Ellipse = .{
+        .origin = .{ .x = 1, .y = 2 },
+        .semi_major = 10,
+        .semi_minor = 4,
+    };
+
+    try testing.expectEqual(@as(f32, 1), ellipse.origin.x);
+    try testing.expectEqual(@as(f32, 2), ellipse.origin.y);
+    try testing.expectEqual(@as(f32, 10), ellipse.semi_major);
+    try testing.expectEqual(@as(f32, 4), ellipse.semi_minor);
 }
 
 test "Shape: different shape types" {

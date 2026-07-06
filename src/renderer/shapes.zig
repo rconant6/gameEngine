@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const hf = @import("math").utils;
 const tris = @import("triangulation.zig");
+const log = @import("debug").log;
 // NOTE: These need to stay in this order in the file to keep collision working? (maybe)
 // Circle => 0
 // Rectangle => 1
@@ -10,18 +11,6 @@ pub fn Circle(comptime PointType: type) type {
     return struct {
         origin: PointType,
         radius: f32,
-
-        pub fn init(
-            gpa: Allocator,
-            origin: PointType,
-            r: f32,
-        ) !@This() {
-            _ = gpa;
-            return .{
-                .origin = origin,
-                .radius = r,
-            };
-        }
     };
 }
 
@@ -32,13 +21,11 @@ pub fn Rectangle(comptime PointType: type) type {
         half_width: f32,
 
         pub fn init(
-            gpa: Allocator,
             x: f32,
             y: f32,
             w: f32,
             h: f32,
         ) !@This() {
-            _ = gpa;
             return .{
                 .center = .{ .x = x - w / 2, .y = y - h / 2 },
                 .half_width = w / 2,
@@ -54,7 +41,11 @@ pub fn Rectangle(comptime PointType: type) type {
             };
         }
 
-        pub fn initFromCenter(center: PointType, width: f32, height: f32) @This() {
+        pub fn initFromCenter(
+            center: PointType,
+            width: f32,
+            height: f32,
+        ) @This() {
             return .{
                 .center = center,
                 .half_width = width * 0.5,
@@ -62,7 +53,11 @@ pub fn Rectangle(comptime PointType: type) type {
             };
         }
 
-        pub fn initFromTopLeft(top_left: PointType, width: f32, height: f32) @This() {
+        pub fn initFromTopLeft(
+            top_left: PointType,
+            width: f32,
+            height: f32,
+        ) @This() {
             return .{
                 .center = .{
                     .x = top_left.x + width * 0.5,
@@ -83,8 +78,16 @@ pub fn Rectangle(comptime PointType: type) type {
 
         pub fn getCorners(self: *const @This()) [4]PointType {
             const XType = @TypeOf(self.center.x);
-            const hw = if (XType == i32) @as(i32, @intFromFloat(self.half_width)) else self.half_width;
-            const hh = if (XType == i32) @as(i32, @intFromFloat(self.half_height)) else self.half_height;
+
+            const hw = if (XType == i32) @as(
+                i32,
+                @intFromFloat(self.half_width),
+            ) else self.half_width;
+
+            const hh = if (XType == i32) @as(
+                i32,
+                @intFromFloat(self.half_height),
+            ) else self.half_height;
 
             const top_left: PointType = .{
                 .x = self.center.x - hw,
@@ -114,11 +117,13 @@ pub fn Triangle(comptime PointType: type) type {
         v2: PointType,
 
         pub fn init(
-            gpa: Allocator,
             points: []const PointType,
-        ) !@This() {
-            _ = gpa;
-            std.debug.assert(points.len == 3);
+        ) @This() {
+            log.err(
+                .renderer,
+                "Triangle creation without 3 points {d}",
+                .{points.len},
+            );
             var verts = [3]PointType{ points[0], points[1], points[2] };
             std.mem.sort(PointType, &verts, {}, hf.sortPointByYThenX);
             return .{
@@ -134,18 +139,6 @@ pub fn Line(comptime PointType: type) type {
     return struct {
         start: PointType,
         end: PointType,
-
-        pub fn init(
-            gpa: Allocator,
-            start: PointType,
-            end: PointType,
-        ) !@This() {
-            _ = gpa;
-            return .{
-                .start = start,
-                .end = end,
-            };
-        }
     };
 }
 
@@ -208,7 +201,6 @@ pub fn Polygon(comptime PointType: type) type {
     };
 }
 
-// TODO: NOT IMPLEMENTED
 pub fn Ellipse(comptime PointType: type) type {
     return struct {
         origin: PointType,
