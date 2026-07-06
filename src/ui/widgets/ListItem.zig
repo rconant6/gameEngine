@@ -101,6 +101,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
             bounds.width,
             bounds.height,
         ),
+        .ScreenSpace,
     );
     const state = ListItemState{ .bits = self.state orelse {
         log.err(.ui, "Invalid ListItem State {s}", .{self.id});

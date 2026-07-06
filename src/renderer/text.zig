@@ -123,7 +123,7 @@ fn drawGlyph(
 
         const triangle: Shapes.Triangle(WorldPoint) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
         renderer.drawGeometry(
-            ShapeRegistry.createShapeUnion(Shapes.Triangle(WorldPoint), triangle),
+            ShapeRegistry.createShapeUnion(Shapes.Triangle(WorldPoint), triangle, .WorldSpace),
             .{},
             color,
             null,
@@ -163,7 +163,7 @@ fn drawGlyphScreen(
 
         const triangle: Shapes.Triangle(ScreenPoint) = .{ .v0 = t0, .v1 = t1, .v2 = t2 };
         renderer.drawGeometry(
-            ShapeRegistry.createShapeUnion(Shapes.Triangle(ScreenPoint), triangle),
+            ShapeRegistry.createShapeUnion(Shapes.Triangle(ScreenPoint), triangle, .ScreenSpace),
             .{},
             color,
             null,

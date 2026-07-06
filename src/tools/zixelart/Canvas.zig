@@ -81,6 +81,7 @@ pub fn init(
                         .{ .x = @floatFromInt(loc_x), .y = @floatFromInt(loc_y) },
                         @floatFromInt(self.pixel_size),
                     ),
+                    .ScreenSpace,
                 ),
                 .color = Colors.LIGHT_GRAY,
             };

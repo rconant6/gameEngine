@@ -456,7 +456,6 @@ pub const Engine = struct {
     pub const getMouseScrollDelta = @import("EngineInput.zig").getMouseScrollDelta;
 
     // MARK: Render methods
-    pub const draw = @import("EngineRender.zig").draw;
 
     // MARK: Bounds methods
     pub const getGameWidth = @import("EngineBounds.zig").getGameWidth;

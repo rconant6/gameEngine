@@ -102,9 +102,21 @@ pub const ShapeRegistry = struct {
         return null;
     }
 
-    pub fn createShapeUnion(comptime ShapeType: type, shape: ShapeType) ShapeData {
+    // TRANSITIONAL: `space` disambiguates the World/Screen variant, since ScreenPoint==V2
+    // makes Circle(V2) match BOTH TriangleWorld and TriangleScreen by type. Once the union
+    // collapses to one variant per shape (V2-only), there's nothing to disambiguate and this
+    // arg is DELETED — space then lives only in the draw call's ClipMap choice.
+    pub fn createShapeUnion(
+        comptime ShapeType: type,
+        shape: ShapeType,
+        comptime space: CoordinateSpace,
+    ) ShapeData {
+        const suffix = comptime switch (space) {
+            .WorldSpace => "World",
+            .ScreenSpace => "Screen",
+        };
         inline for (shape_names, 0..) |name, i| {
-            if (ShapeType == shape_types[i]) {
+            if (ShapeType == shape_types[i] and comptime std.mem.endsWith(u8, name, suffix)) {
                 return @unionInit(ShapeData, name, shape);
             }
         }

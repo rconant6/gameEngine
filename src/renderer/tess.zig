@@ -12,6 +12,17 @@ const ShapeData = reg.ShapeData;
 const Shapes = @import("shapes.zig");
 const Batch = @import("batch.zig").Batch;
 
+const seg_buckets = [_]u32{ 8, 12, 16, 24, 32, 48, 64, 96 };
+// NOTE: ensure seg_buckets is ascending, will cause unusual display behavior
+comptime {
+    for (seg_buckets[1..], 1..) |bucket, i| {
+        if (bucket <= seg_buckets[i - 1])
+            @compileError("seg_buckets must be strictly ascending");
+    }
+}
+const MAX_SEG: usize = seg_buckets[seg_buckets.len - 1];
+const CHORD_GAP_PX: f32 = 0.33; // its subpixel you 'can't see'
+
 pub const DrawStyle = struct {
     fill: ?Color = null,
     stroke: ?Color = null,
@@ -102,10 +113,8 @@ fn Tess(comptime V: type, comptime K: type) type {
         xf: LocalXform,
         map: ClipMap,
         tri_key: K, // triangle draw-call key
-        // stroke half-width, PRE-RESOLVED into the shape's own space by the caller:
-        // world shapes → (stroke_width/2)/px_per_unit; screen shapes → stroke_width/2.
-        // stroke/strokeRing use this directly and stay space-agnostic.
         hw: f32,
+        px_per_unit: f32,
 
         fn emit(self: Self, p: V2, color: u32) !void {
             const local = self.xf.apply(p);
@@ -331,6 +340,7 @@ pub fn tessellate(
     style: DrawStyle,
     map: ClipMap,
     hw: f32, // stroke half-width, already resolved into the shape's space by caller
+    px_per_unit: f32,
 ) !void {
     const t = Tess(V, K){
         .batch = batch,
@@ -339,6 +349,7 @@ pub fn tessellate(
         .map = map,
         .tri_key = tri_key,
         .hw = hw,
+        .px_per_unit = px_per_unit,
     };
 
     // A3 fix (interim — Option A): one arm over the comptime-generated union.
@@ -346,22 +357,25 @@ pub fn tessellate(
     // and coerce the shape's points to V2 (world passes through; screen is the
     // same {x,y} floats). The ClipMap for the space was already chosen by the
     // caller. NOTE: collapses to 6 V2-only variants in the follow-up step.
+    // ScreenPoint == V2, so a shape over either point type is the SAME type — the
+    // union variant `s` is already the V2-typed shape the methods want, no coercion.
+    // The World/Screen suffix is still stripped to pick the method (variants are
+    // named by point-space); the ClipMap for the space was chosen by the caller.
     switch (shape) {
         inline else => |s, tag| {
             const base = comptime stripSpaceSuffix(@tagName(tag));
-            const v2s = toV2Shape(s);
             if (comptime std.mem.eql(u8, base, "Circle")) {
-                try t.circle(v2s, style);
+                try t.circle(s, style);
             } else if (comptime std.mem.eql(u8, base, "Ellipse")) {
-                try t.ellipse(v2s, style);
+                try t.ellipse(s, style);
             } else if (comptime std.mem.eql(u8, base, "Rectangle")) {
-                try t.rect(v2s, style);
+                try t.rect(s, style);
             } else if (comptime std.mem.eql(u8, base, "Triangle")) {
-                try t.tri(v2s, style);
+                try t.tri(s, style);
             } else if (comptime std.mem.eql(u8, base, "Polygon")) {
-                try t.poly(v2s, style);
+                try t.poly(s, style);
             } else if (comptime std.mem.eql(u8, base, "Line")) {
-                try t.line(v2s, style);
+                try t.line(s, style);
             } else {
                 @compileError("tessellate: unhandled shape base '" ++ base ++ "'");
             }
@@ -384,56 +398,3 @@ pub fn isScreenSpace(shape: ShapeData) bool {
     }
 }
 
-// Reinterpret a shape's point type as V2. WorldPoint IS V2 → identity return.
-// ScreenPoint is a distinct-but-identical {x:f32,y:f32}; rebuild the shape with
-// V2 points. Point fields are copied by name; non-point fields pass through.
-fn toV2Shape(s: anytype) ShapeToV2(@TypeOf(s)) {
-    const Out = ShapeToV2(@TypeOf(s));
-    if (@TypeOf(s) == Out) return s; // world shape: already V2
-    var out: Out = undefined;
-    inline for (@typeInfo(Out).@"struct".fields) |f| {
-        const src = @field(s, f.name);
-        @field(out, f.name) = coerceField(f.type, src);
-    }
-    return out;
-}
-
-// Maps Shapes.X(ScreenPoint) → Shapes.X(V2). If already V2, returns as-is.
-fn ShapeToV2(comptime T: type) type {
-    // The shape generics are Circle(V2)/Circle(ScreenPoint)/… — reconstruct with V2.
-    // We identify the base generic by matching against the known shape fns.
-    inline for (.{
-        .{ Shapes.Circle, "Circle" },
-        .{ Shapes.Ellipse, "Ellipse" },
-        .{ Shapes.Rectangle, "Rectangle" },
-        .{ Shapes.Triangle, "Triangle" },
-        .{ Shapes.Polygon, "Polygon" },
-        .{ Shapes.Line, "Line" },
-    }) |entry| {
-        const gen = entry[0];
-        if (T == gen(math.WorldPoint) or T == gen(math.ScreenPoint)) {
-            return gen(V2);
-        }
-    }
-    @compileError("ShapeToV2: unknown shape type " ++ @typeName(T));
-}
-
-// Field-level coercion between a Screen-typed shape field and its V2 equivalent.
-// ScreenPoint and V2 are layout-identical {x:f32,y:f32}, so a differing field is
-// the same bytes as its V2 counterpart. Same type → pass through; a point value →
-// rebuild; a slice → @ptrCast; an optional slice (Polygon.triangle_cache) → unwrap,
-// @ptrCast, re-wrap (@ptrCast can't see through the optional).
-fn coerceField(comptime FieldT: type, src: anytype) FieldT {
-    const SrcT = @TypeOf(src);
-    if (FieldT == SrcT) return src;
-    // ScreenPoint value → V2 value (the common case: origin/center/v0/…).
-    if (SrcT == math.ScreenPoint and FieldT == V2) return .{ .x = src.x, .y = src.y };
-    // Slice of points (Polygon.points): layout-identical element → reinterpret.
-    if (@typeInfo(FieldT) == .pointer) return @ptrCast(src);
-    // Optional slice (Polygon.triangle_cache: ?[][3]P): unwrap → cast → re-wrap.
-    if (@typeInfo(FieldT) == .optional) {
-        const inner = src orelse return null;
-        return @ptrCast(inner);
-    }
-    @compileError("coerceField: unhandled " ++ @typeName(SrcT) ++ " -> " ++ @typeName(FieldT));
-}

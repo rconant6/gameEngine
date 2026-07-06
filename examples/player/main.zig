@@ -87,6 +87,7 @@ pub fn main(init: std.process.Init) !void {
                     .half_width = 50,
                     .half_height = 50,
                 },
+                .ScreenSpace,
             ),
             .fill_color = Colors.NEON_MAGENTA,
             .stroke_color = Colors.WHITE,

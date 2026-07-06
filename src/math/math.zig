@@ -39,7 +39,11 @@ pub const WorldPoint = V2;
 ///     UI elements, debug info, input coords
 ///     Fixed screen overlays, debug grids
 /// Note: Uses f32 for math consistency. Rasterization converts to int.
-pub const ScreenPoint = @import("ScreenPoint.zig");
+/// ScreenPoint IS V2 (same {x:f32, y:f32}) — the distinction was name-only and
+/// nothing relied on it as a type guard, so it's an alias. This collapses the
+/// World/Screen coercion in tess.zig: shapes over both point types become the
+/// same type, so there's nothing to bridge.
+pub const ScreenPoint = V2;
 
 /// ----   CLIP SPACE  ----
 /// used for internal render pipeline by gpu

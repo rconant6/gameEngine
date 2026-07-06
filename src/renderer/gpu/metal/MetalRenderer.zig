@@ -292,6 +292,11 @@ pub fn drawShape(
 ) void {
     const xf = tess.LocalXform.from(transform);
     const is_screen = tess.isScreenSpace(shape);
+    const px_per_unit =
+        if (is_screen) 1.0 else @as(
+            f32,
+            @floatFromInt(ctx.height),
+        ) / (2.0 * ctx.ortho_size);
     const map = if (is_screen)
         tess.ClipMap.fromScreen(ctx)
     else
@@ -301,8 +306,8 @@ pub fn drawShape(
     // px_per_unit = height / (2 * ortho_size).
     const half = stroke_width / 2.0;
     const hw: f32 = if (is_screen) half else blk: {
-        const fh: f32 = @floatFromInt(ctx.height);
-        const px_per_unit = fh / (2.0 * ctx.ortho_size);
+        // const fh: f32 = @floatFromInt(ctx.height);
+        // const px_per_unit = fh / (2.0 * ctx.ortho_size);
         break :blk half / px_per_unit;
     };
     const style = tess.DrawStyle{
@@ -321,6 +326,7 @@ pub fn drawShape(
         style,
         map,
         hw,
+        px_per_unit,
     ) catch {
         log.err(.renderer, "Failed to tessellate shape {any}", .{@TypeOf(shape)});
     };

@@ -130,6 +130,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
             bounds.width,
             4,
         ),
+        .ScreenSpace,
     );
     ri.renderer.drawGeometry(
         track_shape,
@@ -149,6 +150,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
                 thumb_x - bounds.x,
                 4,
             ),
+            .ScreenSpace,
         );
         ri.renderer.drawGeometry(
             fill_shape,
@@ -168,6 +170,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
             4,
             bounds.height,
         ),
+        .ScreenSpace,
     );
     ri.renderer.drawGeometry(
         thumb_shape,

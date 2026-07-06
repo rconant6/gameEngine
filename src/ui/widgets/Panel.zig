@@ -57,6 +57,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
             bounds.width,
             bounds.height,
         ),
+        .ScreenSpace,
     );
     ri.renderer.drawGeometry(
         bg_shape,

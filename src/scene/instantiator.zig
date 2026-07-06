@@ -469,7 +469,11 @@ pub const Instantiator = struct {
                 }
             }
         }
-        component.geometry = ShapeRegistry.createShapeUnion(ShapeType, shape);
+        // space is comptime for @unionInit, but scene-parsed space is runtime → branch.
+        component.geometry = if (self.in_screen_space)
+            ShapeRegistry.createShapeUnion(ShapeType, shape, .ScreenSpace)
+        else
+            ShapeRegistry.createShapeUnion(ShapeType, shape, .WorldSpace);
 
         return component;
     }
@@ -509,7 +513,8 @@ pub const Instantiator = struct {
             }
         }
         const polygon = try Shapes.Polygon(WorldPoint).init(self.persistent, owned_points);
-        component.geometry = ShapeRegistry.createShapeUnion(Shapes.Polygon(WorldPoint), polygon);
+        // this build path is world-only by construction (Polygon(WorldPoint) hardcoded)
+        component.geometry = ShapeRegistry.createShapeUnion(Shapes.Polygon(WorldPoint), polygon, .WorldSpace);
 
         return component;
     }

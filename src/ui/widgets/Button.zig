@@ -107,6 +107,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
             bounds.width,
             bounds.height,
         ),
+        .ScreenSpace,
     );
     const state = ButtonState{ .bits = self.state orelse {
         log.err(.ui, "Invalid Button State {s}", .{self.id});

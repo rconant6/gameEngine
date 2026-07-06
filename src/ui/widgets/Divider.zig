@@ -43,7 +43,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
         ),
     };
     ri.renderer.drawGeometry(
-        rend.ShapeRegistry.createShapeUnion(ScreenRect, rect),
+        rend.ShapeRegistry.createShapeUnion(ScreenRect, rect, .ScreenSpace),
         null,
         self.color,
         null,
