@@ -24,6 +24,31 @@ comptime {
 const MAX_SEG: usize = seg_buckets[seg_buckets.len - 1];
 const CHORD_GAP_PX: f32 = 0.33; // its subpixel you 'can't see'
 
+const unit_rings: [seg_buckets.len][MAX_SEG]V2 = blk: {
+    var rings: [seg_buckets.len][MAX_SEG]V2 = undefined;
+    for (seg_buckets, 0..) |count, b| {
+        const stepf: f32 = std.math.tau / @as(f32, @floatFromInt(count));
+        for (0..count) |i| {
+            const fi: f32 = @floatFromInt(i);
+            rings[b][i] = .{ .x = @cos(fi * stepf), .y = @sin(fi * stepf) };
+        }
+    }
+
+    break :blk rings;
+};
+
+fn bucketFor(radius_world: f32, px_per_unit: f32) usize {
+    const r_px = radius_world * px_per_unit;
+    if (r_px <= CHORD_GAP_PX) return 0;
+
+    const ideal = @divExact(std.math.pi, std.math.acos(1 - CHORD_GAP_PX / r_px));
+    inline for (seg_buckets, 0..) |count, idx| {
+        if (@as(f32, count) >= ideal) return idx;
+    }
+
+    return seg_buckets.len - 1;
+}
+
 pub const ClipMap = struct {
     scale: [2]f32 = .{0} ** 2,
     offset: [2]f32 = .{0} ** 2,
@@ -184,26 +209,23 @@ fn Tess(comptime V: type, comptime K: type) type {
         fn circle(self: Self, c: Shapes.Circle, style: DrawStyle) !void {
             if (style.fill == null and style.stroke == null) return;
 
-            const num_steps: usize = 32; // update to be better than always 32
-            const stepf: f32 = std.math.tau / @as(f32, @floatFromInt(num_steps));
+            const bucket = bucketFor(c.radius, self.px_per_unit);
+            const num_steps = seg_buckets[bucket];
+            const ring = unit_rings[bucket];
 
-            var pts: [num_steps]V2 = undefined;
+            var pts: [MAX_SEG]V2 = undefined;
             for (0..num_steps) |i| {
-                const fi: f32 = @floatFromInt(i);
-                const pnt: V2 = .{
-                    .x = @cos(fi * stepf),
-                    .y = @sin(fi * stepf),
-                };
-                pts[i] = c.origin.add(pnt.mul(c.radius));
+                pts[i] = c.origin.add(ring[i].mul(c.radius));
             }
+            const perimeter = pts[0..num_steps];
 
             if (style.fill) |fc| {
                 const col = fc.pack();
                 const start = self.batch.mark();
                 for (0..num_steps) |i| {
                     try self.emit(c.origin, col);
-                    try self.emit(pts[i], col);
-                    try self.emit(pts[(i + 1) % num_steps], col);
+                    try self.emit(perimeter[i], col);
+                    try self.emit(perimeter[(i + 1) % num_steps], col);
                 }
                 try self.batch.pushCall(
                     self.tri_key,
@@ -213,30 +235,30 @@ fn Tess(comptime V: type, comptime K: type) type {
             }
 
             if (style.stroke) |_| {
-                try self.strokeRing(&pts, style);
+                try self.strokeRing(perimeter, style);
             }
         }
         fn ellipse(self: Self, e: Shapes.Ellipse, style: DrawStyle) !void {
             if (style.fill == null and style.stroke == null) return;
 
-            const num_steps: usize = 32; // update to be better than always 32
-            const stepf: f32 = std.math.tau / @as(f32, @floatFromInt(num_steps));
+            const bucket = bucketFor(@max(e.semi_major, e.semi_minor), self.px_per_unit);
+            const num_steps = seg_buckets[bucket];
+            const ring = unit_rings[bucket];
 
-            var pts: [num_steps]V2 = undefined;
+            var pts: [MAX_SEG]V2 = undefined;
             for (0..num_steps) |i| {
-                const fi: f32 = @floatFromInt(i);
-                const x_step = e.semi_major * @cos(fi * stepf);
-                const y_step = e.semi_minor * @sin(fi * stepf);
-                pts[i] = e.origin.add(.{ .x = x_step, .y = y_step });
+                const u = ring[i];
+                pts[i] = e.origin.add(.{ .x = u.x * e.semi_major, .y = u.y * e.semi_minor });
             }
+            const perimeter = pts[0..num_steps];
 
             if (style.fill) |fc| {
                 const col = fc.pack();
                 const start = self.batch.mark();
                 for (0..num_steps) |i| {
                     try self.emit(e.origin, col);
-                    try self.emit(pts[i], col);
-                    try self.emit(pts[(i + 1) % num_steps], col);
+                    try self.emit(perimeter[i], col);
+                    try self.emit(perimeter[(i + 1) % num_steps], col);
                 }
                 try self.batch.pushCall(
                     self.tri_key,
@@ -246,7 +268,7 @@ fn Tess(comptime V: type, comptime K: type) type {
             }
 
             if (style.stroke) |_| {
-                try self.strokeRing(&pts, style);
+                try self.strokeRing(perimeter, style);
             }
         }
         fn line(self: Self, l: Shapes.Line, style: DrawStyle) !void {
