@@ -345,6 +345,7 @@ pub const Engine = struct {
             dt,
             self.app.logical_width,
             self.app.logical_height,
+            self.app.scale_factor,
         );
         if (maybe_ctx) |ctx| {
             if (debug_enabled) {

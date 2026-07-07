@@ -27,6 +27,7 @@ pub const App = struct {
     renderer: rend.Renderer,
     logical_width: u32,
     logical_height: u32,
+    scale_factor: f32, // physical / logical, from backingScaleFactor; sourced once at init
 
     pub fn init(
         gpa: std.mem.Allocator,
@@ -87,6 +88,7 @@ pub const App = struct {
             .renderer = renderer,
             .logical_width = window_size.width,
             .logical_height = window_size.height,
+            .scale_factor = scale_factor,
         };
     }
 

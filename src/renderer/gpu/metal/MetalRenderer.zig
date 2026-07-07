@@ -69,7 +69,6 @@ texture_vertex_buffers: [3]*MTLBuffer, // sprite ring
 
 width: u32,
 height: u32,
-scale_factor: f32,
 clear_color: Color,
 frame_number: u64,
 start_time: f64,
@@ -149,7 +148,6 @@ pub fn init(
         .texture_vertex_buffers = texture_vertex_buffers,
         .width = config.width,
         .height = config.height,
-        .scale_factor = 1.0, // need to get from platform?
         .clear_color = Colors.MAGENTA,
         .frame_number = 0,
         .start_time = 0.0,

@@ -5,9 +5,6 @@ const V2 = math.V2;
 const hf = math.utils;
 const tris = @import("triangulation");
 const log = @import("debug").log;
-// NOTE: These need to stay in this order in the file to keep collision working? (maybe)
-// Circle => 0
-// Rectangle => 1
 
 pub const Circle = struct {
     origin: V2,

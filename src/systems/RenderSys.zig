@@ -29,6 +29,7 @@ pub fn run(
     dt: f32,
     logical_width: u32,
     logical_height: u32,
+    scale_factor: f32,
 ) ?RenderContext {
     const camera_loc = world.getComponent(active_camera, Transform) orelse return null;
     const camera = world.getComponent(active_camera, Camera) orelse return null;
@@ -41,7 +42,7 @@ pub fn run(
         .ortho_size = camera.ortho_size,
         .height = renderer.height,
         .width = renderer.width,
-        .scale_factor = 1.0,
+        .scale_factor = scale_factor,
         .time = 0,
     };
 
@@ -53,7 +54,7 @@ pub fn run(
         .ortho_size = camera.ortho_size,
         .height = logical_height,
         .width = logical_width,
-        .scale_factor = 1.0,
+        .scale_factor = scale_factor,
         .time = 0,
     };
 
