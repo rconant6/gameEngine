@@ -284,9 +284,6 @@ pub const Instantiator = struct {
             try self.world.addComponent(entity, Components.OnTimer, component);
             return;
         }
-        // Tag owns its string inline (Tag.init copies), so it can't flow through
-        // buildGenericComponent — that path looks for a `tags` field, which is now
-        // buf/len. Pull the scene's `tags` string out and hand it to Tag.init.
         if (std.mem.eql(u8, comp_name, "Tag")) {
             const props = comp_decl.generic.properties orelse
                 return InstantiatorError.MissingRequiredField;
@@ -402,16 +399,25 @@ pub const Instantiator = struct {
         return component;
     }
 
+    fn shapeOwnsPoints(comptime T: type) bool {
+        return @hasField(T, "points") and
+            @hasDecl(T, "init") and
+            @hasDecl(T, "deinit");
+    }
+
     fn buildSpriteComponent(
         self: *Instantiator,
         comptime ShapeType: type,
         sprite: SpriteBlock,
     ) !Components.Sprite {
-        if (ShapeType == Shapes.Polygon) {
-            return try self.buildPolygonSprite(sprite);
-        }
         var component = std.mem.zeroInit(Components.Sprite, .{});
-        var shape = std.mem.zeroInit(ShapeType, .{});
+
+        const owns_points = comptime shapeOwnsPoints(ShapeType);
+        var raw_points: []const V2 = &.{};
+        var shape: ShapeType = if (comptime owns_points)
+            undefined
+        else
+            std.mem.zeroInit(ShapeType, .{});
 
         // For screen space shapes, geometry should be centered at (0,0)
         // and positioning comes from the entity's UIElement component
@@ -439,8 +445,18 @@ pub const Instantiator = struct {
                 if (!field_found) {
                     inline for (std.meta.fields(ShapeType)) |shape_field| {
                         if (std.mem.eql(u8, shape_field.name, prop.name)) {
-                            // Skip setting center/origin for screen space shapes
-                            // These should always be (0,0) for screen space
+                            if (comptime owns_points) {
+                                if (std.mem.eql(u8, shape_field.name, "points")) {
+                                    raw_points = try self.extractValueForType(
+                                        []const V2,
+                                        prop.value,
+                                    ) orelse return InstantiatorError.InvalidValue;
+                                    field_found = true;
+                                    break;
+                                }
+                                return InstantiatorError.UnknownProperty;
+                            }
+
                             if (is_screen_space and
                                 (std.mem.eql(u8, shape_field.name, "center") or
                                     std.mem.eql(u8, shape_field.name, "origin")))
@@ -467,50 +483,15 @@ pub const Instantiator = struct {
                 }
             }
         }
-        // the entity's authored coordinate space (from a [UIElement] block → screen)
         component.space = if (self.in_screen_space) .screen else .world;
-        component.geometry = ShapeRegistry.createShapeUnion(ShapeType, shape);
 
-        return component;
-    }
-    fn buildPolygonSprite(
-        self: *Instantiator,
-        sprite: SpriteBlock,
-    ) !Components.Sprite {
-        var component = std.mem.zeroInit(Components.Sprite, .{});
-        var owned_points: []const V2 = undefined;
-        defer self.persistent.free(owned_points);
-        if (sprite.properties) |props| {
-            for (props) |prop| {
-                if (std.mem.eql(u8, "points", prop.name)) {
-                    owned_points = try self.extractValueForType(
-                        []const V2,
-                        prop.value,
-                    ) orelse return InstantiatorError.InvalidValue;
-                    continue;
-                }
-                var field_found = false;
-                inline for (std.meta.fields(Components.Sprite)) |field| {
-                    if (std.mem.eql(u8, field.name, prop.name)) {
-                        field_found = true;
-                        const field_value = try self.extractValueForType(
-                            field.type,
-                            prop.value,
-                        );
-                        if (field_value) |val| {
-                            @field(component, field.name) = val;
-                        }
-                        break;
-                    }
-                }
-                if (!field_found) {
-                    return InstantiatorError.UnknownProperty;
-                }
-            }
+        if (comptime owns_points) {
+            defer self.persistent.free(raw_points);
+            const owned = try ShapeType.init(self.persistent, raw_points);
+            component.geometry = ShapeRegistry.createShapeUnion(ShapeType, owned);
+        } else {
+            component.geometry = ShapeRegistry.createShapeUnion(ShapeType, shape);
         }
-        const polygon = try Shapes.Polygon.init(self.persistent, owned_points);
-        // this build path is world-only by construction (Polygon(WorldPoint) hardcoded)
-        component.geometry = ShapeRegistry.createShapeUnion(Shapes.Polygon, polygon);
 
         return component;
     }

@@ -229,7 +229,7 @@ test "TemplateInstantiation: template with polygon sprite" {
     try testing.expect(sprite.?.geometry != null);
 
     switch (sprite.?.geometry.?) {
-        .PolygonWorld => |poly| {
+        .Polygon => |poly| {
             // LargeAsteroid has 5 points (pentagon)
             try testing.expectEqual(@as(usize, 5), poly.points.len);
         },

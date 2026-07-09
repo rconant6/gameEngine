@@ -44,6 +44,7 @@ pub const DrawStyle = struct {
     fill: ?Color = null,
     stroke: ?Color = null,
     stroke_width: f32 = 1.0, // world units world-side, px screen-side
+    opacity: f32 = 1.0,
 };
 
 pub const Transform = struct {

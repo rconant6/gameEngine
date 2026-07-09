@@ -1,0 +1,267 @@
+//! Tessellation coverage — drives the REAL `renderer.tessellate` with a
+//! capturing fake vertex, asserting:
+//!   - vertex COUNT per shape/style (geometry topology), and
+//!   - vertex COLOR (opacity applied at pack time — the private packWithOpacity
+//!     path, observable through the u32 handed to makeVertex).
+//!
+//! These drive the real tessellator, not a stand-in. Each test asserts the
+//! correct expected output for its shape.
+
+const std = @import("std");
+const testing = std.testing;
+const rend = @import("renderer");
+const tessellate = rend.tessellate;
+const Batch = rend.Batch;
+const LocalXform = rend.LocalXform;
+const ClipMap = rend.ClipMap;
+const ShapeData = rend.ShapeData;
+const ShapeRegistry = rend.ShapeRegistry;
+const Shapes = rend.Shapes;
+const DrawStyle = rend.DrawStyle;
+const Color = rend.Color;
+const math = @import("math");
+const V2 = math.V2;
+
+// ---- capturing fake backend vertex/key -------------------------------------
+
+const TestVertex = struct {
+    pos: [2]f32,
+    color: u32,
+};
+
+fn makeTestVertex(pos: [2]f32, color: u32) TestVertex {
+    return .{ .pos = pos, .color = color };
+}
+
+// Single-primitive key; eql required by Batch.pushCall.
+const TestKey = struct {
+    id: u8 = 0,
+    pub fn eql(self: TestKey, other: TestKey) bool {
+        return self.id == other.id;
+    }
+};
+
+const TestBatch = Batch(TestVertex, TestKey);
+
+const identity_xf = LocalXform.from(null); // from(null) → identity
+const identity_map = ClipMap{ .scale = .{ 1, 1 }, .offset = .{ 0, 0 } };
+
+fn tessShape(batch: *TestBatch, shape_data: ShapeData, style: DrawStyle) !void {
+    try tessellate(
+        TestVertex,
+        TestKey,
+        batch,
+        makeTestVertex,
+        .{ .id = 0 },
+        shape_data,
+        identity_xf,
+        style,
+        identity_map,
+        0.1, // hw (stroke half-width)
+        50.0, // px_per_unit (drives bucketFor / segment count)
+    );
+}
+
+fn shape(comptime T: type, value: T) ShapeData {
+    return ShapeRegistry.createShapeUnion(T, value);
+}
+
+// Expected packed color after opacity is applied to `c`'s alpha byte.
+fn expectedPacked(c: Color, opacity: f32) u32 {
+    if (opacity >= 1.0) return c.pack();
+    var rgba = c.rgba;
+    rgba.a = @intFromFloat(@round(@as(f32, @floatFromInt(rgba.a)) * opacity));
+    return rgba.pack();
+}
+
+fn expectAllColor(batch: *const TestBatch, expected: u32) !void {
+    try testing.expect(batch.vertices.items.len > 0);
+    for (batch.vertices.items) |v| {
+        try testing.expectEqual(expected, v.color);
+    }
+}
+
+// ============================================================
+// Geometry: vertex counts (implemented arms)
+// ============================================================
+
+test "NGon fill emits 3 verts per side (fan)" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const hex = shape(Shapes.NGon, .{ .origin = .{ .x = 0, .y = 0 }, .radius = 5, .sides = 6 });
+    try tessShape(&batch, hex, .{ .fill = Color.initRgba(255, 0, 0, 255) });
+
+    try testing.expectEqual(@as(usize, 6 * 3), batch.vertices.items.len);
+}
+
+test "Star fill emits 3 verts per spoke (2*points triangles)" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const star = shape(Shapes.Star, .{
+        .origin = .{ .x = 0, .y = 0 },
+        .outer_radius = 4,
+        .inner_radius = 1.5,
+        .points = 5,
+    });
+    try tessShape(&batch, star, .{ .fill = Color.initRgba(0, 255, 0, 255) });
+
+    try testing.expectEqual(@as(usize, 2 * 5 * 3), batch.vertices.items.len);
+}
+
+test "PolyLine stroke emits 6 verts per open segment (N-1 segments)" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    var pts = [_]V2{
+        .{ .x = 0, .y = 0 },
+        .{ .x = 1, .y = 1 },
+        .{ .x = 2, .y = 0 },
+        .{ .x = 3, .y = 1 },
+    };
+    var pl = try Shapes.PolyLine.init(testing.allocator, &pts);
+    defer pl.deinit();
+
+    try tessShape(&batch, shape(Shapes.PolyLine, pl), .{ .stroke = Color.initRgba(0, 0, 255, 255) });
+
+    // 4 points → 3 open segments → 3 * 6
+    try testing.expectEqual(@as(usize, 3 * 6), batch.vertices.items.len);
+}
+
+test "NGon fill+stroke emits both (fan + closed stroke ring)" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const sides: u32 = 5;
+    const pent = shape(Shapes.NGon, .{ .origin = .{ .x = 0, .y = 0 }, .radius = 3, .sides = sides });
+    try tessShape(&batch, pent, .{
+        .fill = Color.initRgba(255, 255, 0, 255),
+        .stroke = Color.initRgba(255, 255, 255, 255),
+    });
+
+    // fill fan: sides*3 ; closed stroke: sides segments * 6
+    try testing.expectEqual(@as(usize, sides * 3 + sides * 6), batch.vertices.items.len);
+}
+
+test "Rectangle fill emits 6 verts (2 tris)" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const rect = shape(Shapes.Rectangle, Shapes.Rectangle.initFromCenter(.{ .x = 0, .y = 0 }, 4, 2));
+    try tessShape(&batch, rect, .{ .fill = Color.initRgba(10, 20, 30, 255) });
+
+    try testing.expectEqual(@as(usize, 6), batch.vertices.items.len);
+}
+
+test "no-style shape emits nothing" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const circ = shape(Shapes.Circle, .{ .origin = .{ .x = 0, .y = 0 }, .radius = 2 });
+    try tessShape(&batch, circ, .{});
+
+    try testing.expectEqual(@as(usize, 0), batch.vertices.items.len);
+}
+
+// ============================================================
+// Opacity: color applied at pack time (real packWithOpacity path)
+// ============================================================
+
+test "opacity 1.0 leaves fill alpha untouched (fast path)" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const tri = shape(Shapes.Triangle, Shapes.Triangle.init(&.{
+        .{ .x = 0, .y = 0 }, .{ .x = 1, .y = 0 }, .{ .x = 0, .y = 1 },
+    }));
+    const fill = Color.initRgba(200, 100, 50, 200);
+    try tessShape(&batch, tri, .{ .fill = fill, .opacity = 1.0 });
+
+    try expectAllColor(&batch, expectedPacked(fill, 1.0));
+}
+
+test "opacity 0.5 halves the fill alpha, RGB unchanged" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const tri = shape(Shapes.Triangle, Shapes.Triangle.init(&.{
+        .{ .x = 0, .y = 0 }, .{ .x = 1, .y = 0 }, .{ .x = 0, .y = 1 },
+    }));
+    const fill = Color.initRgba(200, 100, 50, 255);
+    try tessShape(&batch, tri, .{ .fill = fill, .opacity = 0.5 });
+
+    try expectAllColor(&batch, expectedPacked(fill, 0.5));
+    // guard against a no-op impl: must differ from the opaque pack
+    try testing.expect(expectedPacked(fill, 0.5) != fill.pack());
+}
+
+test "opacity multiplies an already-translucent color (stacking)" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const tri = shape(Shapes.Triangle, Shapes.Triangle.init(&.{
+        .{ .x = 0, .y = 0 }, .{ .x = 1, .y = 0 }, .{ .x = 0, .y = 1 },
+    }));
+    const fill = Color.initRgba(255, 255, 255, 128); // authored 50% → *0.5 ≈ 64
+    try tessShape(&batch, tri, .{ .fill = fill, .opacity = 0.5 });
+
+    try expectAllColor(&batch, expectedPacked(fill, 0.5));
+}
+
+test "opacity applies to stroke color too" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const hex = shape(Shapes.NGon, .{ .origin = .{ .x = 0, .y = 0 }, .radius = 3, .sides = 6 });
+    const stroke = Color.initRgba(255, 255, 255, 255);
+    try tessShape(&batch, hex, .{ .stroke = stroke, .opacity = 0.5 });
+
+    try expectAllColor(&batch, expectedPacked(stroke, 0.5));
+}
+
+// ============================================================
+// These assert the correct expected output; a shape whose tess isn't
+// implemented fails here, which is the signal.
+// ============================================================
+
+test "Arc wedge (thickness 0) fill emits a fan" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const arc = shape(Shapes.Arc, .{
+        .origin = .{ .x = 0, .y = 0 },
+        .radius = 5,
+        .thickness = 0,
+        .start_angle = 0,
+        .end_angle = std.math.pi, // half sweep
+    });
+    try tessShape(&batch, arc, .{ .fill = Color.initRgba(255, 200, 0, 255) });
+
+    // a filled wedge must emit triangles; exact count depends on segment choice,
+    // but it must be a positive multiple of 3 and non-empty.
+    try testing.expect(batch.vertices.items.len > 0);
+    try testing.expectEqual(@as(usize, 0), batch.vertices.items.len % 3);
+}
+
+test "Capsule fill emits geometry" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const cap = shape(Shapes.Capsule, Shapes.Capsule.init(.{ .x = 0, .y = 0 }, 8, 3));
+    try tessShape(&batch, cap, .{ .fill = Color.initRgba(0, 200, 120, 255) });
+
+    try testing.expect(batch.vertices.items.len > 0);
+    try testing.expectEqual(@as(usize, 0), batch.vertices.items.len % 3);
+}
+
+test "RoundedRect fill emits geometry" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const rr = shape(Shapes.RoundedRect, Shapes.RoundedRect.initFromCenter(.{ .x = 0, .y = 0 }, 6, 4, 1));
+    try tessShape(&batch, rr, .{ .fill = Color.initRgba(60, 130, 255, 255) });
+
+    try testing.expect(batch.vertices.items.len > 0);
+    try testing.expectEqual(@as(usize, 0), batch.vertices.items.len % 3);
+}

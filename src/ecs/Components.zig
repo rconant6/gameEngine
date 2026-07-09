@@ -33,6 +33,7 @@ pub const Sprite = struct {
     geometry: ?ShapeData,
     fill_color: ?Color = null,
     stroke_color: ?Color = null,
+    opacity: f32 = 1.0,
     stroke_width: f32 = 1,
     space: CoordinateSpace = .world,
     visible: bool = true,

@@ -101,6 +101,7 @@
       stroke_color:color #00aa00
       stroke_width:f32 3.0
       visible:bool true
+      opacity:f32 0.5
     [Collider:circle]
       radius:f32 1.5
     [Tag]
@@ -348,6 +349,300 @@
       visible:bool true
     [Tag]
       tags:string "grid"
+
+  // ============================================
+  // NEW SHAPE SHOWCASE  (lower band, x:-28..28  y:-10..-17)
+  // ============================================
+  // New shapes + stroke-width + opacity paths. Row roughly left→right.
+
+  // --- RoundedRect: uniform radius, filled + stroked ---
+  [ShowRoundRect:entity]
+    [Transform]
+      position:vec3 {-26.0, -12.0, 0.0}
+      scale:f32 1.0
+    [Sprite:roundedrect]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 3.0
+      half_height:f32 2.0
+      radius:f32 1.0
+      fill_color:color #4488ff
+      stroke_color:color #ffffff
+      stroke_width:f32 2.0
+      visible:bool true
+    [Tag]
+      tags:string "showcase roundrect"
+
+//  // --- RoundedRect: per-corner radii (asymmetric), fill only ---
+//  [ShowRoundRectAsym:entity]
+//    [Transform]
+//      position:vec3 {-19.0, -12.0, 0.0}
+//      scale:f32 1.0
+//    [Sprite:roundedrect]
+//      center:vec2 {0.0, 0.0}
+//      half_width:f32 2.5
+//      half_height:f32 2.5
+//      radius_tl:f32 2.0
+//      radius_tr:f32 0.0
+//      radius_br:f32 2.0
+//      radius_bl:f32 0.0
+//      fill_color:color #ff8844
+//      visible:bool true
+//    [Tag]
+//      tags:string "showcase roundrect-asym"
+
+  // --- Capsule: horizontal pill (paddle), stroked, half-opacity ---
+  [ShowCapsuleH:entity]
+    [Transform]
+      position:vec3 {-12.0, -12.0, 0.0}
+      scale:f32 1.0
+    [Sprite:capsule]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 3.5
+      half_height:f32 1.2
+      fill_color:color #22cc88
+      stroke_color:color #ffffff
+      stroke_width:f32 2.0
+      visible:bool true
+      opacity:f32 0.5
+    [Tag]
+      tags:string "showcase capsule-h"
+
+  // --- Capsule: vertical pill (implied radius on the short axis) ---
+  [ShowCapsuleV:entity]
+    [Transform]
+      position:vec3 {-6.0, -12.0, 0.0}
+      scale:f32 1.0
+    [Sprite:capsule]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 1.2
+      half_height:f32 3.0
+      fill_color:color #cc4488
+      visible:bool true
+    [Tag]
+      tags:string "showcase capsule-v"
+
+  // --- Arc: filled pie/wedge (thickness 0) ---
+  [ShowArcPie:entity]
+    [Transform]
+      position:vec3 {0.0, -12.0, 0.0}
+      scale:f32 1.0
+    [Sprite:arc]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 2.5
+      thickness:f32 0.0 // put back to 0
+      start_angle:f32 0.0
+      end_angle:f32 2.2
+      fill_color:color #ffcc00
+      stroke_color:color #ffffff
+      stroke_width:f32 1.5
+      visible:bool true
+    [Tag]
+      tags:string "showcase arc-pie"
+
+  // --- Arc: ring segment / donut slice (thickness > 0), e.g. health ring ---
+  [ShowArcRing:entity]
+    [Transform]
+      position:vec3 {6.0, -12.0, 0.0}
+      scale:f32 1.0
+    [Sprite:arc]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 2.8
+      thickness:f32 0.8
+      start_angle:f32 0.5
+      end_angle:f32 5.0
+      fill_color:color #00ddff
+      visible:bool true
+    [Tag]
+      tags:string "showcase arc-ring"
+
+  // --- NGon: hexagon (sides:u32 int-field path), stroked ---
+  [ShowHexagon:entity]
+    [Transform]
+      position:vec3 {13.0, -12.0, 0.0}
+      scale:f32 1.0
+    [Sprite:ngon]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 2.5
+      sides:u32 6
+      fill_color:color #8866ff
+      stroke_color:color #ffffff
+      stroke_width:f32 2.0
+      visible:bool true
+    [Tag]
+      tags:string "showcase ngon-hex"
+
+  // --- NGon: triangle (min sides = 3), oriented via Transform.rotation, thick stroke ---
+  [ShowTriGon:entity]
+    [Transform]
+      position:vec3 {19.0, -12.0, 0.0}
+      rotation:f32 1.57
+      scale:f32 1.0
+    [Sprite:ngon]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 2.5
+      sides:u32 3
+      fill_color:color #ff5566
+      stroke_color:color #ffff00
+      stroke_width:f32 4.0
+      visible:bool true
+    [Tag]
+      tags:string "showcase ngon-tri"
+
+  // --- Star: 5-point, filled + stroked (point-up via Transform.rotation) ---
+  [ShowStar:entity]
+    [Transform]
+      position:vec3 {25.0, -12.0, 0.0}
+      rotation:f32 1.57
+      scale:f32 1.0
+    [Sprite:star]
+      origin:vec2 {0.0, 0.0}
+      outer_radius:f32 2.8
+      inner_radius:f32 1.2
+      points:u32 5
+      fill_color:color #ffdd00
+      stroke_color:color #ffffff
+      stroke_width:f32 1.5
+      visible:bool true
+    [Tag]
+      tags:string "showcase star"
+
+  // --- Star: 8-point spiky (small inner radius), half-opacity ---
+  [ShowStarSpiky:entity]
+    [Transform]
+      position:vec3 {-23.0, -16.5, 0.0}
+      scale:f32 1.0
+    [Sprite:star]
+      origin:vec2 {0.0, 0.0}
+      outer_radius:f32 2.5
+      inner_radius:f32 0.7
+      points:u32 8
+      fill_color:color #ff66cc
+      visible:bool true
+      opacity:f32 0.5
+    [Tag]
+      tags:string "showcase star-spiky"
+
+  // --- Polyline: open path, acts like line (stroke_width + stroke_color) ---
+  [ShowPolyline:entity]
+    [Transform]
+      position:vec3 {-14.0, -16.5, 0.0}
+      scale:f32 1.25
+    [Sprite:polyline]
+      points:vec2[] {{-6.0, 0.0}, {-3.0, 2.0}, {0.0, -1.0}, {3.0, 2.0}, {6.0, 0.0}}
+      stroke_color:color #00ffaa
+      stroke_width:f32 3.0
+      visible:bool true
+    [Tag]
+      tags:string "showcase polyline"
+
+  // --- Polyline: thin zigzag, different color, tests width path ---
+  [ShowPolylineThin:entity]
+    [Transform]
+      position:vec3 {2.0, -16.5, 0.0}
+      scale:f32 1.0
+    [Sprite:polyline]
+      points:vec2[] {{-5.0, -1.0}, {-2.5, 1.5}, {0.0, -1.0}, {2.5, 1.5}, {5.0, -1.0}}
+      stroke_color:color #ff8800
+      stroke_width:f32 1.0
+      visible:bool true
+    [Tag]
+      tags:string "showcase polyline-thin"
+
+  // --- Stroke-width ladder: same circle, increasing stroke_width ---
+  [StrokeLadder1:entity]
+    [Transform]
+      position:vec3 {14.0, -16.5, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.2
+      fill_color:color #222222
+      stroke_color:color #ffffff
+      stroke_width:f32 1.0
+      visible:bool true
+    [Tag]
+      tags:string "showcase stroke-ladder"
+
+  [StrokeLadder2:entity]
+    [Transform]
+      position:vec3 {18.0, -16.5, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.2
+      fill_color:color #222222
+      stroke_color:color #ffffff
+      stroke_width:f32 3.0
+      visible:bool true
+    [Tag]
+      tags:string "showcase stroke-ladder"
+
+  [StrokeLadder3:entity]
+    [Transform]
+      position:vec3 {22.0, -16.5, 0.0}
+      scale:f32 1.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.2
+      fill_color:color #222222
+      stroke_color:color #ffffff
+      stroke_width:f32 6.0
+      visible:bool true
+    [Tag]
+      tags:string "showcase stroke-ladder"
+
+  // --- Opacity ladder: same yellow star, decreasing opacity over dark bg ---
+  [OpacityLadder1:entity]
+    [Transform]
+      position:vec3 {26.0, -16.5, 0.0}
+      scale:f32 1.0
+    [Sprite:ngon]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.3
+      sides:u32 5
+      fill_color:color #ffff00
+      visible:bool true
+      opacity:f32 1.0
+    [Tag]
+      tags:string "showcase opacity-ladder"
+
+  [OpacityLadder2:entity]
+    [Transform]
+      position:vec3 {28.0, -14.0, 0.0}
+      scale:f32 1.0
+    [Sprite:ngon]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.3
+      sides:u32 5
+      fill_color:color #ffff00
+      visible:bool true
+      opacity:f32 0.6
+    [Tag]
+      tags:string "showcase opacity-ladder"
+
+  [OpacityLadder3:entity]
+    [Transform]
+      position:vec3 {28.0, -11.5, 0.0}
+      scale:f32 1.0
+    [Sprite:ngon]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 1.3
+      sides:u32 5
+      fill_color:color #ffff00
+      visible:bool true
+      opacity:f32 0.25
+    [Tag]
+      tags:string "showcase opacity-ladder"
+
+  // Showcase label (world-space text under the row)
+  [ShowcaseLabel:entity]
+    [Transform]
+      position:vec2 {-27.0, -18.5}
+    [Text]
+      text:string "phase 3.1 shapes: roundrect capsule arc ngon star polyline | stroke+opacity ladders"
+      font_name:string "OrbitronFont"
+      text_color:color #cccccc
+      size:f32 0.4
 
   // ============================================
   // SCREEN-SPACE UI ELEMENTS (HUD)

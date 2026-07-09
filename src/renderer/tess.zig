@@ -12,6 +12,7 @@ const rt = @import("render_types.zig");
 const DrawStyle = rt.DrawStyle;
 const RenderContext = rt.RenderContext;
 const Transform = rt.Transform;
+const log = @import("debug").log;
 
 const seg_buckets = [_]u32{ 8, 12, 16, 24, 32, 48, 64, 96 };
 // NOTE: ensure seg_buckets is ascending, will cause unusual display behavior
@@ -144,28 +145,47 @@ fn Tess(comptime V: type, comptime K: type) type {
             try self.batch.vertex(self.makeVertex(clip, color));
         }
 
-        fn stroke(self: Self, edges: []const [2]V2, style: DrawStyle) !void {
-            const sc = style.stroke.?.pack();
+        fn emitSegment(self: Self, p0: V2, p1: V2, pc: u32, hw: f32) !void {
+            const dir = p1.sub(p0).normalize();
+            const norm = dir.perp();
+
+            const a = p0.add(norm.mul(hw));
+            const b = p0.sub(norm.mul(hw));
+            const e = p1.add(norm.mul(hw));
+            const f = p1.sub(norm.mul(hw));
+
+            try self.emit(a, pc);
+            try self.emit(b, pc);
+            try self.emit(e, pc);
+            try self.emit(e, pc);
+            try self.emit(b, pc);
+            try self.emit(f, pc);
+        }
+
+        fn arcSegment(self: Self, radius: f32, sweep: f32) u32 {
+            const bucket = bucketFor(radius, self.px_per_unit);
+            const full_n = seg_buckets[bucket];
+            return @intFromFloat(
+                @max(
+                    2.0,
+                    @ceil(full_n * @abs(sweep) / std.math.tau),
+                ),
+            );
+        }
+
+        fn strokeClosed(self: Self, points: []const V2, style: DrawStyle) !void {
+            if (points.len < 2) return;
+
+            const sc = packWithOpacity(style.stroke.?, style.opacity);
             const hw = self.hw;
             const start = self.batch.mark();
 
-            for (edges) |edge| {
-                const p0 = edge[0];
-                const p1 = edge[1];
+            const n = points.len;
+            for (0..n) |i| {
+                const p0 = points[i];
+                const p1 = points[(i + 1) % n];
 
-                const dir = p1.sub(p0).normalize();
-                const norm = dir.perp();
-                const a = p0.add(norm.mul(hw));
-                const b = p0.sub(norm.mul(hw));
-                const e = p1.add(norm.mul(hw));
-                const f = p1.sub(norm.mul(hw));
-
-                try self.emit(a, sc);
-                try self.emit(b, sc);
-                try self.emit(e, sc);
-                try self.emit(e, sc);
-                try self.emit(b, sc);
-                try self.emit(f, sc);
+                try self.emitSegment(p0, p1, sc, hw);
             }
             try self.batch.pushCall(
                 self.tri_key,
@@ -173,37 +193,52 @@ fn Tess(comptime V: type, comptime K: type) type {
                 self.batch.mark() - start,
             );
         }
-        // NOTE: ring is an OPEN perimeter (first point NOT repeated at the end);
-        // the last edge wraps back to ring[0] via `% n`. One int-mod per edge.
-        fn strokeRing(self: Self, ring: []const V2, style: DrawStyle) !void {
-            const sc = style.stroke.?.pack();
+
+        fn strokeOpen(self: Self, points: []const V2, style: DrawStyle) !void {
+            if (points.len < 2) return;
+
+            const sc = packWithOpacity(style.stroke.?, style.opacity);
             const hw = self.hw;
             const start = self.batch.mark();
 
-            const n = ring.len;
+            const n = points.len - 1;
             for (0..n) |i| {
-                const p0 = ring[i];
-                const p1 = ring[(i + 1) % n];
+                const p0 = points[i];
+                const p1 = points[i + 1];
 
-                const dir = p1.sub(p0).normalize();
-                const norm = dir.perp();
-                const a = p0.add(norm.mul(hw));
-                const b = p0.sub(norm.mul(hw));
-                const e = p1.add(norm.mul(hw));
-                const f = p1.sub(norm.mul(hw));
-
-                try self.emit(a, sc);
-                try self.emit(b, sc);
-                try self.emit(e, sc);
-                try self.emit(e, sc);
-                try self.emit(b, sc);
-                try self.emit(f, sc);
+                try self.emitSegment(p0, p1, sc, hw);
             }
             try self.batch.pushCall(
                 self.tri_key,
                 start,
                 self.batch.mark() - start,
             );
+        }
+
+        fn arcPoints(
+            self: Self,
+            buf: []V2,
+            origin: V2,
+            radius: f32,
+            start: f32,
+            end: f32,
+        ) usize {
+            const sweep = end - start;
+            const bucket = bucketFor(radius, self.px_per_unit);
+            const full_n = seg_buckets[bucket];
+            var n: u32 = @intFromFloat(@max(2.0, @ceil(@as(f32, @floatFromInt(full_n)) * @abs(sweep) / std.math.tau)));
+            n = @min(n, buf.len);
+            const step: f32 = sweep / @as(f32, @floatFromInt((n - 1)));
+            for (0..n) |i| {
+                const fi: f32 = @floatFromInt(i);
+                const point: V2 = .{
+                    .x = @cos(start + fi * step),
+                    .y = @sin(start + fi * step),
+                };
+                buf[i] = origin.add(point.mul(radius));
+            }
+
+            return n;
         }
 
         fn circle(self: Self, c: Shapes.Circle, style: DrawStyle) !void {
@@ -220,7 +255,7 @@ fn Tess(comptime V: type, comptime K: type) type {
             const perimeter = pts[0..num_steps];
 
             if (style.fill) |fc| {
-                const col = fc.pack();
+                const col = packWithOpacity(fc, style.opacity);
                 const start = self.batch.mark();
                 for (0..num_steps) |i| {
                     try self.emit(c.origin, col);
@@ -235,9 +270,10 @@ fn Tess(comptime V: type, comptime K: type) type {
             }
 
             if (style.stroke) |_| {
-                try self.strokeRing(perimeter, style);
+                try self.strokeClosed(perimeter, style);
             }
         }
+
         fn ellipse(self: Self, e: Shapes.Ellipse, style: DrawStyle) !void {
             if (style.fill == null and style.stroke == null) return;
 
@@ -253,7 +289,7 @@ fn Tess(comptime V: type, comptime K: type) type {
             const perimeter = pts[0..num_steps];
 
             if (style.fill) |fc| {
-                const col = fc.pack();
+                const col = packWithOpacity(fc, style.opacity);
                 const start = self.batch.mark();
                 for (0..num_steps) |i| {
                     try self.emit(e.origin, col);
@@ -268,78 +304,214 @@ fn Tess(comptime V: type, comptime K: type) type {
             }
 
             if (style.stroke) |_| {
-                try self.strokeRing(perimeter, style);
+                try self.strokeClosed(perimeter, style);
             }
         }
+        fn arc(self: Self, a: Shapes.Arc, style: DrawStyle) !void {
+            if (style.fill == null and style.stroke == null) return;
+
+            const r_out = a.radius;
+            const r_in = a.radius - a.thickness;
+            const sweep = a.end_angle - a.start_angle;
+            _ = sweep;
+            std.debug.assert(0 <= r_in and r_in <= r_out);
+
+            if (a.thickness == 0) {
+                // draw a wedge
+                var points: [MAX_SEG]V2 = undefined;
+                const points_len = self.arcPoints(
+                    &points,
+                    a.origin,
+                    r_out,
+                    a.start_angle,
+                    a.end_angle,
+                );
+                if (style.fill) |fc| {
+                    const col = packWithOpacity(fc, style.opacity);
+                    const start = self.batch.mark();
+
+                    for (0..points_len - 1) |i| {
+                        try self.emit(a.origin, col);
+                        try self.emit(points[i], col);
+                        try self.emit(points[i + 1], col);
+                    }
+
+                    try self.batch.pushCall(
+                        self.tri_key,
+                        start,
+                        self.batch.mark() - start,
+                    );
+                }
+
+                if (style.stroke) |_| {
+                    // do the outline
+                }
+            } else {
+                // draw the 'thick' arc
+            }
+        }
+
+        fn capsule(self: Self, c: Shapes.Capsule, style: DrawStyle) !void {
+            _ = self;
+            _ = style;
+            _ = c;
+        }
+
         fn line(self: Self, l: Shapes.Line, style: DrawStyle) !void {
             if (style.stroke) |_| {
-                try self.stroke(
-                    &.{.{ l.start, l.end }},
+                try self.strokeOpen(
+                    &.{ l.start, l.end },
                     style,
                 );
             }
         }
+
+        fn polyline(self: Self, l: Shapes.PolyLine, style: DrawStyle) !void {
+            if (style.stroke) |_| {
+                try self.strokeOpen(
+                    l.points,
+                    style,
+                );
+            }
+        }
+
         fn poly(self: Self, p: Shapes.Polygon, style: DrawStyle) !void {
             if (style.fill) |fc| {
                 const cache = p.triangle_cache orelse return error.InvalidPolygon;
-                const c = fc.pack();
+                const col = packWithOpacity(fc, style.opacity);
                 const start = self.batch.mark();
                 for (cache) |t| {
-                    try self.emit(t[0], c);
-                    try self.emit(t[1], c);
-                    try self.emit(t[2], c);
+                    try self.emit(t[0], col);
+                    try self.emit(t[1], col);
+                    try self.emit(t[2], col);
                 }
                 try self.batch.pushCall(self.tri_key, start, self.batch.mark() - start);
             }
             if (style.stroke) |_| {
-                try self.strokeRing(p.points, style);
+                try self.strokeClosed(p.points, style);
             }
         }
+
+        fn nGon(self: Self, g: Shapes.NGon, style: DrawStyle) !void {
+            const n = std.math.clamp(g.sides, 3, MAX_SEG);
+            const step: f32 = std.math.tau / @as(f32, @floatFromInt(g.sides));
+
+            var points: [MAX_SEG]V2 = undefined;
+            for (0..n) |i| {
+                const fi: f32 = @floatFromInt(i);
+                points[i] = g.origin.add(.{
+                    .x = @cos(fi * step),
+                    .y = @sin(fi * step),
+                });
+            }
+
+            if (style.fill) |fc| {
+                const col = packWithOpacity(fc, style.opacity);
+                const start = self.batch.mark();
+
+                for (0..n) |i| {
+                    try self.emit(g.origin, col);
+                    try self.emit(points[i], col);
+                    try self.emit(points[@mod((i + 1), n)], col);
+                }
+
+                try self.batch.pushCall(
+                    self.tri_key,
+                    start,
+                    self.batch.mark() - start,
+                );
+            }
+
+            if (style.stroke) |_| {
+                try self.strokeClosed(points[0..g.sides], style);
+            }
+        }
+
+        fn star(self: Self, s: Shapes.Star, style: DrawStyle) !void {
+            const n = std.math.clamp(s.points, 2, MAX_SEG / 2);
+            const total = 2 * n;
+            const step = std.math.tau / @as(f32, @floatFromInt(total));
+
+            var points: [MAX_SEG]V2 = undefined;
+            for (0..total) |i| {
+                const r = if (i & 1 == 0) s.outer_radius else s.inner_radius;
+                const fi: f32 = @floatFromInt(i);
+                const point = s.origin.add(.{
+                    .x = @cos(fi * step),
+                    .y = @sin(fi * step),
+                });
+                points[i] = point.mul(r);
+            }
+
+            if (style.fill) |fc| {
+                const col = packWithOpacity(fc, style.opacity);
+                const start = self.batch.mark();
+
+                for (0..total) |i| {
+                    try self.emit(s.origin, col);
+                    try self.emit(points[i], col);
+                    try self.emit(points[@mod((i + 1), total)], col);
+                }
+
+                try self.batch.pushCall(
+                    self.tri_key,
+                    start,
+                    self.batch.mark() - start,
+                );
+            }
+
+            if (style.stroke) |_| {
+                try self.strokeClosed(points[0..total], style);
+            }
+        }
+
         fn rect(self: Self, r: Shapes.Rectangle, style: DrawStyle) !void {
             const corners = r.getCorners();
             if (style.fill) |fc| {
-                const c = fc.pack();
+                const col = packWithOpacity(fc, style.opacity);
                 const start = self.batch.mark();
 
-                try self.emit(corners[0], c);
-                try self.emit(corners[1], c);
-                try self.emit(corners[2], c);
-                try self.emit(corners[0], c);
-                try self.emit(corners[2], c);
-                try self.emit(corners[3], c);
+                try self.emit(corners[0], col);
+                try self.emit(corners[1], col);
+                try self.emit(corners[2], col);
+                try self.emit(corners[0], col);
+                try self.emit(corners[2], col);
+                try self.emit(corners[3], col);
 
-                try self.batch.pushCall(self.tri_key, start, self.batch.mark() - start);
+                try self.batch.pushCall(
+                    self.tri_key,
+                    start,
+                    self.batch.mark() - start,
+                );
             }
             if (style.stroke) |_| {
-                try self.stroke(
-                    &.{
-                        .{ corners[0], corners[1] },
-                        .{ corners[1], corners[2] },
-                        .{ corners[2], corners[3] },
-                        .{ corners[3], corners[0] },
-                    },
+                try self.strokeClosed(
+                    &corners,
                     style,
                 );
             }
         }
+
+        fn roundedRect(self: Self, r: Shapes.RoundedRect, style: DrawStyle) !void {
+            _ = self;
+            _ = r;
+            _ = style;
+        }
+
         fn tri(self: Self, t: Shapes.Triangle, style: DrawStyle) !void {
             if (style.fill) |fc| {
-                const c = fc.pack();
+                const col = packWithOpacity(fc, style.opacity);
                 const start = self.batch.mark();
 
-                try self.emit(t.v0, c);
-                try self.emit(t.v1, c);
-                try self.emit(t.v2, c);
+                try self.emit(t.v0, col);
+                try self.emit(t.v1, col);
+                try self.emit(t.v2, col);
 
                 try self.batch.pushCall(self.tri_key, start, self.batch.mark() - start);
             }
             if (style.stroke) |_| {
-                try self.stroke(
-                    &.{
-                        .{ t.v0, t.v1 },
-                        .{ t.v1, t.v2 },
-                        .{ t.v2, t.v0 },
-                    },
+                try self.strokeClosed(
+                    &.{ t.v0, t.v1, t.v2 },
                     style,
                 );
             }
@@ -357,7 +529,7 @@ pub fn tessellate(
     xf: LocalXform,
     style: DrawStyle,
     map: ClipMap,
-    hw: f32, // stroke half-width, already resolved into the shape's space by caller
+    hw: f32,
     px_per_unit: f32,
 ) !void {
     const ts = Tess(V, K){
@@ -371,11 +543,40 @@ pub fn tessellate(
     };
 
     switch (shape) {
+        .Arc => |a| try ts.arc(a, style),
+        .Capsule => |c| try ts.capsule(c, style),
         .Circle => |c| try ts.circle(c, style),
         .Ellipse => |e| try ts.ellipse(e, style),
-        .Rectangle => |r| try ts.rect(r, style),
-        .Triangle => |t| try ts.tri(t, style),
-        .Polygon => |p| try ts.poly(p, style),
         .Line => |l| try ts.line(l, style),
+        .NGon => |n| try ts.nGon(n, style),
+        .PolyLine => |p| try ts.polyline(p, style),
+        .Polygon => |p| try ts.poly(p, style),
+        .Rectangle => |r| try ts.rect(r, style),
+        .RoundedRect => |rr| try ts.roundedRect(rr, style),
+        .Star => |s| try ts.star(s, style),
+        .Triangle => |t| try ts.tri(t, style),
     }
+}
+
+fn arcSecs(radius: f32, sweep: f32, px_per_unit: f32) usize {
+    const bucket = bucketFor(radius, px_per_unit);
+    const full_len = seg_buckets[bucket];
+
+    return @max(2, @ceil(full_len * @abs(sweep) / std.math.tau));
+}
+
+inline fn direction(ang: f32) V2 {
+    return .{
+        .x = @cos(ang),
+        .y = @sin(ang),
+    };
+}
+
+fn packWithOpacity(c: Color, opacity: f32) u32 {
+    if (opacity >= 1.0) return c.pack();
+
+    var rgba = c.rgba;
+    rgba.a = @intFromFloat(@round(@as(f32, rgba.a) * std.math.clamp(opacity, 0, 1)));
+
+    return rgba.pack();
 }

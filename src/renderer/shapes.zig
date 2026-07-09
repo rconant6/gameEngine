@@ -105,6 +105,108 @@ pub const Rectangle = struct {
     }
 };
 
+pub const RoundedRect = struct {
+    center: V2,
+    half_width: f32,
+    half_height: f32,
+    radius: f32,
+
+    pub fn init(
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        radius: f32,
+    ) !@This() {
+        return .{
+            .center = .{ .x = x - w / 2, .y = y - h / 2 },
+            .half_width = w / 2,
+            .half_height = h / 2,
+            .radius = radius,
+        };
+    }
+
+    pub fn initSquare(center: V2, size: f32, radius: f32) @This() {
+        return .{
+            .center = center,
+            .half_width = size * 0.5,
+            .half_height = size * 0.5,
+            .radius = radius,
+        };
+    }
+
+    pub fn initFromCenter(
+        center: V2,
+        width: f32,
+        height: f32,
+        radius: f32,
+    ) @This() {
+        return .{
+            .center = center,
+            .half_width = width * 0.5,
+            .half_height = height * 0.5,
+            .radius = radius,
+        };
+    }
+
+    pub fn initFromTopLeft(
+        top_left: V2,
+        width: f32,
+        height: f32,
+        radius: f32,
+    ) @This() {
+        return .{
+            .center = .{
+                .x = top_left.x + width * 0.5,
+                .y = top_left.y + height * 0.5,
+            },
+            .half_width = width / 2,
+            .half_height = height / 2,
+            .radius = radius,
+        };
+    }
+
+    pub fn getWidth(self: @This()) f32 {
+        return self.half_width * 2;
+    }
+
+    pub fn getHeight(self: @This()) f32 {
+        return self.half_height * 2;
+    }
+
+    pub fn getCorners(self: *const @This()) [4]V2 {
+        const XType = @TypeOf(self.center.x);
+
+        const hw = if (XType == i32) @as(
+            i32,
+            @intFromFloat(self.half_width),
+        ) else self.half_width;
+
+        const hh = if (XType == i32) @as(
+            i32,
+            @intFromFloat(self.half_height),
+        ) else self.half_height;
+
+        const top_left: V2 = .{
+            .x = self.center.x - hw,
+            .y = self.center.y + hh,
+        };
+        const top_right: V2 = .{
+            .x = self.center.x + hw,
+            .y = self.center.y + hh,
+        };
+        const bottom_right: V2 = .{
+            .x = self.center.x + hw,
+            .y = self.center.y - hh,
+        };
+        const bottom_left: V2 = .{
+            .x = self.center.x - hw,
+            .y = self.center.y - hh,
+        };
+        return .{ top_left, top_right, bottom_right, bottom_left };
+    }
+};
+
 pub const Triangle = struct {
     v0: V2,
     v1: V2,
@@ -128,9 +230,39 @@ pub const Triangle = struct {
     }
 };
 
+pub const Arc = struct {
+    origin: V2,
+    radius: f32,
+    thickness: f32, // 0 wedge, >0 ring segment
+    start_angle: f32, // radians
+    end_angle: f32,
+};
+
 pub const Line = struct {
     start: V2,
     end: V2,
+};
+
+pub const PolyLine = struct {
+    gpa: Allocator,
+    points: []const V2,
+
+    pub fn init(
+        gpa: Allocator,
+        points: []const V2,
+    ) !@This() {
+        const owned_points = try gpa.dupe(V2, points);
+        errdefer gpa.free(owned_points);
+
+        return .{
+            .gpa = gpa,
+            .points = owned_points,
+        };
+    }
+
+    pub fn deinit(self: *@This()) void {
+        self.gpa.free(self.points);
+    }
 };
 
 pub const Polygon = struct {
@@ -194,4 +326,39 @@ pub const Ellipse = struct {
     origin: V2,
     semi_minor: f32,
     semi_major: f32,
+};
+
+pub const Capsule = struct {
+    center: V2,
+    half_width: f32,
+    half_height: f32,
+
+    pub fn init(center: V2, w: f32, h: f32) @This() {
+        return .{
+            .center = center,
+            .half_width = w * 0.5,
+            .half_height = h * 0.5,
+        };
+    }
+
+    pub fn getWidth(self: @This()) f32 {
+        return self.half_width * 2;
+    }
+
+    pub fn getHeight(self: @This()) f32 {
+        return self.half_height * 2;
+    }
+};
+
+pub const NGon = struct {
+    origin: V2,
+    radius: f32,
+    sides: u32,
+};
+
+pub const Star = struct {
+    origin: V2,
+    outer_radius: f32,
+    inner_radius: f32,
+    points: u32,
 };

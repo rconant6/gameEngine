@@ -215,6 +215,20 @@ pub fn addAllTests(
             .{ "math", mod(modules, .math) },
             .{ "Action", mod(modules, .action) },
         }, .link_engine = true },
+        .{ .name = "point-ownership-tests", .path = "tests/scene/test_point_ownership.zig", .imports = &.{
+            .{ "scene-format", mod(modules, .scene_format) },
+            .{ "ecs", mod(modules, .ecs) },
+            .{ "scene", mod(modules, .scene) },
+            .{ "assets", mod(modules, .assets) },
+            .{ "math", mod(modules, .math) },
+        }, .link_engine = true },
+        .{ .name = "shape-instantiation-tests", .path = "tests/scene/test_shape_instantiation.zig", .imports = &.{
+            .{ "scene-format", mod(modules, .scene_format) },
+            .{ "ecs", mod(modules, .ecs) },
+            .{ "scene", mod(modules, .scene) },
+            .{ "assets", mod(modules, .assets) },
+            .{ "math", mod(modules, .math) },
+        }, .link_engine = true },
     };
 
     // ========================================
@@ -232,6 +246,10 @@ pub fn addAllTests(
     // ========================================
     const renderer_tests = [_]TestSpec{
         .{ .name = "shapes-tests", .path = "tests/renderer/test_shapes.zig", .imports = &.{
+            .{ "math", mod(modules, .math) },
+            .{ "renderer", mod(modules, .renderer) },
+        }, .link_engine = true },
+        .{ .name = "tessellation-tests", .path = "tests/renderer/test_tessellation.zig", .imports = &.{
             .{ "math", mod(modules, .math) },
             .{ "renderer", mod(modules, .renderer) },
         }, .link_engine = true },

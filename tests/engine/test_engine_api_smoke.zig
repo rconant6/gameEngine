@@ -35,8 +35,6 @@ const api = [_][]const u8{
     "setActiveCameraFollowStiffness", "setActiveCameraFollowDamping",
     // input (EngineInput.zig)
     "isDown", "isPressed", "isReleased", "getAxis", "getAxis2d", "getMouseScrollDelta",
-    // render (EngineRender.zig)
-    "draw",
     // bounds (EngineBounds.zig)
     "getGameWidth", "getGameHeight", "getTopLeft", "getTopRight", "getBottomLeft",
     "getBottomRight", "getCenter", "getLeftEdge", "getRightEdge", "getTopEdge",
