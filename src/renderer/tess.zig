@@ -307,16 +307,20 @@ fn Tess(comptime V: type, comptime K: type) type {
         fn arc(self: Self, a: Shapes.Arc, style: DrawStyle) !void {
             if (style.fill == null and style.stroke == null) return;
 
+            const sweep = a.end_angle - a.start_angle;
+            if (@abs(sweep) >= std.math.tau) {
+                try self.circle(.{
+                    .origin = a.origin,
+                    .radius = a.radius,
+                }, style);
+                return;
+            }
+
+            const r_out = a.radius;
+            const r_in = a.radius - a.thickness;
+            std.debug.assert(0 <= r_in and r_in <= r_out);
+
             if (a.thickness == 0) {
-
-                // doing the wedge path
-                const sweep = a.end_angle - a.start_angle;
-                if (@abs(sweep) >= std.math.tau)
-                    return self.circle(
-                        .{ .origin = a.origin, .radius = a.radius },
-                        style,
-                    );
-
                 var buf: [MAX_SEG + 1]V2 = undefined;
                 buf[0] = a.origin;
                 const seg_len = arcSegs(a.radius, sweep, self.px_per_unit);
@@ -346,7 +350,41 @@ fn Tess(comptime V: type, comptime K: type) type {
                     try self.strokeClosed(perimeter, style);
                 }
             } else {
-                // TODO:  do the donut ring
+                const n = arcSegs(r_out, sweep, self.px_per_unit);
+                var buf: [2 * MAX_SEG]V2 = undefined;
+
+                arcInto(buf[0..], a.origin, r_out, a.start_angle, a.end_angle, n);
+                arcInto(buf[n..], a.origin, r_in, a.end_angle, a.start_angle, n);
+
+                if (style.fill) |fc| {
+                    const col = packWithOpacity(fc, style.opacity);
+                    const start = self.batch.mark();
+
+                    for (0..n - 1) |i| {
+                        const outer0 = buf[i];
+                        const outer1 = buf[i + 1];
+                        const inner0 = buf[2 * n - 1 - i];
+                        const inner1 = buf[2 * n - 2 - i];
+
+                        try self.emit(outer0, col);
+                        try self.emit(inner0, col);
+                        try self.emit(outer1, col);
+
+                        try self.emit(outer1, col);
+                        try self.emit(inner0, col);
+                        try self.emit(inner1, col);
+                    }
+
+                    try self.batch.pushCall(
+                        self.tri_key,
+                        start,
+                        self.batch.mark() - start,
+                    );
+                }
+
+                if (style.stroke) |_| {
+                    try self.strokeClosed(buf[0 .. 2 * n], style);
+                }
             }
         }
 
@@ -412,6 +450,8 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn line(self: Self, l: Shapes.Line, style: DrawStyle) !void {
+            if (style.fill == null and style.stroke == null) return;
+
             if (style.stroke) |_| {
                 try self.strokeOpen(
                     &.{ l.start, l.end },
@@ -421,6 +461,8 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn polyline(self: Self, l: Shapes.PolyLine, style: DrawStyle) !void {
+            if (style.fill == null and style.stroke == null) return;
+
             if (style.stroke) |_| {
                 try self.strokeOpen(
                     l.points,
@@ -430,6 +472,8 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn poly(self: Self, p: Shapes.Polygon, style: DrawStyle) !void {
+            if (style.fill == null and style.stroke == null) return;
+
             if (style.fill) |fc| {
                 const cache = p.triangle_cache orelse return error.InvalidPolygon;
                 const col = packWithOpacity(fc, style.opacity);
@@ -447,6 +491,8 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn nGon(self: Self, g: Shapes.NGon, style: DrawStyle) !void {
+            if (style.fill == null and style.stroke == null) return;
+
             const n = std.math.clamp(g.sides, 3, MAX_SEG);
             const step: f32 = std.math.tau / @as(f32, @floatFromInt(g.sides));
 
@@ -482,18 +528,17 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn star(self: Self, s: Shapes.Star, style: DrawStyle) !void {
+            if (style.fill == null and style.stroke == null) return;
+
             const n = std.math.clamp(s.points, 2, MAX_SEG / 2);
-            const total = 2 * n;
-            const step = std.math.tau / @as(f32, @floatFromInt(total));
+            const w = 2 * n;
+            const step = std.math.tau / @as(f32, @floatFromInt(w));
 
             var points: [MAX_SEG]V2 = undefined;
-            for (0..total) |i| {
+            for (0..w) |i| {
                 const r = if (i & 1 == 0) s.outer_radius else s.inner_radius;
                 const fi: f32 = @floatFromInt(i);
-                const point = s.origin.add(.{
-                    .x = @cos(fi * step),
-                    .y = @sin(fi * step),
-                });
+                const point = s.origin.add(direction(step * fi));
                 points[i] = point.mul(r);
             }
 
@@ -501,10 +546,10 @@ fn Tess(comptime V: type, comptime K: type) type {
                 const col = packWithOpacity(fc, style.opacity);
                 const start = self.batch.mark();
 
-                for (0..total) |i| {
+                for (0..w) |i| {
                     try self.emit(s.origin, col);
                     try self.emit(points[i], col);
-                    try self.emit(points[@mod((i + 1), total)], col);
+                    try self.emit(points[@mod((i + 1), w)], col);
                 }
 
                 try self.batch.pushCall(
@@ -515,11 +560,13 @@ fn Tess(comptime V: type, comptime K: type) type {
             }
 
             if (style.stroke) |_| {
-                try self.strokeClosed(points[0..total], style);
+                try self.strokeClosed(points[0..w], style);
             }
         }
 
         fn rect(self: Self, r: Shapes.Rectangle, style: DrawStyle) !void {
+            if (style.fill == null and style.stroke == null) return;
+
             const corners = r.getCorners();
             if (style.fill) |fc| {
                 const col = packWithOpacity(fc, style.opacity);
@@ -547,29 +594,51 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn roundedRect(self: Self, r: Shapes.RoundedRect, style: DrawStyle) !void {
-            _ = self;
-            _ = r;
-            _ = style;
-            // if no fill and no stroke: return
-            // rad = min(r.radius, r.half_width, r.half_height)
-            // ix = r.half_width - rad
-            // iy = r.half_height - rad
-            // c_TR = r.center.add(.{ .x =  ix, .y =  iy })
-            // c_TL = r.center.add(.{ .x = -ix, .y =  iy })
-            // c_BL = r.center.add(.{ .x = -ix, .y = -iy })
-            // c_BR = r.center.add(.{ .x =  ix, .y = -iy })
-            // n = arcSegs(rad, pi/2, self.px_per_unit)       // each corner 90°, SAME n
+            if (style.fill == null and style.stroke == null) return;
+            const pi: f32 = std.math.pi;
 
-            // var buf: [4*MAX_SEG]V2 = undefined
-            // w = 0                                          // CCW, each corner sweeps its quadrant:
-            // arcInto(buf[w..], c_TR, rad,      0,   pi/2,   n); w += n   // right→top
-            // arcInto(buf[w..], c_TL, rad,   pi/2,   pi,     n); w += n   // top→left
-            // arcInto(buf[w..], c_BL, rad,     pi,   3*pi/2, n); w += n   // left→bottom
-            // arcInto(buf[w..], c_BR, rad, 3*pi/2,   2*pi,   n); w += n   // bottom→right
-            // perimeter = buf[0..w]
+            const rad = @min(r.radius, r.half_width, r.half_height);
+            const ix = r.half_width - rad;
+            const iy = r.half_height - rad;
+            const c_tr = r.center.add(.{ .x = ix, .y = iy });
+            const c_tl = r.center.add(.{ .x = -ix, .y = iy });
+            const c_bl = r.center.add(.{ .x = -ix, .y = -iy });
+            const c_br = r.center.add(.{ .x = ix, .y = -iy });
+            const n = arcSegs(rad, pi / 2.0, self.px_per_unit);
 
-            // if fill:  fan from r.center over perimeter, WRAP
-            // if stroke: self.strokeClosed(perimeter, style)
+            var buf: [4 * MAX_SEG]V2 = undefined;
+            var w: usize = 0;
+            arcInto(buf[w..], c_tr, rad, 0.0, pi / 2.0, n);
+            w += n;
+            arcInto(buf[w..], c_tl, rad, pi / 2.0, pi, n);
+            w += n;
+            arcInto(buf[w..], c_bl, rad, pi, 3.0 * pi / 2.0, n);
+            w += n;
+            arcInto(buf[w..], c_br, rad, 3.0 * pi / 2.0, 2.0 * pi, n);
+            w += n;
+            const perimeter = buf[0..w];
+
+            if (style.fill) |fc| {
+                const col = packWithOpacity(fc, style.opacity);
+                const start = self.batch.mark();
+                for (0..w) |i| {
+                    try self.emit(r.center, col);
+                    try self.emit(perimeter[i], col);
+                    try self.emit(perimeter[(i + 1) % w], col);
+                }
+                try self.batch.pushCall(
+                    self.tri_key,
+                    start,
+                    self.batch.mark() - start,
+                );
+            }
+
+            if (style.stroke) |_| {
+                try self.strokeClosed(
+                    perimeter,
+                    style,
+                );
+            }
         }
 
         fn tri(self: Self, t: Shapes.Triangle, style: DrawStyle) !void {
@@ -632,7 +701,7 @@ pub fn tessellate(
     }
 }
 
-fn arcSegs(radius: f32, sweep: f32, px_per_unit: f32) usize {
+pub fn arcSegs(radius: f32, sweep: f32, px_per_unit: f32) usize {
     const bucket = bucketFor(radius, px_per_unit);
     const full_len = @as(f32, @floatFromInt(seg_buckets[bucket]));
 
@@ -644,7 +713,7 @@ fn arcSegs(radius: f32, sweep: f32, px_per_unit: f32) usize {
     );
 }
 
-fn arcInto(buf: []V2, center: V2, radius: f32, start: f32, end: f32, n: usize) void {
+pub fn arcInto(buf: []V2, center: V2, radius: f32, start: f32, end: f32, n: usize) void {
     const step = (end - start) / @as(f32, @floatFromInt(n - 1));
     for (0..n) |i| {
         const ang = start + @as(f32, @floatFromInt(i)) * step;
@@ -659,7 +728,7 @@ inline fn direction(ang: f32) V2 {
     };
 }
 
-fn packWithOpacity(c: Color, opacity: f32) u32 {
+pub fn packWithOpacity(c: Color, opacity: f32) u32 {
     if (opacity >= 1.0) return c.pack();
 
     var rgba = c.rgba;
