@@ -46,6 +46,21 @@ pub const DrawStyle = struct {
     stroke: ?Color = null,
     stroke_width: f32 = 1.0, // world units world-side, px screen-side
     opacity: f32 = 1.0,
+    gradient: ?Gradient = null,
+
+    // The effective fill color: an explicit `fill`, or (if only a gradient is
+    // set) the gradient's start color as the trigger/fallback. So a gradient
+    // renders even without an explicit fill — no silent no-op. null = no fill.
+    pub fn fillColor(self: DrawStyle) ?Color {
+        return self.fill orelse if (self.gradient) |g| g.start_color else null;
+    }
+};
+
+pub const Gradient = struct {
+    kind: enum { linear, radial },
+    start_color: Color,
+    end_color: Color,
+    angle: f32 = 0, // linear only: axis direction in shape-local space (radians)
 };
 
 pub const Transform = struct {

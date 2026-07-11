@@ -127,6 +127,60 @@ pub const LocalXform = struct {
     }
 };
 
+// Channel-lerp two packed 0xRRGGBBAA colors. t in [0,1].
+fn lerpPacked(a: u32, b: u32, t: f32) u32 {
+    var out: u32 = 0;
+    inline for (.{ 24, 16, 8, 0 }) |shift| {
+        const ca: f32 = @floatFromInt((a >> shift) & 0xFF);
+        const cb: f32 = @floatFromInt((b >> shift) & 0xFF);
+        const c: u32 = @intFromFloat(@round(ca + (cb - ca) * t));
+        out |= c << shift;
+    }
+    return out;
+}
+
+const GradPaint = struct {
+    kind: enum { linear, radial },
+    start: u32, // pre-packed, opacity already applied
+    end: u32,
+    // linear: unit axis dir + projection range [lo, lo+span] along it
+    axis: V2 = .{ .x = 1, .y = 0 },
+    lo: f32 = 0,
+    span: f32 = 1,
+    // radial: center + max radius (perimeter)
+    center: V2 = .{ .x = 0, .y = 0 },
+    radius: f32 = 1,
+};
+
+// Per-vertex color source. Fill hands emit a gradient paint (when set) or flat;
+// stroke always hands flat. Evaluated in LOCAL (post-LocalXform) space so the
+// gradient rotates/scales with the shape.
+const Paint = union(enum) {
+    flat: u32,
+    grad: GradPaint,
+
+    fn at(self: Paint, local_p: V2) u32 {
+        switch (self) {
+            .flat => |f| return f,
+            .grad => |g| {
+                const t = switch (g.kind) {
+                    .linear => std.math.clamp(
+                        (local_p.dot(g.axis) - g.lo) / g.span,
+                        0.0,
+                        1.0,
+                    ),
+                    .radial => std.math.clamp(
+                        local_p.sub(g.center).magnitude() / g.radius,
+                        0.0,
+                        1.0,
+                    ),
+                };
+                return lerpPacked(g.start, g.end, t);
+            },
+        }
+    }
+};
+
 fn Tess(comptime V: type, comptime K: type) type {
     return struct {
         const Self = @This();
@@ -138,14 +192,16 @@ fn Tess(comptime V: type, comptime K: type) type {
         hw: f32,
         px_per_unit: f32,
 
-        fn emit(self: Self, p: V2, color: u32) !void {
+        fn emit(self: Self, p: V2, paint: Paint) !void {
             const local = self.xf.apply(p);
             const clip = self.map.apply(local);
+            // gradient evaluates in LOCAL space so it rotates/scales with the shape
+            const color = paint.at(local);
 
             try self.batch.vertex(self.makeVertex(clip, color));
         }
 
-        fn emitSegment(self: Self, p0: V2, p1: V2, pc: u32, hw: f32) !void {
+        fn emitSegment(self: Self, p0: V2, p1: V2, paint: Paint, hw: f32) !void {
             const dir = p1.sub(p0).normalize();
             const norm = dir.perp();
 
@@ -154,12 +210,12 @@ fn Tess(comptime V: type, comptime K: type) type {
             const e = p1.add(norm.mul(hw));
             const f = p1.sub(norm.mul(hw));
 
-            try self.emit(a, pc);
-            try self.emit(b, pc);
-            try self.emit(e, pc);
-            try self.emit(e, pc);
-            try self.emit(b, pc);
-            try self.emit(f, pc);
+            try self.emit(a, paint);
+            try self.emit(b, paint);
+            try self.emit(e, paint);
+            try self.emit(e, paint);
+            try self.emit(b, paint);
+            try self.emit(f, paint);
         }
 
         fn arcSegment(self: Self, radius: f32, sweep: f32) u32 {
@@ -173,10 +229,46 @@ fn Tess(comptime V: type, comptime K: type) type {
             );
         }
 
+        // Resolve a shape's fill into a Paint. No gradient → flat. Gradient →
+        // radial keys off center/radius directly; linear projects the shape's
+        // extent (center ± radius along the axis) into a [lo, lo+span] range.
+        // center/radius are in the shape's own (pre-transform) space, matching
+        // where emit evaluates the gradient.
+        fn buildFillPaint(_: Self, style: DrawStyle, fc: Color, center: V2, radius: f32) Paint {
+            const g = style.gradient orelse
+                return .{ .flat = packWithOpacity(fc, style.opacity) };
+
+            const start = packWithOpacity(g.start_color, style.opacity);
+            const end = packWithOpacity(g.end_color, style.opacity);
+
+            switch (g.kind) {
+                .radial => return .{ .grad = .{
+                    .kind = .radial,
+                    .start = start,
+                    .end = end,
+                    .center = center,
+                    .radius = @max(radius, 0.0001),
+                } },
+                .linear => {
+                    const axis = direction(g.angle);
+                    // extent along axis: center projection ± radius
+                    const mid = center.dot(axis);
+                    return .{ .grad = .{
+                        .kind = .linear,
+                        .start = start,
+                        .end = end,
+                        .axis = axis,
+                        .lo = mid - radius,
+                        .span = @max(2.0 * radius, 0.0001),
+                    } };
+                },
+            }
+        }
+
         fn strokeClosed(self: Self, points: []const V2, style: DrawStyle) !void {
             if (points.len < 2) return;
 
-            const sc = packWithOpacity(style.stroke.?, style.opacity);
+            const paint = Paint{ .flat = packWithOpacity(style.stroke.?, style.opacity) };
             const hw = self.hw;
             const start = self.batch.mark();
 
@@ -185,7 +277,7 @@ fn Tess(comptime V: type, comptime K: type) type {
                 const p0 = points[i];
                 const p1 = points[(i + 1) % n];
 
-                try self.emitSegment(p0, p1, sc, hw);
+                try self.emitSegment(p0, p1, paint, hw);
             }
             try self.batch.pushCall(
                 self.tri_key,
@@ -197,7 +289,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         fn strokeOpen(self: Self, points: []const V2, style: DrawStyle) !void {
             if (points.len < 2) return;
 
-            const sc = packWithOpacity(style.stroke.?, style.opacity);
+            const paint = Paint{ .flat = packWithOpacity(style.stroke.?, style.opacity) };
             const hw = self.hw;
             const start = self.batch.mark();
 
@@ -206,7 +298,7 @@ fn Tess(comptime V: type, comptime K: type) type {
                 const p0 = points[i];
                 const p1 = points[i + 1];
 
-                try self.emitSegment(p0, p1, sc, hw);
+                try self.emitSegment(p0, p1, paint, hw);
             }
             try self.batch.pushCall(
                 self.tri_key,
@@ -239,7 +331,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn circle(self: Self, c: Shapes.Circle, style: DrawStyle) !void {
-            if (style.fill == null and style.stroke == null) return;
+            if (style.fillColor() == null and style.stroke == null) return;
 
             const bucket = bucketFor(c.radius, self.px_per_unit);
             const num_steps = seg_buckets[bucket];
@@ -251,13 +343,13 @@ fn Tess(comptime V: type, comptime K: type) type {
             }
             const perimeter = pts[0..num_steps];
 
-            if (style.fill) |fc| {
-                const col = packWithOpacity(fc, style.opacity);
+            if (style.fillColor()) |fc| {
+                const paint = self.buildFillPaint(style, fc, c.origin, c.radius);
                 const start = self.batch.mark();
                 for (0..num_steps) |i| {
-                    try self.emit(c.origin, col);
-                    try self.emit(perimeter[i], col);
-                    try self.emit(perimeter[(i + 1) % num_steps], col);
+                    try self.emit(c.origin, paint);
+                    try self.emit(perimeter[i], paint);
+                    try self.emit(perimeter[(i + 1) % num_steps], paint);
                 }
                 try self.batch.pushCall(
                     self.tri_key,
@@ -272,7 +364,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn ellipse(self: Self, e: Shapes.Ellipse, style: DrawStyle) !void {
-            if (style.fill == null and style.stroke == null) return;
+            if (style.fillColor() == null and style.stroke == null) return;
 
             const bucket = bucketFor(@max(e.semi_major, e.semi_minor), self.px_per_unit);
             const num_steps = seg_buckets[bucket];
@@ -285,13 +377,13 @@ fn Tess(comptime V: type, comptime K: type) type {
             }
             const perimeter = pts[0..num_steps];
 
-            if (style.fill) |fc| {
-                const col = packWithOpacity(fc, style.opacity);
+            if (style.fillColor()) |fc| {
+                const paint = self.buildFillPaint(style, fc, e.origin, @max(e.semi_major, e.semi_minor));
                 const start = self.batch.mark();
                 for (0..num_steps) |i| {
-                    try self.emit(e.origin, col);
-                    try self.emit(perimeter[i], col);
-                    try self.emit(perimeter[(i + 1) % num_steps], col);
+                    try self.emit(e.origin, paint);
+                    try self.emit(perimeter[i], paint);
+                    try self.emit(perimeter[(i + 1) % num_steps], paint);
                 }
                 try self.batch.pushCall(
                     self.tri_key,
@@ -305,7 +397,7 @@ fn Tess(comptime V: type, comptime K: type) type {
             }
         }
         fn arc(self: Self, a: Shapes.Arc, style: DrawStyle) !void {
-            if (style.fill == null and style.stroke == null) return;
+            if (style.fillColor() == null and style.stroke == null) return;
 
             const sweep = a.end_angle - a.start_angle;
             if (@abs(sweep) >= std.math.tau) {
@@ -328,14 +420,14 @@ fn Tess(comptime V: type, comptime K: type) type {
                 arcInto(buf[1..len], a.origin, a.radius, a.start_angle, a.end_angle, n);
                 const perimeter = buf[0..len];
 
-                if (style.fill) |fc| {
-                    const col = packWithOpacity(fc, style.opacity);
+                if (style.fillColor()) |fc| {
+                    const paint = self.buildFillPaint(style, fc, a.origin, a.radius);
 
                     const start = self.batch.mark();
                     for (0..n) |i| {
-                        try self.emit(perimeter[0], col);
-                        try self.emit(perimeter[i], col);
-                        try self.emit(perimeter[i + 1], col);
+                        try self.emit(perimeter[0], paint);
+                        try self.emit(perimeter[i], paint);
+                        try self.emit(perimeter[i + 1], paint);
                     }
 
                     try self.batch.pushCall(
@@ -355,8 +447,8 @@ fn Tess(comptime V: type, comptime K: type) type {
                 arcInto(buf[0..], a.origin, r_out, a.start_angle, a.end_angle, n);
                 arcInto(buf[n..], a.origin, r_in, a.end_angle, a.start_angle, n);
 
-                if (style.fill) |fc| {
-                    const col = packWithOpacity(fc, style.opacity);
+                if (style.fillColor()) |fc| {
+                    const paint = self.buildFillPaint(style, fc, a.origin, r_out);
                     const start = self.batch.mark();
 
                     for (0..n - 1) |i| {
@@ -365,13 +457,13 @@ fn Tess(comptime V: type, comptime K: type) type {
                         const inner0 = buf[2 * n - 1 - i];
                         const inner1 = buf[2 * n - 2 - i];
 
-                        try self.emit(outer0, col);
-                        try self.emit(inner0, col);
-                        try self.emit(outer1, col);
+                        try self.emit(outer0, paint);
+                        try self.emit(inner0, paint);
+                        try self.emit(outer1, paint);
 
-                        try self.emit(outer1, col);
-                        try self.emit(inner0, col);
-                        try self.emit(inner1, col);
+                        try self.emit(outer1, paint);
+                        try self.emit(inner0, paint);
+                        try self.emit(inner1, paint);
                     }
 
                     try self.batch.pushCall(
@@ -388,7 +480,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn capsule(self: Self, c: Shapes.Capsule, style: DrawStyle) !void {
-            if (style.fill == null and style.stroke == null) return;
+            if (style.fillColor() == null and style.stroke == null) return;
             const pi: f32 = std.math.pi;
 
             const horizontal = c.half_width >= c.half_height;
@@ -426,14 +518,14 @@ fn Tess(comptime V: type, comptime K: type) type {
             w += n;
             const perimeter = buf[0..w];
 
-            if (style.fill) |fc| {
-                const col = packWithOpacity(fc, style.opacity);
+            if (style.fillColor()) |fc| {
+                const paint = self.buildFillPaint(style, fc, c.center, @max(c.half_width, c.half_height));
 
                 const start = self.batch.mark();
                 for (0..w) |i| {
-                    try self.emit(c.center, col);
-                    try self.emit(perimeter[i], col);
-                    try self.emit(perimeter[@mod((i + 1), w)], col);
+                    try self.emit(c.center, paint);
+                    try self.emit(perimeter[i], paint);
+                    try self.emit(perimeter[@mod((i + 1), w)], paint);
                 }
 
                 try self.batch.pushCall(
@@ -449,7 +541,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn line(self: Self, l: Shapes.Line, style: DrawStyle) !void {
-            if (style.fill == null and style.stroke == null) return;
+            if (style.fillColor() == null and style.stroke == null) return;
 
             if (style.stroke) |_| {
                 try self.strokeOpen(
@@ -460,7 +552,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn polyline(self: Self, l: Shapes.PolyLine, style: DrawStyle) !void {
-            if (style.fill == null and style.stroke == null) return;
+            if (style.fillColor() == null and style.stroke == null) return;
 
             if (style.stroke) |_| {
                 try self.strokeOpen(
@@ -471,16 +563,19 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn poly(self: Self, p: Shapes.Polygon, style: DrawStyle) !void {
-            if (style.fill == null and style.stroke == null) return;
+            if (style.fillColor() == null and style.stroke == null) return;
 
-            if (style.fill) |fc| {
+            if (style.fillColor()) |fc| {
                 const cache = p.triangle_cache orelse return error.InvalidPolygon;
-                const col = packWithOpacity(fc, style.opacity);
+                // radius = farthest point from centroid (for radial/linear extent)
+                var rad: f32 = 0.0001;
+                for (p.points) |pt| rad = @max(rad, pt.sub(p.center).magnitude());
+                const paint = self.buildFillPaint(style, fc, p.center, rad);
                 const start = self.batch.mark();
                 for (cache) |t| {
-                    try self.emit(t[0], col);
-                    try self.emit(t[1], col);
-                    try self.emit(t[2], col);
+                    try self.emit(t[0], paint);
+                    try self.emit(t[1], paint);
+                    try self.emit(t[2], paint);
                 }
                 try self.batch.pushCall(self.tri_key, start, self.batch.mark() - start);
             }
@@ -490,7 +585,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn nGon(self: Self, g: Shapes.NGon, style: DrawStyle) !void {
-            if (style.fill == null and style.stroke == null) return;
+            if (style.fillColor() == null and style.stroke == null) return;
 
             const n = std.math.clamp(g.sides, 3, MAX_SEG);
             const step: f32 = std.math.tau / @as(f32, @floatFromInt(g.sides));
@@ -504,14 +599,14 @@ fn Tess(comptime V: type, comptime K: type) type {
                 });
             }
 
-            if (style.fill) |fc| {
-                const col = packWithOpacity(fc, style.opacity);
+            if (style.fillColor()) |fc| {
+                const paint = self.buildFillPaint(style, fc, g.origin, g.radius);
                 const start = self.batch.mark();
 
                 for (0..n) |i| {
-                    try self.emit(g.origin, col);
-                    try self.emit(points[i], col);
-                    try self.emit(points[@mod((i + 1), n)], col);
+                    try self.emit(g.origin, paint);
+                    try self.emit(points[i], paint);
+                    try self.emit(points[@mod((i + 1), n)], paint);
                 }
 
                 try self.batch.pushCall(
@@ -527,7 +622,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn star(self: Self, s: Shapes.Star, style: DrawStyle) !void {
-            if (style.fill == null and style.stroke == null) return;
+            if (style.fillColor() == null and style.stroke == null) return;
 
             const n = std.math.clamp(s.points, 2, MAX_SEG / 2);
             const w = 2 * n;
@@ -541,14 +636,14 @@ fn Tess(comptime V: type, comptime K: type) type {
                 points[i] = point.mul(r);
             }
 
-            if (style.fill) |fc| {
-                const col = packWithOpacity(fc, style.opacity);
+            if (style.fillColor()) |fc| {
+                const paint = self.buildFillPaint(style, fc, s.origin, s.outer_radius);
                 const start = self.batch.mark();
 
                 for (0..w) |i| {
-                    try self.emit(s.origin, col);
-                    try self.emit(points[i], col);
-                    try self.emit(points[@mod((i + 1), w)], col);
+                    try self.emit(s.origin, paint);
+                    try self.emit(points[i], paint);
+                    try self.emit(points[@mod((i + 1), w)], paint);
                 }
 
                 try self.batch.pushCall(
@@ -564,19 +659,20 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn rect(self: Self, r: Shapes.Rectangle, style: DrawStyle) !void {
-            if (style.fill == null and style.stroke == null) return;
+            if (style.fillColor() == null and style.stroke == null) return;
 
             const corners = r.getCorners();
-            if (style.fill) |fc| {
-                const col = packWithOpacity(fc, style.opacity);
+            if (style.fillColor()) |fc| {
+                const half_diag = (V2{ .x = r.half_width, .y = r.half_height }).magnitude();
+                const paint = self.buildFillPaint(style, fc, r.center, half_diag);
                 const start = self.batch.mark();
 
-                try self.emit(corners[0], col);
-                try self.emit(corners[1], col);
-                try self.emit(corners[2], col);
-                try self.emit(corners[0], col);
-                try self.emit(corners[2], col);
-                try self.emit(corners[3], col);
+                try self.emit(corners[0], paint);
+                try self.emit(corners[1], paint);
+                try self.emit(corners[2], paint);
+                try self.emit(corners[0], paint);
+                try self.emit(corners[2], paint);
+                try self.emit(corners[3], paint);
 
                 try self.batch.pushCall(
                     self.tri_key,
@@ -593,7 +689,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn roundedRect(self: Self, r: Shapes.RoundedRect, style: DrawStyle) !void {
-            if (style.fill == null and style.stroke == null) return;
+            if (style.fillColor() == null and style.stroke == null) return;
             const pi: f32 = std.math.pi;
 
             const rad = @min(r.radius, r.half_width, r.half_height);
@@ -617,13 +713,14 @@ fn Tess(comptime V: type, comptime K: type) type {
             w += n;
             const perimeter = buf[0..w];
 
-            if (style.fill) |fc| {
-                const col = packWithOpacity(fc, style.opacity);
+            if (style.fillColor()) |fc| {
+                const half_diag = (V2{ .x = r.half_width, .y = r.half_height }).magnitude();
+                const paint = self.buildFillPaint(style, fc, r.center, half_diag);
                 const start = self.batch.mark();
                 for (0..w) |i| {
-                    try self.emit(r.center, col);
-                    try self.emit(perimeter[i], col);
-                    try self.emit(perimeter[(i + 1) % w], col);
+                    try self.emit(r.center, paint);
+                    try self.emit(perimeter[i], paint);
+                    try self.emit(perimeter[(i + 1) % w], paint);
                 }
                 try self.batch.pushCall(
                     self.tri_key,
@@ -641,13 +738,16 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn tri(self: Self, t: Shapes.Triangle, style: DrawStyle) !void {
-            if (style.fill) |fc| {
-                const col = packWithOpacity(fc, style.opacity);
+            if (style.fillColor()) |fc| {
+                const centroid = t.v0.add(t.v1).add(t.v2).mul(1.0 / 3.0);
+                var rad: f32 = 0.0001;
+                for ([_]V2{ t.v0, t.v1, t.v2 }) |v| rad = @max(rad, v.sub(centroid).magnitude());
+                const paint = self.buildFillPaint(style, fc, centroid, rad);
                 const start = self.batch.mark();
 
-                try self.emit(t.v0, col);
-                try self.emit(t.v1, col);
-                try self.emit(t.v2, col);
+                try self.emit(t.v0, paint);
+                try self.emit(t.v1, paint);
+                try self.emit(t.v2, paint);
 
                 try self.batch.pushCall(self.tri_key, start, self.batch.mark() - start);
             }

@@ -38,6 +38,8 @@ pub const Line = renderer.Shapes.Line;
 pub const RenderContext = renderer.RenderContext;
 pub const RenderTransform = renderer.Transform;
 pub const ShapeRegistry = renderer.ShapeRegistry;
+pub const DrawStyle = renderer.DrawStyle;
+pub const Gradient = renderer.Gradient;
 
 // MARK: Asset Types
 const assets = @import("assets");

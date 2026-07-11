@@ -321,6 +321,33 @@ pub fn main(init: std.process.Init) !void {
         };
         game.app.renderer.drawTextScreen(font, "test screen", .{ .x = 100, .y = 100 }, 30.0, engine.Colors.WHITE, ctx);
 
+        // Phase 3.4 gradient test — radial circle + linear rect, screen space.
+        game.app.renderer.render(.{
+            .shape = engine.ShapeRegistry.createShapeUnion(
+                engine.Circle,
+                .{ .origin = .{ .x = 300, .y = 200 }, .radius = 80 },
+            ),
+            .style = .{ .gradient = .{ // gradient-only (no explicit fill) now works
+                .kind = .radial,
+                .start_color = engine.Colors.YELLOW,
+                .end_color = engine.Colors.RED,
+            } },
+            .space = .screen,
+        }, ctx);
+        game.app.renderer.render(.{
+            .shape = engine.ShapeRegistry.createShapeUnion(
+                engine.Rectangle,
+                engine.Rectangle.initFromCenter(.{ .x = 550, .y = 200 }, 200, 120),
+            ),
+            .style = .{ .fill = engine.Colors.CYAN, .gradient = .{
+                .kind = .linear,
+                .start_color = engine.Colors.CYAN,
+                .end_color = engine.Colors.MAGENTA,
+                .angle = 0,
+            } },
+            .space = .screen,
+        }, ctx);
+
         game.endFrame();
 
         // if (game.hasErrors()) {

@@ -34,6 +34,7 @@ const Font = text_module.Font;
 const rt = @import("render_types.zig");
 pub const CoordinateSpace = rt.CoordinateSpace;
 pub const DrawStyle = rt.DrawStyle;
+pub const Gradient = rt.Gradient;
 pub const Renderable = rt.Renderable;
 pub const RenderConfig = rt.RendererConfig;
 pub const RenderContext = rt.RenderContext;

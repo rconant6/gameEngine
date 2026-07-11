@@ -18,6 +18,7 @@ const ShapeData = rend.ShapeData;
 const ShapeRegistry = rend.ShapeRegistry;
 const Shapes = rend.Shapes;
 const DrawStyle = rend.DrawStyle;
+const Gradient = rend.Gradient;
 const Color = rend.Color;
 const math = @import("math");
 const V2 = math.V2;
@@ -264,4 +265,146 @@ test "RoundedRect fill emits geometry" {
 
     try testing.expect(batch.vertices.items.len > 0);
     try testing.expectEqual(@as(usize, 0), batch.vertices.items.len % 3);
+}
+
+// ============================================================
+// Gradients — evaluated per-vertex in local space (identity xf/map here, so
+// vertex world coords == shape-local coords). Radial fans put the center vertex
+// at distance 0 (t=0 → start_color) and perimeter at ~radius (t≈1 → end_color).
+// ============================================================
+
+fn hasColor(batch: *const TestBatch, expected: u32) bool {
+    for (batch.vertices.items) |v| {
+        if (v.color == expected) return true;
+    }
+    return false;
+}
+
+test "radial gradient: fan hub is start_color, perimeter reaches end_color" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const start = Color.initRgba(255, 255, 0, 255); // yellow
+    const end = Color.initRgba(255, 0, 0, 255); // red
+    const circ = shape(Shapes.Circle, .{ .origin = .{ .x = 0, .y = 0 }, .radius = 5 });
+    try tessShape(&batch, circ, .{
+        .fill = start,
+        .gradient = .{ .kind = .radial, .start_color = start, .end_color = end },
+    });
+
+    // the fan hub (origin, distance 0 → t=0) is emitted as start_color, exactly.
+    try testing.expect(hasColor(&batch, start.pack()));
+    // perimeter vertices (~radius → t near 1) reach end_color.
+    try testing.expect(hasColor(&batch, end.pack()));
+}
+
+test "gradient-only (no explicit fill) still renders" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const start = Color.initRgba(0, 255, 255, 255);
+    const end = Color.initRgba(255, 0, 255, 255);
+    const circ = shape(Shapes.Circle, .{ .origin = .{ .x = 0, .y = 0 }, .radius = 4 });
+    // NOTE: no .fill set — only .gradient. Must still emit (fillColor() fallback).
+    try tessShape(&batch, circ, .{
+        .gradient = .{ .kind = .radial, .start_color = start, .end_color = end },
+    });
+
+    try testing.expect(batch.vertices.items.len > 0);
+    try testing.expect(hasColor(&batch, start.pack())); // hub = start
+}
+
+test "flat fill unaffected by absent gradient (fast path intact)" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const fill = Color.initRgba(10, 20, 30, 255);
+    const circ = shape(Shapes.Circle, .{ .origin = .{ .x = 0, .y = 0 }, .radius = 3 });
+    try tessShape(&batch, circ, .{ .fill = fill }); // no gradient
+
+    // every vertex is the one flat packed color
+    try expectAllColor(&batch, fill.pack());
+}
+
+test "radial gradient produces MORE than 2 distinct colors (actually lerps)" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const start = Color.initRgba(0, 0, 0, 255);
+    const end = Color.initRgba(255, 255, 255, 255);
+    // ellipse: fan interior points land at varying radii → intermediate t values
+    const ell = shape(Shapes.Ellipse, .{ .origin = .{ .x = 0, .y = 0 }, .semi_minor = 2, .semi_major = 6 });
+    try tessShape(&batch, ell, .{
+        .fill = start,
+        .gradient = .{ .kind = .radial, .start_color = start, .end_color = end },
+    });
+
+    // count distinct colors — a real gradient yields several, a broken/flat one yields 1-2
+    var seen: [64]u32 = undefined;
+    var n: usize = 0;
+    for (batch.vertices.items) |v| {
+        var found = false;
+        for (seen[0..n]) |s| if (s == v.color) {
+            found = true;
+            break;
+        };
+        if (!found and n < seen.len) {
+            seen[n] = v.color;
+            n += 1;
+        }
+    }
+    try testing.expect(n >= 3);
+}
+
+test "linear gradient varies along its axis (directional)" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    // start = cyan (R=0), end = magenta (R=255). Along +x, red should INCREASE.
+    // (The extent uses the shape's bounding radius, so corners land at
+    // intermediate t rather than pure 0/1 — we test the DIRECTION, not exact
+    // endpoints: left-side vertices are more cyan, right-side more magenta.)
+    const start = Color.initRgba(0, 255, 255, 255);
+    const end = Color.initRgba(255, 0, 255, 255);
+    const rect = shape(Shapes.Rectangle, Shapes.Rectangle.initFromCenter(.{ .x = 0, .y = 0 }, 10, 6));
+    try tessShape(&batch, rect, .{
+        .fill = start,
+        .gradient = .{ .kind = .linear, .start_color = start, .end_color = end, .angle = 0 },
+    });
+
+    // find the red channel of the left-most and right-most emitted vertices
+    var left_r: u32 = 999;
+    var right_r: u32 = 999;
+    var min_x: f32 = std.math.inf(f32);
+    var max_x: f32 = -std.math.inf(f32);
+    for (batch.vertices.items) |v| {
+        const r = (v.color >> 24) & 0xFF;
+        if (v.pos[0] < min_x) {
+            min_x = v.pos[0];
+            left_r = r;
+        }
+        if (v.pos[0] > max_x) {
+            max_x = v.pos[0];
+            right_r = r;
+        }
+    }
+    // red rises left→right (cyan→magenta along +x): proves linear directionality
+    try testing.expect(right_r > left_r);
+}
+
+test "gradient endpoints honor opacity" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const start = Color.initRgba(255, 255, 255, 255);
+    const end = Color.initRgba(255, 0, 0, 255);
+    const circ = shape(Shapes.Circle, .{ .origin = .{ .x = 0, .y = 0 }, .radius = 5 });
+    try tessShape(&batch, circ, .{
+        .fill = start,
+        .opacity = 0.5,
+        .gradient = .{ .kind = .radial, .start_color = start, .end_color = end },
+    });
+
+    // hub = start with alpha halved (opacity applied before pack, same as flat)
+    try testing.expect(hasColor(&batch, expectedPacked(start, 0.5)));
 }
