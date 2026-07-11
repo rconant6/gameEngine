@@ -16,6 +16,7 @@ pub const RendererConfig = struct {
     native_handle: ?*anyopaque = null,
     enable_validation: bool = false,
     vsync: bool = true,
+    msaa_samples: u8 = 4,
 };
 
 pub const RenderContext = struct {

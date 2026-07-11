@@ -323,20 +323,19 @@ fn Tess(comptime V: type, comptime K: type) type {
             if (a.thickness == 0) {
                 var buf: [MAX_SEG + 1]V2 = undefined;
                 buf[0] = a.origin;
-                const seg_len = arcSegs(a.radius, sweep, self.px_per_unit);
-
-                arcInto(buf[1..], a.origin, a.radius, a.start_angle, a.end_angle, seg_len);
-                const len = seg_len + 1;
+                const n = arcSegs(a.radius, sweep, self.px_per_unit);
+                const len = n + 1;
+                arcInto(buf[1..len], a.origin, a.radius, a.start_angle, a.end_angle, n);
                 const perimeter = buf[0..len];
 
                 if (style.fill) |fc| {
                     const col = packWithOpacity(fc, style.opacity);
 
                     const start = self.batch.mark();
-                    for (0..len) |i| {
-                        try self.emit(buf[0], col);
-                        try self.emit(buf[i], col);
-                        try self.emit(buf[i + 1], col);
+                    for (0..n) |i| {
+                        try self.emit(perimeter[0], col);
+                        try self.emit(perimeter[i], col);
+                        try self.emit(perimeter[i + 1], col);
                     }
 
                     try self.batch.pushCall(

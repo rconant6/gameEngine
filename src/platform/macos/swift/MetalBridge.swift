@@ -10,7 +10,7 @@
     let inflight: DispatchSemaphore  // init value = maxFramesInFlight (3)
     let maxInFlight: Int
     var msaa: MTLTexture?  // TODO: nil for now
-    var sampleCount: Int = 1
+    var sampleCount: Int = 4
 
     init(device: MTLDevice, queue: MTLCommandQueue, layer: CAMetalLayer, maxInFlight: Int) {
       self.device = device
@@ -34,10 +34,11 @@
   }
 
   // MARK: new wrapping FFI layer functions
-  @_cdecl("metal_frame_context_create")
+    @_cdecl("metal_frame_context_create")
   public func metal_frame_context_create(
     device: OpaquePointer, queue: OpaquePointer,
-    layer: OpaquePointer, maxInFlight: UInt32
+    layer: OpaquePointer, maxInFlight: UInt32,
+        ctx: OpaquePointer,
   ) -> OpaquePointer? {
     let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
     let q = Unmanaged<MTLCommandQueue>.fromOpaque(UnsafeRawPointer(queue)).takeUnretainedValue()
@@ -50,6 +51,33 @@
   @_cdecl("metal_frame_context_destroy")
   public func metal_frame_context_destroy(ctx: OpaquePointer) {
     Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).release()
+  }
+
+  // Create the multisample color texture the render pass resolves from.
+  // sampleCount <= 1 leaves ctx.msaa nil (frame_begin falls back to the drawable,
+  // storeAction .store — i.e. MSAA off). width/height = drawable physical pixels.
+  // NOTE: drawable-sized; a live resize must recreate this (rides with the parked
+  // resize/S6 work — not wired yet).
+  @_cdecl("metal_frame_context_set_msaa")
+  public func metal_frame_context_set_msaa(
+    ctx: OpaquePointer, sampleCount: UInt8, width: UInt32, height: UInt32
+  ) {
+    let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
+    guard sampleCount > 1 else {
+      c.msaa = nil
+      c.sampleCount = 1
+      return
+    }
+    let d = MTLTextureDescriptor()
+    d.textureType = .type2DMultisample
+    d.pixelFormat = .bgra8Unorm  // MUST match the drawable's format
+    d.width = Int(width)
+    d.height = Int(height)
+    d.sampleCount = Int(sampleCount)
+    d.storageMode = .private  // (.memoryless is the TBDR win — follow-up once verified)
+    d.usage = .renderTarget
+    c.msaa = c.device.makeTexture(descriptor: d)
+    c.sampleCount = Int(sampleCount)
   }
   @_cdecl("metal_frame_begin")
   public func metal_frame_begin(
@@ -238,7 +266,7 @@
   @_cdecl("metal_create_render_pipeline_state")
   public func metal_create_render_pipeline_state(
     device: OpaquePointer, vertexFn: OpaquePointer, fragmentFn: OpaquePointer,
-    pixelFormat: UInt64
+    pixelFormat: UInt64, sampleCount: UInt8,
   ) -> OpaquePointer? {
     let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
     let vf = Unmanaged<MTLFunction>.fromOpaque(UnsafeRawPointer(vertexFn)).takeUnretainedValue()
@@ -261,6 +289,7 @@
     pipelineDesc.vertexFunction = vf
     pipelineDesc.fragmentFunction = ff
     pipelineDesc.vertexDescriptor = vertexDesc
+    pipelineDesc.rasterSampleCount = Int(sampleCount)
 
     guard let pf = MTLPixelFormat(rawValue: UInt(pixelFormat)) else { return nil }
     pipelineDesc.colorAttachments[0].pixelFormat = pf
@@ -425,7 +454,8 @@
     device: OpaquePointer,
     vertexFn: OpaquePointer,
     fragmentFn: OpaquePointer,
-    pixelFormat: UInt64
+    pixelFormat: UInt64,
+    sampleCount: UInt8,
   ) -> OpaquePointer? {
     guard let pf = MTLPixelFormat(rawValue: UInt(pixelFormat)) else { return nil }
 
@@ -455,6 +485,7 @@
     pipelineDesc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
     pipelineDesc.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
     pipelineDesc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+    pipelineDesc.rasterSampleCount = Int(sampleCount)
 
     guard let pipeline = try? dev.makeRenderPipelineState(descriptor: pipelineDesc) else {
       return nil

@@ -95,17 +95,21 @@ pub fn init(
     const tex_vertex_fn = try mb.createFunction(library, "texture_vertex_main");
     const tex_fragment_fn = try mb.createFunction(library, "texture_fragment_main");
 
+    // Both pipelines' rasterSampleCount MUST match the render target's sample
+    // count (the MSAA texture below), or Metal throws at draw.
     const pipeline_state = try mb.createRenderPipelineState(
         device,
         vertex_fn,
         fragment_fn,
         MTLPixelFormat.bgra8Unorm,
+        config.msaa_samples,
     );
     const texture_pipeline_state = try mb.createTexturePipelineState(
         device,
         tex_vertex_fn,
         tex_fragment_fn,
         MTLPixelFormat.bgra8Unorm,
+        config.msaa_samples,
     );
 
     // CPU-side batches
@@ -132,6 +136,14 @@ pub fn init(
         queue,
         layer,
         FRAMES_IN_FLIGHT,
+    );
+    // Create the MSAA color texture the render pass resolves from. Sized to the
+    // physical drawable (config.width/height). msaa_samples <= 1 → nil → MSAA off.
+    mb.frameContextSetMsaa(
+        frame_ctx,
+        config.msaa_samples,
+        config.width,
+        config.height,
     );
 
     return Self{

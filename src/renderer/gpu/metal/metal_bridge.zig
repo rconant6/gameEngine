@@ -102,6 +102,7 @@ extern fn metal_create_render_pipeline_state(
     vertex_function: *MTLFunction,
     fragment_function: *MTLFunction,
     pixel_format: u64,
+    sample_count: u8,
 ) ?*MTLRenderPipelineState;
 extern fn metal_command_buffer_commit(buffer: *MTLCommandBuffer) void;
 extern fn metal_command_buffer_present_drawable(
@@ -135,7 +136,18 @@ extern fn metal_create_texture_pipeline_state(
     vertex_function: *MTLFunction,
     fragment_function: *MTLFunction,
     pixel_format: u64,
+    sample_count: u8,
 ) ?*MTLRenderPipelineState;
+
+// Creates the multisample color texture on the frame context (sample_count > 1)
+// and stores sampleCount. No-op-worthy when sample_count <= 1 (caller skips).
+// width/height = drawable's physical pixel size.
+extern fn metal_frame_context_set_msaa(
+    ctx: *MetalFrameContext,
+    sample_count: u8,
+    width: u32,
+    height: u32,
+) void;
 
 // MARK: Zig wrappers for extern functions
 pub const MetalBridge = struct {
@@ -222,12 +234,14 @@ pub const MetalBridge = struct {
         vertex_function: *MTLFunction,
         fragment_function: *MTLFunction,
         pixel_format: MTLPixelFormat,
+        sample_count: u8,
     ) !*MTLRenderPipelineState {
         return metal_create_render_pipeline_state(
             device,
             vertex_function,
             fragment_function,
             @intFromEnum(pixel_format),
+            sample_count,
         ) orelse MTLError.PipelineCreationFailed;
     }
     pub fn setColorAttachment(
@@ -319,12 +333,23 @@ pub const MetalBridge = struct {
         vertex_function: *MTLFunction,
         fragment_function: *MTLFunction,
         pixel_format: MTLPixelFormat,
+        sample_count: u8,
     ) !*MTLRenderPipelineState {
         return metal_create_texture_pipeline_state(
             device,
             vertex_function,
             fragment_function,
             @intFromEnum(pixel_format),
+            sample_count,
         ) orelse MTLError.PipelineCreationFailed;
+    }
+    // Create the MSAA color texture on the context (skips if sample_count <= 1).
+    pub fn frameContextSetMsaa(
+        ctx: *MetalFrameContext,
+        sample_count: u8,
+        width: u32,
+        height: u32,
+    ) void {
+        metal_frame_context_set_msaa(ctx, sample_count, width, height);
     }
 };
