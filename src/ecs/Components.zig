@@ -8,6 +8,7 @@ const ShapeData = registry.ShapeData;
 const rend = @import("renderer");
 const ScreenAnchor = rend.ScreenAnchor;
 const Color = rend.Color;
+const Colors = rend.Colors;
 const Shape = rend.Shape;
 const CoordinateSpace = rend.CoordinateSpace;
 const action = @import("action");
@@ -37,6 +38,7 @@ pub const Sprite = struct {
     stroke_width: f32 = 1,
     space: CoordinateSpace = .world,
     visible: bool = true,
+    tint: Color = Colors.WHITE,
 
     pub fn deinit(self: *Sprite) void {
         if (self.geometry) |*geo| {
@@ -131,6 +133,7 @@ pub const ZxlSprite = struct {
     // asset_name is a borrowed AST slice when scene-instantiated; dupe + own so
     // it survives the scene's lifetime. Code-created leaves it false.
     asset_name_owned: bool = false,
+    tint: Color = Colors.WHITE,
 
     pub fn deinit(self: *ZxlSprite, gpa: std.mem.Allocator) void {
         if (self.asset_name_owned) gpa.free(self.asset_name);

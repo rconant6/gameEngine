@@ -50,6 +50,7 @@ pub const MetalVertex = extern struct {
 pub const MetalTextureVertex = extern struct {
     position: [2]f32, // clip space x,y
     texcoord: [2]f32, // u, v in [0,1]
+    color: [4]f16,
 };
 pub const VertexBufferPool = struct {
     buffers: std.ArrayList(*MTLBuffer),

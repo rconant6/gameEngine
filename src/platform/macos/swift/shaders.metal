@@ -2,7 +2,8 @@
 using namespace metal;
 
 // 8-byte aligned to match Zig LocalXform (6x f32 = 24B, no padding).
-// A float4 here would force 16-byte alignment -> 32B stride -> misreads past index 0.
+// A float4 here would force 16-byte alignment -> 32B stride -> misreads past
+// index 0.
 struct LocalXFrom {
   float2 m0; // m00, m01
   float2 m1; // m10, m11
@@ -45,11 +46,13 @@ fragment float4 fragment_main(VertexOut input [[stage_in]]) {
 struct TextureVertexIn {
   float2 position [[attribute(0)]];
   float2 texcoord [[attribute(1)]];
+  half4 color [[attribute(2)]];
 };
 
 struct TextureVertexOut {
   float4 position [[position]];
   float2 texcoord;
+  half4 color;
 };
 
 vertex TextureVertexOut texture_vertex_main(TextureVertexIn in [[stage_in]]) {
@@ -57,6 +60,7 @@ vertex TextureVertexOut texture_vertex_main(TextureVertexIn in [[stage_in]]) {
 
   out.position = float4(in.position, 0, 1);
   out.texcoord = in.texcoord;
+  out.color = in.color;
 
   return out;
 }
@@ -64,5 +68,7 @@ vertex TextureVertexOut texture_vertex_main(TextureVertexIn in [[stage_in]]) {
 fragment float4 texture_fragment_main(TextureVertexOut input [[stage_in]],
                                       texture2d<float> tex [[texture(0)]]) {
   constexpr sampler s(mag_filter::nearest, min_filter::nearest);
-  return tex.sample(s, input.texcoord);
+  float4 texel = tex.sample(s, input.texcoord);
+
+  return texel * float4(input.color);
 }

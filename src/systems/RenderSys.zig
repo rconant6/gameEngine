@@ -227,6 +227,7 @@ pub fn run(
             ctx,
             zxl_sprite.flip_h,
             zxl_sprite.flip_v,
+            zxl_sprite.tint,
         );
     }
 

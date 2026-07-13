@@ -251,6 +251,7 @@ pub fn drawTextureQuad(
     ctx: RenderContext,
     flip_h: bool,
     flip_v: bool,
+    tint: Color,
 ) void {
     const half_w = width / 2;
     const half_h = height / 2;
@@ -286,7 +287,7 @@ pub fn drawTextureQuad(
         .{ u_tr, v_tr },
         .{ u_bl, v_bl },
         .{ u_br, v_br },
-    }) catch |err| {
+    }, tint.linearOpacity(1.0)) catch |err| {
         log.err(.renderer, "Failed to batch textured sprite {any}", .{err});
     };
 }
@@ -298,17 +299,24 @@ fn addSprite(
     texture: *MTLTexture,
     clip_corners: [4][2]f32, // TL, TR, BL, BR in clip space
     uvs: [4][2]f32, // TL, TR, BL, BR in uv coords
+    color: [4]f32,
 ) !void {
     const start: u32 = self.texture_batch.mark();
+    const c: [4]f16 = .{
+        @floatCast(color[0]),
+        @floatCast(color[1]),
+        @floatCast(color[2]),
+        @floatCast(color[3]),
+    };
     const verts = [6]MetalTextureVertex{
         // TRI 1
-        .{ .position = clip_corners[0], .texcoord = uvs[0] },
-        .{ .position = clip_corners[1], .texcoord = uvs[1] },
-        .{ .position = clip_corners[2], .texcoord = uvs[2] },
+        .{ .position = clip_corners[0], .texcoord = uvs[0], .color = c },
+        .{ .position = clip_corners[1], .texcoord = uvs[1], .color = c },
+        .{ .position = clip_corners[2], .texcoord = uvs[2], .color = c },
         // TRI 2
-        .{ .position = clip_corners[1], .texcoord = uvs[1] },
-        .{ .position = clip_corners[3], .texcoord = uvs[3] },
-        .{ .position = clip_corners[2], .texcoord = uvs[2] },
+        .{ .position = clip_corners[1], .texcoord = uvs[1], .color = c },
+        .{ .position = clip_corners[3], .texcoord = uvs[3], .color = c },
+        .{ .position = clip_corners[2], .texcoord = uvs[2], .color = c },
     };
     for (verts) |v| try self.texture_batch.vertex(v);
     try self.texture_batch.pushCall(.{ .tex = texture }, start, 6);

@@ -489,7 +489,11 @@
     vertexDesc.attributes[1].offset = 8
     vertexDesc.attributes[1].bufferIndex = 0
 
-    vertexDesc.layouts[0].stride = 16
+    vertexDesc.attributes[2].format = .half4
+    vertexDesc.attributes[2].offset = 16
+    vertexDesc.attributes[2].bufferIndex = 0
+
+    vertexDesc.layouts[0].stride = 24
 
     let pipelineDesc = MTLRenderPipelineDescriptor()
     pipelineDesc.vertexFunction = vf

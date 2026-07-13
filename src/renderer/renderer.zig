@@ -136,6 +136,7 @@ pub const Renderer = struct {
         ctx: RenderContext,
         flip_h: bool,
         flip_v: bool,
+        tint: Color,
     ) void {
         self.backend.drawTextureQuad(
             texture,
@@ -146,6 +147,7 @@ pub const Renderer = struct {
             ctx,
             flip_h,
             flip_v,
+            tint,
         );
     }
 

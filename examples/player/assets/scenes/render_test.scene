@@ -44,6 +44,7 @@
     [ZxlSprite]
       asset_name:string "TestSprite"
       pixel_scale:f32 2.0
+      tint:color #ffffff
 
   // Timed-death sprite — appears lower-left, LifetimeSys destroys it after 2s
   [DyingSprite:entity]
