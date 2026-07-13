@@ -28,10 +28,8 @@ pub const Color = struct {
     // Mathy version (where the work happens)
     lin: [4]f32,
 
-    // ---- Rebuild anchors -------------------------------------------------
     // Every constructor and op routes through exactly one of these, so the
     // three views (rgba / hsva / lin) can never drift.
-
     fn fromRgba(rgba: Rgba) Color {
         return .{
             .rgba = rgba,
@@ -74,8 +72,7 @@ pub const Color = struct {
         }).pack();
     }
 
-    // MARK: Constructore
-
+    // MARK: Constructors
     pub fn initRgba(r: u8, g: u8, b: u8, a: u8) Color {
         return fromRgba(.{ .r = r, .g = g, .b = b, .a = a });
     }
@@ -122,15 +119,11 @@ pub const Color = struct {
         }
     }
 
-    /// Alias kept so every existing call site stays green. Today == toSrgbPacked.
     pub fn pack(self: Color) u32 {
         return self.toSrgbPacked();
     }
 
-    // ---- Opacity / packing (absorbed from tess.zig) ---------------------
-
-    /// Pack with a 0..1 opacity multiplier applied to alpha. Replaces the old
-    /// tess.packWithOpacity.
+    // Pack with a 0..1 opacity multiplier applied to alpha
     pub fn withOpacityPacked(self: Color, opacity: f32) u32 {
         if (opacity >= 1.0) return self.toSrgbPacked();
         const a: u8 = @intFromFloat(@round(@as(f32, @floatFromInt(self.rgba.a)) *
@@ -138,8 +131,15 @@ pub const Color = struct {
         return (Rgba{ .r = self.rgba.r, .g = self.rgba.g, .b = self.rgba.b, .a = a }).pack();
     }
 
-    /// Static packed-space lerp for the gradient hot path. NOT linear-correct —
-    /// the deliberate fast path (touches every vertex). Replaces tess.lerpPacked.
+    // Linear rgb with (alpha × opacity) applied, clamped. The float twin of
+    // withOpacityPacked — for the GPU path that carries linear color per vertex.
+    pub fn linearOpacity(self: Color, opacity: f32) [4]f32 {
+        const k = std.math.clamp(opacity, 0, 1);
+        return .{ self.lin[0], self.lin[1], self.lin[2], std.math.clamp(self.lin[3] * k, 0, 1) };
+    }
+
+    // Static packed-space lerp for the gradient hot path. NOT linear-correct —
+    // the deliberate fast path (touches every vertex). Replaces tess.lerpPacked.
     pub fn lerpPackedU32(a: u32, b: u32, t: f32) u32 {
         const ca = Rgba.unpack(a);
         const cb = Rgba.unpack(b);
@@ -152,13 +152,11 @@ pub const Color = struct {
         }).pack();
     }
 
-    // ---- Intent ops (compute in linear, return Color) -------------------
-
-    /// Scale alpha by amount (0 = transparent, 1 = unchanged).
+    // Scale alpha by amount (0 = transparent, 1 = unchanged).
     pub fn fade(self: Color, amount: f32) Color {
         return fromLin(.{ self.lin[0], self.lin[1], self.lin[2], self.lin[3] * amount });
     }
-    /// Toward white in linear space.
+    // Toward white in linear space.
     pub fn lighten(self: Color, amount: f32) Color {
         const k = std.math.clamp(amount, 0, 1);
         return fromLin(.{
@@ -168,7 +166,7 @@ pub const Color = struct {
             self.lin[3],
         });
     }
-    /// Toward black in linear space.
+    // Toward black in linear space.
     pub fn darken(self: Color, amount: f32) Color {
         const k = std.math.clamp(amount, 0, 1);
         return fromLin(.{
@@ -178,16 +176,16 @@ pub const Color = struct {
             self.lin[3],
         });
     }
-    /// Increase saturation. Perceptual knob stays on the HSV cylinder.
+    // Increase saturation. Perceptual knob stays on the HSV cylinder.
     pub fn saturate(self: Color, amount: f32) Color {
         return initHsva(self.hsva.h, std.math.clamp(self.hsva.s + amount, 0, 1), self.hsva.v, self.hsva.a);
     }
-    /// Decrease saturation.
+    // Decrease saturation.
     pub fn desaturate(self: Color, amount: f32) Color {
         return initHsva(self.hsva.h, std.math.clamp(self.hsva.s - amount, 0, 1), self.hsva.v, self.hsva.a);
     }
 
-    /// The one mixer. t in 0..1 from self toward other, interpolated in `space`.
+    // The one mixer. t in 0..1 from self toward other, interpolated in `space`.
     pub fn mix(self: Color, other: Color, t: f32, space: MixSpace) Color {
         const k = std.math.clamp(t, 0, 1);
         switch (space) {
@@ -238,7 +236,7 @@ pub const Color = struct {
         }
     }
 
-    /// Straight-alpha source-over compositing, in linear. `self` over `over`.
+    // Straight-alpha source-over compositing, in linear. `self` over `over`.
     pub fn blend(self: Color, over: Color) Color {
         const sa = self.lin[3];
         const oa = over.lin[3];
@@ -252,7 +250,7 @@ pub const Color = struct {
         });
     }
 
-    /// Componentwise multiply in linear (tint / sprite modulate).
+    // Componentwise multiply in linear (tint / sprite modulate).
     pub fn modulate(self: Color, other: Color) Color {
         return fromLin(.{
             self.lin[0] * other.lin[0],
@@ -262,13 +260,12 @@ pub const Color = struct {
         });
     }
 
-    /// Rotate hue by degrees (absorbed from math.hueShift).
+    // Rotate hue by degrees (absorbed from math.hueShift).
     pub fn hueShift(self: Color, degrees: f32) Color {
         return self.withHue(@mod(self.hsva.h + degrees, 360));
     }
 
     // ---- Harmony (zero-alloc, fixed arrays) -----------------------------
-
     pub fn complementary(self: Color) Color {
         return self.hueShift(180);
     }
@@ -285,19 +282,17 @@ pub const Color = struct {
         return .{ self.hueShift(90), self.hueShift(180), self.hueShift(270) };
     }
 
-    // ---- Queries / relationships ----------------------------------------
-
-    /// Rec. 709 relative luminance on LINEAR rgb.
+    // Rec. 709 relative luminance on LINEAR rgb.
     pub fn luminance(self: Color) f32 {
         return 0.2126 * self.lin[0] + 0.7152 * self.lin[1] + 0.0722 * self.lin[2];
     }
-    /// WCAG contrast ratio, 1..21.
+    // WCAG contrast ratio, 1..21.
     pub fn contrastRatio(self: Color, other: Color) f32 {
         const l1 = @max(self.luminance(), other.luminance());
         const l2 = @min(self.luminance(), other.luminance());
         return (l1 + 0.05) / (l2 + 0.05);
     }
-    /// Perceptual-ish distance (weighted HSV). Absorbed from math.distance, bug-fixed.
+    // Perceptual-ish distance (weighted HSV). Absorbed from math.distance, bug-fixed.
     pub fn distance(self: Color, other: Color) f32 {
         const diff = @abs(self.hsva.h - other.hsva.h);
         const hue_diff = @min(diff, 360 - diff);
@@ -312,8 +307,6 @@ pub const Color = struct {
 
         return @sqrt(dist_sq);
     }
-
-    // ---- With-family (channel replacement) ------------------------------
 
     pub fn withRgb(c: Color, r: u8, g: u8, b: u8) Color {
         return Color.initRgba(r, g, b, c.rgba.a);
@@ -346,8 +339,6 @@ pub const Color = struct {
         return Color.initHsva(c.hsva.h, c.hsva.s, c.hsva.v, a);
     }
 
-    // ---- Classifier accessors -------------------------------------------
-
     pub fn hue(c: Color) Hue {
         return Hue.from(c);
     }
@@ -368,21 +359,21 @@ pub const Color = struct {
 
     // ---- Private impl ----------------------------------------------------
 
-    /// sRGB-encoded [0,1] -> linear-light [0,1]. IEC 61966-2-1 exact piecewise.
+    // sRGB-encoded [0,1] -> linear-light [0,1]. IEC 61966-2-1 exact piecewise.
     fn srgbToLinear(c: f32) f32 {
         return if (c <= 0.04045) c / 12.92 else std.math.pow(f32, (c + 0.055) / 1.055, 2.4);
     }
-    /// linear-light [0,1] -> sRGB-encoded [0,1]. Exact piecewise inverse.
+    // linear-light [0,1] -> sRGB-encoded [0,1]. Exact piecewise inverse.
     fn linearToSrgb(c: f32) f32 {
         return if (c <= 0.0031308) 12.92 * c else 1.055 * std.math.pow(f32, c, 1.0 / 2.4) - 0.055;
     }
 
-    /// Sign-safe cube root (guards NaN if a blend nudges a channel negative).
-    fn cbrt(x: f32) f32 {
+    // Sign-safe cube root (guards NaN if a blend nudges a channel negative).
+    fn cubeRoot(x: f32) f32 {
         return std.math.sign(x) * std.math.pow(f32, @abs(x), 1.0 / 3.0);
     }
 
-    /// linear-light sRGB rgb -> OKLab (L, a, b). Ottosson / CSS Color 4.
+    // linear-light sRGB rgb -> OKLab (L, a, b). Ottosson / CSS Color 4.
     fn linearToOklab(rgb: [3]f32) [3]f32 {
         const r = rgb[0];
         const g = rgb[1];
@@ -392,9 +383,9 @@ pub const Color = struct {
         const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * bl;
         const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * bl;
 
-        const l_ = cbrt(l);
-        const m_ = cbrt(m);
-        const s_ = cbrt(s);
+        const l_ = cubeRoot(l);
+        const m_ = cubeRoot(m);
+        const s_ = cubeRoot(s);
 
         return .{
             0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
@@ -403,7 +394,7 @@ pub const Color = struct {
         };
     }
 
-    /// OKLab (L, a, b) -> linear-light sRGB rgb. Inverse of linearToOklab.
+    // OKLab (L, a, b) -> linear-light sRGB rgb. Inverse of linearToOklab.
     fn oklabToLinear(lab: [3]f32) [3]f32 {
         const L = lab[0];
         const a = lab[1];

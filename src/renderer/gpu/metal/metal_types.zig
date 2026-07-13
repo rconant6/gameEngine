@@ -43,7 +43,9 @@ pub const MetalError = error{
 
 pub const MetalVertex = extern struct {
     position: [2]f32, // x, y, in clip space [-1, 1]
-    color: u32, // packed unorm4x8
+    color: [4]f16, // LINEAR rgba, half precision (HW encodes to sRGB on write)
+    xform_index: u16,
+    _pad: u16 = 0,
 };
 pub const MetalTextureVertex = extern struct {
     position: [2]f32, // clip space x,y
@@ -84,6 +86,7 @@ pub const MTLResourceOptions = enum(u32) {
 pub const MTLPixelFormat = enum(u64) {
     invalid = 0,
     bgra8Unorm = 80,
+    bgra8Unorm_sRGB = 81, // sRGB twin of 80: HW encodes linear->sRGB on write
     rgba8Unorm = 70,
     rgba16Float = 115,
     rgba32Float = 125,
@@ -106,12 +109,14 @@ pub const MTLPrimitiveType = enum(u64) {
     triangleStrip = 4,
 };
 
-// --- Batch draw-call keys + vertex builder (Q1 unpack lives here) ---
+pub const Space = enum(u8) { world, screen };
 // Grouping keys for Batch(V, K).pushCall merge logic.
 pub const GeomKey = struct {
     prim: MTLPrimitiveType,
+    space: Space,
+
     pub fn eql(a: GeomKey, b: GeomKey) bool {
-        return a.prim == b.prim;
+        return a.prim == b.prim and a.space == b.space;
     }
 };
 pub const TexKey = struct {
@@ -121,8 +126,17 @@ pub const TexKey = struct {
     }
 };
 
-pub fn makeVertex(pos: [2]f32, color: u32) MetalVertex {
-    return .{ .position = pos, .color = @byteSwap(color) };
+pub fn makeVertex(pos: [2]f32, color: [4]f32, xform_index: u16) MetalVertex {
+    return .{
+        .position = pos,
+        .color = .{
+            @floatCast(color[0]),
+            @floatCast(color[1]),
+            @floatCast(color[2]),
+            @floatCast(color[3]),
+        },
+        .xform_index = xform_index,
+    };
 }
 
 pub const PipelineConfig = struct {
@@ -143,16 +157,13 @@ pub const ClearColor = struct {
     a: f64,
 
     pub fn fromColor(c: Color) ClearColor {
-        const rf: f64 = @floatFromInt(c.rgba.r);
-        const gf: f64 = @floatFromInt(c.rgba.g);
-        const bf: f64 = @floatFromInt(c.rgba.b);
-        const af: f64 = @floatFromInt(c.rgba.a);
-
+        // LINEAR: the .bgra8Unorm_sRGB attachment encodes linear->sRGB on write,
+        // so the clear value must be linear too (same funnel as the vertices).
         return .{
-            .r = rf / 255.0,
-            .g = gf / 255.0,
-            .b = bf / 255.0,
-            .a = af / 255.0,
+            .r = c.lin[0],
+            .g = c.lin[1],
+            .b = c.lin[2],
+            .a = c.lin[3],
         };
     }
 };

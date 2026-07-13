@@ -149,6 +149,13 @@ extern fn metal_frame_context_set_msaa(
     height: u32,
 ) void;
 
+extern fn metal_render_encoder_set_vertex_bytes(
+    encoder: *MTLRenderCommandEncoder,
+    bytes: *const anyopaque,
+    length: u64,
+    index: u64,
+) void;
+
 // MARK: Zig wrappers for extern functions
 pub const MetalBridge = struct {
     pub fn frameContextCreate(
@@ -351,5 +358,13 @@ pub const MetalBridge = struct {
         height: u32,
     ) void {
         metal_frame_context_set_msaa(ctx, sample_count, width, height);
+    }
+    pub fn setVertexBytes(
+        encoder: *MTLRenderCommandEncoder,
+        bytes: *const anyopaque,
+        length: u64,
+        index: u46,
+    ) void {
+        metal_render_encoder_set_vertex_bytes(encoder, bytes, length, index);
     }
 };

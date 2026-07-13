@@ -34,11 +34,11 @@
   }
 
   // MARK: new wrapping FFI layer functions
-    @_cdecl("metal_frame_context_create")
+  @_cdecl("metal_frame_context_create")
   public func metal_frame_context_create(
     device: OpaquePointer, queue: OpaquePointer,
     layer: OpaquePointer, maxInFlight: UInt32,
-        ctx: OpaquePointer,
+    ctx: OpaquePointer,
   ) -> OpaquePointer? {
     let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
     let q = Unmanaged<MTLCommandQueue>.fromOpaque(UnsafeRawPointer(queue)).takeUnretainedValue()
@@ -70,11 +70,11 @@
     }
     let d = MTLTextureDescriptor()
     d.textureType = .type2DMultisample
-    d.pixelFormat = .bgra8Unorm  // MUST match the drawable's format
+    d.pixelFormat = .bgra8Unorm_srgb  // MUST match the drawable's format
     d.width = Int(width)
     d.height = Int(height)
     d.sampleCount = Int(sampleCount)
-    d.storageMode = .private  // (.memoryless is the TBDR win — follow-up once verified)
+    d.storageMode = .memoryless
     d.usage = .renderTarget
     c.msaa = c.device.makeTexture(descriptor: d)
     c.sampleCount = Int(sampleCount)
@@ -278,11 +278,15 @@
     vertexDesc.attributes[0].offset = 0
     vertexDesc.attributes[0].bufferIndex = 0
 
-    vertexDesc.attributes[1].format = .uchar4Normalized
+    vertexDesc.attributes[1].format = .half4
     vertexDesc.attributes[1].offset = 8
     vertexDesc.attributes[1].bufferIndex = 0
 
-    vertexDesc.layouts[0].stride = 12
+    vertexDesc.attributes[2].format = .ushort
+    vertexDesc.attributes[2].offset = 16
+    vertexDesc.attributes[2].bufferIndex = 0
+
+    vertexDesc.layouts[0].stride = 20
     vertexDesc.layouts[0].stepFunction = .perVertex
 
     let pipelineDesc = MTLRenderPipelineDescriptor()
@@ -399,6 +403,18 @@
     let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
       .takeUnretainedValue()
     enc.endEncoding()
+  }
+
+  @_cdecl("metal_render_encoder_set_vertex_bytes")
+  public func metal_render_encoder_set_vertex_bytes(
+    encoder: OpaquePointer,
+    bytes: UnsafeRawPointer,
+    length: UInt64,
+    index: UInt64,
+  ) {
+    let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
+      .takeUnretainedValue()
+    enc.setVertexBytes(bytes, length: Int(length), index: Int(index))
   }
 
   @_cdecl("metal_create_texture")

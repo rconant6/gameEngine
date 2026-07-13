@@ -87,8 +87,12 @@ public func get_window_size(
     height.pointee = 0
     return
   }
-  width.pointee = Int32(gameWindow.frame.width)
-  height.pointee = Int32(gameWindow.frame.height)
+  // Content area only — excludes the title bar. Metal renders into the content
+  // view, so screen-space UI must be sized/anchored against THIS, not frame.height
+  // (which includes the ~28px title bar and would shift the whole HUD down).
+  let content = gameWindow.contentLayoutRect
+  width.pointee = Int32(content.width)
+  height.pointee = Int32(content.height)
 }
 // TODO: This is not the right place to do this work?
 @MainActor

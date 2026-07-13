@@ -51,7 +51,7 @@ class GameWindow: NSWindow {
       metalLayer.device = metalView.device
     }
 
-    metalLayer.pixelFormat = .bgra8Unorm
+    metalLayer.pixelFormat = .bgra8Unorm_srgb
 
     let scale = self.backingScaleFactor
     metalLayer.drawableSize = CGSize(

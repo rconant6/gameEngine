@@ -12,8 +12,6 @@ const testing = std.testing;
 const rend = @import("renderer");
 const tessellate = rend.tessellate;
 const Batch = rend.Batch;
-const LocalXform = rend.LocalXform;
-const ClipMap = rend.ClipMap;
 const ShapeData = rend.ShapeData;
 const ShapeRegistry = rend.ShapeRegistry;
 const Shapes = rend.Shapes;
@@ -27,11 +25,23 @@ const V2 = math.V2;
 
 const TestVertex = struct {
     pos: [2]f32,
-    color: u32,
+    color: u32, // linear rgba packed RRGGBBAA (test-side storage for byte assertions)
 };
 
-fn makeTestVertex(pos: [2]f32, color: u32) TestVertex {
-    return .{ .pos = pos, .color = color };
+// Pack the tessellator's linear [4]f32 color into RRGGBBAA bytes so the byte-level
+// assertions below (channel extraction, exact match) keep working on the new seam.
+fn packLinear(c: [4]f32) u32 {
+    const b = struct {
+        fn q(x: f32) u32 {
+            return @intFromFloat(@round(std.math.clamp(x, 0, 1) * 255.0));
+        }
+    };
+    return (b.q(c[0]) << 24) | (b.q(c[1]) << 16) | (b.q(c[2]) << 8) | b.q(c[3]);
+}
+
+fn makeTestVertex(pos: [2]f32, color: [4]f32, xform_index: u16) TestVertex {
+    _ = xform_index; // tests assert on pos/color only; transform is applied GPU-side
+    return .{ .pos = pos, .color = packLinear(color) };
 }
 
 // Single-primitive key; eql required by Batch.pushCall.
@@ -44,9 +54,6 @@ const TestKey = struct {
 
 const TestBatch = Batch(TestVertex, TestKey);
 
-const identity_xf = LocalXform.from(null); // from(null) → identity
-const identity_map = ClipMap{ .scale = .{ 1, 1 }, .offset = .{ 0, 0 } };
-
 fn tessShape(batch: *TestBatch, shape_data: ShapeData, style: DrawStyle) !void {
     try tessellate(
         TestVertex,
@@ -55,9 +62,8 @@ fn tessShape(batch: *TestBatch, shape_data: ShapeData, style: DrawStyle) !void {
         makeTestVertex,
         .{ .id = 0 },
         shape_data,
-        identity_xf,
+        0, // xform_index (identity slot; transform is applied GPU-side now)
         style,
-        identity_map,
         0.1, // hw (stroke half-width)
         50.0, // px_per_unit (drives bucketFor / segment count)
     );
@@ -67,12 +73,10 @@ fn shape(comptime T: type, value: T) ShapeData {
     return ShapeRegistry.createShapeUnion(T, value);
 }
 
-// Expected packed color after opacity is applied to `c`'s alpha byte.
+// Expected packed color after opacity is applied — matches the linear seam the
+// tessellator now emits (linear rgb + alpha×opacity, packed the same as makeTestVertex).
 fn expectedPacked(c: Color, opacity: f32) u32 {
-    if (opacity >= 1.0) return c.pack();
-    var rgba = c.rgba;
-    rgba.a = @intFromFloat(@round(@as(f32, @floatFromInt(rgba.a)) * opacity));
-    return rgba.pack();
+    return packLinear(c.linearOpacity(opacity));
 }
 
 fn expectAllColor(batch: *const TestBatch, expected: u32) !void {
@@ -293,9 +297,9 @@ test "radial gradient: fan hub is start_color, perimeter reaches end_color" {
     });
 
     // the fan hub (origin, distance 0 → t=0) is emitted as start_color, exactly.
-    try testing.expect(hasColor(&batch, start.pack()));
+    try testing.expect(hasColor(&batch, expectedPacked(start, 1.0)));
     // perimeter vertices (~radius → t near 1) reach end_color.
-    try testing.expect(hasColor(&batch, end.pack()));
+    try testing.expect(hasColor(&batch, expectedPacked(end, 1.0)));
 }
 
 test "gradient-only (no explicit fill) still renders" {
@@ -311,7 +315,7 @@ test "gradient-only (no explicit fill) still renders" {
     });
 
     try testing.expect(batch.vertices.items.len > 0);
-    try testing.expect(hasColor(&batch, start.pack())); // hub = start
+    try testing.expect(hasColor(&batch, expectedPacked(start, 1.0))); // hub = start
 }
 
 test "flat fill unaffected by absent gradient (fast path intact)" {
@@ -323,7 +327,7 @@ test "flat fill unaffected by absent gradient (fast path intact)" {
     try tessShape(&batch, circ, .{ .fill = fill }); // no gradient
 
     // every vertex is the one flat packed color
-    try expectAllColor(&batch, fill.pack());
+    try expectAllColor(&batch, expectedPacked(fill, 1.0));
 }
 
 test "radial gradient produces MORE than 2 distinct colors (actually lerps)" {

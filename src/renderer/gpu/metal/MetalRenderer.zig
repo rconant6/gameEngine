@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
 const math = @import("math");
 const WorldPoint = math.WorldPoint;
 const bridge = @import("metal_bridge.zig");
@@ -47,6 +48,7 @@ const Self = @This();
 const SLOT_BYTES: usize = 2 * 1024 * 1024;
 const TEX_SLOT_BYTES: usize = 512 * 1024;
 const FRAMES_IN_FLIGHT: usize = 3;
+const XFORM_SLOT_BYTES: usize = 1024 * 1024;
 
 pub const Texture = MTLTexture;
 pub const Device = MTLDevice;
@@ -54,6 +56,8 @@ pub const Device = MTLDevice;
 device: *MTLDevice,
 command_queue: *MTLCommandQueue,
 layer: *CAMetalLayer,
+clip_world: ClipMap = .{},
+clip_screen: ClipMap = .{},
 
 pipeline_state: *MTLRenderPipelineState,
 
@@ -66,6 +70,8 @@ frame_ctx: *MetalFrameContext,
 frame_index: u8, // ring cursor (0..2)
 vertex_buffers: [3]*MTLBuffer, // geometry ring
 texture_vertex_buffers: [3]*MTLBuffer, // sprite ring
+xforms: ArrayList(LocalXTransform),
+xform_buffers: [3]*MTLBuffer, // xform ring
 
 width: u32,
 height: u32,
@@ -101,14 +107,14 @@ pub fn init(
         device,
         vertex_fn,
         fragment_fn,
-        MTLPixelFormat.bgra8Unorm,
+        MTLPixelFormat.bgra8Unorm_sRGB,
         config.msaa_samples,
     );
     const texture_pipeline_state = try mb.createTexturePipelineState(
         device,
         tex_vertex_fn,
         tex_fragment_fn,
-        MTLPixelFormat.bgra8Unorm,
+        MTLPixelFormat.bgra8Unorm_sRGB,
         config.msaa_samples,
     );
 
@@ -120,6 +126,7 @@ pub fn init(
     const options = @intFromEnum(MTLResourceOptions.storageModeShared);
     var vertex_buffers: [3]*MTLBuffer = undefined;
     var texture_vertex_buffers: [3]*MTLBuffer = undefined;
+    var xform_buffers: [3]*MTLBuffer = undefined;
     for (&vertex_buffers) |*b| b.* = try mb.createBuffer(
         device,
         SLOT_BYTES,
@@ -128,6 +135,11 @@ pub fn init(
     for (&texture_vertex_buffers) |*b| b.* = try mb.createBuffer(
         device,
         TEX_SLOT_BYTES,
+        options,
+    );
+    for (&xform_buffers) |*b| b.* = try mb.createBuffer(
+        device,
+        XFORM_SLOT_BYTES,
         options,
     );
 
@@ -165,6 +177,8 @@ pub fn init(
         .start_time = 0.0,
         .last_frame_time = 0.0,
         .persistent = p_gpa,
+        .xforms = .empty,
+        .xform_buffers = xform_buffers,
     };
 }
 fn getShaderPath(gpa: std.mem.Allocator, io: std.Io) ![]const u8 {
@@ -186,10 +200,13 @@ pub fn deinit(self: *Self) void {
 
     for (self.vertex_buffers) |b| mb.release(b);
     for (self.texture_vertex_buffers) |tb| mb.release(tb);
+    for (self.xform_buffers) |xb| mb.release(xb);
 
     mb.release(self.pipeline_state);
     mb.release(self.texture_pipeline_state);
     mb.frameContextDestroy(self.frame_ctx);
+
+    self.xforms.deinit(self.persistent);
 }
 
 pub fn createTexture(self: *Self, width: u32, height: u32) !*MTLTexture {
@@ -298,31 +315,52 @@ fn addSprite(
 }
 
 pub fn render(self: *Self, r: Renderable, ctx: RenderContext) void {
-    const xf = tess.LocalXform.from(r.transform);
+    // Identity (null transform — all text glyphs, most UI) reuses the shared slot 0
+    // seeded in beginFrame; only real transforms append their own entry. Kills the
+    // per-glyph-triangle identity flood (see beginFrame).
+    const xform_index: u16 = if (r.transform == null) 0 else blk: {
+        const idx: u16 = @intCast(self.xforms.items.len);
+        self.xforms.append(self.persistent, tess.LocalXform.from(r.transform)) catch |err| {
+            log.err(.renderer, "Failed to store xform {any}", .{err});
+            break :blk 0; // fall back to identity rather than a bad index
+        };
+        break :blk idx;
+    };
+
     const is_screen = r.space == .screen;
     const px_per_unit =
         if (is_screen) 1.0 else @as(
             f32,
             @floatFromInt(ctx.height),
         ) / (2.0 * ctx.ortho_size);
-    const map = if (is_screen)
-        ClipMap.fromScreen(ctx)
-    else
-        ClipMap.fromWorld(ctx);
+
+    // Each call updates ONLY its own space's map, from its own ctx. World calls
+    // carry the world ctx (physical dims), screen calls the UI ctx (logical dims).
+    // Writing both from one ctx clobbers whichever the last caller wasn't.
+    if (is_screen) {
+        self.clip_screen = ClipMap.fromScreen(ctx);
+    } else {
+        self.clip_world = ClipMap.fromWorld(ctx);
+    }
+    const key: metal.GeomKey = .{
+        .prim = .triangle,
+        .space = if (is_screen) .screen else .world,
+    };
+
     const half = r.style.stroke_width / 2.0;
     const hw: f32 = if (is_screen) half else blk: {
         break :blk half / px_per_unit;
     };
+
     tess.tessellate(
         MetalVertex,
         metal.GeomKey,
         &self.batch,
         metal.makeVertex,
-        .{ .prim = .triangle },
+        key,
         r.shape,
-        xf,
+        xform_index,
         r.style,
-        map,
         hw,
         px_per_unit,
     ) catch {
@@ -333,6 +371,8 @@ pub fn render(self: *Self, r: Renderable, ctx: RenderContext) void {
 pub fn beginFrame(self: *Self) !void {
     self.batch.clear();
     self.texture_batch.clear();
+    self.xforms.clearRetainingCapacity();
+    try self.xforms.append(self.persistent, LocalXTransform.identity);
     self.frame_index +%= 1;
     self.frame_number += 1;
 }
@@ -380,8 +420,33 @@ fn flushGeometryBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !
     mb.setPipelineState(encoder, self.pipeline_state);
     mb.setVertexBuffer(encoder, buffer, 0, 0);
 
+    if (self.xforms.items.len > 0) {
+        const xf_buf = self.xform_buffers[idx];
+        const xf_ptr = try mb.getBufferContents(xf_buf);
+        const xf_size = @sizeOf(LocalXTransform);
+        const xf_bytes = self.xforms.items.len * xf_size;
+        // Clamp to the slot. Truncation here leaves high-index vertices reading
+        // stale buffer memory -> shapes flicker/jump, so it MUST be loud.
+        const xf_copy = if (xf_bytes > XFORM_SLOT_BYTES) blk: {
+            const clamped = (XFORM_SLOT_BYTES / xf_size) * xf_size;
+            log.err(
+                .renderer,
+                "Xform overflow: {d}B > slot {d}B; truncated to {d} xforms (verts past this read garbage)",
+                .{ xf_bytes, XFORM_SLOT_BYTES, clamped / xf_size },
+            );
+            break :blk clamped;
+        } else xf_bytes;
+        @memcpy(
+            @as([*]u8, @ptrCast(xf_ptr))[0..xf_copy],
+            @as([*]const u8, @ptrCast(self.xforms.items.ptr))[0..xf_copy],
+        );
+        mb.setVertexBuffer(encoder, xf_buf, 0, 2);
+    }
+
     for (self.batch.draw_calls.items) |call| {
         if (call.vertex_start + call.vertex_count > copied_vertex_count) break;
+        const map = if (call.key.space == .screen) self.clip_screen else self.clip_world;
+        mb.setVertexBytes(encoder, &map, @sizeOf(ClipMap), 1);
 
         mb.drawPrimitives(
             encoder,

@@ -92,8 +92,7 @@ pub const LocalXform = struct {
     tx: f32,
     ty: f32,
 
-    // identity when null; cos/sin once. Bakes the old transformPoint order
-    // (scale, THEN rotate, THEN translate). rotate∘scale = [[s·c, -s·s],[s·s, s·c]].
+    // (scale, rotate, translate). rotate∘scale = [[s·c, -s·s],[s·s, s·c]].
     pub fn from(t: ?Transform) LocalXform {
         const tf = t orelse return identity;
         const s = tf.scale orelse 1.0;
@@ -110,7 +109,7 @@ pub const LocalXform = struct {
             .ty = off.y,
         };
     }
-    const identity: LocalXform = .{
+    pub const identity: LocalXform = .{
         .m00 = 1,
         .m01 = 0,
         .m10 = 0,
@@ -129,8 +128,8 @@ pub const LocalXform = struct {
 
 const GradPaint = struct {
     kind: enum { linear, radial },
-    start: u32, // pre-packed, opacity already applied
-    end: u32,
+    start: [4]f32, // linear, opacity already applied
+    end: [4]f32,
     // linear: unit axis dir + projection range [lo, lo+span] along it
     axis: V2 = .{ .x = 1, .y = 0 },
     lo: f32 = 0,
@@ -144,10 +143,10 @@ const GradPaint = struct {
 // stroke always hands flat. Evaluated in LOCAL (post-LocalXform) space so the
 // gradient rotates/scales with the shape.
 const Paint = union(enum) {
-    flat: u32,
+    flat: [4]f32,
     grad: GradPaint,
 
-    fn at(self: Paint, local_p: V2) u32 {
+    fn at(self: Paint, local_p: V2) [4]f32 {
         switch (self) {
             .flat => |f| return f,
             .grad => |g| {
@@ -163,7 +162,13 @@ const Paint = union(enum) {
                         1.0,
                     ),
                 };
-                return Color.lerpPackedU32(g.start, g.end, t);
+                // linear-space component lerp (correct gradient interpolation)
+                return .{
+                    g.start[0] + (g.end[0] - g.start[0]) * t,
+                    g.start[1] + (g.end[1] - g.start[1]) * t,
+                    g.start[2] + (g.end[2] - g.start[2]) * t,
+                    g.start[3] + (g.end[3] - g.start[3]) * t,
+                };
             },
         }
     }
@@ -173,20 +178,20 @@ fn Tess(comptime V: type, comptime K: type) type {
     return struct {
         const Self = @This();
         batch: *Batch(V, K),
-        makeVertex: *const fn ([2]f32, u32) V, // backend vertex builder
-        xf: LocalXform,
-        map: ClipMap,
+        makeVertex: *const fn ([2]f32, [4]f32, u16) V,
+        xform_index: u16,
         tri_key: K, // triangle draw-call key
         hw: f32,
         px_per_unit: f32,
 
         fn emit(self: Self, p: V2, paint: Paint) !void {
-            const local = self.xf.apply(p);
-            const clip = self.map.apply(local);
-            // gradient evaluates in LOCAL space so it rotates/scales with the shape
-            const color = paint.at(local);
+            const color = paint.at(p);
 
-            try self.batch.vertex(self.makeVertex(clip, color));
+            try self.batch.vertex(self.makeVertex(
+                .{ p.x, p.y },
+                color,
+                self.xform_index,
+            ));
         }
 
         fn emitSegment(self: Self, p0: V2, p1: V2, paint: Paint, hw: f32) !void {
@@ -224,10 +229,10 @@ fn Tess(comptime V: type, comptime K: type) type {
         // where emit evaluates the gradient.
         fn buildFillPaint(_: Self, style: DrawStyle, fc: Color, center: V2, radius: f32) Paint {
             const g = style.gradient orelse
-                return .{ .flat = fc.withOpacityPacked(style.opacity) };
+                return .{ .flat = fc.linearOpacity(style.opacity) };
 
-            const start = g.start_color.withOpacityPacked(style.opacity);
-            const end = g.end_color.withOpacityPacked(style.opacity);
+            const start = g.start_color.linearOpacity(style.opacity);
+            const end = g.end_color.linearOpacity(style.opacity);
 
             switch (g.kind) {
                 .radial => return .{ .grad = .{
@@ -256,7 +261,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         fn strokeClosed(self: Self, points: []const V2, style: DrawStyle) !void {
             if (points.len < 2) return;
 
-            const paint = Paint{ .flat = style.stroke.?.withOpacityPacked(style.opacity) };
+            const paint = Paint{ .flat = style.stroke.?.linearOpacity(style.opacity) };
             const hw = self.hw;
             const start = self.batch.mark();
 
@@ -277,7 +282,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         fn strokeOpen(self: Self, points: []const V2, style: DrawStyle) !void {
             if (points.len < 2) return;
 
-            const paint = Paint{ .flat = style.stroke.?.withOpacityPacked(style.opacity) };
+            const paint = Paint{ .flat = style.stroke.?.linearOpacity(style.opacity) };
             const hw = self.hw;
             const start = self.batch.mark();
 
@@ -475,8 +480,16 @@ fn Tess(comptime V: type, comptime K: type) type {
 
             const r = @min(c.half_width, c.half_height);
             const off = if (horizontal) c.half_width - r else c.half_height - r;
-            const right_c = if (horizontal) c.center.add(.{ .x = off, .y = 0 }) else c.center.add(.{ .x = 0, .y = off });
-            const left_c = if (horizontal) c.center.add(.{ .x = -off, .y = 0 }) else c.center.add(.{ .x = 0, .y = -off });
+            const right_c = if (horizontal) c.center.add(
+                .{ .x = off, .y = 0 },
+            ) else c.center.add(
+                .{ .x = 0, .y = off },
+            );
+            const left_c = if (horizontal) c.center.add(
+                .{ .x = -off, .y = 0 },
+            ) else c.center.add(
+                .{ .x = 0, .y = -off },
+            );
             const angle_idx: usize = if (horizontal) 0 else 4;
             const n = arcSegs(r, std.math.pi, self.px_per_unit);
             const angles: [8]f32 = .{
@@ -507,7 +520,12 @@ fn Tess(comptime V: type, comptime K: type) type {
             const perimeter = buf[0..w];
 
             if (style.fillColor()) |fc| {
-                const paint = self.buildFillPaint(style, fc, c.center, @max(c.half_width, c.half_height));
+                const paint = self.buildFillPaint(
+                    style,
+                    fc,
+                    c.center,
+                    @max(c.half_width, c.half_height),
+                );
 
                 const start = self.batch.mark();
                 for (0..w) |i| {
@@ -753,20 +771,18 @@ pub fn tessellate(
     comptime V: type,
     comptime K: type,
     batch: *Batch(V, K),
-    comptime makeVertex: fn ([2]f32, u32) V,
+    comptime makeVertex: fn ([2]f32, [4]f32, u16) V,
     tri_key: K,
     shape: ShapeData,
-    xf: LocalXform,
+    xf_idx: u16,
     style: DrawStyle,
-    map: ClipMap,
     hw: f32,
     px_per_unit: f32,
 ) !void {
     const ts = Tess(V, K){
         .batch = batch,
         .makeVertex = makeVertex,
-        .xf = xf,
-        .map = map,
+        .xform_index = xf_idx,
         .tri_key = tri_key,
         .hw = hw,
         .px_per_unit = px_per_unit,
