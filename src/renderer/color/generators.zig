@@ -89,7 +89,7 @@ fn internalClosest(c: Color, list: []const TaggedColor) TaggedColor {
     var best: TaggedColor = list[0];
 
     for (list) |entry| {
-        const dist = math.distance(entry.color, c);
+        const dist = entry.color.distance(c);
         if (dist < min) {
             min = dist;
             best = entry;

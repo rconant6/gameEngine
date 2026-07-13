@@ -127,18 +127,6 @@ pub const LocalXform = struct {
     }
 };
 
-// Channel-lerp two packed 0xRRGGBBAA colors. t in [0,1].
-fn lerpPacked(a: u32, b: u32, t: f32) u32 {
-    var out: u32 = 0;
-    inline for (.{ 24, 16, 8, 0 }) |shift| {
-        const ca: f32 = @floatFromInt((a >> shift) & 0xFF);
-        const cb: f32 = @floatFromInt((b >> shift) & 0xFF);
-        const c: u32 = @intFromFloat(@round(ca + (cb - ca) * t));
-        out |= c << shift;
-    }
-    return out;
-}
-
 const GradPaint = struct {
     kind: enum { linear, radial },
     start: u32, // pre-packed, opacity already applied
@@ -175,7 +163,7 @@ const Paint = union(enum) {
                         1.0,
                     ),
                 };
-                return lerpPacked(g.start, g.end, t);
+                return Color.lerpPackedU32(g.start, g.end, t);
             },
         }
     }
@@ -236,10 +224,10 @@ fn Tess(comptime V: type, comptime K: type) type {
         // where emit evaluates the gradient.
         fn buildFillPaint(_: Self, style: DrawStyle, fc: Color, center: V2, radius: f32) Paint {
             const g = style.gradient orelse
-                return .{ .flat = packWithOpacity(fc, style.opacity) };
+                return .{ .flat = fc.withOpacityPacked(style.opacity) };
 
-            const start = packWithOpacity(g.start_color, style.opacity);
-            const end = packWithOpacity(g.end_color, style.opacity);
+            const start = g.start_color.withOpacityPacked(style.opacity);
+            const end = g.end_color.withOpacityPacked(style.opacity);
 
             switch (g.kind) {
                 .radial => return .{ .grad = .{
@@ -268,7 +256,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         fn strokeClosed(self: Self, points: []const V2, style: DrawStyle) !void {
             if (points.len < 2) return;
 
-            const paint = Paint{ .flat = packWithOpacity(style.stroke.?, style.opacity) };
+            const paint = Paint{ .flat = style.stroke.?.withOpacityPacked(style.opacity) };
             const hw = self.hw;
             const start = self.batch.mark();
 
@@ -289,7 +277,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         fn strokeOpen(self: Self, points: []const V2, style: DrawStyle) !void {
             if (points.len < 2) return;
 
-            const paint = Paint{ .flat = packWithOpacity(style.stroke.?, style.opacity) };
+            const paint = Paint{ .flat = style.stroke.?.withOpacityPacked(style.opacity) };
             const hw = self.hw;
             const start = self.batch.mark();
 
@@ -825,15 +813,4 @@ inline fn direction(ang: f32) V2 {
         .x = @cos(ang),
         .y = @sin(ang),
     };
-}
-
-pub fn packWithOpacity(c: Color, opacity: f32) u32 {
-    if (opacity >= 1.0) return c.pack();
-
-    var rgba = c.rgba;
-    rgba.a = @intFromFloat(
-        @round(@as(f32, rgba.a) * std.math.clamp(opacity, 0, 1)),
-    );
-
-    return rgba.pack();
 }

@@ -9,7 +9,6 @@ const Saturation = color_mod.Saturation;
 const Temperature = color_mod.Temperature;
 const TaggedColor = color_mod.TaggedColor;
 const Family = color_mod.Family;
-const math = color_mod.math;
 
 test "Color: init with RGBA values" {
     const color = Color.initRgba(255, 128, 64, 200);
@@ -564,57 +563,57 @@ test "TaggedColor: preserves original color" {
 // Math: Distance Tests
 // =============================================================================
 
-test "math.distance: identical colors have zero distance" {
+test "Color.distance: identical colors have zero distance" {
     const red = Color.initRgba(255, 0, 0, 255);
-    try testing.expectApproxEqAbs(@as(f32, 0.0), math.distance(red, red), 0.001);
+    try testing.expectApproxEqAbs(@as(f32, 0.0), red.distance(red), 0.001);
 }
 
-test "math.distance: similar colors have small distance" {
+test "Color.distance: similar colors have small distance" {
     const red1 = Color.initRgba(255, 0, 0, 255);
     const red2 = Color.initRgba(250, 10, 5, 255);
-    const dist = math.distance(red1, red2);
+    const dist = red1.distance(red2);
     try testing.expect(dist < 0.1);
 }
 
-test "math.distance: different hues have larger distance" {
+test "Color.distance: different hues have larger distance" {
     const red = Color.initRgba(255, 0, 0, 255);
     const blue = Color.initRgba(0, 0, 255, 255);
-    const dist = math.distance(red, blue);
+    const dist = red.distance(blue);
     try testing.expect(dist > 0.2);
 }
 
 // =============================================================================
-// Math: Lerp Tests
+// Mix: .hsv path (shortest-arc hue lerp)
 // =============================================================================
 
-test "math.lerp: t=0 returns first color" {
+test "Color.mix .hsv: t=0 returns first color" {
     const red = Color.initRgba(255, 0, 0, 255);
     const blue = Color.initRgba(0, 0, 255, 255);
-    const result = math.lerp(red, blue, 0.0);
+    const result = red.mix(blue, 0.0, .hsv);
 
     try testing.expectApproxEqAbs(red.hsva.h, result.hsva.h, 0.01);
 }
 
-test "math.lerp: t=1 returns second color" {
+test "Color.mix .hsv: t=1 returns second color" {
     const red = Color.initRgba(255, 0, 0, 255);
     const blue = Color.initRgba(0, 0, 255, 255);
-    const result = math.lerp(red, blue, 1.0);
+    const result = red.mix(blue, 1.0, .hsv);
 
     try testing.expectApproxEqAbs(blue.hsva.h, result.hsva.h, 0.01);
 }
 
-test "math.lerp: t=0.5 is midpoint" {
+test "Color.mix .hsv: t=0.5 is midpoint" {
     const black = Color.initHsva(0.0, 0.0, 0.0, 1.0);
     const white = Color.initHsva(0.0, 0.0, 1.0, 1.0);
-    const result = math.lerp(black, white, 0.5);
+    const result = black.mix(white, 0.5, .hsv);
 
     try testing.expectApproxEqAbs(@as(f32, 0.5), result.hsva.v, 0.01);
 }
 
-test "math.lerp: takes shortest path around hue circle" {
+test "Color.mix .hsv: takes shortest path around hue circle" {
     const red = Color.initHsva(10.0, 1.0, 1.0, 1.0);
     const rose = Color.initHsva(350.0, 1.0, 1.0, 1.0);
-    const result = math.lerp(red, rose, 0.5);
+    const result = red.mix(rose, 0.5, .hsv);
 
     // Midpoint should be at 0/360, not at 180
     const h = result.hsva.h;
@@ -622,33 +621,34 @@ test "math.lerp: takes shortest path around hue circle" {
 }
 
 // =============================================================================
-// Math: Hue Shift Tests
+// Color.hueShift Tests
 // =============================================================================
 
-test "math.hueShift: shifts hue by degrees" {
+test "Color.hueShift: shifts hue by degrees" {
     const red = Color.initHsva(0.0, 1.0, 1.0, 1.0);
-    const shifted = math.hueShift(red, 120.0);
+    const shifted = red.hueShift(120.0);
 
     try testing.expectApproxEqAbs(@as(f32, 120.0), shifted.hsva.h, 0.01);
 }
 
-test "math.hueShift: wraps around 360" {
+test "Color.hueShift: wraps around 360" {
     const rose = Color.initHsva(350.0, 1.0, 1.0, 1.0);
-    const shifted = math.hueShift(rose, 30.0);
+    const shifted = rose.hueShift(30.0);
 
-    try testing.expectApproxEqAbs(@as(f32, 20.0), shifted.hsva.h, 0.01);
+    // tolerance 0.5: hue round-trips through 8-bit RGBA storage
+    try testing.expectApproxEqAbs(@as(f32, 20.0), shifted.hsva.h, 0.5);
 }
 
-test "math.hueShift: negative shift works" {
+test "Color.hueShift: negative shift works" {
     const green = Color.initHsva(120.0, 1.0, 1.0, 1.0);
-    const shifted = math.hueShift(green, -60.0);
+    const shifted = green.hueShift(-60.0);
 
     try testing.expectApproxEqAbs(@as(f32, 60.0), shifted.hsva.h, 0.01);
 }
 
-test "math.hueShift: preserves saturation and value" {
+test "Color.hueShift: preserves saturation and value" {
     const original = Color.initHsva(0.0, 0.7, 0.8, 1.0);
-    const shifted = math.hueShift(original, 90.0);
+    const shifted = original.hueShift(90.0);
 
     try testing.expectApproxEqAbs(original.hsva.s, shifted.hsva.s, 0.01);
     try testing.expectApproxEqAbs(original.hsva.v, shifted.hsva.v, 0.01);
@@ -927,7 +927,8 @@ test "generators.complement: wraps around 360" {
     const color = Color.initHsva(270.0, 1.0, 1.0, 1.0);
     const comp = generators.complement(color);
     // 270 + 180 = 450 -> 90
-    try testing.expectApproxEqAbs(@as(f32, 90.0), comp.hsva.h, 0.01);
+    // tolerance 0.5: hue round-trips through 8-bit RGBA storage
+    try testing.expectApproxEqAbs(@as(f32, 90.0), comp.hsva.h, 0.5);
 }
 
 test "generators.complement: red -> cyan" {
@@ -964,17 +965,19 @@ test "generators.analogous: neighbors are ±30 degrees" {
     // result[0] = hue - 30 = 60
     // result[1] = hue = 90
     // result[2] = hue + 30 = 120
-    try testing.expectApproxEqAbs(@as(f32, 60.0), result[0].hsva.h, 0.01);
-    try testing.expectApproxEqAbs(@as(f32, 90.0), result[1].hsva.h, 0.01);
-    try testing.expectApproxEqAbs(@as(f32, 120.0), result[2].hsva.h, 0.01);
+    // tolerance 0.5: hue round-trips through 8-bit RGBA storage
+    try testing.expectApproxEqAbs(@as(f32, 60.0), result[0].hsva.h, 0.5);
+    try testing.expectApproxEqAbs(@as(f32, 90.0), result[1].hsva.h, 0.5);
+    try testing.expectApproxEqAbs(@as(f32, 120.0), result[2].hsva.h, 0.5);
 }
 
 test "generators.analogous: wraps around hue wheel" {
     const color = Color.initHsva(10.0, 1.0, 1.0, 1.0);
     const result = generators.analogous(color);
     // result[0] = 10 - 30 = -20 -> 340
-    try testing.expectApproxEqAbs(@as(f32, 340.0), result[0].hsva.h, 0.01);
-    try testing.expectApproxEqAbs(@as(f32, 40.0), result[2].hsva.h, 0.01);
+    // tolerance 0.5: hue round-trips through 8-bit RGBA storage
+    try testing.expectApproxEqAbs(@as(f32, 340.0), result[0].hsva.h, 0.5);
+    try testing.expectApproxEqAbs(@as(f32, 40.0), result[2].hsva.h, 0.5);
 }
 
 test "generators.analogous: preserves saturation and value" {
@@ -1024,9 +1027,10 @@ test "generators.splitComplementary: base + flanking complement" {
     const color = Color.initHsva(0.0, 1.0, 1.0, 1.0);
     const result = generators.splitComplementary(color);
     // Base at 0, flanks at 150 and 210
-    try testing.expectApproxEqAbs(@as(f32, 0.0), result[0].hsva.h, 0.01);
-    try testing.expectApproxEqAbs(@as(f32, 150.0), result[1].hsva.h, 0.01);
-    try testing.expectApproxEqAbs(@as(f32, 210.0), result[2].hsva.h, 0.01);
+    // tolerance 0.5: hue round-trips through 8-bit RGBA storage
+    try testing.expectApproxEqAbs(@as(f32, 0.0), result[0].hsva.h, 0.5);
+    try testing.expectApproxEqAbs(@as(f32, 150.0), result[1].hsva.h, 0.5);
+    try testing.expectApproxEqAbs(@as(f32, 210.0), result[2].hsva.h, 0.5);
 }
 
 // === Harmony: tetradic ===
@@ -1041,10 +1045,11 @@ test "generators.tetradic: rectangle scheme at 90 degree intervals" {
     const color = Color.initHsva(0.0, 1.0, 1.0, 1.0);
     const result = generators.tetradic(color);
     // 0, 90, 180, 270
-    try testing.expectApproxEqAbs(@as(f32, 0.0), result[0].hsva.h, 0.01);
-    try testing.expectApproxEqAbs(@as(f32, 90.0), result[1].hsva.h, 0.01);
-    try testing.expectApproxEqAbs(@as(f32, 180.0), result[2].hsva.h, 0.01);
-    try testing.expectApproxEqAbs(@as(f32, 270.0), result[3].hsva.h, 0.01);
+    // tolerance 0.5: hue round-trips through 8-bit RGBA storage
+    try testing.expectApproxEqAbs(@as(f32, 0.0), result[0].hsva.h, 0.5);
+    try testing.expectApproxEqAbs(@as(f32, 90.0), result[1].hsva.h, 0.5);
+    try testing.expectApproxEqAbs(@as(f32, 180.0), result[2].hsva.h, 0.5);
+    try testing.expectApproxEqAbs(@as(f32, 270.0), result[3].hsva.h, 0.5);
 }
 
 // === Harmony: square ===
@@ -1059,10 +1064,11 @@ test "generators.square: evenly spaced at 90 degrees" {
     const color = Color.initHsva(30.0, 1.0, 1.0, 1.0);
     const result = generators.square(color);
     // 30, 120, 210, 300
-    try testing.expectApproxEqAbs(@as(f32, 30.0), result[0].hsva.h, 0.01);
-    try testing.expectApproxEqAbs(@as(f32, 120.0), result[1].hsva.h, 0.01);
-    try testing.expectApproxEqAbs(@as(f32, 210.0), result[2].hsva.h, 0.01);
-    try testing.expectApproxEqAbs(@as(f32, 300.0), result[3].hsva.h, 0.01);
+    // tolerance 0.5: hue round-trips through 8-bit RGBA storage
+    try testing.expectApproxEqAbs(@as(f32, 30.0), result[0].hsva.h, 0.5);
+    try testing.expectApproxEqAbs(@as(f32, 120.0), result[1].hsva.h, 0.5);
+    try testing.expectApproxEqAbs(@as(f32, 210.0), result[2].hsva.h, 0.5);
+    try testing.expectApproxEqAbs(@as(f32, 300.0), result[3].hsva.h, 0.5);
 }
 
 // === Library-Aware: closest ===

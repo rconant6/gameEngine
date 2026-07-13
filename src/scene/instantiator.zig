@@ -822,6 +822,13 @@ fn getDefaultValue(comptime T: type) T {
             }
             return result;
         },
+        .array => |array_info| {
+            var result: T = undefined;
+            inline for (0..array_info.len) |i| {
+                result[i] = getDefaultValue(array_info.child);
+            }
+            return result;
+        },
         .@"enum" => |enum_info| {
             if (enum_info.fields.len > 0) {
                 return @enumFromInt(enum_info.fields[0].value);
