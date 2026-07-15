@@ -22,7 +22,7 @@ const SimulateOpts = @import("game_state").SimulateOpts;
 
 pub const CollisionDetectionSys = @import("CollisionDetectionSys.zig");
 pub const movementSystem = @import("MovementSys.zig").run;
-pub const physicsSystem = @import("PhysicsSys.zig").run;
+pub const physicsSystem = @import("PhysicsSys.zig");
 pub const collisionDetectionSystem = CollisionDetectionSys.run;
 pub const solidResolutionSystem = @import("SolidResolutionSys.zig").run;
 pub const actionSystem = @import("ActionSys.zig").run;

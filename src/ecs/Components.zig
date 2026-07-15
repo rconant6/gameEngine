@@ -102,8 +102,10 @@ pub const Velocity = struct {
     angular: f32,
 };
 pub const Physics = struct {
-    mass: f32,
-    friction: f32,
+    mass: f32 = 1.0, // 0 = static/immovable object
+    friction: f32 = 0.0, // linear damping coefficient
+    restitution: f32 = 1.0, // Bounciness [0..1]
+    gravity_scale: f32 = 0.0, // multiplier of world gravity
 };
 // MARK: Collision Components
 pub const Collider = struct {

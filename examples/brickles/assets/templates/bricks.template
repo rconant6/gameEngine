@@ -2,7 +2,8 @@
 //   destroy_self        -> brick disappears
 //   add_state_int score -> +points
 //   add_state_int bricks -> -1 toward the win condition (bricks == 0)
-// The ball's own OnCollision handles the bounce, so bricks don't need to.
+// Bricks carry static [Physics] (mass 0, restitution 1) so the ball bounces off
+// them via PhysicsSys.response; the OnCollision below is just score/destroy.
 // Position is supplied by spawn offset / the scene layout that instantiates them.
 
 [Brick:template]
@@ -24,6 +25,9 @@
     half_height:f32 0.55
   [Tag]
     tags:string "brick"
+  [Physics]
+    mass:f32 0.0
+    restitution:f32 1.0
   [OnCollision]
     [trigger]
       other_tag_pattern:string "ball"
@@ -63,6 +67,9 @@
     half_height:f32 0.55
   [Tag]
     tags:string "brick"
+  [Physics]
+    mass:f32 0.0
+    restitution:f32 1.0
   [OnCollision]
     [trigger]
       other_tag_pattern:string "ball"
@@ -102,6 +109,9 @@
     half_height:f32 0.55
   [Tag]
     tags:string "brick"
+  [Physics]
+    mass:f32 0.0
+    restitution:f32 1.0
   [OnCollision]
     [trigger]
       other_tag_pattern:string "ball"
@@ -138,6 +148,9 @@
     half_height:f32 0.55
   [Tag]
     tags:string "brick"
+  [Physics]
+    mass:f32 0.0
+    restitution:f32 1.0
   [OnCollision]
     [trigger]
       other_tag_pattern:string "ball"
@@ -174,6 +187,9 @@
     half_height:f32 0.55
   [Tag]
     tags:string "brick"
+  [Physics]
+    mass:f32 0.0
+    restitution:f32 1.0
   [OnCollision]
     [trigger]
       other_tag_pattern:string "ball"
@@ -210,6 +226,9 @@
     half_height:f32 0.55
   [Tag]
     tags:string "brick"
+  [Physics]
+    mass:f32 0.0
+    restitution:f32 1.0
   [OnCollision]
     [trigger]
       other_tag_pattern:string "ball"

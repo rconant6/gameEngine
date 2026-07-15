@@ -101,6 +101,11 @@ pub fn addAllTests(
             .{ "ecs", mod(modules, .ecs) },
             .{ "systems", mod(modules, .systems) },
         }, .link_engine = true },
+        .{ .name = "physics-tests", .path = "tests/ecs/test_physics.zig", .imports = &.{
+            .{ "math", mod(modules, .math) },
+            .{ "ecs", mod(modules, .ecs) },
+            .{ "systems", mod(modules, .systems) },
+        }, .link_engine = true },
         .{ .name = "text-align-tests", .path = "tests/ecs/test_text_align.zig", .imports = &.{
             .{ "ecs", mod(modules, .ecs) },
             .{ "renderer", mod(modules, .renderer) },
@@ -116,12 +121,6 @@ pub fn addAllTests(
             .{ "math", mod(modules, .math) },
             .{ "Action", mod(modules, .action) },
             .{ "ecs", mod(modules, .ecs) },
-        }, .link_engine = true },
-        .{ .name = "reflect-velocity-tests", .path = "tests/ecs/test_reflect_velocity.zig", .imports = &.{
-            .{ "math", mod(modules, .math) },
-            .{ "Action", mod(modules, .action) },
-            .{ "ecs", mod(modules, .ecs) },
-            .{ "game_state", mod(modules, .game_state) },
         }, .link_engine = true },
         .{ .name = "action-executor-tests", .path = "tests/ecs/test_action_executor.zig", .imports = &.{
             .{ "math", mod(modules, .math) },

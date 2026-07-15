@@ -107,6 +107,7 @@ pub const Engine = struct {
     dt: f32 = 0,
     max_dt: f32 = 1.0 / 15.0,
     time_scale: f32 = 1.0,
+    gravity: V2 = .{ .x = 0, .y = 0 },
 
     active_camera_entity: Entity,
 
@@ -300,11 +301,11 @@ pub const Engine = struct {
             };
         }
 
-        self.collision_events = &.{};
+        if (opts.physics) Systems.physicsSystem.forces(&self.world, dt, self.gravity);
+
         if (opts.movement) Systems.movementSystem(&self.world, dt, &self.debugger);
 
-        if (opts.physics) Systems.physicsSystem(&self.world, dt);
-
+        self.collision_events = &.{};
         if (opts.collision) {
             self.collision_events = Systems.collisionDetectionSystem(
                 &self.world,
@@ -312,6 +313,8 @@ pub const Engine = struct {
                 &self.debugger,
             );
         }
+
+        if (opts.physics) Systems.physicsSystem.response(&self.world, self.collision_events);
 
         if (opts.solid) Systems.solidResolutionSystem(
             &self.world,

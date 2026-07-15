@@ -28,37 +28,13 @@
       radius:f32 0.35
     [Tag]
       tags:string "ball"
-    [OnCollision]
-      // bounce is physics response — must fire EVERY overlapping frame, so phase
-      // "stay". (The default phase is "enter", fire-once-on-contact, which is for
-      // scoring/state actions like the gutter below.)
-      [trigger]
-        other_tag_pattern:string "wall"
-        phase:string "stay"
-        [action]
-          type:string "bounce"
-          target:string "self"
-          restitution:f32 1.0
-          separate:bool true
-          priority:i32 0
-      [trigger]
-        other_tag_pattern:string "paddle"
-        phase:string "stay"
-        [action]
-          type:string "bounce"
-          target:string "self"
-          restitution:f32 1.0
-          separate:bool true
-          priority:i32 0
-      [trigger]
-        other_tag_pattern:string "brick"
-        phase:string "stay"
-        [action]
-          type:string "bounce"
-          target:string "self"
-          restitution:f32 1.0
-          separate:bool true
-          priority:i32 0
+    // Bounce is now a physics PROPERTY, not a scripted action. PhysicsSys.response
+    // reflects+separates against any other body that also has [Physics], every
+    // frame from the contact stream — walls/paddle/bricks below carry static
+    // Physics; the gutter deliberately does NOT (ball passes through to score).
+    [Physics]
+      mass:f32 1.0
+      restitution:f32 1.0
 
   // ── Paddle (Left/Right arrows) ──
   [Paddle:entity]
@@ -113,6 +89,11 @@
           target:string "self"
           velocity:vec2 {0.0, 0.0}
           priority:i32 0
+    // Static (mass 0): the ball bounces off it, but the physics response never
+    // shoves the paddle — the player drives it via set_velocity above.
+    [Physics]
+      mass:f32 0.0
+      restitution:f32 1.0
 
   // ── Walls (top, left, right) — invisible-ish thin colliders tagged "wall" ──
   [WallTop:entity]
@@ -131,10 +112,13 @@
       half_height:f32 0.3
     [Tag]
       tags:string "wall"
+    [Physics]
+      mass:f32 0.0
+      restitution:f32 1.0
 
   // Side walls are solid: they stop the PADDLE at the edges (replaces the paddle
   // clamp the game never needed to hand-roll). The ball also bounces off them via
-  // its own bounce trigger; the extra solid separation is a negligible epsilon push.
+  // its own [Physics] restitution; the extra solid separation is a negligible epsilon push.
   [WallLeft:entity]
     [Transform]
       position:vec3 {-17.4, 0.0, 0.0}
@@ -152,6 +136,9 @@
       solid:bool true
     [Tag]
       tags:string "wall"
+    [Physics]
+      mass:f32 0.0
+      restitution:f32 1.0
 
   [WallRight:entity]
     [Transform]
@@ -170,6 +157,9 @@
       solid:bool true
     [Tag]
       tags:string "wall"
+    [Physics]
+      mass:f32 0.0
+      restitution:f32 1.0
 
   // ── Gutter (below the paddle) — ball falling past loses a ball, re-serves ──
   [Gutter:entity]

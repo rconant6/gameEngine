@@ -22,25 +22,12 @@
       radius:f32 0.4
     [Tag]
       tags:string "ball"
-    [OnCollision]
-      [trigger]
-        other_tag_pattern:string "wall"
-        phase:string "stay"
-        [action]
-          type:string "reflect_velocity"
-          target:string "self"
-          x:bool false
-          y:bool true
-          priority:i32 0
-      [trigger]
-        other_tag_pattern:string "paddle"
-        phase:string "stay"
-        [action]
-          type:string "reflect_velocity"
-          target:string "self"
-          x:bool true
-          y:bool false
-          priority:i32 0
+    // Bounce is a physics property now. PhysicsSys.response reflects about the
+    // contact normal — for pong's axis-aligned walls/paddles that IS the old
+    // per-axis flip (wall normal (0,±1) → y-flip; paddle face (±1,0) → x-flip).
+    [Physics]
+      mass:f32 1.0
+      restitution:f32 1.0
 
   // ── Left Paddle (W/S) ──
   [PaddleLeft:entity]
@@ -95,6 +82,9 @@
           target:string "self"
           velocity:vec2 {0.0, 0.0}
           priority:i32 0
+    [Physics]
+      mass:f32 0.0
+      restitution:f32 1.0
 
   // ── Right Paddle (Up/Down) ──
   [PaddleRight:entity]
@@ -149,6 +139,9 @@
           target:string "self"
           velocity:vec2 {0.0, 0.0}
           priority:i32 0
+    [Physics]
+      mass:f32 0.0
+      restitution:f32 1.0
 
   // ── Top Wall ── (solid: stops the paddles at the top edge — replaces the old
   // clampPaddleVelocity in main.zig. The ball also gets clean separation here.)
@@ -169,6 +162,9 @@
       solid:bool true
     [Tag]
       tags:string "wall"
+    [Physics]
+      mass:f32 0.0
+      restitution:f32 1.0
 
   // ── Bottom Wall ── (solid: stops the paddles at the bottom edge)
   [WallBottom:entity]
@@ -188,6 +184,9 @@
       solid:bool true
     [Tag]
       tags:string "wall"
+    [Physics]
+      mass:f32 0.0
+      restitution:f32 1.0
 
   // ── Center Line (visual only) ──
   [CenterLine:entity]

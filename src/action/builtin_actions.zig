@@ -25,16 +25,6 @@ pub const DestroySelf = struct {};
 pub const DestroyOther = struct {};
 pub const SpawnEntity = struct { template_name: []const u8, offset: V2 };
 pub const SetVelocity = struct { target: ActionTarget, velocity: V2 };
-pub const ReflectVelocity = struct {
-    target: ActionTarget,
-    x: bool = false,
-    y: bool = false,
-};
-pub const Bounce = struct {
-    target: ActionTarget = .self,
-    restitution: f32 = 1.0,
-    separate: bool = true,
-};
 pub const DebugPrint = struct { msg: []const u8 };
 pub const PlaySound = struct { name: []const u8 };
 // set_state_var has a custom decode (reads the value's type annotation to pick
@@ -51,8 +41,6 @@ pub fn registerBuiltins(reg: *ActionRegistry) !void {
     _ = try reg.register(DestroyOther, "destroy_other", destroyOther, null);
     _ = try reg.register(SpawnEntity, "spawn_entity", spawnEntity, null);
     _ = try reg.register(SetVelocity, "set_velocity", setVelocity, null);
-    _ = try reg.register(ReflectVelocity, "reflect_velocity", reflectVelocity, null);
-    _ = try reg.register(Bounce, "bounce", bounce, null);
     _ = try reg.register(DebugPrint, "debug_print", debugPrint, null);
     _ = try reg.register(PlaySound, "play_sound", playSound, null);
     _ = try reg.register(AddStateInt, "add_state_int", addStateInt, null);
@@ -137,47 +125,6 @@ fn setVelocity(ctx: *ActionRunContext, sv: SetVelocity) void {
             "set_velocity: entity {d} has no Velocity component",
             .{target.id},
         );
-    }
-}
-fn reflectVelocity(ctx: *ActionRunContext, rv: ReflectVelocity) void {
-    const target = resolveTarget(ctx, rv.target) orelse {
-        log.warn(.action, "reflect_velocity target=other but no other_entity", .{});
-        return;
-    };
-
-    if (ctx.world.getComponentMut(target, Velocity)) |velocity| {
-        if (ctx.collision_normal) |n| {
-            if (rv.x and velocity.linear.x * n.x < 0) velocity.linear.x = -velocity.linear.x;
-            if (rv.y and velocity.linear.y * n.y < 0) velocity.linear.y = -velocity.linear.y;
-        } else {
-            if (rv.x) velocity.linear.x = -velocity.linear.x;
-            if (rv.y) velocity.linear.y = -velocity.linear.y;
-        }
-    } else {
-        log.warn(
-            .action,
-            "reflect_velocity: entity {d} has no Velocity component",
-            .{target.id},
-        );
-    }
-}
-fn bounce(ctx: *ActionRunContext, b: Bounce) void {
-    const target = resolveTarget(ctx, b.target) orelse return;
-    const n = ctx.collision_normal orelse {
-        log.warn(.action, "bounce without a collision", .{});
-        return;
-    };
-    const v = ctx.world.getComponentMut(target, Velocity) orelse return;
-    const d = v.linear.dot(n);
-    if (d < 0) {
-        v.linear = v.linear.sub(n.mul((1.0 + b.restitution) * d));
-    }
-    if (b.separate) {
-        if (ctx.collision_penetration) |pen| {
-            if (ctx.world.getComponentMut(target, Transform)) |t| {
-                t.position = t.position.add(n.mul(pen + 0.001));
-            }
-        }
     }
 }
 fn debugPrint(_: *ActionRunContext, dp: DebugPrint) void {
