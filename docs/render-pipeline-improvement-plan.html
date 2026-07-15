@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Render Pipeline Deep Dive &amp; Improvement Plan</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    padding: 2rem 2rem 6rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  h1 { color: #58a6ff; font-size: 1.8rem; border-bottom: 1px solid #21262d; padding-bottom: 0.5rem; margin-bottom: 0.25rem; }
+  .page-sub { color: #8b949e; font-size: 0.9rem; margin-bottom: 2rem; }
+  h2 { color: #f0883e; font-size: 1.35rem; margin-top: 3rem; margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid #21262d; }
+  h3 { color: #d2a8ff; font-size: 1.05rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  h4 { color: #7ee787; font-size: 0.95rem; margin-top: 1.1rem; margin-bottom: 0.35rem; }
+  p, li { margin-bottom: 0.4rem; }
+  ul, ol { padding-left: 1.5rem; margin-bottom: 0.75rem; }
+  code {
+    background: #161b22; padding: 0.15rem 0.4rem; border-radius: 3px;
+    font-family: 'SF Mono','Fira Code',monospace; font-size: 0.85em; color: #79c0ff;
+  }
+  pre {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 1rem; overflow-x: auto; margin: 0.75rem 0 1rem;
+  }
+  pre code { background: none; padding: 0; color: #c9d1d9; font-size: 0.82rem; line-height: 1.5; }
+  .mono { font-family: 'SF Mono','Fira Code',monospace; }
+
+  nav {
+    background: #161b22; border: 1px solid #21262d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin-bottom: 2rem;
+  }
+  nav .nav-title { color: #8b949e; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: 0.5rem; }
+  nav .nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.3rem 1rem; }
+  nav a { font-size: 0.85rem; display: block; padding: 0.15rem 0; }
+
+  section { scroll-margin-top: 1rem; }
+
+  .card {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 1rem 1.25rem; margin: 0.75rem 0;
+  }
+  .card.crit  { border-color: #f85149; }
+  .card.perf  { border-color: #f0883e; }
+  .card.api   { border-color: #d2a8ff; }
+  .card.good  { border-color: #7ee787; }
+  .card-name { font-family: 'SF Mono','Fira Code',monospace; font-size: 0.95rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .card-name.c-red    { color: #f85149; }
+  .card-name.c-orange { color: #f0883e; }
+  .card-name.c-purple { color: #d2a8ff; }
+  .card-name.c-green  { color: #7ee787; }
+  .loc { color: #8b949e; font-size: 0.78rem; font-family: 'SF Mono','Fira Code',monospace; }
+
+  table { border-collapse: collapse; width: 100%; margin: 0.75rem 0 1.25rem; font-size: 0.88rem; }
+  th { background: #161b22; color: #8b949e; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.05em; text-align: left; }
+  th, td { border: 1px solid #30363d; padding: 0.5rem 0.7rem; vertical-align: top; }
+  td.num { text-align: right; font-family: 'SF Mono','Fira Code',monospace; }
+
+  .badge { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 10px; font-size: 0.72rem; font-weight: 600; margin-right: 0.4rem; }
+  .badge.crit { background: #3d1418; color: #f85149; border: 1px solid #f85149; }
+  .badge.perf { background: #3a2208; color: #f0883e; border: 1px solid #f0883e; }
+  .badge.api  { background: #2a1f3d; color: #d2a8ff; border: 1px solid #d2a8ff; }
+  .badge.win  { background: #0f2b18; color: #7ee787; border: 1px solid #7ee787; }
+  .badge.dec  { background: #0d2438; color: #58a6ff; border: 1px solid #58a6ff; }
+
+  .flow { font-family: 'SF Mono','Fira Code',monospace; font-size: 0.8rem; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem 1.25rem; margin: 0.75rem 0; white-space: pre; overflow-x: auto; line-height: 1.6; }
+  .dim { color: #8b949e; }
+  .warn-inline { color: #f85149; }
+  .ok-inline { color: #7ee787; }
+</style>
+</head>
+<body>
+
+<h1>Render Pipeline Deep Dive &amp; Improvement Plan</h1>
+<div class="page-sub">Written 2026-06-11 · Covers the Metal path (the only complete backend) from <code>RenderSys</code> down to <code>CAMetalLayer</code> · Planning document — no code has been changed</div>
+
+<nav>
+  <div class="nav-title">Contents</div>
+  <div class="nav-grid">
+    <a href="#summary">0. Executive summary</a>
+    <a href="#current">1. How a frame works today</a>
+    <a href="#good">2. What's already good</a>
+    <a href="#stability">3. Findings: stability &amp; correctness</a>
+    <a href="#perf">4. Findings: performance</a>
+    <a href="#api">5. Findings: API &amp; mechanics</a>
+    <a href="#phase0">Phase 0 — Stable frame foundation</a>
+    <a href="#phase1">Phase 1 — Draw-call collapse</a>
+    <a href="#phase2">Phase 2 — Unified tessellator &amp; strokes</a>
+    <a href="#phase3">Phase 3 — New shapes &amp; visual polish</a>
+    <a href="#phase4">Phase 4 — Layers &amp; ordered submission</a>
+    <a href="#phase4a">Phase 4a — Indexed unified pipeline</a>
+    <a href="#phase4b">Phase 4b — SDF text &amp; producer collapse</a>
+    <a href="#phase5">Phase 5 — Throughput at scale</a>
+    <a href="#decisions">6. Decision log</a>
+    <a href="#validation">7. Validation plan</a>
+  </div>
+</nav>
+
+<!-- ===================================================== -->
+<section id="summary">
+<h2>0. Executive summary</h2>
+<p>The renderer's architecture is right: an immediate-mode draw API feeding a CPU-side batch that flushes once per frame into pre-allocated GPU buffers. The problem is that the implementation defeats the batch at the last step — <strong>nearly every triangle and line becomes its own GPU draw call</strong> — and the Metal frame lifecycle has correctness gaps (no CPU/GPU synchronization, per-frame object leaks, no blending on shapes) that will bite harder as scenes grow.</p>
+<p>The plan is six phases. Phase 0 makes frames safe (sync, leaks, buffers, blending, resize). Phase 1 is a one-sitting change that merges adjacent draw calls and adds stats counters — it should take a PONG frame from ~80 draw calls to under 5. Phase 2 centralizes tessellation into a backend-agnostic module, which makes <code>stroke_width</code> real, removes the World/Screen code duplication, and is the platform every new shape lands on. Phase 3 is the visible payoff: rounded rects, capsules, arcs/rings, n-gons, MSAA, working opacity, gradients. Phase 4 makes <code>RenderLayer.z_order</code> real and fixes the "sprites always render on top of shapes" ordering flaw. Phase 5 is on-demand scaling work (atlases, culling, indexed drawing).</p>
+<p>Decisions are made throughout and collected in the <a href="#decisions">decision log</a> — each one notes what was rejected and why, so any of them can be re-litigated before implementation.</p>
+</section>
+
+<!-- ===================================================== -->
+<section id="current">
+<h2>1. How a frame works today</h2>
+<div class="flow">engine.beginFrame()                                  <span class="dim">engine.zig:339</span>
+ └─ app.beginFrame()                                 <span class="dim">app.zig:108</span>
+     ├─ poll platform events
+     └─ renderer.beginFrame()                        <span class="dim">MetalRenderer.zig:257</span>
+         ├─ batch.clear(), texture_batch.clear()
+         ├─ <span class="warn-inline">nextDrawable()  ← BLOCKS on vsync, held for the whole frame</span>
+         └─ create MTLCommandBuffer
+
+game logic (user code)                                <span class="dim">examples/pong/main.zig:66-114</span>
+
+engine.update(dt)
+ ├─ simulate(dt)         action/physics/movement/collision/camera
+ └─ render(dt)           RenderSys.run                <span class="dim">RenderSys.zig:22</span>
+     ├─ query(Transform, Sprite)   → drawGeometry → GeometryBatch.addShape
+     ├─ query(Transform, Text)     → drawText → <span class="warn-inline">one addTriangle per glyph triangle</span>
+     ├─ query(UIElement, Sprite)   → drawGeometry (screen-space ctx)
+     ├─ query(Transform, ZxlSprite)→ drawTextureQuad → TextureBatch.addSprite
+     └─ debugger.run(dt, ctx)      → same paths
+
+engine.endFrame()                                     <span class="dim">MetalRenderer.zig:267</span>
+ ├─ create render pass descriptor + encoder
+ ├─ memcpy geometry vertices → <span class="warn-inline">single shared MTLBuffer (no sync with GPU)</span>
+ ├─ <span class="warn-inline">one drawPrimitives() per DrawCall (≈ per triangle/line)</span>
+ ├─ memcpy texture vertices → 256KB buffer <span class="warn-inline">(no bounds check)</span>
+ ├─ one setFragmentTexture + drawPrimitives per sprite
+ └─ present + commit</div>
+
+<p>Key structural facts:</p>
+<ul>
+  <li>All vertex math happens on the CPU. Shaders are pass-throughs (<code>shaders.metal</code>): position and color/uv go in clip-space, come out unchanged. Camera, local transform, and tessellation are all CPU work, per vertex, per frame.</li>
+  <li><code>Vertex</code> = 24 bytes (<code>[2]f32</code> pos + <code>[4]f32</code> color). <code>TextureVertex</code> = 16 bytes (pos + uv). Two pipelines: geometry (no blending) and texture (alpha blending).</li>
+  <li>Two strictly ordered flush passes: all geometry, then all textures. Painter's order only holds <em>within</em> each pass.</li>
+  <li><code>ShapeData</code> is a comptime-generated union of every shape in <code>shapes.zig</code> × {WorldPoint, ScreenPoint} (<code>shape_registry.zig:12</code>). The scene instantiator maps scene fields to shape struct fields by comptime reflection — new shapes are nearly free on the data side.</li>
+</ul>
+</section>
+
+<!-- ===================================================== -->
+<section id="good">
+<h2>2. What's already good (keep these)</h2>
+<div class="card good">
+  <div class="card-name c-green">Worth protecting through the refactor</div>
+  <ul>
+    <li><strong>Comptime shape registry</strong> — <code>ShapeData</code> auto-derives from <code>shapes.zig</code> decls; scene field mapping is reflection-driven. Adding a shape struct is ~zero plumbing. This is the extension mechanism the whole plan builds on.</li>
+    <li><strong>Batch-then-flush architecture</strong> — the right shape for a 2D engine. The fix is in the flush, not the design.</li>
+    <li><strong>Polygon triangulation cache</strong> (<code>shapes.zig:159</code>) and <strong>glyph triangle cache</strong> (<code>text.zig:107</code>) — tessellate-once, reuse-forever is exactly right; Phase 2 extends this idea to circles.</li>
+    <li><strong>Backend isolation</strong> — <code>Renderer</code> switches implementation at comptime via <code>build_options.backend</code>; the FFI bridge is one file per side. The plan keeps this boundary and shrinks the FFI surface.</li>
+    <li><strong>Frame-texture lazy cache</strong> (<code>TextureManager.getFrameTexture</code>) — uploads once, caches per frame, hot-reload aware.</li>
+  </ul>
+</div>
+</section>
+
+<!-- ===================================================== -->
+<section id="stability">
+<h2>3. Findings: stability &amp; correctness</h2>
+<p>These are bugs, not style issues. They're listed first because every later phase assumes a stable frame.</p>
+
+<div class="card crit">
+  <div class="card-name c-red">S1 · No CPU↔GPU synchronization on vertex buffers</div>
+  <div class="loc">MetalRenderer.zig:295-326, 341-352</div>
+  <p>One shared <code>MTLBuffer</code> (storageModeShared) is memcpy'd in <code>endFrame</code> every frame. Nothing waits for the previous frame's command buffer to finish reading it. When the GPU runs behind (heavy frame, window drag, vsync backpressure), the CPU overwrites vertices mid-read → flicker/garbage geometry. Same for the texture vertex buffer. Classic fix: a ring of 3 buffers + a completion-handler semaphore.</p>
+</div>
+
+<div class="card crit">
+  <div class="card-name c-red">S2 · Swift bridge leaks ~5 Objective-C objects per frame</div>
+  <div class="loc">MetalBridge.swift:24-31 (cmd buffer), 58-62 (drawable), 63-67 (drawable texture), 158-163 (pass descriptor), 197-209 (encoder)</div>
+  <p>Every per-frame bridge call returns <code>Unmanaged.passRetained(...)</code> and nothing ever releases. At 60fps that's ~300 leaked objects/sec, and retained drawables fight the <code>CAMetalLayer</code> drawable pool (it only has ~3). <code>MetalRenderer.deinit</code> has a TODO acknowledging no releases happen anywhere. There's also no <code>autoreleasepool</code> around the frame on the Zig-driven thread.</p>
+</div>
+
+<div class="card crit">
+  <div class="card-name c-red">S3 · Geometry vertex buffer is 288&nbsp;MB (intended: 12&nbsp;MB)</div>
+  <div class="loc">MetalRenderer.zig:39, 85-88, 239-243</div>
+  <p><code>MAX_VERT_SIZE = 1024*1024*12</code> is commented "12MB of vertices storage" but is then multiplied by <code>@sizeOf(Vertex)</code> (24) → a 288&nbsp;MB unified-memory allocation. Meanwhile <code>drawShape</code> uses the same constant as a <em>vertex count</em> in its "flush early" check — which doesn't flush, just logs a misleading warning ("Failed to flush batch"). Three different semantics for one constant.</p>
+</div>
+
+<div class="card crit">
+  <div class="card-name c-red">S4 · Texture flush has no overflow guard</div>
+  <div class="loc">MetalRenderer.zig:341-352</div>
+  <p><code>flushTextureBatch</code> memcpys <code>vertices.len * 16</code> bytes into a fixed 256&nbsp;KB buffer with no size check. More than 2,730 sprites in a frame silently corrupts whatever Metal allocated after the buffer. The geometry flush at least clamps; this one doesn't.</p>
+</div>
+
+<div class="card crit">
+  <div class="card-name c-red">S5 · Geometry pipeline has alpha blending disabled</div>
+  <div class="loc">MetalBridge.swift:120-155 (vs. texture pipeline: 330-334)</div>
+  <p><code>metal_create_render_pipeline_state</code> never sets <code>isBlendingEnabled</code>. Vertex colors carry alpha but it's written straight to the framebuffer — every shape, every glyph, every debug overlay renders fully opaque. Anyone setting <code>#RRGGBBAA</code> in a scene file or fading text gets silently ignored. The texture pipeline <em>does</em> blend, so sprites behave differently from shapes.</p>
+</div>
+
+<div class="card crit">
+  <div class="card-name c-red">S6 · Window resize is a no-op</div>
+  <div class="loc">MetalRenderer.zig:162-167; GameWindow.swift:107-111</div>
+  <p><code>resize()</code> updates width/height fields and stops. <code>drawableSize</code> is set exactly once, when the layer is first fetched. Resizing the window stretches/blurs output and desyncs the aspect math in <code>worldToClipSpace</code> against the actual drawable.</p>
+</div>
+
+<div class="card crit">
+  <div class="card-name c-red">S7 · Sprites always render on top of all shapes</div>
+  <div class="loc">MetalRenderer.zig:280-281; Components.zig:53-55</div>
+  <p>Geometry flushes before textures, unconditionally. A UI panel (shape) can never draw over a ZxlSprite; HUD-over-character is impossible. Related: <code>RenderLayer { z_order }</code> exists as a component but no system reads it — render order is ECS storage order. Fixed properly in Phase 4.</p>
+</div>
+
+<div class="card crit">
+  <div class="card-name c-red">S8 · Frame timing quantized to whole milliseconds, owned by each game</div>
+  <div class="loc">examples/pong/main.zig:59-64</div>
+  <p>Examples compute <code>dt</code> from a millisecond clock: at 60Hz dt alternates 16/17ms (±3%), which reads as micro-stutter in linear motion. Every game re-implements this. The engine should own timing at nanosecond precision and hand dt out.</p>
+</div>
+</section>
+
+<!-- ===================================================== -->
+<section id="perf">
+<h2>4. Findings: performance</h2>
+
+<div class="card perf">
+  <div class="card-name c-orange">P1 · Draw-call explosion — one drawPrimitives per triangle/line <span class="badge win">biggest win</span></div>
+  <div class="loc">geometry_batch.zig:489-512 (circle), 316-347 (rect), 251-255 (tri), 402-421 (poly outline); text.zig:115-133</div>
+  <table>
+    <tr><th>Item drawn</th><th>Draw calls today</th><th>Could be</th></tr>
+    <tr><td>Circle, fill + stroke (32 segments)</td><td class="num">64</td><td class="num">≤2</td></tr>
+    <tr><td>Rectangle, fill + stroke</td><td class="num">6</td><td class="num">≤2</td></tr>
+    <tr><td>One text character (~10–50 glyph triangles)</td><td class="num">10–50</td><td class="num">shared</td></tr>
+    <tr><td>"FPS: 59.9" debug readout</td><td class="num">~150+</td><td class="num">shared</td></tr>
+    <tr><td>PONG frame (ball, 2 paddles, walls, score)</td><td class="num">~80–150</td><td class="num">≤5</td></tr>
+    <tr><td>Stress: 100 circles fill+stroke</td><td class="num">6,400</td><td class="num">≤2</td></tr>
+  </table>
+  <p>Every one of those calls also crosses Zig→Swift FFI (<code>metal_render_encoder_draw_primitives</code> → <code>Unmanaged.fromOpaque</code> → objc dispatch). Since consecutive calls share pipeline and buffer, calls with the same primitive type and contiguous vertex ranges can be merged mechanically — order preserved, zero visual change. <code>addPolygon</code>'s fill already does this correctly for its own triangles, which proves the pattern.</p>
+</div>
+
+<div class="card perf">
+  <div class="card-name c-orange">P2 · All transform math on CPU, per vertex, with per-vertex sin/cos</div>
+  <div class="loc">geometry_utils.zig:18-27 (rotatePt), geometry_batch.zig:423-513 (addCircle)</div>
+  <p><code>rotatePt</code> evaluates <code>cos/sin</code> for <em>every vertex</em> instead of once per shape. <code>addCircle</code> re-tessellates 32 segments every frame with 2 transcendental calls per segment — and computes each perimeter point twice (segment i's p2 = segment i+1's p1). A rotating circle pays ~256 sin/cos per frame. The vertex shader does nothing that could absorb this. Fixes: per-shape 2×3 matrix (cos/sin once), unit-circle LUTs, and moving the camera→clip transform to the GPU as a per-pass uniform.</p>
+</div>
+
+<div class="card perf">
+  <div class="card-name c-orange">P3 · One draw call + texture bind per sprite, no atlas</div>
+  <div class="loc">texture_batch.zig:35-76; MetalRenderer.zig:357-365</div>
+  <p><code>TextureBatch.addSprite</code> appends a draw call per quad; flush sets the fragment texture per call even when consecutive sprites share one. Each Zxl animation frame is also its own <code>MTLTexture</code>, so animation guarantees texture switches. Run-merging is trivial now; an atlas is the Phase 5 fix.</p>
+</div>
+
+<div class="card perf">
+  <div class="card-name c-orange">P4 · Text goes through full shape dispatch per glyph triangle</div>
+  <div class="loc">text.zig:115-133, 155-173</div>
+  <p>Glyph triangles are cached (good), but each one is wrapped in a <code>ShapeData</code> union, dispatched through <code>addShapeDispatch</code>, transform-branched per vertex, and given its own draw call. A 100-char HUD ≈ 3–5k vertices of avoidable per-frame overhead plus thousands of calls. P1's merging absorbs the draw calls; Phase 2's tessellator gives text a direct "append pre-transformed triangles" path.</p>
+</div>
+
+<div class="card perf">
+  <div class="card-name c-orange">P5 · 24-byte vertex; color as 4×f32</div>
+  <div class="loc">metal_types.zig:40-43</div>
+  <p>Flat-shaded 2D needs 4 bytes of color, not 16. <code>unorm4x8</code> halves vertex size to 12 bytes — halves the per-frame memcpy and GPU fetch. Free win bundled into the Phase 2 shader rev.</p>
+</div>
+
+<div class="card perf">
+  <div class="card-name c-orange">P6 · No visibility culling</div>
+  <div class="loc">RenderSys.zig:58-78</div>
+  <p>Off-screen entities are fully tessellated, transformed, and submitted. The camera's ortho bounds are already computable (<code>getCameraViewBounds</code> exists); a conservative AABB test in RenderSys skips the entire cost. Matters once worlds are bigger than one screen — Phase 5.</p>
+</div>
+
+<div class="card perf">
+  <div class="card-name c-orange">P7 · Drawable acquired at frame start and held throughout</div>
+  <div class="loc">MetalRenderer.zig:261</div>
+  <p><code>nextDrawable()</code> can block ~a full vsync when the pool is starved; calling it in <code>beginFrame</code> serializes that wait <em>before</em> simulation instead of overlapping. Apple's guidance: acquire as late as possible — here, in <code>endFrame</code> after batching. Combined with S2's retained drawables, today's pattern is maximally pool-hostile.</p>
+</div>
+</section>
+
+<!-- ===================================================== -->
+<section id="api">
+<h2>5. Findings: API &amp; mechanics</h2>
+
+<div class="card api">
+  <div class="card-name c-purple">A1 · stroke_width is accepted everywhere and honored nowhere</div>
+  <div class="loc">geometry_batch.zig: every addX starts with <code>_ = stroke_width</code></div>
+  <p>Scene files, the Inspector, and <code>Sprite</code> all carry <code>stroke_width</code>; the Metal path draws 1px hairlines regardless (line primitives can't be widened on Metal, and wide lines are optional on Vulkan). Phase 2 tessellates strokes as triangles, making the parameter real and uniform across backends.</p>
+</div>
+
+<div class="card api">
+  <div class="card-name c-purple">A2 · Positional-optionals draw signature</div>
+  <p><code>drawGeometry(shape, transform, fill_color, stroke_color, stroke_width, ctx)</code> reads as a mystery at call sites and grows a parameter per new style feature. Plan: a <code>DrawStyle</code> struct with defaults (fill, stroke, width, opacity, later gradient), one new <code>drawShape(shape, transform, style, ctx)</code> entry point, old signature kept as a thin wrapper until callers migrate.</p>
+</div>
+
+<div class="card api">
+  <div class="card-name c-purple">A3 · World/Screen duplication doubles the batch code</div>
+  <div class="loc">geometry_batch.zig — ~60% of its 533 lines is <code>if (PointType == ScreenPoint)</code> branching</div>
+  <p>Every shape × every vertex picks between <code>makeVertex</code>/<code>makeScreenVertex</code>. Both spaces are just different affine maps to clip space. Phase 2 collapses this to a single tessellation path parameterized by one <code>ClipMap</code> (scale+offset), chosen per draw. New shapes then get written once, not twice.</p>
+</div>
+
+<div class="card api">
+  <div class="card-name c-purple">A4 · Silent no-op and dead API surface</div>
+  <div class="loc">geometry_batch.zig:515-531; shapes.zig:211-218; EngineRender.zig:7-11; RenderContext fields</div>
+  <ul>
+    <li><code>Ellipse</code> is registered in the union and parseable from scenes, but <code>addEllipse</code> is an empty body — scene authors get nothing, no error.</li>
+    <li><code>EngineRender.draw()</code> calls <code>renderer.drawShape(shape_union, xform)</code> — an arity that doesn't exist; it only compiles because Zig lazily analyzes unused decls. Dead API.</li>
+    <li><code>RenderContext.time / frame_number / scale_factor</code> are hardwired to 0/0/1.0 by RenderSys every frame; <code>MetalRenderer.start_time/last_frame_time/scale_factor</code> are likewise dead. Either feed them honestly (engine has all three) or drop them. Phase 2 feeds them — shader effects and px-accurate strokes will want time and scale.</li>
+  </ul>
+</div>
+
+<div class="card api">
+  <div class="card-name c-purple">A5 · Scene format has no integer type</div>
+  <p>Supported value types are vec2/vec3/f32/string/color/bool. Z-order (<code>RenderLayer.z_order: i32</code>), n-gon side counts, and similar fields can't be expressed. Small lexer/parser addition, needed by Phases 3–4.</p>
+</div>
+</section>
+
+<!-- ===================================================== -->
+<section id="phase0">
+<h2>Phase 0 — Stable frame foundation <span class="badge win">DONE: S1–S5, S8</span> <span class="badge dec">S6 (resize) deferred to Vulkan bring-up</span></h2>
+<p><strong>Goal:</strong> every later phase assumes frames that don't race, leak, or lie. Nothing here changes what's drawn.</p>
+
+<h3>0.1 Frame lifecycle bridge — full specification (fixes S1, S2, P7)</h3>
+<p>This is the detailed spec for the rewrite. It replaces the per-frame object soup with a two-object model and a strict ownership contract. The <strong>S2 memory leak</strong> (the ~1 MB / 10 s the renderer is bleeding) is fixed here directly.</p>
+
+<h4>Root cause of the leak (S2), object by object</h4>
+<p>Five bridge functions on the hot path each do <code>Unmanaged.passRetained(x).toOpaque()</code> — i.e. they hand Zig a +1 retain count — and <strong>nothing on either side ever calls <code>release</code></strong>. <code>MetalRenderer.deinit</code> literally has <code>// TODO: Release all the MTL resources</code>. Per frame, leaked:</p>
+<table>
+  <tr><th>Bridge fn (current)</th><th>Loc</th><th>Returns retained</th><th>Released today?</th></tr>
+  <tr><td><code>metal_create_command_buffer</code></td><td class="loc">MetalBridge.swift:24-31</td><td>MTLCommandBuffer (+ its internal encoder/arg storage)</td><td class="warn-inline">never</td></tr>
+  <tr><td><code>metal_layer_next_drawable</code></td><td class="loc">:57-62</td><td>CAMetalDrawable (wrapper; holds a drawable-pool slot)</td><td class="warn-inline">never</td></tr>
+  <tr><td><code>metal_drawable_get_texture</code></td><td class="loc">:63-67</td><td>MTLTexture view of the drawable</td><td class="warn-inline">never</td></tr>
+  <tr><td><code>metal_create_render_pass_descriptor</code></td><td class="loc">:158-163</td><td>MTLRenderPassDescriptor</td><td class="warn-inline">never</td></tr>
+  <tr><td><code>metal_command_buffer_create_render_encoder</code></td><td class="loc">:197-209</td><td>MTLRenderCommandEncoder</td><td class="warn-inline">never</td></tr>
+</table>
+<p>Five objects × ~300–400 B effective ≈ <strong>~1.7 KB/frame → ~1 MB per 10 s @ 60 fps</strong>, matching the observed growth. (The drawable's multi-MB IOSurface is <em>not</em> in this total — present recycles it — which is why the bleed is KB/frame, not MB/frame.) There's also no <code>autoreleasepool</code> wrapping the frame on the Zig-driven thread, so even autoreleased temporaries created inside these calls have no drain point.</p>
+<p><strong>The rule the new design enforces:</strong> any object handed across FFI as a pointer is owned by exactly one side, and the function name says which. <code>*_begin</code>/<code>create_*</code> transfer ownership to Zig (Zig must pass it back to a <code>*_end</code>/<code>*_release</code>); everything else is borrowed for the duration of the call only.</p>
+
+<h4>Two Swift objects</h4>
+<pre><code>// MetalBridge.swift — process-lifetime, created once, lives in a Swift global
+final class MetalFrameContext {
+    let device: MTLDevice
+    let queue: MTLCommandQueue
+    let layer: CAMetalLayer
+    let inflight: DispatchSemaphore     // init value = maxFramesInFlight (3)
+    var msaa: MTLTexture?               // nil until Phase 3; recreated on resize
+    var sampleCount: Int = 1
+}
+
+// One per frame. Returned to Zig RETAINED; ownership transfers to Zig until
+// it is handed to metal_frame_end, which releases it.
+final class MetalFrame {
+    let drawable: CAMetalDrawable        // strong ref keeps the pool slot alive
+    let commandBuffer: MTLCommandBuffer
+    let encoder: MTLRenderCommandEncoder // pass descriptor built + discarded internally
+}</code></pre>
+<p>The pass descriptor is created, consumed by <code>makeRenderCommandEncoder</code>, and dropped <em>inside</em> <code>metal_frame_begin</code> — it never crosses FFI, so it can't be leaked. Same for the drawable's texture: used to set the color attachment internally, never returned.</p>
+
+<h4>FFI surface — exact signatures</h4>
+<p>Zig <code>extern</code> declarations (left) and their Swift <code>@_cdecl</code> counterparts (behavior on right). Opaque pointers are <code>OpaquePointer?</code> on the Swift side as today.</p>
+<pre><code>// ---- context lifecycle (called once each) -------------------------------
+extern fn metal_frame_context_create(
+    device: *MTLDevice,
+    queue: *MTLCommandQueue,
+    layer: *CAMetalLayer,
+    max_frames_in_flight: u32,          // 3
+) ?*MetalFrameContext;
+//   Swift: stores refs (passUnretained — context outlives them anyway),
+//          inflight = DispatchSemaphore(value: maxFramesInFlight),
+//          returns passRetained(ctx). OWNER: Zig (until destroy).
+
+extern fn metal_frame_context_destroy(ctx: *MetalFrameContext) void;
+//   Swift: Unmanaged.fromOpaque(ctx).release(). Called from MetalRenderer.deinit.
+
+// ---- per-frame (called every endFrame) ----------------------------------
+extern fn metal_frame_begin(
+    ctx: *MetalFrameContext,
+    clear_r: f64, clear_g: f64, clear_b: f64, clear_a: f64,
+) ?*MetalFrame;
+//   Swift, in order:
+//     1. ctx.inflight.wait()              // BLOCKS until a slot frees (gates buffer ring)
+//     2. autoreleasepool {
+//          guard let drawable = ctx.layer.nextDrawable() else {
+//              ctx.inflight.signal(); return nil   // never strand the semaphore
+//          }
+//          let cb  = ctx.queue.makeCommandBuffer()!
+//          let rpd = MTLRenderPassDescriptor()
+//          let target = ctx.msaa ?? drawable.texture          // Phase 3 picks MSAA tex
+//          rpd.colorAttachments[0].texture        = target
+//          rpd.colorAttachments[0].loadAction     = .clear
+//          rpd.colorAttachments[0].clearColor     = MTLClearColor(r,g,b,a)
+//          rpd.colorAttachments[0].storeAction    =
+//              ctx.msaa != nil ? .multisampleResolve : .store
+//          if ctx.msaa != nil {
+//              rpd.colorAttachments[0].resolveTexture = drawable.texture
+//          }
+//          let enc = cb.makeRenderCommandEncoder(descriptor: rpd)!
+//          // rpd drops here — never leaves Swift
+//        }
+//     3. return passRetained(MetalFrame(drawable, cb, enc))   // OWNER: Zig
+//   On any failure after wait(): signal() before returning nil. NULL => Zig
+//   skips this frame's draws entirely (no buffers touched, no present).
+
+extern fn metal_frame_encoder(frame: *MetalFrame) *MTLRenderCommandEncoder;
+//   Swift: passUnretained(frame.encoder). BORROWED — valid only between
+//   metal_frame_begin and metal_frame_end. Zig uses it for set_pipeline_state /
+//   set_vertex_buffer / set_vertex_bytes / draw_primitives, then drops it.
+
+extern fn metal_frame_end(ctx: *MetalFrameContext, frame: *MetalFrame) void;
+//   Swift, in order:
+//     1. frame.encoder.endEncoding()
+//     2. frame.commandBuffer.present(frame.drawable)
+//     3. frame.commandBuffer.addCompletedHandler { _ in ctx.inflight.signal() }
+//     4. frame.commandBuffer.commit()
+//     5. Unmanaged<MetalFrame>.fromOpaque(frame).release()   // drops cb, enc,
+//        drawable together — the whole per-frame retain graph goes to zero
+//   The completion handler is the ONLY signal() on the success path; it fires
+//   when the GPU is done reading this frame's vertex buffer slot.
+
+// ---- generic release for createTexture/createBuffer (closes deinit TODO) --
+extern fn metal_release(ptr: *anyopaque) void;
+//   Swift: Unmanaged<AnyObject>.fromOpaque(ptr).release(). Used by deinit to
+//   free the buffer rings, textures, pipelines, library, queue, device.</code></pre>
+
+<h4>Ownership contract (the one table to remember)</h4>
+<table>
+  <tr><th>Object</th><th>Created by</th><th>Owner after call</th><th>Freed by</th><th>Lifetime</th></tr>
+  <tr><td>FrameContext</td><td><code>metal_frame_context_create</code></td><td>Zig</td><td><code>metal_frame_context_destroy</code></td><td>process</td></tr>
+  <tr><td>MetalFrame (+ cb, encoder, drawable)</td><td><code>metal_frame_begin</code></td><td><span class="ok-inline">Zig</span></td><td><code>metal_frame_end</code></td><td>one frame</td></tr>
+  <tr><td>encoder handle</td><td><code>metal_frame_encoder</code></td><td>borrowed</td><td>— (don't)</td><td>begin→end</td></tr>
+  <tr><td>render pass descriptor</td><td>inside <code>frame_begin</code></td><td>Swift</td><td>autoreleasepool</td><td>never crosses FFI</td></tr>
+  <tr><td>device / queue / pipelines / library</td><td>init</td><td>Zig</td><td><code>metal_release</code> in deinit</td><td>process</td></tr>
+  <tr><td>buffer-ring buffers, textures</td><td><code>createBuffer</code>/<code>createTexture</code></td><td>Zig</td><td><code>metal_release</code></td><td>process / asset</td></tr>
+</table>
+<p><strong>Invariant:</strong> exactly one <code>metal_frame_end</code> (or a NULL return from <code>begin</code>) for every <code>metal_frame_begin</code>. Honor that and the per-frame retain count returns to zero every frame — the leak is structurally gone, not just patched.</p>
+
+<h4>Zig side — MetalRenderer changes (as built)</h4>
+<div class="card good">
+  <div class="card-name c-green">As-built note</div>
+  <p>Two things landed differently from the first sketch and are now the source of truth: (1) <strong><code>frame_index</code> is <code>u8</code> indexed <code>@mod(idx, 3)</code></strong>, not <code>u2</code> — <code>u2</code> wraps 0→1→2→<span class="warn-inline">3</span>→0 and would index a nonexistent 4th buffer. (2) <strong>Memcpy and draw stay in one function per pass</strong> (combined, "option B"); there is no separate <code>uploadBatches</code>. The flush functions take <code>(encoder, idx)</code> and do slot copy + draw together — fewer moving parts, and upload-on-another-thread isn't needed at this scale.</p>
+</div>
+<pre><code>// fields: drop current_drawable, current_command_buffer, vertex_buffer,
+//         vertex_buffer_size, texture_vertex_buffer; add:
+frame_ctx: *MetalFrameContext,
+frame_index: u8 = 0,                     // ring cursor, used @mod(_,3)
+vertex_buffers: [3]*MTLBuffer,           // geometry ring (was: single vertex_buffer)
+texture_vertex_buffers: [3]*MTLBuffer,   // sprite ring
+// const SLOT_BYTES     = 2 * 1024 * 1024;   // replaces the bogus MAX_VERT_SIZE
+// const TEX_SLOT_BYTES = 512 * 1024;
+// const FRAMES_IN_FLIGHT: u32 = 3;
+// init: create ONE of each pipeline + batch (NOT in the ring loop); loop
+//       creates only the 3+3 buffers; then metal_frame_context_create.
+
+pub fn beginFrame(self: *Self) !void {
+    self.batch.clear();
+    self.texture_batch.clear();
+    self.frame_index +%= 1;              // advance ring; 0,1,2,0,... (mod at use)
+    self.frame_number += 1;
+    // NO Metal calls here anymore — drawable acquired late (fixes P7)
+}
+
+pub fn endFrame(self: *Self) !void {
+    const frame = MetalBridge.frameBegin(self.frame_ctx, ClearColor.fromColor(self.clear_color))
+        orelse return;                   // NULL => drop frame, buffers untouched, NO clear
+    const idx = @mod(self.frame_index, 3);
+    const enc = MetalBridge.frameEncoder(frame);
+    try self.flushGeometryBatch(enc, idx);         // memcpy slot[idx] + draw
+    try self.flushTextureBatch(enc, idx);          // memcpy slot[idx] + draw + S4 guard
+    MetalBridge.frameEnd(self.frame_ctx, frame);   // releases frame, signals on GPU done
+}
+
+// flush = one function per pass, (encoder, idx). Copy is clamped to a vertex
+// multiple of SLOT_BYTES / TEX_SLOT_BYTES (S4 now covers BOTH passes; the
+// texture pass had no guard before). setVertexBuffer binds buffers[idx].
+
+pub fn deinit(self: *Self) void {
+    self.batch.deinit();
+    self.texture_batch.deinit();
+    for (self.vertex_buffers) |b| MetalBridge.release(b);
+    for (self.texture_vertex_buffers) |b| MetalBridge.release(b);
+    MetalBridge.release(self.pipeline_state);
+    MetalBridge.release(self.texture_pipeline_state);
+    MetalBridge.frameContextDestroy(self.frame_ctx);   // closes the deinit TODO
+}</code></pre>
+<p>Why the wait gates correctness (S1): <code>metal_frame_begin</code> blocks on the semaphore <em>before</em> the flush writes <code>buffers[idx]</code>. With value=3, the CPU can be at most 3 frames ahead, and slot N is only rewritten after the command buffer that last read it ran its completion handler. No fence math on the Zig side; the semaphore is the whole sync mechanism. Init-time objects stay <code>passRetained</code> forever — correct for process-lifetime resources.</p>
+<div class="card crit">
+  <div class="card-name c-red">Two known gaps deferred to 0.2 (do NOT fix in 0.1)</div>
+  <ul>
+    <li><strong>Overflow still draws garbage.</strong> When a flush clamps the vertex copy, the <code>draw_calls</code> loop still issues draws whose <code>vertex_start + vertex_count</code> reach past the clamp into stale buffer bytes → junk triangles. Pre-existing behavior (the old geometry path had it too). 0.2's real fix trims the draw list at the clamp boundary; the ring-grow makes clamping rare anyway. 0.1 matches current behavior (log + truncate). If a blank-on-overflow frame is preferred meanwhile, <code>return</code> after the log instead of drawing.</li>
+    <li><strong><code>deinit</code> doesn't drain in-flight frames.</strong> Releasing a ring buffer while its command buffer is still on the GPU is a use-after-free. Harmless on a clean Esc-to-quit (GPU idle), but 0.2 should acquire the semaphore <code>FRAMES_IN_FLIGHT</code> times before the buffer releases to guarantee the GPU is done.</li>
+  </ul>
+</div>
+
+<h4>Migration map (old call → new)</h4>
+<table>
+  <tr><th>Deleted FFI fn</th><th>Replaced by</th></tr>
+  <tr><td><code>metal_create_command_buffer</code></td><td rowspan="5">folded into <code>metal_frame_begin</code> (single retained handle out)</td></tr>
+  <tr><td><code>metal_layer_next_drawable</code></td></tr>
+  <tr><td><code>metal_drawable_get_texture</code></td></tr>
+  <tr><td><code>metal_create_render_pass_descriptor</code></td></tr>
+  <tr><td><code>metal_command_buffer_create_render_encoder</code></td></tr>
+  <tr><td><code>metal_render_pass_set_color_attachment</code></td><td>internal to <code>frame_begin</code> (clear color passed as 4 f64s)</td></tr>
+  <tr><td><code>metal_render_encoder_end</code></td><td rowspan="3">folded into <code>metal_frame_end</code></td></tr>
+  <tr><td><code>metal_command_buffer_present_drawable</code></td></tr>
+  <tr><td><code>metal_command_buffer_commit</code></td></tr>
+  <tr><td><em>(get encoder for draw calls)</em></td><td><code>metal_frame_encoder</code> (borrowed)</td></tr>
+  <tr><td><em>(nothing — leak)</em></td><td><code>metal_release</code> + <code>metal_frame_context_destroy</code></td></tr>
+</table>
+<p>Net FFI change: ~9 per-frame calls collapse to 3 (<code>begin</code>, <code>encoder</code>, <code>end</code>) plus the draw/bind calls, which keep their current signatures but take the borrowed encoder. <code>setVertexBuffer</code> picks <code>vertex_buffers[@mod(frame_index, 3)]</code> instead of the single buffer.</p>
+
+<h4>Verifying the fix</h4>
+<p>Before: <code>leaks &lt;pid&gt;</code> after 60 s shows ~3,600 each of <code>MTLCommandBuffer</code>, render encoder, and descriptor (one per frame). After: those counts stay flat; RSS is stable over a 10-minute soak. This is the explicit Phase 0 soak check in §7.</p>
+
+<h3>0.2 Right-size buffers with a sane overflow policy (fixes S3, S4)</h3>
+<ul>
+  <li>Geometry ring: <strong>2&nbsp;MB per slot</strong> (≈87k vertices of 24B; ≈175k after Phase 2's 12B vertex). Texture ring: <strong>512&nbsp;KB per slot</strong>. Total GPU memory: 7.5&nbsp;MB instead of 288&nbsp;MB.</li>
+  <li>One overflow policy in both flushes: if bytes &gt; capacity → truncate this frame's copy at a vertex boundary, log throttled (once/second), set <code>pending_grow = needed_bytes</code>. Next <code>beginFrame</code> waits out all in-flight frames (3 semaphore acquires), reallocates the ring ×2, releases old buffers. No corruption, no permanent truncation. <strong>Also trim the <code>draw_calls</code> list at the clamp boundary</strong> — 0.1 leaves this undone (see the deferred-gaps note under 0.1), so overflow currently draws past-the-clamp garbage until this lands.</li>
+  <li><strong>Drain on <code>deinit</code>:</strong> before releasing the ring buffers, acquire the semaphore <code>FRAMES_IN_FLIGHT</code> times (blocks until every in-flight frame's completion handler has fired → GPU provably idle), <strong>then signal it <code>FRAMES_IN_FLIGHT</code> times to restore its original value</strong>. The rebalance is mandatory: <code>libdispatch</code> aborts (<em>"Semaphore object deallocated while in use (current value &lt; original value)"</em>) if a <code>DispatchSemaphore</code> is deallocated below the value it was created with. The re-signal doesn't weaken the barrier — nothing is submitting frames during teardown, so the restored permits are never consumed; they exist only so the semaphore can dispose cleanly. Do the wait+signal as the FIRST thing in <code>deinit</code>, before any release.</li>
+  <li>Delete the fake "flush early" check in <code>drawShape</code> and the <code>MAX_VERT_SIZE</code> constant; capacity lives on the ring.</li>
+</ul>
+
+<h3>0.3 Enable blending on the geometry pipeline (fixes S5)</h3>
+<p>Same straight-alpha config the texture pipeline already uses (<code>sourceAlpha / oneMinusSourceAlpha</code>, both channels). Premultiplied alpha was considered and deferred — see <a href="#decisions">D6</a>.</p>
+
+<h3>0.4 Implement resize (fixes S6) <span class="badge dec">DEFERRED — parked until Vulkan is live</span></h3>
+<p><strong>Deliberately left stubbed as of 2026-06-30.</strong> Resize is the one Phase 0 item that is inherently cross-backend — it couples the platform resize callback to the render backend's swapchain/drawable sizing. Wiring it fully on Metal while the Vulkan backend is still a non-running skeleton would bake a Metal-shaped assumption (drawable-size model, single color target) into the platform→renderer contract that would then have to be reworked for Vulkan's swapchain-recreation model. So <code>MetalRenderer.resize</code> stays a near-no-op (updates the width/height fields, emits a one-time "resize not implemented (0.4 deferred)" warning so window-drag blur is self-explaining) until Vulkan bring-up, at which point resize gets designed once against both backends.</p>
+<p>Intended shape when un-parked: platform resize callback → <code>renderer.resize(w, h)</code> → Metal sets <code>drawableSize = w*scale, h*scale</code>; Vulkan recreates the swapchain. Engine updates <code>logical_*</code>, renderer updates physical. MSAA texture (Phase 3) recreates here too. Drawable-size changes take effect next frame naturally since the drawable is acquired late.</p>
+
+<h3>0.5 Engine-owned nanosecond timing (fixes S8) <span class="badge win">DONE</span></h3>
+<p><strong>Complete.</strong> Engine owns dt: <code>beginFrame</code> diffs <code>platform.monotonicNanos()</code> against <code>last_frame_ns</code>, clamps the spike via <code>max_dt</code>, scales by <code>time_scale</code>, and seeds the first frame to dt=0 so nothing integrates against a bogus startup gap. Exposed as <code>Engine.deltaTime()</code>; the examples' old millisecond <code>monoMillis()</code> math is gone. (Landed alongside the frame-bridge work.)</p>
+</section>
+
+<!-- ===================================================== -->
+<section id="phase1">
+<h2>Phase 1 — Draw-call collapse <span class="badge win">DONE 2026-06-30</span> <span class="badge perf">fixes P1, P3 (merge half)</span></h2>
+<div class="card good">
+  <div class="card-name c-green">Landed</div>
+  <p>One <code>pushCall</code> helper per batch (<code>geometry_batch.zig</code>, <code>texture_batch.zig</code>) extends the last <code>DrawCall</code> when compatible (geometry: same primitive + contiguous range; texture: same texture), else appends. Every <code>addX</code> routes its draw-call append through it. Output-identical — all 5 example apps render unchanged. Backend-shared files, so the win is portable to Vulkan for free. One bug found + fixed in review: the texture <code>pushCall</code> was missing a <code>return</code> after the merge, so same-texture sprites both grew the prior call AND appended a new one (double-draw, hidden by opaque overdraw — would've shown as double-blend on a transparent sprite). RenderStats was cut (see 1.3); measure via Xcode GPU capture instead.</p>
+</div>
+<p><strong>Goal:</strong> same vertices, same order, ~98% fewer GPU calls. Independent of Phase 0 — can be done first if preferred.</p>
+
+<h3>1.1 Auto-merge in GeometryBatch</h3>
+<p>Replace every <code>draw_calls.append(...)</code> in the addX functions with one method that extends the previous call when compatible:</p>
+<pre><code>fn pushCall(self: *GeometryBatch, prim: MTLPrimitiveType, start: u32, count: u32) !void
+    // if last call exists and last.primitive_type == prim
+    //    and last.vertex_start + last.vertex_count == start:
+    //        last.vertex_count += count          // merge — order preserved
+    // else append new DrawCall</code></pre>
+<p>Painter's order is untouched because only <em>adjacent</em> ranges merge. A circle's 32 fill triangles become one call; an all-triangle frame becomes literally one call per contiguous run. Interleaved fill/stroke still alternates triangle/line runs per shape (~2 calls each) — that residual cost disappears in Phase 2 when strokes become triangles.</p>
+
+<h3>1.2 Same merge for TextureBatch</h3>
+<p><code>addSprite</code> merges when <code>texture == last.texture</code> (ranges are always contiguous there). Flush only rebinds the fragment texture when it changes.</p>
+
+<h3>1.3 Measurement — external, not a permanent renderer feature <span class="badge dec">RenderStats CUT</span></h3>
+<p><strong>Decision (revised):</strong> the original plan added a persistent <code>RenderStats</code> struct on the renderer, filled in the flush and shown on the debug overlay. <strong>Cut it.</strong> Stats populated in the backend flush would have to be re-plumbed identically in every backend (Metal, then Vulkan, then GL) to feed a debug readout — a permanent per-backend tax for something that isn't load-bearing. The batching code (<code>geometry_batch.zig</code>, <code>texture_batch.zig</code>) is backend-shared and carries the real, portable win; counters were the only part that didn't share cleanly, and they were the only part that wasn't load-bearing.</p>
+<p>Measure the merge <em>once</em> instead, with tools that already exist and are better:</p>
+<ul>
+  <li><strong>Xcode Metal frame capture / GPU report</strong> — exact per-frame draw-call count and encoder time, ground truth, zero code.</li>
+  <li><strong>A throwaway <code>log.info</code></strong> in the flush during development for a quick before/after, deleted before commit. The number lives in the commit message, not the renderer forever.</li>
+</ul>
+<p>If persistent perf instrumentation is ever genuinely wanted, the right shape is <em>not</em> per-backend counters — it's returning the backend's already-known numbers through the existing <code>frame_end</code> path (one struct, filled where the work happens, no new plumbing), or just Instruments. That's a "when actually needed" decision, explicitly deferred.</p>
+</section>
+
+<!-- ===================================================== -->
+<section id="phase2">
+<h2>Phase 2 — Unified tessellator &amp; real strokes <span class="badge perf">fixes P2, P4, P5</span> <span class="badge api">fixes A1, A2, A3, A4</span></h2>
+<p><strong>Goal:</strong> one backend-agnostic module turns <code>ShapeData + DrawStyle</code> into triangles. Backends stop knowing what a circle is. This is the platform Phase 3's shapes land on.</p>
+<p style="border-left:3px solid #d29922;padding-left:12px;color:#c9d1d9;"><strong>Doc synced 2026-07-01 to the settled design.</strong> The split below is deliberate and locked: <strong>2.1</strong> = the tessellator + real strokes + a generic batch, keeping the OLD 24-byte float vertex (revertible, byte-identical on fills). <strong>2.2</strong> = the 12-byte vertex + camera-on-GPU + circle LUT. <strong>2.3/2.4</strong> = public API + honest context. Three commits: 2.1 / 2.2 / 2.3+2.4.</p>
+
+<h3>2.1 Tessellator + real strokes + generic batch <span class="badge api">A1, A3, A4</span></h3>
+<p><strong>What 2.1 does:</strong> extract all geometry tessellation into a new backend-agnostic <code>src/renderer/tess.zig</code>; make strokes real (tessellated quads, 2 tris/edge, butt joins first — NOT 1px lines); collapse both Metal batches into one comptime-generic <code>Batch(V, K)</code> in a new <code>src/renderer/batch.zig</code>. Deletes <code>geometry_batch.zig</code> entirely.</p>
+
+<p><strong>Locked decisions:</strong></p>
+<table>
+  <tr><th>#</th><th>Decision</th></tr>
+  <tr><td>Q1</td><td>Color crosses the tess→batch seam as <code>u32</code>; vertex STORAGE stays <code>[4]f32</code>. The unpack lives in the backend's <code>makeVertex</code>, never in tess. <code>shaders.metal</code> + vertex descriptor UNCHANGED → geometry-fill stays byte-identical. (The real 12B/u32 vertex is 2.2.)</td></tr>
+  <tr><td>Q2</td><td>Circle tessellation is 32 segments, per-vertex <code>sin/cos</code>, kept as-is. Adaptive LUT buckets are 2.2. Only circle behavior change: outline becomes stroke quads, not line primitives.</td></tr>
+  <tr><td>Q3</td><td>Batch carries <code>gpa</code>; renderer passes <code>self.persistent</code>. No frame arena today (renderer's "frame" is <code>persistent</code> + <code>clearRetainingCapacity</code>); a real frame arena is a spun-out follow-up. 2.1 adds zero new heap allocations (xforms are stack).</td></tr>
+  <tr><td>Q4</td><td>Text deferred; <code>text.zig</code> untouched. Ported onto the batch in a later step once geometry is proven.</td></tr>
+  <tr><td>Seam</td><td>NO VertexSink / function-pointer / <code>*anyopaque</code> seam. <code>tessellate</code> takes the batch directly with EXPLICIT generics — no <code>anytype</code>. A comptime <code>makeVertex</code> keeps tess format-agnostic; everything inlines, zero per-vertex indirection.</td></tr>
+</table>
+
+<p><strong>Files at a glance:</strong></p>
+<table>
+  <tr><th>File</th><th>Action</th></tr>
+  <tr><td><code>src/renderer/batch.zig</code></td><td>CREATE — generic <code>Batch(V,K)</code> + <code>DrawCall(K)</code></td></tr>
+  <tr><td><code>src/renderer/tess.zig</code></td><td>CREATE — <code>DrawStyle</code>/<code>ClipMap</code>/<code>LocalXform</code> + the <code>Tess(V,K)</code> methods + <code>tessellate</code></td></tr>
+  <tr><td><code>src/renderer/gpu/metal/geometry_batch.zig</code></td><td>DELETE FILE — struct→generic, <code>addX</code>→tess methods, <code>pushCall</code>→batch.zig</td></tr>
+  <tr><td><code>src/renderer/gpu/metal/texture_batch.zig</code></td><td>REWRITE — <code>TextureBatch = Batch(TexVertex, TexKey)</code> alias; keep <code>addSprite</code></td></tr>
+  <tr><td><code>src/renderer/gpu/metal/metal_types.zig</code></td><td>EDIT — add <code>GeomKey</code>/<code>TexKey</code> (w/ <code>eql</code>) + <code>makeVertex</code> (the Q1 unpack)</td></tr>
+  <tr><td><code>src/renderer/gpu/metal/MetalRenderer.zig</code></td><td>EDIT — field types → generic; <code>addShape</code> body → shim; 2 flush lines (<code>call.key.prim</code>/<code>.tex</code>)</td></tr>
+  <tr><td><code>src/renderer/shapes.zig</code></td><td>EDIT — add <code>Ellipse.init</code></td></tr>
+  <tr><td><code>src/platform/macos/swift/shaders.metal</code></td><td>UNCHANGED (Q1)</td></tr>
+</table>
+
+<h4><code>batch.zig</code> — the generic (backend-neutral)</h4>
+<pre><code>pub fn DrawCall(comptime K: type) type {
+    return struct { key: K, vertex_start: u32, vertex_count: u32 };
+}
+pub fn Batch(comptime V: type, comptime K: type) type {
+    return struct {
+        const Self = @This();
+        vertices: std.ArrayList(V),
+        draw_calls: std.ArrayList(DrawCall(K)),
+        gpa: Allocator,                                  // = renderer.persistent (Q3)
+
+        pub fn init(gpa: Allocator) Self;
+        pub fn deinit(self: *Self) void;
+        pub fn clear(self: *Self) void;
+        pub fn mark(self: *const Self) u32;              // = vertices.items.len
+        pub fn vertex(self: *Self, v: V) !void;         // append one vertex
+        pub fn pushCall(self: *Self, key: K, start: u32, count: u32) !void;
+    };
+}
+// pushCall = the ONLY real logic: Phase-1 merge-if-adjacent, keyed by K.eql —
+//   if last.key.eql(key) and last.start+last.count == start: last.count += count; return
+//   else append. Backend keys: GeomKey{prim: MTLPrimitiveType}, TexKey{tex: *MTLTexture},
+//   each with `pub fn eql`. Metal builds Batch(Vertex, GeomKey) and Batch(TexVertex, TexKey).</code></pre>
+
+<h4><code>tess.zig</code> — types carry their own methods; <code>Tess(V,K)</code> owns the per-draw context</h4>
+<pre><code>pub const DrawStyle = struct {
+    fill: ?Color = null,
+    stroke: ?Color = null,
+    stroke_width: f32 = 1.0,        // world units world-side, px screen-side
+};
+
+pub const ClipMap = struct {        // any 2D space → clip, one affine map, built once per draw
+    scale: [2]f32, offset: [2]f32,
+    pub fn fromWorld(ctx: RenderContext) ClipMap;     // camera + ortho + aspect
+    pub fn fromScreen(ctx: RenderContext) ClipMap;    // pixels → clip, incl. y-flip
+    pub inline fn apply(self: ClipMap, p: V2) [2]f32; // p*scale + offset
+};
+
+pub const LocalXform = struct {     // built ONCE per shape; sin/cos evaluated only in `from`
+    m00: f32, m01: f32, m10: f32, m11: f32,           // 2x2 with cos/sin baked
+    tx: f32, ty: f32,                                 // translation
+    pub fn from(t: ?Transform) LocalXform;            // identity when null
+    pub inline fn apply(self: LocalXform, p: V2) V2;  // 4 mul + 4 add, no branches
+};
+
+// The per-draw context carrier. All tessellation is methods on the struct this
+// produces — they reach xf/map/batch/makeVertex via `self`. (This code no longer
+// lives inside the batch, so the context must be carried explicitly, not via an
+// ambient `self`.)
+fn Tess(comptime V: type, comptime K: type) type {
+    return struct {
+        const Self = @This();
+        batch: *Batch(V, K),
+        makeVertex: *const fn ([2]f32, u32) V,        // backend vertex builder (Q1 unpack lives there)
+        xf: LocalXform,
+        map: ClipMap,
+        tri_key: K,
+
+        fn emit(self: Self, p: V2, color: u32) !void;                       // xf.apply→map.apply→batch.vertex
+        fn stroke(self: Self, edges: []const [2]V2, style: DrawStyle) !void;   // disjoint edges (rect/tri/line)
+        fn strokeRing(self: Self, ring: []const V2, style: DrawStyle) !void;   // closed loop (circle/ellipse/poly)
+        fn rect(self: Self, r: Shapes.Rectangle(V2), style: DrawStyle) !void;
+        fn tri(self: Self, t: Shapes.Triangle(V2), style: DrawStyle) !void;
+        fn circle(self: Self, c: Shapes.Circle(V2), style: DrawStyle) !void;
+        fn ellipse(self: Self, e: Shapes.Ellipse(V2), style: DrawStyle) !void;
+        fn poly(self: Self, p: Shapes.Polygon(V2), style: DrawStyle) !void;
+        fn line(self: Self, l: Shapes.Line(V2), style: DrawStyle) !void;
+    };
+}
+
+// entry point — explicit generics, no anytype, no @TypeOf
+pub fn tessellate(comptime V: type, comptime K: type, batch: *Batch(V, K),
+                  comptime makeVertex: fn ([2]f32, u32) V, tri_key: K,
+                  shape: ShapeData, xf: LocalXform, style: DrawStyle,
+                  map: ClipMap, px_per_unit: f32) !void;
+// builds one Tess(V,K){...} then switches the union to t.circle/t.rect/… </code></pre>
+<ul>
+  <li><strong>The one vertex path.</strong> <code>emit</code>: <code>local = xf.apply(p)</code> → <code>clip = map.apply(local)</code> → <code>batch.vertex(makeVertex(clip, color))</code>. This REPLACES the old <code>makeVertex</code>/<code>makeScreenVertex</code> World/Screen fork (A3 death). Caller picks <code>fromWorld</code>/<code>fromScreen</code>; the union keeps both point types but tessellation normalizes <code>ScreenPoint→V2</code> at the switch and every method sees <code>V2</code>. See <a href="#decisions">D1</a>.</li>
+  <li><strong>Strokes = quads.</strong> Per edge, offset <code>hw = stroke_width/2</code> along the edge normal in LOCAL/pre-map space (so width is zoom-correct), emit 2 triangles. <code>stroke</code> takes disjoint edge-pairs; <code>strokeRing</code> takes a closed point-ring (perimeter with <code>ring[last]==ring[0]</code>) and walks <code>ring[i]/ring[i+1]</code> — no <code>%</code> and a single <code>pushCall</code> for the whole ring. Line primitives survive only inside DebugDraw.</li>
+  <li><strong>Circle/ellipse:</strong> 32 segments, per-vertex <code>sin/cos</code> (Q2). Perimeter computed once, shared by the fill fan and <code>strokeRing</code>. Ellipse is the same path with two radii — closing A4's silent no-op.</li>
+  <li><strong>Polygon fill</strong> reuses the existing <code>triangle_cache</code>; only its outline changes to <code>strokeRing</code>.</li>
+</ul>
+
+<h4>Backend keys + the vertex builder (<code>metal_types.zig</code> — the ONLY Metal knowledge)</h4>
+<pre><code>pub const GeomKey = struct { prim: MTLPrimitiveType,
+    pub fn eql(a: GeomKey, b: GeomKey) bool { return a.prim == b.prim; } };
+pub const TexKey  = struct { tex: *MTLTexture,
+    pub fn eql(a: TexKey, b: TexKey) bool { return a.tex == b.tex; } };
+
+pub fn makeVertex(pos: [2]f32, color: u32) Vertex {   // Q1 unpack: u32 → [4]f32, lives HERE
+    return .{ .position = pos, .color = unpackColor(color) };
+}</code></pre>
+<p><code>MetalRenderer.addShape</code> keeps its signature (RenderSys caller untouched) and becomes a shim: build <code>LocalXform.from(transform)</code> + the <code>ClipMap</code> (fromScreen for screen-space shapes else fromWorld) + <code>DrawStyle</code>, then <code>tess.tessellate(Vertex, GeomKey, &amp;self.batch, makeVertex, .{ .prim = .triangle }, …)</code>. Flush bodies are unchanged except <code>call.primitive_type</code>→<code>call.key.prim</code> and <code>call.texture</code>→<code>call.key.tex</code>.</p>
+
+<p><strong>Verification — three DISTINCT claims</strong> (the texture fold rides along with no geometry-check coverage):</p>
+<ul>
+  <li><strong>Geometry fill = byte-identical</strong> — Q1/Q2 preserve the wire format; a frame capture matches vertex-for-vertex. This is the proof for the 400-line deletion.</li>
+  <li><strong>Geometry stroke = the one intended diff</strong> — <code>stroke_width &gt; 1</code> on a paddle visibly widens (impossible today) = A1 closed.</li>
+  <li><strong>Texture = output-identical, internals changed</strong> — multi-texture scene renders right AND texture draw-call count unchanged (the old implicit <code>+=6</code> merge became an explicit <code>count=6</code>). Verify separately.</li>
+  <li>Plus the P1 lesson: count draw calls (geometry should drop) and test a TRANSPARENT stroke so double-blend shows if emit ranges overlap. <code>Batch(V,K)</code> merge gets a backend-free table test (adjacent / non-adjacent / key-change).</li>
+</ul>
+
+<h3>2.2 Vertex format v2 + camera on GPU <span class="badge perf">P5, P2</span></h3>
+<pre><code>pub const Vertex2D = extern struct {
+    position: [2]f32,    // now LOCAL-TRANSFORMED WORLD (or screen px), not clip
+    color: u32,          // unorm4x8 — vertex shrinks 24 → 12 bytes (P5)
+};
+// shaders.metal v2: float2 pos, uchar4 color [[attribute]],
+// constant ClipMap& map [[buffer(1)]] — applied in vertex_main
+// Encoder: setVertexBytes(&world_map) for world runs, (&screen_map) for UI runs</code></pre>
+<p>CPU keeps the local transform (batch stays flat); GPU applies camera→clip. The seam from 2.1 makes this surgical: <code>makeVertex</code> stops unpacking (writes <code>Vertex2D{pos, color}</code> directly), the shader + vertex descriptor rev in lockstep, and circle gets its adaptive LUT buckets {12,16,24,32,48,64,96} keyed off <code>px_per_unit</code>. <strong>tess.zig itself is untouched — <code>makeVertex</code> is the only edit point.</strong> See <a href="#decisions">D2</a>.</p>
+
+<h3>2.3 API: <code>drawShape</code> + DrawStyle (A2)</h3>
+<pre><code>pub fn drawShape(self: *Renderer, shape: ShapeData, transform: ?Transform,
+                 style: DrawStyle, ctx: RenderContext) void;
+// drawGeometry(...) re-expressed as a wrapper building DrawStyle; delete the
+// dead EngineRender.draw (A4); Sprite component maps fill/stroke/width/opacity
+// → DrawStyle in RenderSys. DrawStyle.opacity re-enters here (Phase 3 territory).</code></pre>
+
+<h3>2.4 Honest RenderContext (A4)</h3>
+<p>Engine fills <code>time</code>, <code>frame_number</code>, <code>scale_factor</code> (from <code>backingScaleFactor</code>); RenderSys derives the UI context instead of hand-building two. <code>px_per_unit = height / (2*ortho_size)</code> computed here and passed to tessellation. Also the step that ports <code>text.zig</code> onto the batch (deferred out of 2.1 per Q4).</p>
+
+<h3>Spun-out follow-up: real frame arena</h3>
+<p>Not part of any 2.x commit. Today the renderer's "frame" is <code>persistent</code> + <code>clearRetainingCapacity</code> on the batch ArrayLists — with two long-lived lists that IS a hand-rolled pool, which is why the missing arena never bit. A real per-frame <code>ArenaAllocator</code> is its own small commit; 2.1 doesn't need it, but 2.2's per-frame scratch will want it.</p>
+</section>
+
+<!-- ===================================================== -->
+<section id="phase3">
+<h2>Phase 3 — New shapes &amp; visual polish <span class="badge api">the out-of-the-box payoff</span></h2>
+<p><strong>Goal:</strong> the things a teenager notices. Every shape below is one tessellation function plus a struct in <code>shapes.zig</code> — the comptime registry and scene reflection do the rest.</p>
+
+<h3>3.1 Shape set</h3>
+<pre><code>pub fn RoundedRect(comptime PointType: type) type {
+    return struct {
+        center: PointType, half_width: f32, half_height: f32,
+        // four named f32 fields (not [4]f32) so scene-file reflection and the
+        // Inspector pick them up with zero plumbing — see decision D7
+        radius_tl: f32, radius_tr: f32, radius_br: f32, radius_bl: f32,
+        pub fn init(gpa, x, y, w, h, radius: f32) !@This();   // uniform
+        pub fn initPerCorner(center, w, h, radii: [4]f32) @This();
+        // tess: 4 arc fans (adaptive segs, radius clamped to min(hw,hh))
+        //       + center fan over the straight-edge perimeter
+    };
+}
+Capsule      // center, half_width, half_height (radius = min implied) — pills, paddles
+Arc          // origin, radius, thickness, start_angle, end_angle
+             //   thickness = 0 → filled pie/wedge; &gt; 0 → ring segment (donut, health ring)
+NGon         // origin, radius, sides, rotation — hexagons, dice, gems
+Star         // origin, outer_radius, inner_radius, points, rotation
+Polyline     // owned points + width; miter joins, butt caps (round caps later)
+             //   the "draw a path/trail/river" primitive games keep needing</code></pre>
+<p>Scene plumbing per shape: nothing for f32 fields (auto-reflected, like <code>[Sprite:circle] radius:f32</code> today); <code>sides</code>/<code>points</code> need A5's scene-format <code>int</code> type, added here. Inspector picks fields up the same way.</p>
+
+<h3>3.2 MSAA 4× on by default</h3>
+<p><code>RendererConfig.msaa_samples: u8 = 4</code>. Metal: multisample color texture (private storage, recreated on resize), render pass renders to it with <code>resolveTexture</code> = drawable, <code>storeAction = .multisampleResolve</code> (enum value already defined in metal_types.zig), pipelines get <code>sampleCount</code>. On Apple-Silicon TBDR this is nearly free and it's the single biggest "looks professional" lever for tessellated circles, rounded corners, and vector text. See <a href="#decisions">D4</a>.</p>
+
+<h3>3.3 Working transparency &amp; opacity</h3>
+<p>Phase 0.3 enabled blending; here it becomes API: <code>DrawStyle.opacity</code>, <code>Sprite.opacity</code> (component + scene field + Inspector), applied as an alpha multiplier at tessellation time. Fade-ins, ghost previews, damage flashes all become one-liners.</p>
+
+<h3>3.4 Gradients (vertex-color pass)</h3>
+<pre><code>pub const Gradient = struct {
+    kind: enum { linear, radial },
+    start_color: Color, end_color: Color,
+    angle: f32 = 0,                  // linear: direction in shape-local space
+};
+// DrawStyle.gradient: ?Gradient — when set, tessellation evaluates color per
+// vertex (lerp along axis / center-vs-perimeter). Radial is EXACT on circle/
+// rounded-rect fans (center vertex = start, perimeter = end). No shader change.</code></pre>
+<p>Banding on large linear fills is acceptable at this scale; an SDF/fragment upgrade is the noted future path (<a href="#decisions">D5</a>).</p>
+
+<h3>3.5 Sprite niceties</h3>
+<p><code>ZxlSprite.tint: ?Color</code> and <code>opacity</code> — texture pipeline's vertex format gains a color (matches Vertex2D), fragment multiplies. Hit-flash and fade for sprites, one component field.</p>
+</section>
+
+<!-- ===================================================== -->
+<section id="phase4">
+<h2>Phase 4 — Layers &amp; ordered submission <span class="badge crit">fixes S7</span></h2>
+<p><span class="badge dec">superseded</span> This section is the <em>original 2026-06-11 sketch</em>. The as-planned build (2026-07-15) is <a href="#phase4a">Phase 4a</a> + <a href="#phase4b">Phase 4b</a> below — it takes the "open option" escape hatch (single unified pipeline) as the <em>default</em>, goes <strong>indexed</strong>, and moves text to an <strong>SDF atlas</strong>. Read 4a/4b as authoritative; this sketch is kept for the decision trail.</p>
+<p><strong>Goal:</strong> <code>RenderLayer.z_order</code> means something; shapes and sprites interleave correctly.</p>
+
+<h3>4.1 Frame-local draw item list</h3>
+<pre><code>const DrawItem = struct {
+    sort_key: u64,            // (layer+bias) &lt;&lt; 32 | submission_seq  — stable by construction
+    kind: enum { geometry, sprite },
+    // geometry: range into a frame-arena tessellation output, OR re-tess closure inputs
+    // sprite:   texture + quad
+};
+// RenderSys: query (Sprite, Transform, ?RenderLayer) → collect; sort by key
+// (std.sort.pdq, u64 compare); submit in order into ONE ordered stream.
+// Layer bands: world default 0, debug +1000, UI +2000 (UIElement implies UI band
+// unless an explicit RenderLayer says otherwise).</code></pre>
+
+<h3>4.2 Unified flush</h3>
+<p>The two flush passes become one walk over the ordered stream: encoder switches pipeline only when the item kind changes, rebinds texture only when it changes. Batch breaks now come from <em>actual ordering needs</em> instead of an arbitrary geometry-then-texture rule. RenderStats gains <code>pipeline_switches</code> — with layered content this typically lands at 2–4 per frame (world shapes → sprites → UI), not per-item.</p>
+<p><span class="badge dec">open option</span> If counters show pathological interleaving (shape/sprite/shape/sprite within one layer), the escape hatch is the classic single-pipeline batcher: unify both vertex formats (pos, uv, color) and bind a 1×1 white texture for solid geometry — zero pipeline switches forever. Deliberately <em>not</em> chosen now; sort-then-batch should make it unnecessary (<a href="#decisions">D3</a>).</p>
+</section>
+
+<!-- ===================================================== -->
+<section id="phase4a">
+<h2>Phase 4a — Indexed unified pipeline + ordering <span class="badge crit">fixes S7</span> <span class="badge dec">planned 2026-07-15</span></h2>
+<p><strong>Goal:</strong> collapse the two-pipeline / two-vertex-format / geometry-then-texture flush into <em>one</em> ordered, indexed pipeline; <code>RenderLayer.z_order</code> becomes real. Staged before 4b (SDF text) because it fixes S7 and is verifiable on its own.</p>
+
+<h3>Locked decisions</h3>
+<table>
+  <tr><th>#</th><th>Question</th><th>Resolution</th></tr>
+  <tr><td>L1</td><td>Coalesce model</td><td><strong>Single unified pipeline</strong> — one vertex format, one buffer, one draw-call list, one shader. <code>MetalTextureVertex</code> + texture pipeline/shader <strong>die</strong>. (Takes <a href="#decisions">D3</a>'s escape hatch as the default.)</td></tr>
+  <tr><td>L2</td><td>Solid-geometry sampling</td><td>Shapes/text sample a <strong>1×1 white texture</strong> (created once at init). <code>texel*color</code> is identity.</td></tr>
+  <tr><td>L3</td><td>Draw model</td><td><strong>Indexed.</strong> <code>drawIndexedPrimitives</code> + a <code>u16</code> index buffer; <strong>one vertex buffer + <code>baseVertex</code></strong> so cached &amp; per-frame verts share index space and the sink stays kind-blind.</td></tr>
+  <tr><td>L4</td><td>Sprite transform</td><td><strong>Sprites join the GPU xform path.</strong> Vertex carries local pos + uv + color + xform_index; sprite appends a <code>LocalXform</code>. <code>drawTextureQuad</code>'s CPU matrix math dies.</td></tr>
+  <tr><td>L5</td><td>z granularity</td><td><strong>Full per-entity z_order.</strong> <code>sort_key = (band + z_order) &lt;&lt; 32 | submission_seq</code>. <code>RenderLayer</code> becomes read.</td></tr>
+  <tr><td>L6</td><td>Bands</td><td>world <code>0</code>, debug <code>+1000</code>, UI <code>+2000</code>. <code>UIElement</code>/screen-space implies UI band unless an explicit <code>RenderLayer</code> overrides.</td></tr>
+</table>
+
+<p><strong>Verification (distinct claims):</strong></p>
+<ol>
+  <li>ZxlSprite with <code>RenderLayer.z_order = -1</code> renders <em>under</em> a shape at z 0 — <span class="warn-inline">S7 fixed</span> (sprite no longer forced on top).</li>
+  <li>Debug draws render <em>over</em> world sprites (band +1000 &gt; 0), where today they render under.</li>
+  <li>UI panel (shape, UI band) renders over a world sprite.</li>
+  <li>Pong unchanged; <strong>1 pipeline bind per frame</strong> (texture + ClipMap + baseVertex rebind only on key change).</li>
+</ol>
+
+<h3>Files at a glance</h3>
+<table>
+  <tr><th>File</th><th>Action</th></tr>
+  <tr><td class="mono">platform/macos/swift/shaders.metal</td><td>REWRITE — collapse 2 vertex/fragment pairs → 1; all geometry samples a texture</td></tr>
+  <tr><td class="mono">platform/macos/swift/MetalBridge.swift</td><td>EDIT — add <code>metal_render_encoder_draw_indexed_primitives</code>; add pixel-format arg to <code>metal_create_texture</code></td></tr>
+  <tr><td class="mono">renderer/gpu/metal/metal_bridge.zig</td><td>EDIT — extern + wrapper for indexed draw; R8 texture create; add <code>r8Unorm</code> to <code>MTLPixelFormat</code></td></tr>
+  <tr><td class="mono">renderer/gpu/metal/metal_types.zig</td><td>EDIT — <code>MetalVertex</code> gains <code>uv</code>; delete <code>MetalTextureVertex</code>; <code>GeomKey</code>+<code>TexKey</code>→<code>DrawKey{prim,space,tex}</code>; <code>makeVertex</code> gains uv arg</td></tr>
+  <tr><td class="mono">renderer/batch.zig</td><td>REWRITE — <code>IndexedBatch(V,K)</code>: verts + indices + draw-calls with <code>sort_key</code> + <code>base_vertex</code>; <code>pushIndexed</code> + <code>sortCalls</code></td></tr>
+  <tr><td class="mono">renderer/tess.zig</td><td>EDIT — emit into vert <em>and</em> index arena; <code>makeVertex</code>/<code>emit</code> gain uv (always <code>(0,0)</code> for shapes)</td></tr>
+  <tr><td class="mono">renderer/render_types.zig</td><td>EDIT — <code>Renderable</code> gains <code>texture</code>, uv-carrying, <code>layer: i32</code></td></tr>
+  <tr><td class="mono">renderer/gpu/metal/MetalRenderer.zig</td><td>REWRITE flush/render — one batch, one buffer ring + index ring, white texture, sort, indexed draw; sprites append xform</td></tr>
+  <tr><td class="mono">renderer/renderer.zig</td><td>EDIT — own white texture; thread <code>layer</code> through <code>render</code>/<code>drawText*</code>/<code>drawTextureQuad</code></td></tr>
+  <tr><td class="mono">systems/RenderSys.zig</td><td>EDIT — read <code>RenderLayer</code>, compute band+z, pass <code>layer</code> on every submit</td></tr>
+  <tr><td class="mono">debug/DebugRenderer.zig</td><td>EDIT — pass debug-band layer (+1000)</td></tr>
+</table>
+
+<h4>shaders.metal — REWRITE</h4>
+<p>Collapse to <strong>one</strong> vertex/fragment pair; <code>texture_vertex_main</code>/<code>texture_fragment_main</code> die (sampling reappears inside <code>fragment_main</code>).</p>
+<pre><code>struct LocalXFrom { float2 m0; float2 m1; float2 t; };   // UNCHANGED, 24B
+struct Uniforms   { float2 scale; float2 offset; };       // UNCHANGED (ClipMap)
+struct VertexIn {
+    float2 position    [[attribute(0)]];
+    float2 texcoord    [[attribute(1)]];   // NEW
+    float4 color       [[attribute(2)]];   // was (1)
+    ushort xform_index [[attribute(3)]];   // was (2)
+};
+struct VertexOut { float4 position [[position]]; float2 texcoord; float4 color; };
+
+vertex VertexOut vertex_main(VertexIn in [[stage_in]],
+    constant Uniforms& u [[buffer(1)]], constant LocalXFrom* xforms [[buffer(2)]]) {
+  LocalXFrom xf = xforms[in.xform_index];
+  float2 world = float2(xf.m0.x*in.position.x + xf.m0.y*in.position.y + xf.t.x,
+                        xf.m1.x*in.position.x + xf.m1.y*in.position.y + xf.t.y);
+  float2 clip  = world * u.scale + u.offset;
+  return { float4(clip,0,1), in.texcoord, in.color };
+}
+fragment float4 fragment_main(VertexOut in [[stage_in]], texture2d&lt;float&gt; tex [[texture(0)]]) {
+  constexpr sampler s(mag_filter::nearest, min_filter::nearest);
+  return tex.sample(s, in.texcoord) * in.color;   // white texel ⇒ identity for shapes
+}</code></pre>
+
+<h4>MetalBridge.swift — EDIT</h4>
+<p>Add one <code>@_cdecl</code>; give <code>metal_create_texture</code> a pixel-format arg (or add <code>_r8</code>). Swift compile is part of <code>zig build</code> on macOS — this is the only FFI surface change in 4a.</p>
+<pre><code>metal_render_encoder_draw_indexed_primitives(
+    encoder, primitiveType:UInt64, indexCount:UInt64,
+    indexType:UInt64,          // 0=uint16, 1=uint32 (MTLIndexType raw)
+    indexBuffer:OpaquePointer, indexBufferOffset:UInt64, baseVertex:Int64)
+  → enc.drawIndexedPrimitives(type:, indexCount:, indexType:, indexBuffer:,
+        indexBufferOffset:, instanceCount:1, baseVertex:, baseInstance:0)
+// metal_create_texture gains pixelFormat:UInt64; .rgba8Unorm literal
+// → MTLPixelFormat(rawValue:) ?? .rgba8Unorm  (R8Unorm=10 for SDF atlas)</code></pre>
+
+<h4>metal_bridge.zig — EDIT</h4>
+<pre><code>extern fn metal_render_encoder_draw_indexed_primitives(
+    encoder:*MTLRenderCommandEncoder, primitive_type:u64, index_count:u64,
+    index_type:u64, index_buffer:*MTLBuffer, index_offset:u64, base_vertex:i64) void;
+
+pub fn drawIndexedPrimitives(encoder:*MTLRenderCommandEncoder, prim:MTLPrimitiveType,
+    index_count:u64, index_buf:*MTLBuffer, index_offset:u64, base_vertex:i64) void
+  → metal_render_encoder_draw_indexed_primitives(encoder, @intFromEnum(prim),
+        index_count, 0 /*uint16*/, index_buf, index_offset, base_vertex);
+
+pub fn createTexture(device:*MTLDevice, width:u32, height:u32, format:MTLPixelFormat) !*MTLTexture
+// add r8Unorm = 10 to MTLPixelFormat in metal_types.zig</code></pre>
+
+<h4>metal_types.zig — EDIT</h4>
+<pre><code>pub const MetalVertex = extern struct {
+    position: [2]f32,   // LOCAL coords (GPU applies xform+clip)
+    texcoord: [2]f32,   // (0,0) shapes; real uv sprites/SDF glyphs
+    color:    [4]f16,   // LINEAR
+    xform_index: u16,
+    _pad: u16 = 0,
+};                       // 24B. MetalTextureVertex DELETED.
+
+pub const Space = enum(u8) { world, screen };
+
+// GeomKey + TexKey collapse. tex lets shapes (white tex) coalesce together and
+// sprites coalesce per-texture; space selects ClipMap. Ordering rides sort_key on
+// the DrawCall (batch.zig), NOT the key.
+pub const DrawKey = struct {
+    prim: MTLPrimitiveType, space: Space, tex: *MTLTexture,
+    pub fn eql(a:DrawKey, b:DrawKey) bool
+      → a.prim==b.prim and a.space==b.space and a.tex==b.tex;
+};
+pub fn makeVertex(pos:[2]f32, uv:[2]f32, color:[4]f32, xform_index:u16) MetalVertex</code></pre>
+
+<h4>batch.zig — REWRITE</h4>
+<pre><code>pub fn DrawCall(comptime Key:type) type = struct {
+    key: Key,
+    sort_key: u64,      // (band+z)&lt;&lt;32 | submission_seq — set at push
+    index_start: u32,   // into indices
+    index_count: u32,
+    base_vertex: u32,   // added to each index by the GPU (baseVertex draw arg)
+};
+pub fn IndexedBatch(comptime Vertex:type, comptime Key:type) type = struct {
+    vertices:   std.ArrayList(Vertex),
+    indices:    std.ArrayList(u16),
+    draw_calls: std.ArrayList(DrawCall(Key)),
+    persistent: Allocator,
+
+    pub fn init(gpa:Allocator) Self
+    pub fn deinit(self:*Self) void
+    pub fn clear(self:*Self) void            // clearRetainingCapacity all three
+    pub fn vertexMark(self:*const Self) u32  // vertices.len (== base for next shape)
+    pub fn indexMark(self:*const Self) u32   // indices.len
+    pub fn vertex(self:*Self, v:Vertex) !void
+    pub fn index(self:*Self, i:u16) !void
+    // One draw call per shape. base = vertexMark before the shape emitted, so its
+    // local indices (0..n) are baseVertex-relative. NO merge here.
+    pub fn pushIndexed(self:*Self, key:Key, sort_key:u64,
+                       index_start:u32, index_count:u32, base_vertex:u32) !void
+    // Stable pdq sort by sort_key; called once at flush before the walk.
+    pub fn sortCalls(self:*Self) void
+};</code></pre>
+<p><span class="badge dec">tradeoff</span> With indexed draws + per-shape <code>base_vertex</code>, adjacent same-key calls can't be trivially merged into one <code>drawIndexedPrimitives</code> unless their index ranges are contiguous <em>and</em> share a base. <strong>4a: one indexed draw per DrawCall</strong>, rely on the sort to cluster same-key runs so pipeline/texture/ClipMap <em>rebinds</em> (the real cost) stay rare. Merging contiguous same-base runs is a P5 micro-opt — leave a <code>// TODO</code>. Indexing buys vertex-sharing now; draw-call merging is separable.</p>
+
+<h4>tess.zig — EDIT</h4>
+<p><code>Tess(V,K)</code> emits into a vert <em>and</em> index arena. <code>emit</code> now returns the base-relative vertex index; fan/quad/segment helpers push connectivity via <code>tri()</code>.</p>
+<pre><code>makeVertex: *const fn ([2]f32, [2]f32, [4]f32, u16) V,   // + uv arg
+base: u32,   // vertexMark() snapshot at Tess entry → emit returns base-relative idx
+
+fn emit(self:Self, p:V2, paint:Paint) !u16 {
+    const idx:u16 = @intCast(self.batch.vertexMark() - self.base);
+    try self.batch.vertex(self.makeVertex(.{p.x,p.y}, .{0,0}, paint.at(p), self.xform_index));
+    return idx;
+}
+fn tri(self:Self, a:u16, b:u16, c:u16) !void {          // push 3 indices
+    try self.batch.index(a); try self.batch.index(b); try self.batch.index(c);
+}
+// fan(n): emit center+rim, then tri(center, rim[i], rim[i+1])
+// quad:   4 verts, tri(0,1,2)+tri(1,3,2)   ·   segment(stroke): 4 verts not 6
+// ↑ bulk of 4a's tess work — mechanical, but touches every shape method.
+
+pub fn tessellate(comptime V, comptime K, batch:*IndexedBatch(V,K),
+    comptime makeVertex:fn([2]f32,[2]f32,[4]f32,u16)V,
+    shape:ShapeData, xf_idx:u16, style:DrawStyle, hw:f32, px_per_unit:f32) !void
+// drops tri_key: key/sort_key/base bookkeeping moves to the caller (knows layer, does pushIndexed).</code></pre>
+
+<h4>render_types.zig — EDIT</h4>
+<pre><code>pub const Renderable = struct {
+    shape:     ShapeData,
+    transform: ?Transform = null,
+    style:     DrawStyle = .{},
+    space:     CoordinateSpace = .world,
+    layer:     i32 = 0,                 // NEW: band+z_order, computed by producer
+    texture:   ?*anyopaque = null,      // NEW: null ⇒ white texel; sprites set it
+    uv:        ?[4][2]f32 = null,       // NEW: null ⇒ derived (0,0); quads carry corners
+};
+// 4a: layer used immediately (shapes/text/debug). texture/uv are the 4b conduit —
+// sprites still enter via drawTextureQuad (now writing the ONE batch) until 4b.</code></pre>
+
+<h4>MetalRenderer.zig — REWRITE (render + flush)</h4>
+<pre><code>// Fields (delta):
+batch: IndexedBatch(MetalVertex, DrawKey),   // was two batches
+vertex_buffers: [3]*MTLBuffer,               // one geom ring
+index_buffers:  [3]*MTLBuffer,               // NEW ring
+xform_buffers:  [3]*MTLBuffer,               // unchanged
+white_texture:  *MTLTexture,                 // 1×1 opaque white, created init
+submission_seq: u32,                         // per-frame monotonic tiebreaker
+// texture_pipeline_state / texture_batch / texture_vertex_buffers → DELETED
+
+// render(r, ctx) — the ONE ingest (shapes/text/debug/sprites):
+xform_index = if (r.transform==null) 0 else append LocalXform.from(r.transform)
+is_screen   = r.space==.screen; update clip_world/clip_screen from ctx (unchanged rule)
+tex  = @ptrCast(r.texture) orelse self.white_texture
+base = batch.vertexMark();  i0 = batch.indexMark()
+tess.tessellate(MetalVertex, DrawKey, &batch, makeVertex, r.shape, xform_index,
+                r.style, hw, px_per_unit)
+i_count  = batch.indexMark() - i0
+key      = .{ .prim=.triangle, .space = if(is_screen).screen else .world, .tex=tex }
+sort_key = (@as(u64,@bitCast(@as(i64,r.layer))) &lt;&lt; 32) | submission_seq
+submission_seq += 1
+batch.pushIndexed(key, sort_key, i0, i_count, base)
+
+// flushOrdered(enc, idx) — replaces flushGeometryBatch + flushTextureBatch:
+memcpy verts / indices / xforms → ring[idx]   (overflow-clamp+log each; keep loud xform log)
+setPipelineState(enc, pipeline_state)          // ONCE
+setVertexBuffer(enc, vertex_buffers[idx], 0, 0); setVertexBuffer(xform_buffers[idx], 0, 2)
+batch.sortCalls()
+cur_tex=null; cur_space=null
+for calls |c| {
+    if bounds exceed copied → break
+    if cur_space != c.key.space { setVertexBytes(map, 1); cur_space = c.key.space }
+    if cur_tex   != c.key.tex   { setFragmentTexture(c.key.tex, 0); cur_tex = c.key.tex }
+    drawIndexedPrimitives(enc, .triangle, c.index_count,
+        index_buffers[idx], c.index_start*2, @intCast(c.base_vertex))
+}
+// beginFrame: batch.clear(); xforms→[identity]; submission_seq=0; frame_index+%=1
+// drawTextureQuad (4a-transitional): stop CPU-baking — emit 4 local verts + uv +
+//   6 indices, append a real LocalXform, tex=texture, layer param. Dies in 4b.</code></pre>
+
+<h4>RenderSys.zig / DebugRenderer.zig — EDIT</h4>
+<pre><code>fn layerFor(world, entity, base_band:i32) i32
+  → base_band + (world.getComponent(entity, RenderLayer)?.z_order orelse 0)
+// world shapes/text/zxl: layerFor(entity, 0)   ·   UI queries: layerFor(entity, 2000)
+// DebugRenderer: every render()/drawText call sets .layer = 1000 (debug band)</code></pre>
+</section>
+
+<!-- ===================================================== -->
+<section id="phase4b">
+<h2>Phase 4b — SDF text &amp; producer-seam collapse <span class="badge win">kills text flood</span> <span class="badge dec">planned 2026-07-15</span></h2>
+<p><strong>Goal:</strong> text becomes an <strong>SDF atlas</strong> (cache a <em>texture</em>, not triangles) — one quad per glyph instead of ~40 triangles, crisp at any zoom, and the per-glyph-triangle xform flood dies at the root (the <a href="#phase3">identity-xform dedup</a> band-aid deletes with it). And the producer seam collapses: <code>drawText</code>/<code>drawTextureQuad</code> demote from <code>Renderer</code> methods to <em>free producers</em> feeding the one <code>render()</code> ingest. Renderer's public surface shrinks to <strong>one ingest + lifecycle + texture creation</strong>.</p>
+
+<h3>Locked decisions</h3>
+<table>
+  <tr><th>#</th><th>Question</th><th>Resolution</th></tr>
+  <tr><td>L7</td><td>Text</td><td><strong>SDF atlas.</strong> Glyph rasterized→distance-field into an R8 atlas ONCE at font load; per-frame text = one textured quad per glyph. Vector-triangle glyph path (<code>glyph_triangles</code>, <code>drawGlyph</code>) <strong>dies</strong>.</td></tr>
+  <tr><td>L8</td><td>Shape tess timing</td><td><strong>Per-frame</strong> at live <code>bucketFor</code> (zoom-correct edges). Only <em>text</em> caches (a texture). Matches shipping engines (RTR: cache text, re-tess adaptive curves; caching CPU-tessellated geometry keyed on zoom is a vector-graphics/CAD pattern, not a game one).</td></tr>
+  <tr><td>L9</td><td>Producer seam</td><td><code>drawText</code>/<code>drawTextureQuad</code> → <strong>free producers</strong> that expand a domain thing into <code>Renderable</code>s through the one <code>render()</code> seam. Renderer surface → <code>render()</code> + lifecycle + <code>createTexture</code>/<code>uploadTextureData</code>.</td></tr>
+  <tr><td>L10</td><td>SDF fallback</td><td>If field-gen rabbit-holes, ship atlas plumbing against a plain <strong>grayscale coverage</strong> atlas first; swap in signed-distance behind the same seam (fragment <code>smoothstep</code> vs. direct sample). Design targets SDF.</td></tr>
+</table>
+
+<p><strong>Verification:</strong> text renders as SDF quads; frame xform count no longer scales with glyph-triangle count; the <code>glyph_triangles</code> / ear-clipping-for-text path is gone; output otherwise identical to 4a (sprites/shapes unchanged).</p>
+
+<h3>Files at a glance</h3>
+<table>
+  <tr><th>File</th><th>Action</th></tr>
+  <tr><td class="mono">assets/font/sdf.zig</td><td>CREATE — glyph outline → coverage bitmap → signed-distance field (8SSEDT)</td></tr>
+  <tr><td class="mono">assets/font/font.zig</td><td>EDIT — build SDF atlas at load; store <code>GlyphAtlas</code>; drop <code>glyph_triangles</code>; <code>uvFor</code> + metrics</td></tr>
+  <tr><td class="mono">assets/textures/TextureManager.zig</td><td>EDIT (maybe) — R8 atlas texture create/upload (or Font owns its atlas texture)</td></tr>
+  <tr><td class="mono">renderer/text.zig</td><td>REWRITE — <code>drawText</code>/<code>drawTextScreen</code> become free producers: glyph → one <code>Renderable{quad, texture:atlas, uv, layer}</code> → <code>render()</code></td></tr>
+  <tr><td class="mono">renderer/gpu/metal/MetalRenderer.zig</td><td>EDIT — delete transitional <code>drawTextureQuad</code>; sprites route as Renderables</td></tr>
+  <tr><td class="mono">systems/RenderSys.zig</td><td>EDIT — zxl sprite builds a <code>Renderable{texture,uv,layer}</code> and calls <code>render()</code></td></tr>
+  <tr><td class="mono">renderer/renderer.zig</td><td>EDIT — remove <code>drawText*</code>/<code>drawTextureQuad</code> from Renderer surface; keep <code>render</code> + lifecycle + texture create</td></tr>
+  <tr><td class="mono">platform/macos/swift/shaders.metal</td><td>EDIT — <code>fragment_main</code> SDF branch: <code>alpha = smoothstep(0.5-w, 0.5+w, field)</code> (see L10)</td></tr>
+</table>
+
+<h4>assets/font/sdf.zig — CREATE</h4>
+<p>The one genuinely new algorithm. Pure function (data in → bitmap out), unit-testable in the Layer-4 slot.</p>
+<pre><code>pub const Sdf = struct {
+    // 8SSEDT: 8-point signed sequential Euclidean distance transform over a
+    // rasterized glyph. Standard, deterministic, no deps.
+    pub fn fromGlyph(gpa, glyph:*const FilteredGlyph, upem:u16, cell_px:u16, pad:u16)
+        !struct { bitmap:[]u8, w:u16, h:u16, bearing:V2, advance:f32 }
+    // 1. scale outline em→cell_px; rasterize coverage (scanline even-odd) into w×h
+    // 2. inside/outside distance grids (8SSEDT two passes each)
+    // 3. signed = dist_out - dist_in; map to u8 [0..255] centered 128 (=edge 0.5)
+};</code></pre>
+<p><span class="badge dec">L10</span> Ship <code>fromGlyph</code> returning plain coverage (rasterized alpha, skip the distance transform) first; the atlas/quad plumbing is identical, so the SDF upgrade lands behind the same return shape.</p>
+
+<h4>assets/font/font.zig — EDIT</h4>
+<pre><code>pub const GlyphAtlas = struct {
+    texture: ?*anyopaque = null,       // R8 GPU texture (lazily created on first render)
+    pixels:  []u8,                     // CPU atlas (shelf-packed)
+    w: u16, h: u16,
+    entries: std.AutoHashMap(u16, GlyphEntry),   // glyph_id → uv rect + metrics
+    pub fn uvFor(self, glyph_id:u16) ?GlyphEntry
+};
+pub const GlyphEntry = struct { u0:f32, v0:f32, u1:f32, v1:f32, bearing:V2, size_px:V2 };
+// initFromData: after outlines parsed, shelf-pack each glyph's Sdf.fromGlyph bitmap
+//   into GlyphAtlas.pixels, record entries. Replace glyph_triangles field with atlas.
+// deinit: free atlas pixels + release atlas texture; drop glyph_triangles free.
+// measureText: uses entries[gid].advance (same behavior, new source).
+// Atlas GPU texture created lazily via renderer.createTexture(w,h,.r8Unorm) on first
+//   draw (Font can't see the renderer at load — pass at first-use, like zxl frame textures).</code></pre>
+
+<h4>renderer/text.zig — REWRITE</h4>
+<pre><code>pub fn drawText(renderer, font, text, position, scale, color, ctx, layer) void
+  ensure font.atlas texture exists (create + upload R8 once)
+  pen = position.x
+  for char:
+      e = font.atlas.uvFor(gid) orelse continue
+      build a quad Renderable in LOCAL space (e.size_px*scale, offset by e.bearing),
+        .texture = font.atlas.texture, .uv = corners(e.u0,v0,u1,v1),
+        .style.fill = color,          // SDF: color.a * field (see shader)
+        .space = .world, .layer = layer
+      renderer.render(quad_renderable, ctx)
+      pen += e.advance * scale
+// drawGlyph / drawGlyphScreen (triangle emitters) DIE.</code></pre>
+
+<h4>renderer.zig / MetalRenderer.zig / RenderSys.zig — EDIT</h4>
+<pre><code>// renderer.zig: remove drawText, drawTextScreen, drawTextureQuad from Renderer.
+//   Keep render, beginFrame/endFrame, clear, createTexture, uploadTextureData, getDevice.
+//   → Renderer surface is now: one ingest + lifecycle + texture creation.
+// MetalRenderer.zig: delete the transitional drawTextureQuad method.
+//   render() already handles textured Renderables (r.texture orelse white) from 4a.
+// RenderSys.zig zxl loop: build Renderable{ shape=unit quad, texture=frame_texture,
+//   uv=full, transform=…, style.fill=tint, space=.world, layer=layerFor(entity,0) }
+//   → renderer.render(...). drawTextureQuad call gone.</code></pre>
+
+<h4>shaders.metal — EDIT (SDF branch)</h4>
+<p>The one spot the "one pipeline" ideal gets slightly muddied: the white texel is RGBA, the SDF atlas is R8. Two clean resolutions — decide at impl:</p>
+<pre><code>// (a) one pipeline + is_sdf flag (small per-draw uniform, buffer index 3):
+float field = tex.sample(s, uv).r;
+float w     = fwidth(field) * 0.75;            // edge softness
+alpha = is_sdf ? smoothstep(0.5-w, 0.5+w, field) : sampled.a;
+return float4(in.color.rgb, in.color.a * alpha);
+// (b) two fragment funcs (shapes+sprites / SDF text), sharing the vertex func +
+//     buffers, clustered by band → ~2–3 pipeline switches/frame (still &gt;&gt; the D3 win).</code></pre>
+<p><span class="badge dec">open</span> Lean (a) to preserve one-pipeline; (b) is fine because text clusters into one band. This is the last open impl decision in 4b.</p>
+
+<h3>Open impl decisions (surfaced, not blocking)</h3>
+<ul>
+  <li><strong>uv on Renderable vs. a quad ShapeData variant</strong> — where glyph/sprite corner uvs ride. Lean: <code>uv: ?[4][2]f32</code> on Renderable (as drawn above).</li>
+  <li><strong>SDF sampling vs. one-pipeline purity</strong> — 1 pipeline + <code>is_sdf</code> uniform vs. 2 fragment/pipelines clustered by band. Both beat today.</li>
+  <li><strong>Draw-call merging under indexing</strong> — deferred to P5 (<code>// TODO: merge contiguous same-base runs</code>). 4a accepts N indexed draws; the sort keeps <em>rebinds</em> rare.</li>
+</ul>
+</section>
+
+<!-- ===================================================== -->
+<section id="phase5">
+<h2>Phase 5 — Throughput at scale <span class="badge perf">on-demand, profile first</span></h2>
+<ul>
+  <li><strong>Culling (P6):</strong> camera AABB vs. conservative shape AABB before tessellation. <code>Polygon</code>/<code>Polyline</code> cache bounds at init; circles/rects derive trivially. UI band never culled. ~Day of work, gated on actually building scenes larger than the screen.</li>
+  <li><strong>Texture atlas (P3's other half):</strong> TextureManager shelf-packs all frames of a Zxl asset into one texture at load; frames become UV rects, animation stops breaking batches. Pixel-art frames are small — a 1024² atlas holds hundreds.</li>
+  <li><strong>Indexed drawing:</strong> ring of index buffers + <code>drawIndexedPrimitives</code> bridge fn. Rect 6→4 verts, circle fan 96→33. Worth it only if vertex volume shows up in stats.</li>
+  <li><strong>Glyph atlas for small text:</strong> only if profiling shows CPU tessellation cost on text-heavy UI. Vector text is a genuine feature (crisp at any zoom) — keep it as the default and for large sizes.</li>
+  <li><strong>Vulkan parity:</strong> the tessellator + ordered stream are backend-agnostic by construction; the Vulkan backend (currently a 276-line skeleton) implements the same ring-buffer flush against the existing swapchain plan docs. Explicitly out of scope until the Metal path proves the interfaces.</li>
+</ul>
+</section>
+
+<!-- ===================================================== -->
+<section id="decisions">
+<h2>6. Decision log</h2>
+<table>
+  <tr><th>#</th><th>Decision</th><th>Rationale</th><th>Rejected alternative</th></tr>
+  <tr><td>D1</td><td><strong>Triangles-only geometry; strokes tessellated as quads</strong> (Phase 2)</td><td>Makes <code>stroke_width</code> real; one primitive type = maximal merging; Metal can't widen lines and Vulkan wide-lines is optional, so this is also the portability play.</td><td>Keep line primitives + accept 1px strokes; SDF-only strokes (more shader work, doesn't cover polylines).</td></tr>
+  <tr><td>D2</td><td><strong>CPU does local transform, GPU does camera→clip via per-run <code>ClipMap</code> uniform</strong> (Phase 2)</td><td>Halves per-vertex CPU math, kills per-vertex sin/cos, keeps the batch dead simple (no per-shape uniforms or instancing needed at this scale).</td><td>Full GPU path (per-shape matrices via instancing) — overkill for 2D shape counts; all-CPU status quo — wastes the vertex shader entirely.</td></tr>
+  <tr><td>D3</td><td><strong>Keep two pipelines (geometry, texture); fix ordering by sorting</strong> (Phase 4)</td><td>Sort-then-batch reduces pipeline switches to a handful per frame; avoids forcing UV+texture reads onto every solid pixel.</td><td>Single unified pipeline + white texture — classic and simple, kept as the documented escape hatch if counters disagree.</td></tr>
+  <tr><td>D4</td><td><strong>MSAA 4× default-on, configurable</strong> (Phase 3)</td><td>Near-free on Apple TBDR; biggest visual-quality lever for tessellated edges and vector text; zero content changes.</td><td>SDF everything (big rewrite); post-process AA (worse quality, more work).</td></tr>
+  <tr><td>D5</td><td><strong>Rounded rect &amp; friends via tessellation now; SDF later as targeted upgrade</strong></td><td>One mechanism for every shape including polylines/stars; resolution handled by adaptive segments + MSAA; SDF can later replace circle/rrect/ring fills for zoom-proof edges without API change.</td><td>SDF-first for rounded shapes — prettier at extreme zoom but splits the pipeline in two mechanisms on day one.</td></tr>
+  <tr><td>D6</td><td><strong>Straight (non-premultiplied) alpha everywhere</strong> (Phase 0)</td><td>Matches the existing texture pipeline; one consistent rule; teaching-friendly.</td><td>Premultiplied — technically better for atlas filtering; revisit alongside the Phase 5 atlas work where it actually matters.</td></tr>
+  <tr><td>D7</td><td><strong>RoundedRect stores four named <code>radius_*: f32</code> fields, not <code>[4]f32</code></strong></td><td>Scene-format reflection and the Inspector map named scalar fields automatically; an array field would need new parser/instantiator machinery for one shape.</td><td>vec4-typed radii (new scene type + mapping code for marginal elegance).</td></tr>
+  <tr><td>D8</td><td><strong>Frame transients owned by Swift <code>MetalFrame</code>; 3 frames in flight; drawable acquired in endFrame</strong> (Phase 0)</td><td>Fixes leaks and sync in one structure; shrinks FFI from ~10 calls/frame to ~3 + draws; semaphore lives where dispatch primitives are native.</td><td>Piecemeal <code>metal_release_*</code> FFI calls (chatty, easy to miss one); Zig-side sync (awkward across the bridge).</td></tr>
+  <tr><td>D9</td><td><strong>Buffer rings: 2&nbsp;MB geometry / 512&nbsp;KB texture per slot, grow ×2 at frame boundary on overflow</strong></td><td>Generous for the target scale (~87–175k verts), 7.5&nbsp;MB total vs today's 288&nbsp;MB; growth path means no hard ceiling and no mid-frame stalls.</td><td>Mid-frame flush-and-reuse (more complex encoder juggling; unnecessary at 2D scale).</td></tr>
+  <tr><td>D10</td><td><strong>Phase 1 (merging) is safe to land before Phase 0</strong></td><td>Pure CPU-side bookkeeping with identical output order — the lowest-risk highest-visibility change in the plan; counters land with it.</td><td>Strict phase ordering (no reason to delay the big win).</td></tr>
+</table>
+</section>
+
+<!-- ===================================================== -->
+<section id="validation">
+<h2>7. Validation plan</h2>
+<h3>Instrumentation (lands in Phase 1, kept forever)</h3>
+<p><code>RenderStats</code> on the debug overlay: draw calls (and how many merged), vertices, bytes, texture binds, pipeline switches, CPU batch/encode time. Every phase states its expected movement and gets checked against it.</p>
+<h3>Test scenes</h3>
+<ul>
+  <li><strong>PONG (existing)</strong> — regression canary. Expect ~80–150 calls → ≤5 after Phase 1, ≤3 after Phase 2.</li>
+  <li><strong>Stress scene (new, checked in)</strong> — 1,000 mixed circles/rects/polygons with fills+strokes, 200 lines of text, 500 sprites across 4 textures. Today this would be ~70k draw calls; target ≤10 after Phase 2, 60fps with headroom.</li>
+  <li><strong>Showcase scene (new, doubles as docs)</strong> — every shape × fill/stroke/gradient/opacity/rotation, screen- and world-space, layered over sprites. This is also the manual-QA page for Phase 3 visuals and the Phase 4 ordering proof (UI panel over sprite over shape).</li>
+  <li><strong>Soak check</strong> — after Phase 0, memory flat over 10+ minutes (today it climbs ~5 objects/frame); window resize mid-game stays crisp; vsync-stall under heavy load shows no geometry corruption.</li>
+  <li><strong>Layer-by-layer tests</strong> — tessellator gets pure unit tests (vertex counts, winding, stroke widths, adaptive bucket selection per <code>px_per_unit</code>); merge logic gets table tests (adjacent/non-adjacent/type-change cases); existing layered test structure in build.zig already has the right slot for both.</li>
+</ul>
+</section>
+
+</body>
+</html>
