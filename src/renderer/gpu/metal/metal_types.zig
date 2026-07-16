@@ -43,15 +43,12 @@ pub const MetalError = error{
 
 pub const MetalVertex = extern struct {
     position: [2]f32, // x, y, in clip space [-1, 1]
+    texcoord: [2]f32, // (0, 0) shapes; real uv sprites/SDR glyphs
     color: [4]f16, // LINEAR rgba, half precision (HW encodes to sRGB on write)
     xform_index: u16,
     _pad: u16 = 0,
 };
-pub const MetalTextureVertex = extern struct {
-    position: [2]f32, // clip space x,y
-    texcoord: [2]f32, // u, v in [0,1]
-    color: [4]f16,
-};
+
 pub const VertexBufferPool = struct {
     buffers: std.ArrayList(*MTLBuffer),
     current_index: usize,
@@ -76,8 +73,8 @@ const MTLHazardTrackingMode = enum(u32) {
 pub const MTLResourceOptions = enum(u32) {
     storageModeShared = @intFromEnum(MTLStorageMode.shared),
     // storageModeManaged = @intFromEnum(MTLStorageMode.managed),
-    // storageModePrivate = @intFromEnum(MTLStorageMode.private),
-    // storageModeMemoryless = @intFromEnum(MTLStorageMode.memoryless),
+    storageModePrivate = @intFromEnum(MTLStorageMode.private),
+    storageModeMemoryless = @intFromEnum(MTLStorageMode.memoryless),
     // cpuCacheModeDefaultCache = @intFromEnum(MTLCPUCacheMode.defaultCache),
     // cpuCacheModeWriteCombined = @intFromEnum(MTLCPUCacheMode.writeCombined),
     // hazardTrackingModeTracked = @intFromEnum(MTLHazardTrackingMode.tracked),
@@ -86,6 +83,7 @@ pub const MTLResourceOptions = enum(u32) {
 
 pub const MTLPixelFormat = enum(u64) {
     invalid = 0,
+    r8Unorm = 10,
     bgra8Unorm = 80,
     bgra8Unorm_sRGB = 81, // sRGB twin of 80: HW encodes linear->sRGB on write
     rgba8Unorm = 70,
@@ -111,25 +109,33 @@ pub const MTLPrimitiveType = enum(u64) {
 };
 
 pub const Space = enum(u8) { world, screen };
-// Grouping keys for Batch(V, K).pushCall merge logic.
-pub const GeomKey = struct {
+
+pub const DrawKey = struct {
     prim: MTLPrimitiveType,
     space: Space,
+    tex: *MTLTexture,
 
-    pub fn eql(a: GeomKey, b: GeomKey) bool {
-        return a.prim == b.prim and a.space == b.space;
+    pub fn eql(a: DrawKey, b: DrawKey) bool {
+        return a.tex == b.tex and
+            a.prim == b.prim and
+            a.space == b.space;
     }
 };
 pub const TexKey = struct {
-    tex: *MTLTexture,
     pub fn eql(a: TexKey, b: TexKey) bool {
         return a.tex == b.tex;
     }
 };
 
-pub fn makeVertex(pos: [2]f32, color: [4]f32, xform_index: u16) MetalVertex {
+pub fn makeVertex(
+    pos: [2]f32,
+    uv: [2]f32,
+    color: [4]f32,
+    xform_index: u16,
+) MetalVertex {
     return .{
         .position = pos,
+        .texcoord = uv,
         .color = .{
             @floatCast(color[0]),
             @floatCast(color[1]),

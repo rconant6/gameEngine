@@ -1,4 +1,5 @@
 const std = @import("std");
+const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const cols = @import("color.zig");
 const Color = cols.Color;
@@ -19,7 +20,7 @@ const seg_buckets = [_]u32{ 8, 12, 16, 24, 32, 48, 64, 96 };
 comptime {
     for (seg_buckets[1..], 1..) |bucket, i| {
         if (bucket <= seg_buckets[i - 1])
-            @compileError("seg_buckets must be strictly ascending");
+            @compileError("seg_buckets must be strictly ascending (tess.zig)");
     }
 }
 const MAX_SEG: usize = seg_buckets[seg_buckets.len - 1];
@@ -174,41 +175,181 @@ const Paint = union(enum) {
     }
 };
 
+const Topology = enum { tri, quad, strip };
+
+const topo_table = struct {
+    const tri: []const u16 = &.{ 0, 1, 2 };
+    // standard rectangle
+    const quad: []const u16 = &.{ 0, 1, 2, 0, 2, 3 }; // 4 verts, CCW
+    // strip is the way lines are being drawn
+    const strip: []const u16 = &.{ 0, 1, 2, 2, 1, 3 }; // 4 verts, share edge
+};
+
+fn topoRun(comptime t: Topology) []const u16 {
+    return switch (t) {
+        .tri => topo_table.tri,
+        .quad => topo_table.quad,
+        .strip => topo_table.strip,
+    };
+}
+
+fn topoVertCount(comptime t: Topology) u16 {
+    return switch (t) {
+        .tri => 3,
+        .quad => 4,
+        .strip => 4,
+    };
+}
+fn topoIndexCount(comptime t: Topology) u16 {
+    return switch (t) {
+        .tri => topo_table.tri.len,
+        .quad => topo_table.quad.len,
+        .strip => topo_table.strip.len,
+    };
+}
+
+fn topoRef(comptime t: Topology) []const V2 {
+    return switch (t) {
+        .tri => &.{
+            .{ .x = 0, .y = 0 },
+            .{ .x = 1, .y = 0 },
+            .{ .x = 0, .y = 1 },
+        },
+        .quad => &.{
+            .{ .x = 0, .y = 0 },
+            .{ .x = 1, .y = 0 },
+            .{ .x = 1, .y = 1 },
+            .{ .x = 0, .y = 1 },
+        },
+        .strip => &.{
+            .{ .x = 0, .y = 0 },
+            .{ .x = 1, .y = 0 },
+            .{ .x = 0, .y = 1 },
+            .{ .x = 1, .y = 1 },
+        },
+    };
+}
+
+fn signedArea(a: V2, b: V2, c: V2) f32 {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+fn isCounterClockWinding(a: V2, b: V2, c: V2) bool {
+    return ((b.x - a.x) * (c.y - a.y) -
+        (b.y - a.y) * (c.x - a.x)) >= 0;
+}
+
+comptime {
+    for (std.meta.tag(Topology)) |t| {
+        const run = topoRun(t);
+        const ref = topoRef(t);
+        if (@mod(run.len, 3) != 0)
+            @compileError(
+                @tagName(t) ++ ": indices not multiple of 3",
+            );
+        if (ref.len != topoVertCount(t))
+            @compileError(
+                @tagName(t) ++ ": ref count != topoVertCount",
+            );
+
+        var k: usize = 0;
+        while (k < run.len) : (k += 3) {
+            if (signedArea(ref[run[k]], ref[run[k + 1]], ref[run[k + 2]]) <= 0)
+                @compileError(@tagName(t) ++ ": triangle at " ++ k ++ " is not CCW");
+        }
+    }
+}
+
 fn Tess(comptime V: type, comptime K: type) type {
     return struct {
         const Self = @This();
         batch: *Batch(V, K),
-        makeVertex: *const fn ([2]f32, [4]f32, u16) V,
+        makeVertex: *const fn ([2]f32, [2]f32, [4]f32, u16) V,
         xform_index: u16,
         tri_key: K, // triangle draw-call key
         hw: f32,
         px_per_unit: f32,
+        base: u32,
 
-        fn emit(self: Self, p: V2, paint: Paint) !void {
-            const color = paint.at(p);
+        // This is for emitting a unique vertex and getting its index
+        fn emitV(self: Self, p: V2, paint: Paint) !u16 {
+            const idx: u16 = @intCast(self.batch.vertexMark() - self.base);
 
             try self.batch.vertex(self.makeVertex(
                 .{ p.x, p.y },
-                color,
+                .{ 0, 0 },
+                paint.at(p),
                 self.xform_index,
             ));
+
+            return idx;
+        }
+
+        fn emitIs(self: Self, idxs: []u16) !void {
+            assert(idxs.len > 2);
+
+            self.batch.indices(idxs);
+        }
+
+        fn emitTopology(self: Self, comptime t: Topology, base: u16) !void {
+            var ii: [topoRun(t).len]u16 = undefined;
+            inline for (topoRun(t), 0..) |off, k| ii[k] = base + off;
+            try self.emitIs(&ii);
         }
 
         fn emitSegment(self: Self, p0: V2, p1: V2, paint: Paint, hw: f32) !void {
             const dir = p1.sub(p0).normalize();
             const norm = dir.perp();
+            const base_vertex = self.batch.vertexMark();
 
             const a = p0.add(norm.mul(hw));
             const b = p0.sub(norm.mul(hw));
             const e = p1.add(norm.mul(hw));
             const f = p1.sub(norm.mul(hw));
 
-            try self.emit(a, paint);
-            try self.emit(b, paint);
-            try self.emit(e, paint);
-            try self.emit(e, paint);
-            try self.emit(b, paint);
-            try self.emit(f, paint);
+            try self.emitV(a, paint);
+            try self.emitV(b, paint);
+            try self.emitV(e, paint);
+            try self.emitV(f, paint);
+
+            try self.emitTopology(.strip, base_vertex);
+        }
+
+        fn fanFill(
+            self: Self,
+            center: V2,
+            rim: []const V2,
+            closed: bool,
+            paint: Paint,
+        ) !void {
+            var vi: [MAX_SEG + 1]u16 = undefined; // vertex-index scratch
+            var ii: [3 * MAX_SEG]u16 = undefined; // index scratch (pts[] eqiv of verts)
+            var k: usize = 0;
+            const c = try self.emitV(center, paint);
+            for (rim, 0..) |p, i| vi[i] = try self.emitV(p, paint);
+            const w = rim.len;
+            const last = if (closed) w else w - 1;
+            for (0..last) |i| {
+                const j = (i + 1) % w;
+                ii[k] = c;
+                ii[k + 1] = vi[i];
+                ii[k + 2] = vi[j];
+                k += 3;
+            }
+            try self.emitIs(ii[0..k]);
+        }
+
+        fn rectFill(
+            self: Self,
+            corners: []const V2,
+            paint: Paint,
+        ) !void {
+            const base = self.batch.markVertex();
+            var ii: []u16 = undefined;
+            for (corners, 0..) |corner, i| {
+                ii[i] = try self.emitV(corner, paint);
+            }
+
+            try self.emitTopology(.quad, base);
         }
 
         fn arcSegment(self: Self, radius: f32, sweep: f32) u32 {

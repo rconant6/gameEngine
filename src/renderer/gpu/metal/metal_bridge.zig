@@ -85,6 +85,15 @@ extern fn metal_render_encoder_draw_primitives(
     vertex_start: u64,
     vertex_count: u64,
 ) void;
+extern fn metal_render_encoder_draw_indexed_primitives(
+    encoder: *MTLRenderCommandEncoder,
+    primitive_type: u64,
+    index_count: u64,
+    index_type: u64,
+    index_buffer: *MTLBuffer,
+    index_offset: u64,
+    base_vertex: i64,
+) void;
 extern fn metal_render_encoder_end(encoder: *MTLRenderCommandEncoder) void;
 extern fn metal_device_create_buffer(
     device: *MTLDevice,
@@ -290,6 +299,24 @@ pub const MetalBridge = struct {
             vertex_count,
         );
     }
+    pub fn drawIndexedPrimitives(
+        encoder: *MTLRenderCommandEncoder,
+        primitive_type: MTLPrimitiveType,
+        index_count: u64,
+        index_buffer: *MTLBuffer,
+        index_offset: u64,
+        base_vertex: i64,
+    ) void {
+        metal_render_encoder_draw_indexed_primitives(
+            encoder,
+            @intFromEnum(primitive_type),
+            index_count,
+            0,
+            index_buffer,
+            index_offset,
+            base_vertex,
+        );
+    }
     pub fn endEncoding(encoder: *MTLRenderCommandEncoder) void {
         metal_render_encoder_end(encoder);
     }
@@ -313,8 +340,18 @@ pub const MetalBridge = struct {
         return metal_buffer_length(buffer);
     }
 
-    pub fn createTexture(device: *MTLDevice, width: u32, height: u32) !*MTLTexture {
-        return metal_create_texture(device, width, height) orelse MTLError.TextureCreationFailed;
+    pub fn createTexture(
+        device: *MTLDevice,
+        width: u32,
+        height: u32,
+        format: MTLPixelFormat,
+    ) !*MTLTexture {
+        return metal_create_texture(
+            device,
+            width,
+            height,
+            format,
+        ) orelse MTLError.TextureCreationFailed;
     }
 
     pub fn uploadTextureData(

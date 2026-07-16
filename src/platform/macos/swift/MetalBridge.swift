@@ -1,517 +1,555 @@
 #if USE_METAL
-  import Metal
-  import MetalKit
-  import QuartzCore
+    import Metal
+    import MetalKit
+    import QuartzCore
 
-  final class MetalFrameContext {
-    let device: MTLDevice
-    let queue: MTLCommandQueue
-    let layer: CAMetalLayer
-    let inflight: DispatchSemaphore  // init value = maxFramesInFlight (3)
-    let maxInFlight: Int
-    var msaa: MTLTexture?  // TODO: nil for now
-    var sampleCount: Int = 4
+    final class MetalFrameContext {
+        let device: MTLDevice
+        let queue: MTLCommandQueue
+        let layer: CAMetalLayer
+        let inflight: DispatchSemaphore  // init value = maxFramesInFlight (3)
+        let maxInFlight: Int
+        var msaa: MTLTexture?  // TODO: nil for now
+        var sampleCount: Int = 4
 
-    init(device: MTLDevice, queue: MTLCommandQueue, layer: CAMetalLayer, maxInFlight: Int) {
-      self.device = device
-      self.queue = queue
-      self.layer = layer
-      self.maxInFlight = maxInFlight
-      self.inflight = DispatchSemaphore(value: maxInFlight)
-    }
-  }
-
-  final class MetalFrame {
-    let drawable: CAMetalDrawable
-    let commandBuffer: MTLCommandBuffer
-    let encoder: MTLRenderCommandEncoder
-
-    init(_ d: CAMetalDrawable, _ cb: MTLCommandBuffer, _ e: MTLRenderCommandEncoder) {
-      self.drawable = d
-      self.commandBuffer = cb
-      self.encoder = e
-    }
-  }
-
-  // MARK: new wrapping FFI layer functions
-  @_cdecl("metal_frame_context_create")
-  public func metal_frame_context_create(
-    device: OpaquePointer, queue: OpaquePointer,
-    layer: OpaquePointer, maxInFlight: UInt32,
-    ctx: OpaquePointer,
-  ) -> OpaquePointer? {
-    let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
-    let q = Unmanaged<MTLCommandQueue>.fromOpaque(UnsafeRawPointer(queue)).takeUnretainedValue()
-    let l = Unmanaged<CAMetalLayer>.fromOpaque(UnsafeRawPointer(layer)).takeUnretainedValue()
-
-    let ctx = MetalFrameContext(device: dev, queue: q, layer: l, maxInFlight: Int(maxInFlight))
-
-    return OpaquePointer(Unmanaged.passRetained(ctx).toOpaque())
-  }
-  @_cdecl("metal_frame_context_destroy")
-  public func metal_frame_context_destroy(ctx: OpaquePointer) {
-    Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).release()
-  }
-
-  // Create the multisample color texture the render pass resolves from.
-  // sampleCount <= 1 leaves ctx.msaa nil (frame_begin falls back to the drawable,
-  // storeAction .store — i.e. MSAA off). width/height = drawable physical pixels.
-  // NOTE: drawable-sized; a live resize must recreate this (rides with the parked
-  // resize/S6 work — not wired yet).
-  @_cdecl("metal_frame_context_set_msaa")
-  public func metal_frame_context_set_msaa(
-    ctx: OpaquePointer, sampleCount: UInt8, width: UInt32, height: UInt32
-  ) {
-    let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
-    guard sampleCount > 1 else {
-      c.msaa = nil
-      c.sampleCount = 1
-      return
-    }
-    let d = MTLTextureDescriptor()
-    d.textureType = .type2DMultisample
-    d.pixelFormat = .bgra8Unorm_srgb  // MUST match the drawable's format
-    d.width = Int(width)
-    d.height = Int(height)
-    d.sampleCount = Int(sampleCount)
-    d.storageMode = .memoryless
-    d.usage = .renderTarget
-    c.msaa = c.device.makeTexture(descriptor: d)
-    c.sampleCount = Int(sampleCount)
-  }
-  @_cdecl("metal_frame_begin")
-  public func metal_frame_begin(
-    ctx: OpaquePointer,
-    clear_r: Double,
-    clear_g: Double,
-    clear_b: Double,
-    clear_a: Double,
-  ) -> OpaquePointer? {
-    let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
-    c.inflight.wait()
-    return autoreleasepool {
-      guard let drawable = c.layer.nextDrawable() else {
-        c.inflight.signal()
-        return nil
-      }
-      guard let cb = c.queue.makeCommandBuffer() else {
-        c.inflight.signal()
-        return nil
-      }
-      let rpd = MTLRenderPassDescriptor()
-      let target = c.msaa ?? drawable.texture
-      rpd.colorAttachments[0].texture = target
-      rpd.colorAttachments[0].loadAction = .clear
-      rpd.colorAttachments[0].clearColor = MTLClearColor(
-        red: clear_r, green: clear_g, blue: clear_b, alpha: clear_a)
-      rpd.colorAttachments[0].storeAction = (c.msaa != nil) ? .multisampleResolve : .store
-      if c.msaa != nil { rpd.colorAttachments[0].resolveTexture = drawable.texture }
-      guard let enc = cb.makeRenderCommandEncoder(descriptor: rpd) else {
-        c.inflight.signal()
-        return nil
-      }
-      let frame = MetalFrame(drawable, cb, enc)
-      return OpaquePointer(Unmanaged.passRetained(frame).toOpaque())
-    }
-  }
-
-  @_cdecl("metal_frame_encoder")
-  public func metal_frame_encoder(frame: OpaquePointer) -> OpaquePointer {
-    let f = Unmanaged<MetalFrame>.fromOpaque(UnsafeRawPointer(frame)).takeUnretainedValue()
-    return OpaquePointer(Unmanaged<MTLCommandEncoder>.passUnretained(f.encoder).toOpaque())
-  }
-  @_cdecl("metal_frame_end")
-  public func metal_frame_end(ctx: OpaquePointer, frame: OpaquePointer) {
-    let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
-    let f = Unmanaged<MetalFrame>.fromOpaque(UnsafeRawPointer(frame)).takeUnretainedValue()
-
-    f.encoder.endEncoding()
-    f.commandBuffer.present(f.drawable)
-    let sem = c.inflight
-    f.commandBuffer.addCompletedHandler { _ in sem.signal() }
-    f.commandBuffer.commit()
-    Unmanaged<MetalFrame>.fromOpaque(UnsafeRawPointer(frame)).release()
-  }
-
-  @_cdecl("metal_release")
-  public func metal_release(ptr: OpaquePointer) {
-    Unmanaged<AnyObject>.fromOpaque(UnsafeRawPointer(ptr)).release()
-  }
-  @_cdecl("metal_frame_context_wait_idle")
-  public func metal_frame_context_wait_idle(ctx: OpaquePointer) {
-    let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
-
-    for _ in 0..<c.maxInFlight {
-      c.inflight.wait()  // let gpu get to idle
-    }
-    for _ in 0..<c.maxInFlight {
-      c.inflight.signal()  // get back to 3 available frames in flight so Swift can deinit
-    }
-  }
-
-  // MARK: Device and queue creation
-  @_cdecl("metal_create_device")
-  public func metal_create_device() -> OpaquePointer? {
-    guard let device = MTLCreateSystemDefaultDevice() else {
-      return nil
-    }
-    return OpaquePointer(Unmanaged.passRetained(device).toOpaque())
-  }
-  @_cdecl("metal_create_command_queue")
-  public func metal_create_command_queue(device: OpaquePointer) -> OpaquePointer? {
-    let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
-    guard let cmdQueue = dev.makeCommandQueue() else {
-      return nil
-    }
-    return OpaquePointer(Unmanaged.passRetained(cmdQueue).toOpaque())
-  }
-
-  // MARK: Buffer management
-  @_cdecl("metal_create_command_buffer")
-  public func metal_create_command_buffer(queue: OpaquePointer) -> OpaquePointer? {
-    let q = Unmanaged<MTLCommandQueue>.fromOpaque(UnsafeRawPointer(queue)).takeUnretainedValue()
-    guard let cmdBuf = q.makeCommandBuffer() else {
-      return nil
-    }
-    return OpaquePointer(Unmanaged.passRetained(cmdBuf).toOpaque())
-  }
-  @_cdecl("metal_command_buffer_commit")
-  public func metal_command_buffer_commit(buffer: OpaquePointer) {
-    let buf = Unmanaged<MTLCommandBuffer>.fromOpaque(UnsafeRawPointer(buffer)).takeUnretainedValue()
-    buf.commit()
-  }
-  @_cdecl("metal_command_buffer_present_drawable")
-  public func metal_command_buffer_present_drawable(buffer: OpaquePointer, drawable: OpaquePointer)
-  {
-    let buf = Unmanaged<MTLCommandBuffer>.fromOpaque(UnsafeRawPointer(buffer)).takeUnretainedValue()
-    let draw = Unmanaged<CAMetalDrawable>.fromOpaque(UnsafeRawPointer(drawable))
-      .takeUnretainedValue()
-    buf.present(draw)
-  }
-
-  // MARK: Layer and Drawable access
-  @MainActor
-  @_cdecl("metal_get_layer_from_view")
-  public func metal_get_layer_from_view(window: OpaquePointer?) -> UnsafeMutableRawPointer? {
-    guard let window = window,
-      let gameWindow = activeWindows[window],
-      let layer = gameWindow.getMetalLayer()
-    else { return nil }
-
-    return Unmanaged.passUnretained(layer).toOpaque()
-  }
-  @_cdecl("metal_layer_next_drawable")
-  public func metal_layer_next_drawable(layer: OpaquePointer) -> OpaquePointer? {
-    let l = Unmanaged<CAMetalLayer>.fromOpaque(UnsafeRawPointer(layer)).takeUnretainedValue()
-    guard let nextLayer = l.nextDrawable() else { return nil }
-    return OpaquePointer(Unmanaged.passRetained(nextLayer).toOpaque())
-  }
-  @_cdecl("metal_drawable_get_texture")
-  public func metal_drawable_get_texture(drawable: OpaquePointer) -> OpaquePointer? {
-    let d = Unmanaged<CAMetalDrawable>.fromOpaque(UnsafeRawPointer(drawable)).takeUnretainedValue()
-    return OpaquePointer(Unmanaged.passRetained(d.texture).toOpaque())
-  }
-
-  // MARK: Buffer management
-  @_cdecl("metal_device_create_buffer")
-  public func metal_device_create_buffer(device: OpaquePointer, length: UInt64, options: UInt64)
-    -> OpaquePointer?
-  {
-    let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
-    let resourceOptions = MTLResourceOptions.init(rawValue: UInt(options))
-    guard let buffer = dev.makeBuffer(length: Int(length), options: resourceOptions) else {
-      return nil
-    }
-    return OpaquePointer(Unmanaged.passRetained(buffer).toOpaque())
-  }
-  @_cdecl("metal_buffer_contents")
-  public func metal_buffer_contents(buffer: OpaquePointer) -> UnsafeMutableRawPointer? {
-    let buf = Unmanaged<MTLBuffer>.fromOpaque(UnsafeRawPointer(buffer)).takeUnretainedValue()
-    return buf.contents()
-  }
-
-  // MARK: Shader management
-  @_cdecl("metal_device_create_default_library")
-  public func metal_device_create_default_library(device: OpaquePointer) -> OpaquePointer? {
-    let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
-    guard let lib = dev.makeDefaultLibrary() else { return nil }
-    return OpaquePointer(Unmanaged.passRetained(lib).toOpaque())
-  }
-  @_cdecl("metal_library_create_function")
-  public func metal_library_create_function(library: OpaquePointer, name: UnsafePointer<CChar>, )
-    -> OpaquePointer?
-  {
-    let lib = Unmanaged<MTLLibrary>.fromOpaque(UnsafeRawPointer(library)).takeUnretainedValue()
-    let funcName = String(cString: name)
-    guard let function = lib.makeFunction(name: funcName) else { return nil }
-    return OpaquePointer(Unmanaged.passRetained(function).toOpaque())
-  }
-  @_cdecl("metal_device_create_library_from_file")
-  public func metal_device_create_library_from_file(
-    device: OpaquePointer,
-    path: UnsafePointer<CChar>
-  ) -> OpaquePointer? {
-    let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
-    let pathString = String(cString: path)
-    let url = URL(fileURLWithPath: pathString)
-
-    guard let library = try? dev.makeLibrary(URL: url) else {
-      return nil
+        init(device: MTLDevice, queue: MTLCommandQueue, layer: CAMetalLayer, maxInFlight: Int) {
+            self.device = device
+            self.queue = queue
+            self.layer = layer
+            self.maxInFlight = maxInFlight
+            self.inflight = DispatchSemaphore(value: maxInFlight)
+        }
     }
 
-    return OpaquePointer(Unmanaged.passRetained(library).toOpaque())
-  }
+    final class MetalFrame {
+        let drawable: CAMetalDrawable
+        let commandBuffer: MTLCommandBuffer
+        let encoder: MTLRenderCommandEncoder
 
-  // MARK: Pipeline State Creation
-  @_cdecl("metal_create_render_pipeline_state")
-  public func metal_create_render_pipeline_state(
-    device: OpaquePointer, vertexFn: OpaquePointer, fragmentFn: OpaquePointer,
-    pixelFormat: UInt64, sampleCount: UInt8,
-  ) -> OpaquePointer? {
-    let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
-    let vf = Unmanaged<MTLFunction>.fromOpaque(UnsafeRawPointer(vertexFn)).takeUnretainedValue()
-    let ff = Unmanaged<MTLFunction>.fromOpaque(UnsafeRawPointer(fragmentFn)).takeUnretainedValue()
-
-    let vertexDesc = MTLVertexDescriptor()
-
-    vertexDesc.attributes[0].format = .float2
-    vertexDesc.attributes[0].offset = 0
-    vertexDesc.attributes[0].bufferIndex = 0
-
-    vertexDesc.attributes[1].format = .half4
-    vertexDesc.attributes[1].offset = 8
-    vertexDesc.attributes[1].bufferIndex = 0
-
-    vertexDesc.attributes[2].format = .ushort
-    vertexDesc.attributes[2].offset = 16
-    vertexDesc.attributes[2].bufferIndex = 0
-
-    vertexDesc.layouts[0].stride = 20
-    vertexDesc.layouts[0].stepFunction = .perVertex
-
-    let pipelineDesc = MTLRenderPipelineDescriptor()
-    pipelineDesc.vertexFunction = vf
-    pipelineDesc.fragmentFunction = ff
-    pipelineDesc.vertexDescriptor = vertexDesc
-    pipelineDesc.rasterSampleCount = Int(sampleCount)
-
-    guard let pf = MTLPixelFormat(rawValue: UInt(pixelFormat)) else { return nil }
-    pipelineDesc.colorAttachments[0].pixelFormat = pf
-    pipelineDesc.colorAttachments[0].isBlendingEnabled = true
-    pipelineDesc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-    pipelineDesc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-    pipelineDesc.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
-    pipelineDesc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-
-    guard let pipeline = try? dev.makeRenderPipelineState(descriptor: pipelineDesc) else {
-      return nil
+        init(_ d: CAMetalDrawable, _ cb: MTLCommandBuffer, _ e: MTLRenderCommandEncoder) {
+            self.drawable = d
+            self.commandBuffer = cb
+            self.encoder = e
+        }
     }
 
-    return OpaquePointer(Unmanaged.passRetained(pipeline).toOpaque())
-  }
+    // MARK: new wrapping FFI layer functions
+    @_cdecl("metal_frame_context_create")
+    public func metal_frame_context_create(
+        device: OpaquePointer, queue: OpaquePointer,
+        layer: OpaquePointer, maxInFlight: UInt32,
+        ctx: OpaquePointer,
+    ) -> OpaquePointer? {
+        let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
+        let q = Unmanaged<MTLCommandQueue>.fromOpaque(UnsafeRawPointer(queue)).takeUnretainedValue()
+        let l = Unmanaged<CAMetalLayer>.fromOpaque(UnsafeRawPointer(layer)).takeUnretainedValue()
 
-  // MARK: Renderpass Descriptor management
-  @_cdecl("metal_create_render_pass_descriptor")
-  public func metal_create_render_pass_descriptor() -> OpaquePointer? {
-    let passDescriptor = MTLRenderPassDescriptor()
+        let ctx = MetalFrameContext(device: dev, queue: q, layer: l, maxInFlight: Int(maxInFlight))
 
-    return OpaquePointer(Unmanaged.passRetained(passDescriptor).toOpaque())
-  }
+        return OpaquePointer(Unmanaged.passRetained(ctx).toOpaque())
+    }
+    @_cdecl("metal_frame_context_destroy")
+    public func metal_frame_context_destroy(ctx: OpaquePointer) {
+        Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).release()
+    }
 
-  @_cdecl("metal_render_pass_set_color_attachment")
-  public func metal_render_pass_set_color_attachment(
-    desc: OpaquePointer,
-    texture: OpaquePointer,
-    loadAction: UInt64,
-    storeAction: UInt64,
-    r: Double,
-    g: Double,
-    b: Double,
-    a: Double
-  ) {
-    let renderPass = Unmanaged<MTLRenderPassDescriptor>.fromOpaque(UnsafeRawPointer(desc))
-      .takeUnretainedValue()
-    let tex = Unmanaged<MTLTexture>.fromOpaque(UnsafeRawPointer(texture)).takeUnretainedValue()
+    // Create the multisample color texture the render pass resolves from.
+    // sampleCount <= 1 leaves ctx.msaa nil (frame_begin falls back to the drawable,
+    // storeAction .store — i.e. MSAA off). width/height = drawable physical pixels.
+    // NOTE: drawable-sized; a live resize must recreate this (rides with the parked
+    // resize/S6 work — not wired yet).
+    @_cdecl("metal_frame_context_set_msaa")
+    public func metal_frame_context_set_msaa(
+        ctx: OpaquePointer, sampleCount: UInt8, width: UInt32, height: UInt32
+    ) {
+        let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
+        guard sampleCount > 1 else {
+            c.msaa = nil
+            c.sampleCount = 1
+            return
+        }
+        let d = MTLTextureDescriptor()
+        d.textureType = .type2DMultisample
+        d.pixelFormat = .bgra8Unorm_srgb  // MUST match the drawable's format
+        d.width = Int(width)
+        d.height = Int(height)
+        d.sampleCount = Int(sampleCount)
+        d.storageMode = .memoryless
+        d.usage = .renderTarget
+        c.msaa = c.device.makeTexture(descriptor: d)
+        c.sampleCount = Int(sampleCount)
+    }
+    @_cdecl("metal_frame_begin")
+    public func metal_frame_begin(
+        ctx: OpaquePointer,
+        clear_r: Double,
+        clear_g: Double,
+        clear_b: Double,
+        clear_a: Double,
+    ) -> OpaquePointer? {
+        let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
+        c.inflight.wait()
+        return autoreleasepool {
+            guard let drawable = c.layer.nextDrawable() else {
+                c.inflight.signal()
+                return nil
+            }
+            guard let cb = c.queue.makeCommandBuffer() else {
+                c.inflight.signal()
+                return nil
+            }
+            let rpd = MTLRenderPassDescriptor()
+            let target = c.msaa ?? drawable.texture
+            rpd.colorAttachments[0].texture = target
+            rpd.colorAttachments[0].loadAction = .clear
+            rpd.colorAttachments[0].clearColor = MTLClearColor(
+                red: clear_r, green: clear_g, blue: clear_b, alpha: clear_a)
+            rpd.colorAttachments[0].storeAction = (c.msaa != nil) ? .multisampleResolve : .store
+            if c.msaa != nil { rpd.colorAttachments[0].resolveTexture = drawable.texture }
+            guard let enc = cb.makeRenderCommandEncoder(descriptor: rpd) else {
+                c.inflight.signal()
+                return nil
+            }
+            let frame = MetalFrame(drawable, cb, enc)
+            return OpaquePointer(Unmanaged.passRetained(frame).toOpaque())
+        }
+    }
 
-    if let attachment = renderPass.colorAttachments[0],
-      let load = MTLLoadAction(rawValue: UInt(loadAction)),
-      let store = MTLStoreAction(rawValue: UInt(storeAction))
+    @_cdecl("metal_frame_encoder")
+    public func metal_frame_encoder(frame: OpaquePointer) -> OpaquePointer {
+        let f = Unmanaged<MetalFrame>.fromOpaque(UnsafeRawPointer(frame)).takeUnretainedValue()
+        return OpaquePointer(Unmanaged<MTLCommandEncoder>.passUnretained(f.encoder).toOpaque())
+    }
+    @_cdecl("metal_frame_end")
+    public func metal_frame_end(ctx: OpaquePointer, frame: OpaquePointer) {
+        let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
+        let f = Unmanaged<MetalFrame>.fromOpaque(UnsafeRawPointer(frame)).takeUnretainedValue()
+
+        f.encoder.endEncoding()
+        f.commandBuffer.present(f.drawable)
+        let sem = c.inflight
+        f.commandBuffer.addCompletedHandler { _ in sem.signal() }
+        f.commandBuffer.commit()
+        Unmanaged<MetalFrame>.fromOpaque(UnsafeRawPointer(frame)).release()
+    }
+
+    @_cdecl("metal_release")
+    public func metal_release(ptr: OpaquePointer) {
+        Unmanaged<AnyObject>.fromOpaque(UnsafeRawPointer(ptr)).release()
+    }
+    @_cdecl("metal_frame_context_wait_idle")
+    public func metal_frame_context_wait_idle(ctx: OpaquePointer) {
+        let c = Unmanaged<MetalFrameContext>.fromOpaque(UnsafeRawPointer(ctx)).takeUnretainedValue()
+
+        for _ in 0..<c.maxInFlight {
+            c.inflight.wait()  // let gpu get to idle
+        }
+        for _ in 0..<c.maxInFlight {
+            c.inflight.signal()  // get back to 3 available frames in flight so Swift can deinit
+        }
+    }
+
+    // MARK: Device and queue creation
+    @_cdecl("metal_create_device")
+    public func metal_create_device() -> OpaquePointer? {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            return nil
+        }
+        return OpaquePointer(Unmanaged.passRetained(device).toOpaque())
+    }
+    @_cdecl("metal_create_command_queue")
+    public func metal_create_command_queue(device: OpaquePointer) -> OpaquePointer? {
+        let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
+        guard let cmdQueue = dev.makeCommandQueue() else {
+            return nil
+        }
+        return OpaquePointer(Unmanaged.passRetained(cmdQueue).toOpaque())
+    }
+
+    // MARK: Buffer management
+    @_cdecl("metal_create_command_buffer")
+    public func metal_create_command_buffer(queue: OpaquePointer) -> OpaquePointer? {
+        let q = Unmanaged<MTLCommandQueue>.fromOpaque(UnsafeRawPointer(queue)).takeUnretainedValue()
+        guard let cmdBuf = q.makeCommandBuffer() else {
+            return nil
+        }
+        return OpaquePointer(Unmanaged.passRetained(cmdBuf).toOpaque())
+    }
+    @_cdecl("metal_command_buffer_commit")
+    public func metal_command_buffer_commit(buffer: OpaquePointer) {
+        let buf = Unmanaged<MTLCommandBuffer>.fromOpaque(UnsafeRawPointer(buffer))
+            .takeUnretainedValue()
+        buf.commit()
+    }
+    @_cdecl("metal_command_buffer_present_drawable")
+    public func metal_command_buffer_present_drawable(
+        buffer: OpaquePointer, drawable: OpaquePointer
+    ) {
+        let buf = Unmanaged<MTLCommandBuffer>.fromOpaque(UnsafeRawPointer(buffer))
+            .takeUnretainedValue()
+        let draw = Unmanaged<CAMetalDrawable>.fromOpaque(UnsafeRawPointer(drawable))
+            .takeUnretainedValue()
+        buf.present(draw)
+    }
+
+    // MARK: Layer and Drawable access
+    @MainActor
+    @_cdecl("metal_get_layer_from_view")
+    public func metal_get_layer_from_view(window: OpaquePointer?) -> UnsafeMutableRawPointer? {
+        guard let window = window,
+            let gameWindow = activeWindows[window],
+            let layer = gameWindow.getMetalLayer()
+        else { return nil }
+
+        return Unmanaged.passUnretained(layer).toOpaque()
+    }
+    @_cdecl("metal_layer_next_drawable")
+    public func metal_layer_next_drawable(layer: OpaquePointer) -> OpaquePointer? {
+        let l = Unmanaged<CAMetalLayer>.fromOpaque(UnsafeRawPointer(layer)).takeUnretainedValue()
+        guard let nextLayer = l.nextDrawable() else { return nil }
+        return OpaquePointer(Unmanaged.passRetained(nextLayer).toOpaque())
+    }
+    @_cdecl("metal_drawable_get_texture")
+    public func metal_drawable_get_texture(drawable: OpaquePointer) -> OpaquePointer? {
+        let d = Unmanaged<CAMetalDrawable>.fromOpaque(UnsafeRawPointer(drawable))
+            .takeUnretainedValue()
+        return OpaquePointer(Unmanaged.passRetained(d.texture).toOpaque())
+    }
+
+    // MARK: Buffer management
+    @_cdecl("metal_device_create_buffer")
+    public func metal_device_create_buffer(device: OpaquePointer, length: UInt64, options: UInt64)
+        -> OpaquePointer?
     {
-      attachment.texture = tex
-      attachment.loadAction = load
-      attachment.storeAction = store
-      attachment.clearColor = MTLClearColor(
-        red: r,
-        green: g,
-        blue: b,
-        alpha: a
-      )
+        let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
+        let resourceOptions = MTLResourceOptions.init(rawValue: UInt(options))
+        guard let buffer = dev.makeBuffer(length: Int(length), options: resourceOptions) else {
+            return nil
+        }
+        return OpaquePointer(Unmanaged.passRetained(buffer).toOpaque())
     }
-  }
-
-  // MARK: Render Encoding
-  @_cdecl("metal_command_buffer_create_render_encoder")
-  public func metal_command_buffer_create_render_encoder(
-    buffer: OpaquePointer, descriptor: OpaquePointer
-  ) -> OpaquePointer? {
-    let buf = Unmanaged<MTLCommandBuffer>.fromOpaque(UnsafeRawPointer(buffer)).takeUnretainedValue()
-    let desc = Unmanaged<MTLRenderPassDescriptor>.fromOpaque(UnsafeRawPointer(descriptor))
-      .takeUnretainedValue()
-    guard let encoder = buf.makeRenderCommandEncoder(descriptor: desc) else {
-      return nil
+    @_cdecl("metal_buffer_contents")
+    public func metal_buffer_contents(buffer: OpaquePointer) -> UnsafeMutableRawPointer? {
+        let buf = Unmanaged<MTLBuffer>.fromOpaque(UnsafeRawPointer(buffer)).takeUnretainedValue()
+        return buf.contents()
     }
 
-    return OpaquePointer(Unmanaged.passRetained(encoder).toOpaque())
-  }
-
-  @_cdecl("metal_set_pipeline_state")
-  public func metal_set_pipeline_state(encoder: OpaquePointer, state: OpaquePointer) {
-    let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
-      .takeUnretainedValue()
-    let pipeState = Unmanaged<MTLRenderPipelineState>.fromOpaque(UnsafeRawPointer(state))
-      .takeUnretainedValue()
-
-    enc.setRenderPipelineState(pipeState)
-  }
-
-  @_cdecl("metal_render_encoder_set_vertex_buffer")
-  public func metal_render_encoder_set_vertex_buffer(
-    encoder: OpaquePointer, buffer: OpaquePointer,
-    offset: UInt64, index: UInt64
-  ) {
-    let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
-      .takeUnretainedValue()
-    let buf = Unmanaged<MTLBuffer>.fromOpaque(UnsafeRawPointer(buffer))
-      .takeUnretainedValue()
-
-    enc.setVertexBuffer(buf, offset: Int(offset), index: Int(index))
-  }
-  @_cdecl("metal_render_encoder_draw_primitives")
-  public func metal_render_encoder_draw_primitives(
-    encoder: OpaquePointer, primitiveType: UInt64, vertexStart: UInt64, vertexCount: UInt64
-  ) {
-    let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
-      .takeUnretainedValue()
-    if let primType = MTLPrimitiveType(rawValue: UInt(primitiveType)) {
-      enc.drawPrimitives(
-        type: primType, vertexStart: Int(vertexStart),
-        vertexCount: Int(vertexCount))
+    // MARK: Shader management
+    @_cdecl("metal_device_create_default_library")
+    public func metal_device_create_default_library(device: OpaquePointer) -> OpaquePointer? {
+        let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
+        guard let lib = dev.makeDefaultLibrary() else { return nil }
+        return OpaquePointer(Unmanaged.passRetained(lib).toOpaque())
     }
-  }
-  @_cdecl("metal_render_encoder_end")
-  public func metal_render_encoder_end(encoder: OpaquePointer) {
-    let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
-      .takeUnretainedValue()
-    enc.endEncoding()
-  }
+    @_cdecl("metal_library_create_function")
+    public func metal_library_create_function(library: OpaquePointer, name: UnsafePointer<CChar>, )
+        -> OpaquePointer?
+    {
+        let lib = Unmanaged<MTLLibrary>.fromOpaque(UnsafeRawPointer(library)).takeUnretainedValue()
+        let funcName = String(cString: name)
+        guard let function = lib.makeFunction(name: funcName) else { return nil }
+        return OpaquePointer(Unmanaged.passRetained(function).toOpaque())
+    }
+    @_cdecl("metal_device_create_library_from_file")
+    public func metal_device_create_library_from_file(
+        device: OpaquePointer,
+        path: UnsafePointer<CChar>
+    ) -> OpaquePointer? {
+        let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
+        let pathString = String(cString: path)
+        let url = URL(fileURLWithPath: pathString)
 
-  @_cdecl("metal_render_encoder_set_vertex_bytes")
-  public func metal_render_encoder_set_vertex_bytes(
-    encoder: OpaquePointer,
-    bytes: UnsafeRawPointer,
-    length: UInt64,
-    index: UInt64,
-  ) {
-    let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
-      .takeUnretainedValue()
-    enc.setVertexBytes(bytes, length: Int(length), index: Int(index))
-  }
+        guard let library = try? dev.makeLibrary(URL: url) else {
+            return nil
+        }
 
-  @_cdecl("metal_create_texture")
-  public func metal_create_texture(
-    device: OpaquePointer, width w: UInt32, height h: UInt32
-  ) -> OpaquePointer? {
-    let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
-
-    let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(
-      pixelFormat: .rgba8Unorm, width: Int(w),
-      height: Int(h), mipmapped: false)
-
-    textureDescriptor.usage = .shaderRead
-    textureDescriptor.storageMode = .shared
-
-    guard let texture = dev.makeTexture(descriptor: textureDescriptor) else { return nil }
-
-    return OpaquePointer(Unmanaged.passRetained(texture).toOpaque())
-  }
-
-  @_cdecl("metal_texture_replace_region")
-  public func metal_texture_replace_region(
-    texture: OpaquePointer,
-    width w: UInt32,
-    height h: UInt32,
-    data: UnsafeRawPointer,
-    bytesPerRow: UInt32,
-  ) {
-    let tex = Unmanaged<MTLTexture>.fromOpaque(UnsafeRawPointer(texture)).takeUnretainedValue()
-
-    let region = MTLRegion(
-      origin: MTLOrigin(x: 0, y: 0, z: 0),
-      size: MTLSize(width: Int(w), height: Int(h), depth: 1))
-
-    tex.replace(region: region, mipmapLevel: 0, withBytes: data, bytesPerRow: Int(bytesPerRow))
-  }
-
-  @_cdecl("metal_render_encoder_set_fragment_texture")
-  public func metal_render_encoder_set_fragment_texture(
-    encoder: OpaquePointer,
-    texture: OpaquePointer,
-    index: UInt64
-  ) {
-    let encod = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
-      .takeUnretainedValue()
-    let tex = Unmanaged<MTLTexture>.fromOpaque(UnsafeRawPointer(texture)).takeUnretainedValue()
-
-    encod.setFragmentTexture(tex, index: Int(index))
-  }
-
-  @_cdecl("metal_create_texture_pipeline_state")
-  public func metal_create_texture_pipeline_state(
-    device: OpaquePointer,
-    vertexFn: OpaquePointer,
-    fragmentFn: OpaquePointer,
-    pixelFormat: UInt64,
-    sampleCount: UInt8,
-  ) -> OpaquePointer? {
-    guard let pf = MTLPixelFormat(rawValue: UInt(pixelFormat)) else { return nil }
-
-    let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
-    let vf = Unmanaged<MTLFunction>.fromOpaque(UnsafeRawPointer(vertexFn)).takeUnretainedValue()
-    let ff = Unmanaged<MTLFunction>.fromOpaque(UnsafeRawPointer(fragmentFn)).takeUnretainedValue()
-
-    let vertexDesc = MTLVertexDescriptor()
-    // position
-    vertexDesc.attributes[0].format = .float2
-    vertexDesc.attributes[0].offset = 0
-    vertexDesc.attributes[0].bufferIndex = 0
-    // texcoord
-    vertexDesc.attributes[1].format = .float2
-    vertexDesc.attributes[1].offset = 8
-    vertexDesc.attributes[1].bufferIndex = 0
-
-    vertexDesc.attributes[2].format = .half4
-    vertexDesc.attributes[2].offset = 16
-    vertexDesc.attributes[2].bufferIndex = 0
-
-    vertexDesc.layouts[0].stride = 24
-
-    let pipelineDesc = MTLRenderPipelineDescriptor()
-    pipelineDesc.vertexFunction = vf
-    pipelineDesc.fragmentFunction = ff
-    pipelineDesc.vertexDescriptor = vertexDesc
-    pipelineDesc.colorAttachments[0].pixelFormat = pf
-    pipelineDesc.colorAttachments[0].isBlendingEnabled = true
-    pipelineDesc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-    pipelineDesc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-    pipelineDesc.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
-    pipelineDesc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-    pipelineDesc.rasterSampleCount = Int(sampleCount)
-
-    guard let pipeline = try? dev.makeRenderPipelineState(descriptor: pipelineDesc) else {
-      return nil
+        return OpaquePointer(Unmanaged.passRetained(library).toOpaque())
     }
 
-    return OpaquePointer(Unmanaged.passRetained(pipeline).toOpaque())
-  }
+    // MARK: Pipeline State Creation
+    @_cdecl("metal_create_render_pipeline_state")
+    public func metal_create_render_pipeline_state(
+        device: OpaquePointer, vertexFn: OpaquePointer, fragmentFn: OpaquePointer,
+        pixelFormat: UInt64, sampleCount: UInt8,
+    ) -> OpaquePointer? {
+        let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
+        let vf = Unmanaged<MTLFunction>.fromOpaque(UnsafeRawPointer(vertexFn)).takeUnretainedValue()
+        let ff = Unmanaged<MTLFunction>.fromOpaque(UnsafeRawPointer(fragmentFn))
+            .takeUnretainedValue()
+
+        let vertexDesc = MTLVertexDescriptor()
+
+        vertexDesc.attributes[0].format = .float2
+        vertexDesc.attributes[0].offset = 0
+        vertexDesc.attributes[0].bufferIndex = 0
+
+        vertexDesc.attributes[1].format = .half4
+        vertexDesc.attributes[1].offset = 8
+        vertexDesc.attributes[1].bufferIndex = 0
+
+        vertexDesc.attributes[2].format = .ushort
+        vertexDesc.attributes[2].offset = 16
+        vertexDesc.attributes[2].bufferIndex = 0
+
+        vertexDesc.layouts[0].stride = 20
+        vertexDesc.layouts[0].stepFunction = .perVertex
+
+        let pipelineDesc = MTLRenderPipelineDescriptor()
+        pipelineDesc.vertexFunction = vf
+        pipelineDesc.fragmentFunction = ff
+        pipelineDesc.vertexDescriptor = vertexDesc
+        pipelineDesc.rasterSampleCount = Int(sampleCount)
+
+        guard let pf = MTLPixelFormat(rawValue: UInt(pixelFormat)) else { return nil }
+        pipelineDesc.colorAttachments[0].pixelFormat = pf
+        pipelineDesc.colorAttachments[0].isBlendingEnabled = true
+        pipelineDesc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        pipelineDesc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        pipelineDesc.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
+        pipelineDesc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+
+        guard let pipeline = try? dev.makeRenderPipelineState(descriptor: pipelineDesc) else {
+            return nil
+        }
+
+        return OpaquePointer(Unmanaged.passRetained(pipeline).toOpaque())
+    }
+
+    // MARK: Renderpass Descriptor management
+    @_cdecl("metal_create_render_pass_descriptor")
+    public func metal_create_render_pass_descriptor() -> OpaquePointer? {
+        let passDescriptor = MTLRenderPassDescriptor()
+
+        return OpaquePointer(Unmanaged.passRetained(passDescriptor).toOpaque())
+    }
+
+    @_cdecl("metal_render_pass_set_color_attachment")
+    public func metal_render_pass_set_color_attachment(
+        desc: OpaquePointer,
+        texture: OpaquePointer,
+        loadAction: UInt64,
+        storeAction: UInt64,
+        r: Double,
+        g: Double,
+        b: Double,
+        a: Double
+    ) {
+        let renderPass = Unmanaged<MTLRenderPassDescriptor>.fromOpaque(UnsafeRawPointer(desc))
+            .takeUnretainedValue()
+        let tex = Unmanaged<MTLTexture>.fromOpaque(UnsafeRawPointer(texture)).takeUnretainedValue()
+
+        if let attachment = renderPass.colorAttachments[0],
+            let load = MTLLoadAction(rawValue: UInt(loadAction)),
+            let store = MTLStoreAction(rawValue: UInt(storeAction))
+        {
+            attachment.texture = tex
+            attachment.loadAction = load
+            attachment.storeAction = store
+            attachment.clearColor = MTLClearColor(
+                red: r,
+                green: g,
+                blue: b,
+                alpha: a
+            )
+        }
+    }
+
+    // MARK: Render Encoding
+    @_cdecl("metal_command_buffer_create_render_encoder")
+    public func metal_command_buffer_create_render_encoder(
+        buffer: OpaquePointer, descriptor: OpaquePointer
+    ) -> OpaquePointer? {
+        let buf = Unmanaged<MTLCommandBuffer>.fromOpaque(UnsafeRawPointer(buffer))
+            .takeUnretainedValue()
+        let desc = Unmanaged<MTLRenderPassDescriptor>.fromOpaque(UnsafeRawPointer(descriptor))
+            .takeUnretainedValue()
+        guard let encoder = buf.makeRenderCommandEncoder(descriptor: desc) else {
+            return nil
+        }
+
+        return OpaquePointer(Unmanaged.passRetained(encoder).toOpaque())
+    }
+
+    @_cdecl("metal_set_pipeline_state")
+    public func metal_set_pipeline_state(encoder: OpaquePointer, state: OpaquePointer) {
+        let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
+            .takeUnretainedValue()
+        let pipeState = Unmanaged<MTLRenderPipelineState>.fromOpaque(UnsafeRawPointer(state))
+            .takeUnretainedValue()
+
+        enc.setRenderPipelineState(pipeState)
+    }
+
+    @_cdecl("metal_render_encoder_set_vertex_buffer")
+    public func metal_render_encoder_set_vertex_buffer(
+        encoder: OpaquePointer, buffer: OpaquePointer,
+        offset: UInt64, index: UInt64
+    ) {
+        let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
+            .takeUnretainedValue()
+        let buf = Unmanaged<MTLBuffer>.fromOpaque(UnsafeRawPointer(buffer))
+            .takeUnretainedValue()
+
+        enc.setVertexBuffer(buf, offset: Int(offset), index: Int(index))
+    }
+    @_cdecl("metal_render_encoder_draw_primitives")
+    public func metal_render_encoder_draw_primitives(
+        encoder: OpaquePointer, primitiveType: UInt64, vertexStart: UInt64, vertexCount: UInt64
+    ) {
+        let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
+            .takeUnretainedValue()
+        if let primType = MTLPrimitiveType(rawValue: UInt(primitiveType)) {
+            enc.drawPrimitives(
+                type: primType, vertexStart: Int(vertexStart),
+                vertexCount: Int(vertexCount))
+        }
+    }
+
+    @_cdecl("metal_render_encoder_draw_indexed_primitives")
+    public func metal_render_encoder_draw_indexed_primitives(
+        encoder: OpaquePointer, primitiveType: UInt64, indexCount: UInt64,
+        indexType: UInt64,  // 0-uint16, 1 - uint32 (MTLINDEXTYPE raw)
+        indexBuffer: OpaquePointer, indexBufferOffset: UIn64, baseVertex: Int64,
+    ) -> OpaquePointer {
+        let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
+            .takeUnretainedValue()
+        if let primType = MTLPrimitiveType(rawValue: UInt(primitiveType)) {
+            enc.drawPrimitives(
+                type: primType, vertexStart: Int(vertexStart),
+                vertexCount: Int(vertexCount))
+        }
+
+        let indexType = MTLIndexType(rawValue: UInt(indexType)) ?? .uint16
+        let buf = Unmanaged<MTLBuffer>.fromOpaque(UnsafeRawPointer(buffer))
+            .takeUnretainedValue()
+
+        enc.drawIndexedPrimitives(
+            type: primitiveType, indexCount: indexCount,
+            indexType: indexType, indexBuffer: buf,
+            indexBufferOffset: Int(indexBufferOffset),
+            instanceCount: Int(1), baseVertex: Int(baseVertex),
+            baseInstance: Int(0))
+    }
+
+    @_cdecl("metal_render_encoder_end")
+    public func metal_render_encoder_end(encoder: OpaquePointer) {
+        let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
+            .takeUnretainedValue()
+        enc.endEncoding()
+    }
+
+    @_cdecl("metal_render_encoder_set_vertex_bytes")
+    public func metal_render_encoder_set_vertex_bytes(
+        encoder: OpaquePointer,
+        bytes: UnsafeRawPointer,
+        length: UInt64,
+        index: UInt64,
+    ) {
+        let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
+            .takeUnretainedValue()
+        enc.setVertexBytes(bytes, length: Int(length), index: Int(index))
+    }
+
+    @_cdecl("metal_create_texture")
+    public func metal_create_texture(
+        device: OpaquePointer,
+        width w: UInt32, height h: UInt32,
+        pixelFormmat: UInt64,
+    ) -> OpaquePointer? {
+        let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
+
+        let pxlFormat = MTLPixelFormat(rawValue: pixelFormmat) ?? .rgba8Unorm
+
+        let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: pxlFormat, width: Int(w),
+            height: Int(h), mipmapped: false)
+
+        textureDescriptor.usage = .shaderRead
+        textureDescriptor.storageMode = .shared
+
+        guard let texture = dev.makeTexture(descriptor: textureDescriptor) else { return nil }
+
+        return OpaquePointer(Unmanaged.passRetained(texture).toOpaque())
+    }
+
+    @_cdecl("metal_texture_replace_region")
+    public func metal_texture_replace_region(
+        texture: OpaquePointer,
+        width w: UInt32,
+        height h: UInt32,
+        data: UnsafeRawPointer,
+        bytesPerRow: UInt32,
+    ) {
+        let tex = Unmanaged<MTLTexture>.fromOpaque(UnsafeRawPointer(texture)).takeUnretainedValue()
+
+        let region = MTLRegion(
+            origin: MTLOrigin(x: 0, y: 0, z: 0),
+            size: MTLSize(width: Int(w), height: Int(h), depth: 1))
+
+        tex.replace(region: region, mipmapLevel: 0, withBytes: data, bytesPerRow: Int(bytesPerRow))
+    }
+
+    @_cdecl("metal_render_encoder_set_fragment_texture")
+    public func metal_render_encoder_set_fragment_texture(
+        encoder: OpaquePointer,
+        texture: OpaquePointer,
+        index: UInt64
+    ) {
+        let encod = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
+            .takeUnretainedValue()
+        let tex = Unmanaged<MTLTexture>.fromOpaque(UnsafeRawPointer(texture)).takeUnretainedValue()
+
+        encod.setFragmentTexture(tex, index: Int(index))
+    }
+
+    @_cdecl("metal_create_texture_pipeline_state")
+    public func metal_create_texture_pipeline_state(
+        device: OpaquePointer,
+        vertexFn: OpaquePointer,
+        fragmentFn: OpaquePointer,
+        pixelFormat: UInt64,
+        sampleCount: UInt8,
+    ) -> OpaquePointer? {
+        guard let pf = MTLPixelFormat(rawValue: UInt(pixelFormat)) else { return nil }
+
+        let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
+        let vf = Unmanaged<MTLFunction>.fromOpaque(UnsafeRawPointer(vertexFn)).takeUnretainedValue()
+        let ff = Unmanaged<MTLFunction>.fromOpaque(UnsafeRawPointer(fragmentFn))
+            .takeUnretainedValue()
+
+        let vertexDesc = MTLVertexDescriptor()
+        // position
+        vertexDesc.attributes[0].format = .float2
+        vertexDesc.attributes[0].offset = 0
+        vertexDesc.attributes[0].bufferIndex = 0
+        // texcoord
+        vertexDesc.attributes[1].format = .float2
+        vertexDesc.attributes[1].offset = 8
+        vertexDesc.attributes[1].bufferIndex = 0
+
+        vertexDesc.attributes[2].format = .half4
+        vertexDesc.attributes[2].offset = 16
+        vertexDesc.attributes[2].bufferIndex = 0
+
+        vertexDesc.layouts[0].stride = 24
+
+        let pipelineDesc = MTLRenderPipelineDescriptor()
+        pipelineDesc.vertexFunction = vf
+        pipelineDesc.fragmentFunction = ff
+        pipelineDesc.vertexDescriptor = vertexDesc
+        pipelineDesc.colorAttachments[0].pixelFormat = pf
+        pipelineDesc.colorAttachments[0].isBlendingEnabled = true
+        pipelineDesc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        pipelineDesc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        pipelineDesc.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
+        pipelineDesc.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        pipelineDesc.rasterSampleCount = Int(sampleCount)
+
+        guard let pipeline = try? dev.makeRenderPipelineState(descriptor: pipelineDesc) else {
+            return nil
+        }
+
+        return OpaquePointer(Unmanaged.passRetained(pipeline).toOpaque())
+    }
 
 #endif
