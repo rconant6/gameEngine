@@ -932,26 +932,175 @@ pub fn IndexedBatch(comptime Vertex:type, comptime Key:type) type = struct {
 <p><span class="badge dec">tradeoff</span> With indexed draws + per-shape <code>base_vertex</code>, adjacent same-key calls can't be trivially merged into one <code>drawIndexedPrimitives</code> unless their index ranges are contiguous <em>and</em> share a base. <strong>4a: one indexed draw per DrawCall</strong>, rely on the sort to cluster same-key runs so pipeline/texture/ClipMap <em>rebinds</em> (the real cost) stay rare. Merging contiguous same-base runs is a P5 micro-opt — leave a <code>// TODO</code>. Indexing buys vertex-sharing now; draw-call merging is separable.</p>
 
 <h4>tess.zig — EDIT</h4>
-<p><code>Tess(V,K)</code> emits into a vert <em>and</em> index arena. <code>emit</code> now returns the base-relative vertex index; fan/quad/segment helpers push connectivity via <code>tri()</code>.</p>
-<pre><code>makeVertex: *const fn ([2]f32, [2]f32, [4]f32, u16) V,   // + uv arg
-base: u32,   // vertexMark() snapshot at Tess entry → emit returns base-relative idx
+<p><strong>Today (grounded in the code):</strong> every fill emits a <em>fully-expanded triangle list</em> — no vertex sharing. A circle fan emits <code>3·w</code> verts (re-emitting <code>origin</code> per triangle); <code>rect</code> emits 6 (two corners duplicated); <code>emitSegment</code> emits 6 per edge. <code>Paint.at(local_p)</code> computes gradient color <em>per emitted vertex from its position</em>, so two verts at the same position get the same color — <strong>this is why dedup is color-safe</strong>. <code>poly</code> fills from a precomputed <code>p.triangle_cache</code>.</p>
+<p><strong>The whole rewrite is two primitives, and every shape is a combination of them:</strong> <code>emitV</code> (one unique vertex → its base-relative index) and <code>emitI</code> (push a run of connectivity indices). Fan/ring loops fill a stack index-scratch and flush it with one <code>emitI</code> (mirroring how the vertex side already fills a <code>pts:[MAX_SEG]V2</code> scratch); quad/segment push a static run directly. No convenience wrappers — <code>emitV</code> + <code>emitI</code> compose everything.</p>
+<pre><code>// ── Tess(V,K) field changes ──
+makeVertex: *const fn ([2]f32, [2]f32, [4]f32, u16) V,   // + uv arg (shapes pass (0,0))
+base: u32,   // = batch.vertexMark() at Tess construction → makes emitV indices base-relative
 
-fn emit(self:Self, p:V2, paint:Paint) !u16 {
-    const idx:u16 = @intCast(self.batch.vertexMark() - self.base);
+// ── the two primitives ──
+fn emitV(self: Self, p: V2, paint: Paint) !u16 {        // vertex → base-relative index
+    const idx: u16 = @intCast(self.batch.vertexMark() - self.base);
     try self.batch.vertex(self.makeVertex(.{p.x,p.y}, .{0,0}, paint.at(p), self.xform_index));
     return idx;
 }
-fn tri(self:Self, a:u16, b:u16, c:u16) !void {          // push 3 indices
-    try self.batch.index(a); try self.batch.index(b); try self.batch.index(c);
-}
-// fan(n): emit center+rim, then tri(center, rim[i], rim[i+1])
-// quad:   4 verts, tri(0,1,2)+tri(1,3,2)   ·   segment(stroke): 4 verts not 6
-// ↑ bulk of 4a's tess work — mechanical, but touches every shape method.
+fn emitI(self: Self, idx: []const u16) !void {          // index run → batch
+    for (idx) |i| try self.batch.index(i);
+}</code></pre>
 
-pub fn tessellate(comptime V, comptime K, batch:*IndexedBatch(V,K),
+<p>The ~12 shapes collapse into <strong>5 emission patterns</strong>. Rewrite the shared helpers; each shape calls them.</p>
+
+<h4>tess.zig — fixed topologies: <code>Topo</code> enum + comptime winding guard</h4>
+<p>The <em>fixed</em>-size topologies (quad, strip, raw tri) get a comptime table of <code>base</code>-relative index runs. The table's real job isn't typo-proofing 3 obvious constants — it's <strong>freezing a winding convention (CCW) across every topology before back-face culling exists to punish inconsistency.</strong> <span class="badge crit">confirmed 2026-07-15</span> there is NO cull/winding state anywhere in the Metal path today (Metal default = no culling), so winding is invisible <em>now</em> — which is exactly why locking it while nothing punishes a wrong choice is the right moment. Flip <code>cullMode=.back</code> in Phase 5 and everything already agrees, or the build already failed. Parametric patterns (fan, ring) can't join the table but bind to the <em>same</em> convention via a shared <code>signedArea</code> formula + a one-shot debug assert.</p>
+<pre><code>const Topo = enum { tri, quad, strip };
+
+// Offset patterns RELATIVE to a primitive's first vertex; emitTopo adds `base`.
+// CONVENTION: every triangle is wound CCW — the guard below enforces it.
+const topo_table = struct {
+    const tri:   []const u16 = &.{ 0, 1, 2 };
+    const quad:  []const u16 = &.{ 0, 1, 2,  0, 2, 3 };   // 4 verts CCW
+    const strip: []const u16 = &.{ 0, 1, 2,  2, 1, 3 };   // 4 verts, 2 tris share edge 1-2
+};
+fn topoRun(comptime t: Topo) []const u16
+  → switch: .tri→tri, .quad→quad, .strip→strip;
+fn topoVerts(comptime t: Topo) u16
+  → switch: .tri→3, .quad→4, .strip→4;
+
+// Canonical CCW reference positions so the guard can verify the runs actually
+// produce CCW triangles (mirrors how shapes emit: quad corners CCW from bottom-left).
+fn topoRef(comptime t: Topo) []const V2
+  → .tri:   {(0,0),(1,0),(0,1)}
+    .quad:  {(0,0),(1,0),(1,1),(0,1)}
+    .strip: {(0,0),(1,0),(0,1),(1,1)}
+
+fn signedArea(a: V2, b: V2, c: V2) f32          // shared by guard AND fan/ring asserts
+  → (b.x-a.x)*(c.y-a.y) - (b.y-a.y)*(c.x-a.x);  // >0 == CCW
+
+comptime {
+    for (std.meta.tags(Topo)) |t| {
+        const run = topoRun(t); const ref = topoRef(t);
+        if (run.len % 3 != 0)        @compileError(@tagName(t) ++ ": indices not multiple of 3");
+        if (ref.len != topoVerts(t)) @compileError(@tagName(t) ++ ": ref count != topoVerts");
+        var k: usize = 0;
+        while (k < run.len) : (k += 3)
+            if (signedArea(ref[run[k]], ref[run[k+1]], ref[run[k+2]]) <= 0)
+                @compileError(@tagName(t) ++ ": triangle at " ++
+                    comptimePrint("{d}", .{k}) ++ " is not CCW");
+    }
+}
+
+fn emitTopo(self: Self, comptime t: Topo, base: u16) !void {
+    var ii: [topoRun(t).len]u16 = undefined;    // comptime-sized, stack
+    inline for (topoRun(t), 0..) |off, k| ii[k] = base + off;
+    try self.emitI(&ii);
+}</code></pre>
+<p>Typo <code>.quad = {0,1,2, 0,3,2}</code> (flipped winding) → build fails with <code>quad: triangle at 3 is not CCW</code>. The guard catches the invisible bug the day it's written, not the day culling exposes it. <strong>Precondition on <code>emitTopo</code>:</strong> the <code>topoVerts(t)</code> verts must have been emitted <em>contiguously</em> from <code>base</code> (true because <code>emitV</code> appends sequentially — don't interleave another shape's <code>emitV</code> between them; a debug <code>assert(vertexMark()-self.base == base + topoVerts(t))</code> catches it).</p>
+
+<p><span class="badge dec">Pattern 1 — fan fill</span> circle, ellipse, nGon, star, capsule, roundedRect, wedge-arc (thickness 0). <code>3w</code> verts → <code>w+1</code> verts + <code>3w</code> indices. This is the <code>fanFill</code> extract the plan already flagged as deferred — it lands here and the (now 7) duplicated fan loops collapse into it.</p>
+<pre><code>fn fanFill(self: Self, center: V2, rim: []const V2, closed: bool, paint: Paint) !void {
+    var vi: [MAX_SEG + 1]u16 = undefined;               // vertex-index scratch
+    var ii: [3 * MAX_SEG]u16 = undefined;               // index scratch (mirrors pts[] on vert side)
+    var k: usize = 0;
+    const c = try self.emitV(center, paint);
+    for (rim, 0..) |p, i| vi[i] = try self.emitV(p, paint);
+    const w = rim.len;
+    const last = if (closed) w else w - 1;              // closed wraps i→(i+1)%w
+    for (0..last) |i| {
+        const j = (i + 1) % w;
+        ii[k] = c; ii[k+1] = vi[i]; ii[k+2] = vi[j]; k += 3;
+    }
+    try self.emitI(ii[0..k]);
+}
+// circle/ellipse/nGon/star/capsule/roundedRect: build `rim` into the stack buf exactly
+//   as today, then ONE call: try self.fanFill(center, rim, true, paint);
+// wedge-arc (thickness==0): fanFill(origin, arc_points, false, paint)  — open, no wrap.
+// WINDING: tris are {center, rim[i], rim[i+1]} — CCW iff rim is traversed CCW.
+//   unit_rings is CCW by construction. One-shot debug assert binds it to the .quad/.strip
+//   convention:  std.debug.assert(signedArea(center, rim[0], rim[1]) > 0);</code></pre>
+
+<p><span class="badge dec">Pattern 2 — quad fill</span> rect (also sprite quad + SDF glyph quad in 4b). 6 verts → 4 verts + 6 indices. Emit the 4 corners contiguously, then <code>emitTopo(.quad, base)</code> — no inline run, winding guaranteed by the guarded table.</p>
+<pre><code>const b = try self.emitV(corners[0], paint);   // base = first corner's index
+_ = try self.emitV(corners[1], paint);
+_ = try self.emitV(corners[2], paint);
+_ = try self.emitV(corners[3], paint);
+try self.emitTopo(.quad, b);                    // {b,b+1,b+2, b,b+2,b+3} from the table
+// corners must be CCW (rect.getCorners already is) to match the .quad convention.</code></pre>
+
+<p><span class="badge dec">Pattern 3 — ring quad-strip</span> thick arc (<code>thickness &gt; 0</code>). <code>6(n−1)</code> verts → <code>2n</code> verts + <code>6(n−1)</code> indices. <strong>The buffer layout is load-bearing and unchanged:</strong> <code>buf[0..n]</code> is the outer arc forward (<code>start→end</code>); <code>buf[n..2n]</code> is the inner arc written <em>reversed</em> (<code>end→start</code>) so <code>buf[0..2n]</code> is one continuous perimeter loop (what <code>strokeClosed</code> needs). Today's fill re-emits 6 verts per quad, pairing <code>outer[i]=buf[i]</code> with <code>inner[i]=buf[2n-1-i]</code> — reaching into the reversed inner tail so <code>inner[i]</code> sits at the <em>same angle</em> as <code>outer[i]</code>. Indexed version: emit all <code>2n</code> rail verts ONCE in <code>buf</code> order, capture each index, then reuse the identical <code>2n-1-i</code> pairing over captured indices.</p>
+<pre><code>const n = arcSegs(r_out, sweep, self.px_per_unit);
+var buf: [2 * MAX_SEG]V2 = undefined;
+arcInto(buf[0..], a.origin, r_out, a.start_angle, a.end_angle, n);   // outer, forward
+arcInto(buf[n..], a.origin, r_in,  a.end_angle, a.start_angle, n);   // inner, REVERSED
+
+if (style.fillColor()) |fc| {
+    const paint = self.buildFillPaint(style, fc, a.origin, r_out);
+
+    // 1. emit every rail vertex ONCE, in buf order; keep its index. vidx[j] is the
+    //    index of buf[j], so the reversed-inner pairing carries straight over.
+    var vidx: [2 * MAX_SEG]u16 = undefined;
+    for (0..2 * n) |j| vidx[j] = try self.emitV(buf[j], paint);
+
+    // 2. two triangles per quad, SAME pairing as the old emit loop:
+    //    outer0=vidx[i]  outer1=vidx[i+1]  inner0=vidx[2n-1-i]  inner1=vidx[2n-2-i]
+    var ii: [6 * MAX_SEG]u16 = undefined;                 // index scratch
+    var k: usize = 0;
+    for (0..n - 1) |i| {
+        const outer0 = vidx[i];
+        const outer1 = vidx[i + 1];
+        const inner0 = vidx[2 * n - 1 - i];
+        const inner1 = vidx[2 * n - 2 - i];
+        ii[k] = outer0; ii[k+1] = inner0; ii[k+2] = outer1;    // tri A (was emit outer0,inner0,outer1)
+        ii[k+3] = outer1; ii[k+4] = inner0; ii[k+5] = inner1;  // tri B (was emit outer1,inner0,inner1)
+        k += 6;
+    }
+    try self.emitI(ii[0..k]);
+}
+if (style.stroke) |_| try self.strokeClosed(buf[0 .. 2 * n], style);   // UNCHANGED — one loop</code></pre>
+<p><span class="badge crit">the bug that bit before</span> the inner arc MUST be written to <code>buf[n..]</code> (not <code>buf[2*n..]</code>) and REVERSED — that's what makes <code>vidx[2n-1-i]</code> the same-angle inner partner of <code>vidx[i]</code> and keeps <code>buf[0..2n]</code> a valid stroke loop. Winding of tri A/B is preserved verbatim from the working emit order, so front-face culling (if ever enabled) can't regress.</p>
+
+<p><span class="badge dec">Pattern 4 — cache-list fill</span> poly. <strong>4a keeps poly expanded</strong> (ear-clipped triangulation has little to share): emit each cache triangle's 3 verts, index them. Cross-edge dedup via a position→index map is <code>// TODO</code> — poly earns dedup least and costs a hash map. <strong>Uses raw <code>emitI(&amp;.{a,b,c})</code>, NOT <code>emitTopo(.tri)</code></strong> — the ear-clipper's triangle winding isn't guaranteed CCW, so poly is (like strokes) outside the CCW convention and must not be back-face culled.</p>
+<pre><code>for (cache) |t| {
+    const a = try self.emitV(t[0], paint); const b = try self.emitV(t[1], paint);
+    const c = try self.emitV(t[2], paint); try self.emitI(&.{ a, b, c });
+}</code></pre>
+
+<p><span class="badge crit">Pattern 5 — stroke</span> strokeClosed / strokeOpen → emitSegment. <strong>The one place vertex-sharing is limited</strong> — <code>emitSegment</code> computes corners <code>a,b,e,f</code> from <em>that edge's own normal</em> (butt joins), so a shared endpoint yields <em>different</em> corners per edge; adjacent edges do <strong>not</strong> share verts. Win is 6→4 <em>within</em> a segment only; that's the honest ceiling. No cross-segment dedup.</p>
+<pre><code>fn emitSegment(self: Self, p0: V2, p1: V2, paint: Paint, hw: f32) !void {
+    ... compute a,b,e,f from this edge's normal as today ...
+    // emit contiguously in strip-ref order (a,b,e,f) → emitTopo(.strip, base).
+    const base = try self.emitV(a, paint);
+    _ = try self.emitV(b, paint);
+    _ = try self.emitV(e, paint);
+    _ = try self.emitV(f, paint);
+    try self.emitTopo(.strip, base);            // {base, +1,+2, +2,+1,+3} from the table
+}
+// strokeClosed/strokeOpen: loop edges calling emitSegment — UNCHANGED except they no
+//   longer call pushCall (the caller does it; see below).</code></pre>
+<p><span class="badge crit">winding caveat</span> a butt-join strip's CCW-ness flips with edge direction (<code>dir = p1-p0</code>), so the <em>fixed</em> <code>.strip</code> table can't guarantee CCW for every segment the way <code>.quad</code> can for a rect. Two honest resolutions — pick at impl: <strong>(a)</strong> keep <code>.strip</code> as the shared run and accept that stroke winding is direction-dependent (fine as long as culling stays OFF for the stroke draws, or strokes are excluded from back-face culling — they're thin quads, culling buys little); <strong>(b)</strong> order the 4 emitted corners by the sign of the edge normal so the strip is always CCW, then the guard covers strokes too. Lean (a): don't cull strokes. Note it where <code>cullMode</code> gets set in Phase 5.</p>
+
+<h4>tess.zig — who pushes the draw call (moved OUT of shape methods)</h4>
+<p>Today each method ends with <code>self.batch.pushCall(tri_key, start, count)</code>. Under indexing the draw call needs <code>index_start</code>/<code>index_count</code>/<code>base_vertex</code> <em>and</em> the caller's <code>sort_key</code> — which the shape method doesn't know (layer lives at the <code>render()</code> site). So:</p>
+<ul>
+  <li><strong>Remove every <code>pushCall(...)</code> from the shape methods.</strong> They only emit verts + indices now.</li>
+  <li><code>tessellate()</code> sets <code>Tess.base = batch.vertexMark()</code>, dispatches, and the <strong>caller</strong> brackets with <code>indexMark()</code> to build the one <code>pushIndexed(key, sort_key, i0, i_count, base)</code>.</li>
+  <li><strong>Fill+stroke shapes:</strong> today they push <em>two</em> draw calls (fill tris, then stroke tris, same key). Now they become <em>one</em> — fill indices then stroke indices are contiguous under one <code>base</code>, sharing the shape's <code>LocalXform</code> + key. <span class="ok-inline">Simpler than today, not harder.</span></li>
+</ul>
+<pre><code>pub fn tessellate(comptime V, comptime K, batch:*IndexedBatch(V,K),
     comptime makeVertex:fn([2]f32,[2]f32,[4]f32,u16)V,
     shape:ShapeData, xf_idx:u16, style:DrawStyle, hw:f32, px_per_unit:f32) !void
-// drops tri_key: key/sort_key/base bookkeeping moves to the caller (knows layer, does pushIndexed).</code></pre>
+// drops tri_key. Sets Tess.base = batch.vertexMark(); dispatches to the shape method
+// (emit-only). Caller reads indexMark() before/after → builds the DrawCall.</code></pre>
+
+<h4>tess.zig — vertex-count deltas (verification numbers)</h4>
+<table>
+  <tr><th>Shape</th><th>before (verts)</th><th>after (verts / indices)</th></tr>
+  <tr><td>circle / nGon fan (w segs)</td><td class="mono">3w</td><td class="mono">w+1 / 3w</td></tr>
+  <tr><td>rect fill</td><td class="mono">6</td><td class="mono">4 / 6</td></tr>
+  <tr><td>stroke edge (each)</td><td class="mono">6</td><td class="mono">4 / 6</td></tr>
+  <tr><td>thick-arc ring (n)</td><td class="mono">6(n−1)</td><td class="mono">2n / 6(n−1)</td></tr>
+  <tr><td>poly (t tris)</td><td class="mono">3t</td><td class="mono">3t / 3t (dedup deferred)</td></tr>
+</table>
+<p>Log vert/index counts for a known scene (e.g. one circle at a fixed radius) and check against the table.</p>
 
 <h4>render_types.zig — EDIT</h4>
 <pre><code>pub const Renderable = struct {
