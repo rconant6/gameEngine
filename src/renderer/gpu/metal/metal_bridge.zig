@@ -149,9 +149,6 @@ extern fn metal_create_texture_pipeline_state(
     sample_count: u8,
 ) ?*MTLRenderPipelineState;
 
-// Creates the multisample color texture on the frame context (sample_count > 1)
-// and stores sampleCount. No-op-worthy when sample_count <= 1 (caller skips).
-// width/height = drawable's physical pixel size.
 extern fn metal_frame_context_set_msaa(
     ctx: *MetalFrameContext,
     sample_count: u8,
@@ -180,7 +177,12 @@ pub const MetalBridge = struct {
         layer: *CAMetalLayer,
         max_frames_in_flight: u32, // 3
     ) MTLError!*MetalFrameContext {
-        return metal_frame_context_create(device, queue, layer, max_frames_in_flight) orelse
+        return metal_frame_context_create(
+            device,
+            queue,
+            layer,
+            max_frames_in_flight,
+        ) orelse
             MTLError.FrameContextCreationFailed;
     }
     pub fn frameContextDestroy(ctx: *MetalFrameContext) void {
@@ -246,10 +248,16 @@ pub const MetalBridge = struct {
             MTLError.LibraryCreationFailed;
     }
     pub fn createLibraryFromFile(device: *MTLDevice, path: [*:0]const u8) !*MTLLibrary {
-        return metal_device_create_library_from_file(device, path) orelse MTLError.LibraryCreationFailed;
+        return metal_device_create_library_from_file(
+            device,
+            path,
+        ) orelse MTLError.LibraryCreationFailed;
     }
     pub fn createFunction(library: *MTLLibrary, name: [*:0]const u8) !*MTLFunction {
-        return metal_library_create_function(library, name) orelse
+        return metal_library_create_function(
+            library,
+            name,
+        ) orelse
             MTLError.FunctionNotFound;
     }
     pub fn createRenderPipelineState(
@@ -318,7 +326,7 @@ pub const MetalBridge = struct {
             encoder,
             @intFromEnum(primitive_type),
             index_count,
-            0,
+            1, // is u32, 0 is for u16
             index_buffer,
             index_offset,
             base_vertex,

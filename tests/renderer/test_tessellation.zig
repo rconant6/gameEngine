@@ -178,6 +178,74 @@ test "no-style shape emits nothing" {
 }
 
 // ============================================================
+// Absolute indices + draw-call merge (consumer coalescing)
+// ============================================================
+
+test "indices are absolute: second shape's indices offset by prior vert count" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const rect = shape(Shapes.Rectangle, Shapes.Rectangle.initFromCenter(.{ .x = 0, .y = 0 }, 4, 2));
+
+    // first quad: 4 verts (0..3), indices reference 0..3
+    try tessShape(&batch, rect, .{ .fill = Color.initRgba(10, 20, 30, 255) });
+    const first_idx = batch.indices.items[0..batch.indices.items.len];
+    try testing.expectEqualSlices(u32, &.{ 0, 1, 2, 0, 2, 3 }, first_idx);
+
+    // second quad: verts 4..7 → its indices are the SAME topology + base 4 (absolute)
+    try tessShape(&batch, rect, .{ .fill = Color.initRgba(10, 20, 30, 255) });
+    try testing.expectEqual(@as(usize, 8), batch.vertices.items.len);
+    try testing.expectEqualSlices(u32, &.{ 4, 5, 6, 4, 6, 7 }, batch.indices.items[6..12]);
+}
+
+test "mergeAdjacent collapses two same-key contiguous quads into one call" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const rect = shape(Shapes.Rectangle, Shapes.Rectangle.initFromCenter(.{ .x = 0, .y = 0 }, 4, 2));
+
+    // two quads, each pushed as its own draw call under the SAME key
+    const s0 = batch.indexMark();
+    try tessShape(&batch, rect, .{ .fill = Color.initRgba(10, 20, 30, 255) });
+    try batch.pushIndexed(.{ .id = 0 }, 0, s0, batch.indexMark() - s0);
+
+    const s1 = batch.indexMark();
+    try tessShape(&batch, rect, .{ .fill = Color.initRgba(10, 20, 30, 255) });
+    try batch.pushIndexed(.{ .id = 0 }, 1, s1, batch.indexMark() - s1);
+
+    try testing.expectEqual(@as(usize, 2), batch.draw_calls.items.len);
+
+    batch.sortCalls();
+    batch.mergeAdjacent();
+
+    // one merged call spanning both quads' indices (6 + 6 = 12)
+    try testing.expectEqual(@as(usize, 1), batch.draw_calls.items.len);
+    try testing.expectEqual(@as(u32, 0), batch.draw_calls.items[0].index_start);
+    try testing.expectEqual(@as(u32, 12), batch.draw_calls.items[0].index_count);
+}
+
+test "mergeAdjacent keeps different-key calls separate" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const rect = shape(Shapes.Rectangle, Shapes.Rectangle.initFromCenter(.{ .x = 0, .y = 0 }, 4, 2));
+
+    const s0 = batch.indexMark();
+    try tessShape(&batch, rect, .{ .fill = Color.initRgba(10, 20, 30, 255) });
+    try batch.pushIndexed(.{ .id = 0 }, 0, s0, batch.indexMark() - s0);
+
+    const s1 = batch.indexMark();
+    try tessShape(&batch, rect, .{ .fill = Color.initRgba(10, 20, 30, 255) });
+    try batch.pushIndexed(.{ .id = 1 }, 1, s1, batch.indexMark() - s1); // different key
+
+    batch.sortCalls();
+    batch.mergeAdjacent();
+
+    // distinct keys must NOT merge even though index-contiguous
+    try testing.expectEqual(@as(usize, 2), batch.draw_calls.items.len);
+}
+
+// ============================================================
 // Opacity: color applied at pack time (real packWithOpacity path)
 // ============================================================
 

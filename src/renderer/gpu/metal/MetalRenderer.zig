@@ -45,9 +45,7 @@ const MetalFrameContext = metal.MetalFrameContext;
 const MetalVertex = metal.MetalVertex;
 
 const Self = @This();
-// Sized for content-heavy scenes (zixelart's 64×64 bordered-cell grid). The 28B
-// vertex + per-cell fill+4-stroke quads push ~82k verts; 4 MB gives headroom until
-// smart-stroke / ring-grow lands (see pipeline perf backlog).
+
 const SLOT_BYTES: usize = 4 * 1024 * 1024;
 const INDEX_SLOT_BYTES: usize = 4 * 1024 * 1024;
 const XFORM_SLOT_BYTES: usize = 1024 * 1024;
@@ -284,7 +282,6 @@ pub fn render(self: *Self, r: Renderable, ctx: RenderContext) void {
     else
         self.white_texture;
 
-    const base = self.batch.vertexMark();
     const idx0 = self.batch.indexMark();
 
     const px_per_unit =
@@ -329,7 +326,6 @@ pub fn render(self: *Self, r: Renderable, ctx: RenderContext) void {
         sort_key,
         idx0,
         self.batch.indexMark() - idx0,
-        base,
     ) catch |err| {
         log.err(.renderer, "Failed to push draw call {any}", .{err});
     };
@@ -368,7 +364,7 @@ fn flushOrdered(self: *Self, encoder: *MTLRenderCommandEncoder, idx: usize) !voi
         "vertex",
     );
     const i_copied = try uploadRing(
-        u16,
+        u32,
         self.index_buffers[idx],
         self.batch.indices.items,
         INDEX_SLOT_BYTES,
@@ -388,6 +384,7 @@ fn flushOrdered(self: *Self, encoder: *MTLRenderCommandEncoder, idx: usize) !voi
     mb.setVertexBuffer(encoder, self.xform_buffers[idx], 0, 2);
 
     self.batch.sortCalls();
+    self.batch.mergeAdjacent();
 
     if (self.frame_number % 60 == 0)
         log.info(.renderer, "draw_calls={d} verts={d} idxs={d}", .{
@@ -400,9 +397,9 @@ fn flushOrdered(self: *Self, encoder: *MTLRenderCommandEncoder, idx: usize) !voi
     var cur_space: ?metal.Space = null;
     var cur_sdf: ?bool = null;
 
+    _ = v_copied;
     for (self.batch.draw_calls.items) |call| {
         if (call.index_start + call.index_count > i_copied) break;
-        if (call.base_vertex > v_copied) break;
 
         if (cur_space == null or cur_space.? != call.key.space) {
             const map = if (call.key.space == .screen)
@@ -430,8 +427,8 @@ fn flushOrdered(self: *Self, encoder: *MTLRenderCommandEncoder, idx: usize) !voi
             call.key.prim,
             call.index_count,
             self.index_buffers[idx],
-            call.index_start * @sizeOf(u16), // byte offset into the index buffer
-            @intCast(call.base_vertex),
+            call.index_start * @sizeOf(u32), // byte offset into the index buffer
+            0, // absolute indices — GPU adds no base_vertex
         );
     }
 }

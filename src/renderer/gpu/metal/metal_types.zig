@@ -123,7 +123,8 @@ pub const DrawKey = struct {
     pub fn eql(a: DrawKey, b: DrawKey) bool {
         return a.tex == b.tex and
             a.prim == b.prim and
-            a.space == b.space;
+            a.space == b.space and
+            a.is_sdf == b.is_sdf; // keep sdf glyph draws from merging into shape draws
     }
 };
 

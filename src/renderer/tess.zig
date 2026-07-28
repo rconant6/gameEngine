@@ -178,14 +178,14 @@ const Paint = union(enum) {
 const Topology = enum { tri, quad, strip };
 
 const topo_table = struct {
-    const tri: []const u16 = &.{ 0, 1, 2 };
+    const tri: []const u32 = &.{ 0, 1, 2 };
     // standard rectangle
-    const quad: []const u16 = &.{ 0, 1, 2, 0, 2, 3 }; // 4 verts, CCW
+    const quad: []const u32 = &.{ 0, 1, 2, 0, 2, 3 }; // 4 verts, CCW
     // strip is the way lines are being drawn
-    const strip: []const u16 = &.{ 0, 1, 2, 2, 1, 3 }; // 4 verts, share edge
+    const strip: []const u32 = &.{ 0, 1, 2, 2, 1, 3 }; // 4 verts, share edge
 };
 
-fn topoRun(comptime t: Topology) []const u16 {
+fn topoRun(comptime t: Topology) []const u32 {
     return switch (t) {
         .tri => topo_table.tri,
         .quad => topo_table.quad,
@@ -265,11 +265,9 @@ fn Tess(comptime V: type, comptime K: type) type {
         xform_index: u16,
         hw: f32,
         px_per_unit: f32,
-        base: u32,
 
-        // This is for emitting a unique vertex and getting its index
-        fn emitV(self: Self, p: V2, uv: ?[2]f32, paint: Paint) !u16 {
-            const idx: u16 = @intCast(self.batch.vertexMark() - self.base);
+        fn emitV(self: Self, p: V2, uv: ?[2]f32, paint: Paint) !u32 {
+            const idx: u32 = self.batch.vertexMark();
 
             try self.batch.appendVertex(self.makeVertex(
                 .{ p.x, p.y },
@@ -281,14 +279,14 @@ fn Tess(comptime V: type, comptime K: type) type {
             return idx;
         }
 
-        fn emitIs(self: Self, idxs: []const u16) !void {
+        fn emitIs(self: Self, idxs: []const u32) !void {
             assert(idxs.len > 2);
 
             try self.batch.appendIndices(idxs);
         }
 
-        fn emitTopology(self: Self, comptime t: Topology, base: u16) !void {
-            var ii: [topoRun(t).len]u16 = undefined;
+        fn emitTopology(self: Self, comptime t: Topology, base: u32) !void {
+            var ii: [topoRun(t).len]u32 = undefined;
 
             for (topoRun(t), 0..) |off, k| ii[k] = base + off;
 
@@ -332,8 +330,8 @@ fn Tess(comptime V: type, comptime K: type) type {
             closed: bool,
             paint: Paint,
         ) !void {
-            var vi: [MAX_SEG + 1]u16 = undefined; // vertex-index scratch
-            var ii: [3 * MAX_SEG]u16 = undefined; // index scratch (pts[] eqiv of verts)
+            var vi: [MAX_SEG + 1]u32 = undefined; // vertex-index scratch
+            var ii: [3 * MAX_SEG]u32 = undefined; // index scratch (pts[] eqiv of verts)
             var k: usize = 0;
             const c = try self.emitV(center, null, paint);
             for (rim, 0..) |p, i| vi[i] = try self.emitV(p, null, paint);
@@ -377,11 +375,6 @@ fn Tess(comptime V: type, comptime K: type) type {
             );
         }
 
-        // Resolve a shape's fill into a Paint. No gradient → flat. Gradient →
-        // radial keys off center/radius directly; linear projects the shape's
-        // extent (center ± radius along the axis) into a [lo, lo+span] range.
-        // center/radius are in the shape's own (pre-transform) space, matching
-        // where emit evaluates the gradient.
         fn buildFillPaint(_: Self, style: DrawStyle, fc: Color, center: V2, radius: f32) Paint {
             const g = style.gradient orelse
                 return .{ .flat = fc.linearOpacity(style.opacity) };
@@ -454,7 +447,10 @@ fn Tess(comptime V: type, comptime K: type) type {
             const sweep = end - start;
             const bucket = bucketFor(radius, self.px_per_unit);
             const full_n = seg_buckets[bucket];
-            var n: u32 = @intFromFloat(@max(2.0, @ceil(@as(f32, @floatFromInt(full_n)) * @abs(sweep) / std.math.tau)));
+            var n: u32 = @intFromFloat(@max(
+                2.0,
+                @ceil(@as(f32, @floatFromInt(full_n)) * @abs(sweep) / std.math.tau),
+            ));
             n = @min(n, buf.len);
             const step: f32 = sweep / @as(f32, @floatFromInt((n - 1)));
             for (0..n) |i| {
@@ -493,19 +489,30 @@ fn Tess(comptime V: type, comptime K: type) type {
         fn ellipse(self: Self, e: Shapes.Ellipse, style: DrawStyle) !void {
             if (!style.draws()) return;
 
-            const bucket = bucketFor(@max(e.semi_major, e.semi_minor), self.px_per_unit);
+            const bucket = bucketFor(
+                @max(e.semi_major, e.semi_minor),
+                self.px_per_unit,
+            );
             const num_steps = seg_buckets[bucket];
             const ring = unit_rings[bucket];
 
             var pts: [MAX_SEG]V2 = undefined;
             for (0..num_steps) |i| {
                 const u = ring[i];
-                pts[i] = e.origin.add(.{ .x = u.x * e.semi_major, .y = u.y * e.semi_minor });
+                pts[i] = e.origin.add(.{
+                    .x = u.x * e.semi_major,
+                    .y = u.y * e.semi_minor,
+                });
             }
             const perimeter = pts[0..num_steps];
 
             if (style.fillColor()) |fc| {
-                const paint = self.buildFillPaint(style, fc, e.origin, @max(e.semi_major, e.semi_minor));
+                const paint = self.buildFillPaint(
+                    style,
+                    fc,
+                    e.origin,
+                    @max(e.semi_major, e.semi_minor),
+                );
 
                 try self.fanFill(e.origin, perimeter, true, paint);
             }
@@ -842,7 +849,6 @@ pub fn tessellate(
     px_per_unit: f32,
 ) !void {
     const ts = Tess(V, K){
-        .base = batch.vertexMark(),
         .batch = batch,
         .makeVertex = makeVertex,
         .uv = uv,

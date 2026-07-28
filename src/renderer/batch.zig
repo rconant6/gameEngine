@@ -7,7 +7,6 @@ pub fn DrawCall(comptime Key: type) type {
         sort_key: u64, // (band + z) | submission_seq (set at push)
         index_start: u32, // into the indices
         index_count: u32,
-        base_vertex: u32, // added to each index by the GPU
     };
 }
 
@@ -16,7 +15,7 @@ pub fn IndexedBatch(comptime Vertex: type, comptime Key: type) type {
         const Self = @This();
 
         vertices: std.ArrayList(Vertex),
-        indices: std.ArrayList(u16),
+        indices: std.ArrayList(u32),
         draw_calls: std.ArrayList(DrawCall(Key)),
         persistent: Allocator, // renderer.persistent
 
@@ -49,10 +48,10 @@ pub fn IndexedBatch(comptime Vertex: type, comptime Key: type) type {
         pub fn appendVertex(self: *Self, v: Vertex) !void {
             try self.vertices.append(self.persistent, v);
         }
-        pub fn appendIndex(self: *Self, i: u16) !void {
+        pub fn appendIndex(self: *Self, i: u32) !void {
             try self.indices.append(self.persistent, i);
         }
-        pub fn appendIndices(self: *Self, idxs: []const u16) !void {
+        pub fn appendIndices(self: *Self, idxs: []const u32) !void {
             try self.indices.appendSlice(self.persistent, idxs);
         }
 
@@ -62,7 +61,6 @@ pub fn IndexedBatch(comptime Vertex: type, comptime Key: type) type {
             sort_key: u64,
             index_start: u32,
             index_count: u32,
-            base_vertex: u32,
         ) !void {
             try self.draw_calls.append(
                 self.persistent,
@@ -71,7 +69,6 @@ pub fn IndexedBatch(comptime Vertex: type, comptime Key: type) type {
                     .sort_key = sort_key,
                     .index_start = index_start,
                     .index_count = index_count,
-                    .base_vertex = base_vertex,
                 },
             );
         }
@@ -87,6 +84,25 @@ pub fn IndexedBatch(comptime Vertex: type, comptime Key: type) type {
 
         fn lessBySortKey(_: void, a: DrawCall(Key), b: DrawCall(Key)) bool {
             return a.sort_key < b.sort_key;
+        }
+
+        pub fn mergeAdjacent(self: *Self) void {
+            const calls = self.draw_calls.items;
+            if (calls.len <= 1) return;
+
+            var write: usize = 0;
+            for (calls[1..]) |cur| {
+                const prev = &calls[write];
+                const contiguous =
+                    prev.index_start + prev.index_count == cur.index_start;
+                if (prev.key.eql(cur.key) and contiguous) {
+                    prev.index_count += cur.index_count;
+                } else {
+                    write += 1;
+                    calls[write] = cur;
+                }
+            }
+            self.draw_calls.shrinkRetainingCapacity(write + 1);
         }
     };
 }
