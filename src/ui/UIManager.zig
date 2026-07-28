@@ -8,6 +8,7 @@ const WidgetNode = @import("widgets/WidgetNode.zig");
 pub const WidgetState = @import("widgetState.zig").WidgetState;
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
+const Texture = Renderer.Texture;
 const RenderContext = rend.RenderContext;
 const assets = @import("assets");
 const Font = assets.Font;
@@ -116,6 +117,7 @@ pub fn render(
     self: *Self,
     renderer: *Renderer,
     font: ?*const Font,
+    tex: *Texture,
     ctx: RenderContext,
 ) void {
     const root = self.root orelse return;
@@ -124,6 +126,7 @@ pub fn render(
         .ctx = ctx,
         .renderer = renderer,
         .font = font orelse &self.font,
+        .tex = tex,
     };
     root.render(render_info);
 }

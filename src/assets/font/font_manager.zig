@@ -4,6 +4,9 @@ pub const Font = @import("font.zig").Font;
 const debug = @import("debug");
 const log = debug.log;
 const Memory = @import("math").GameMemory;
+const rend = @import("renderer");
+const Renderer = rend.Renderer;
+const Texture = Renderer.Texture;
 
 const FontAsset = struct {
     font: *Font,
@@ -15,14 +18,16 @@ pub const FontManager = struct {
     arena: Allocator,
     persistent: Allocator,
     io: std.Io,
+    renderer: *Renderer, // for lazy atlas-texture upload (mirrors TextureManager)
     assets: std.StringHashMap(FontAsset),
     font_path: []const u8,
 
-    pub fn init(mem: *Memory, io: std.Io) FontManager {
+    pub fn init(mem: *Memory, io: std.Io, renderer: *Renderer) FontManager {
         return .{
             .arena = mem.asset.fonts,
             .persistent = mem.persistent,
             .io = io,
+            .renderer = renderer,
             .assets = std.StringHashMap(FontAsset).init(mem.asset.fonts),
             .font_path = "",
         };
@@ -80,9 +85,20 @@ pub const FontManager = struct {
         try self.store(name, font_ptr, source_path, 0);
     }
 
-    pub fn get(self: *FontManager, name: []const u8) ?*Font {
+    // Read-only truth handle. Consumers measure/lay-out/draw against this; they
+    // never mutate the font. The only post-load mutation (the lazy atlas texture)
+    // goes through getOrCreateAtlasTexture, which holds the mutable font internally.
+    pub fn get(self: *FontManager, name: []const u8) ?*const Font {
         const entry = self.assets.get(name) orelse return null;
         return entry.font;
+    }
+
+    // Lazy GPU atlas texture, cached on the atlas slot. Mirrors
+    // TextureManager.getFrameTexture: the manager owns truth + its GPU projection
+    // and writes the slot here — the ONE post-load mutation in the whole system.
+    pub fn getOrCreateAtlasTexture(self: *FontManager, name: []const u8) !?*Texture {
+        const entry = self.assets.get(name) orelse return null;
+        return try atlasTexture(self.renderer, entry.font);
     }
 
     // Re-read from source_path, swap out the Font, preserve the name key
@@ -138,6 +154,17 @@ pub const FontManager = struct {
         };
     }
 };
+
+// Lazily create+upload a font's R8 atlas texture, caching it on the atlas slot.
+// The ONE post-load mutation. Free fn so both the manager (managed fonts) and
+// app-owned bare fonts (UI) share one lazy-create path. Caller owns `font`.
+pub fn atlasTexture(renderer: *Renderer, font: *Font) !*Texture {
+    if (font.atlas.texture) |t| return @ptrCast(t);
+    const tex = try renderer.createTexture(font.atlas.w, font.atlas.h, .r8);
+    renderer.uploadTextureData(tex, font.atlas.w, font.atlas.h, font.atlas.pixels.ptr, font.atlas.w);
+    font.atlas.texture = tex;
+    return tex;
+}
 
 fn statMtime(io: std.Io, path: []const u8) i96 {
     const stat = std.Io.Dir.cwd().statFile(io, path, .{}) catch return 0;

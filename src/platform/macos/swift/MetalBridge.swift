@@ -279,19 +279,25 @@
 
         let vertexDesc = MTLVertexDescriptor()
 
+        // Matches MetalVertex: position[2]f32 @0, texcoord[2]f32 @8,
+        // color[4]f16 @16, xform_index u16 @24, stride 28.
         vertexDesc.attributes[0].format = .float2
         vertexDesc.attributes[0].offset = 0
         vertexDesc.attributes[0].bufferIndex = 0
 
-        vertexDesc.attributes[1].format = .half4
+        vertexDesc.attributes[1].format = .float2
         vertexDesc.attributes[1].offset = 8
         vertexDesc.attributes[1].bufferIndex = 0
 
-        vertexDesc.attributes[2].format = .ushort
+        vertexDesc.attributes[2].format = .half4
         vertexDesc.attributes[2].offset = 16
         vertexDesc.attributes[2].bufferIndex = 0
 
-        vertexDesc.layouts[0].stride = 20
+        vertexDesc.attributes[3].format = .ushort
+        vertexDesc.attributes[3].offset = 24
+        vertexDesc.attributes[3].bufferIndex = 0
+
+        vertexDesc.layouts[0].stride = 28
         vertexDesc.layouts[0].stepFunction = .perVertex
 
         let pipelineDesc = MTLRenderPipelineDescriptor()
@@ -409,22 +415,18 @@
     public func metal_render_encoder_draw_indexed_primitives(
         encoder: OpaquePointer, primitiveType: UInt64, indexCount: UInt64,
         indexType: UInt64,  // 0-uint16, 1 - uint32 (MTLINDEXTYPE raw)
-        indexBuffer: OpaquePointer, indexBufferOffset: UIn64, baseVertex: Int64,
-    ) -> OpaquePointer {
+        indexBuffer: OpaquePointer, indexBufferOffset: UInt64, baseVertex: Int64,
+    ) {
         let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
             .takeUnretainedValue()
-        if let primType = MTLPrimitiveType(rawValue: UInt(primitiveType)) {
-            enc.drawPrimitives(
-                type: primType, vertexStart: Int(vertexStart),
-                vertexCount: Int(vertexCount))
-        }
-
-        let indexType = MTLIndexType(rawValue: UInt(indexType)) ?? .uint16
-        let buf = Unmanaged<MTLBuffer>.fromOpaque(UnsafeRawPointer(buffer))
+        let buf = Unmanaged<MTLBuffer>.fromOpaque(UnsafeRawPointer(indexBuffer))
             .takeUnretainedValue()
 
+        let primType = MTLPrimitiveType(rawValue: UInt(primitiveType)) ?? .triangle;
+        let indexType = MTLIndexType(rawValue: UInt(indexType)) ?? .uint16
+
         enc.drawIndexedPrimitives(
-            type: primitiveType, indexCount: indexCount,
+            type: primType, indexCount: Int(indexCount),
             indexType: indexType, indexBuffer: buf,
             indexBufferOffset: Int(indexBufferOffset),
             instanceCount: Int(1), baseVertex: Int(baseVertex),
@@ -450,6 +452,18 @@
         enc.setVertexBytes(bytes, length: Int(length), index: Int(index))
     }
 
+    @_cdecl("metal_render_encoder_set_fragment_bytes")
+    public func metal_render_encoder_set_fragment_bytes(
+        encoder: OpaquePointer,
+        bytes: UnsafeRawPointer,
+        length: UInt64,
+        index: UInt64,
+    ) {
+        let enc = Unmanaged<MTLRenderCommandEncoder>.fromOpaque(UnsafeRawPointer(encoder))
+            .takeUnretainedValue()
+        enc.setFragmentBytes(bytes, length: Int(length), index: Int(index))
+    }
+
     @_cdecl("metal_create_texture")
     public func metal_create_texture(
         device: OpaquePointer,
@@ -458,7 +472,7 @@
     ) -> OpaquePointer? {
         let dev = Unmanaged<MTLDevice>.fromOpaque(UnsafeRawPointer(device)).takeUnretainedValue()
 
-        let pxlFormat = MTLPixelFormat(rawValue: pixelFormmat) ?? .rgba8Unorm
+        let pxlFormat = MTLPixelFormat(rawValue: UInt(pixelFormmat)) ?? .rgba8Unorm
 
         let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: pxlFormat, width: Int(w),

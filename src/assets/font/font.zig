@@ -5,17 +5,22 @@ const CmapFormat4Header = font_data.CmapFormat4Header;
 const CmapHeader = font_data.CmapHeader;
 const FilteredGlyph = font_data.FilteredGlyph;
 const FontDirHeader = font_data.FontDirHeader;
-const GlyfHeader = font_data.GlyfHeader;
+const GlyphHeader = font_data.GlyphHeader;
 const GlyphFlag = font_data.GlyphFlag;
 const HeadTable = font_data.HeadTable;
 const HheaTable = font_data.HheaTable;
 const Hmetric = font_data.Hmetric;
 const MaxPTable = font_data.MaxPTable;
 const TableEntry = font_data.TableEntry;
+const font_atlas = @import("font_atlas.zig");
+const GlyphAtlas = font_atlas.GlyphAtlas;
+const GlyphEntry = font_atlas.GlyphEntry;
+const sdf = @import("sdf.zig");
 const V2 = font_data.V2;
-
 const FontReader = @import("FontReader.zig").FontReader;
 const log = @import("debug").log;
+
+const Shelf = struct { x: usize = 0, y: usize = 0, row_h: usize = 0 };
 
 fn loadFile(gpa: std.mem.Allocator, io: std.Io, path: []const u8) ![]const u8 {
     return std.Io.Dir.cwd().readFileAllocOptions(io, path, gpa, .unlimited, .@"1", null);
@@ -229,7 +234,7 @@ fn parseGlyph(
     reader: *FontReader,
     gpa: std.mem.Allocator, // main engine allocator
     temp_arena: std.mem.Allocator, // temp arena
-    header: GlyfHeader,
+    header: GlyphHeader,
     units_per_em: u16,
 ) !FilteredGlyph {
     const number_of_contours: u16 = if (header.number_of_contours < 0) 0 else @intCast(header.number_of_contours);
@@ -347,7 +352,7 @@ pub const Font = struct {
     char_to_glyph: std.AutoHashMap(u32, u16) = undefined, // from cmap
     glyph_advance_width: std.ArrayList(Hmetric) = undefined, // horizontal spacing data
     glyph_shapes: std.AutoHashMap(u16, FilteredGlyph) = undefined, // data for shapes of glyphs
-    glyph_triangles: std.AutoHashMap(u16, [][3]usize),
+    atlas: GlyphAtlas,
 
     pub fn init(gpa: std.mem.Allocator, io: std.Io, path: []const u8) !Font {
         var arena = std.heap.ArenaAllocator.init(gpa);
@@ -396,50 +401,139 @@ pub const Font = struct {
             try table_directory.put(temp_alloc, table_entry.tag, table_entry);
         }
 
-        const head_entry = try requireTable(table_directory, "head", error.HeadTableNotFound);
+        const head_entry = try requireTable(
+            table_directory,
+            "head",
+            error.HeadTableNotFound,
+        );
         const head_table = try parseHeadTable(&reader, head_entry);
         const index_to_loc = head_table.index_to_loc_format;
         const units_per_em = head_table.units_per_em;
         _ = index_to_loc;
 
-        const maxp_entry = try requireTable(table_directory, "maxp", error.MaxpTableNotFound);
+        const maxp_entry = try requireTable(
+            table_directory,
+            "maxp",
+            error.MaxpTableNotFound,
+        );
         const maxp_table = try parseMaxpTable(&reader, maxp_entry);
         const number_glyphs = maxp_table.num_glyphs;
 
-        const hhea_entry = try requireTable(table_directory, "hhea", error.HheaTableNotFound);
+        const hhea_entry = try requireTable(
+            table_directory,
+            "hhea",
+            error.HheaTableNotFound,
+        );
         const hhea_table = try parseHheaTable(&reader, hhea_entry);
         const number_hMetrics = hhea_table.number_hMetrics;
 
-        const hmtx_entry = try requireTable(table_directory, "hmtx", error.HmtxTableNotFound);
+        const hmtx_entry = try requireTable(
+            table_directory,
+            "hmtx",
+            error.HmtxTableNotFound,
+        );
         var hMetrics = try std.ArrayList(Hmetric).initCapacity(gpa, number_glyphs);
         errdefer hMetrics.deinit(gpa);
         try parseHmetrics(&reader, &hMetrics, hmtx_entry, number_glyphs, number_hMetrics);
 
-        const cmap_entry = try requireTable(table_directory, "cmap", error.CmapTableNotFound);
+        const cmap_entry = try requireTable(
+            table_directory,
+            "cmap",
+            error.CmapTableNotFound,
+        );
         const cmap_format4_header = try parseCmapTable(&reader, cmap_entry);
         var map_indicies = std.AutoHashMap(u32, u16).init(gpa);
         errdefer map_indicies.deinit();
         try parseCmapFormatData(&reader, &map_indicies, temp_alloc, cmap_format4_header);
 
-        const glyph_entry = try requireTable(table_directory, "glyf", error.GlyfTableNotFound);
+        const glyph_entry = try requireTable(
+            table_directory,
+            "glyf",
+            error.GlyfTableNotFound,
+        );
 
-        const loca_entry = try requireTable(table_directory, "loca", error.LocaTableNotFound);
+        const loca_entry = try requireTable(
+            table_directory,
+            "loca",
+            error.LocaTableNotFound,
+        );
         var temp_alloc_mut = temp_alloc;
-        const offsets = try parseLocaTable(&reader, &temp_alloc_mut, loca_entry, number_glyphs);
+        const offsets = try parseLocaTable(
+            &reader,
+            &temp_alloc_mut,
+            loca_entry,
+            number_glyphs,
+        );
+
+        var atlas: GlyphAtlas = try .init(gpa);
+        errdefer atlas.deinit(gpa);
+        var shelf: Shelf = .{}; // persists across glyphs — one packing cursor
+        const atlas_w_f: f32 = @floatFromInt(GlyphAtlas.ATLAS_W);
+        const atlas_h_f: f32 = @floatFromInt(GlyphAtlas.ATLAS_H);
 
         var glyphs = std.AutoHashMap(u16, FilteredGlyph).init(gpa);
         errdefer glyphs.deinit();
         for (0..number_glyphs) |glyphIndex| {
             const start = offsets[glyphIndex];
             const end = offsets[glyphIndex + 1];
-            if (start == end) continue; // Skip empty glyphs
+            if (start == end) continue; // Skip empty glyphs (space etc. — no ink to pack)
 
             reader.seek(glyph_entry.offset + start);
-            const header = reader.readStruct(GlyfHeader);
-            reader.rewind(getBytesOfPadding(GlyfHeader));
+            const header = reader.readStruct(GlyphHeader);
+            reader.rewind(getBytesOfPadding(GlyphHeader));
 
-            const glyph_data = try parseGlyph(&reader, gpa, temp_alloc, header, units_per_em);
+            const glyph_data = try parseGlyph(
+                &reader,
+                gpa,
+                temp_alloc,
+                header,
+                units_per_em,
+            );
             try glyphs.put(@intCast(glyphIndex), glyph_data);
+
+            // cell size is fixed (cell_px + 2*pad); wrap to a new shelf row first so
+            // gx/gy point at the glyph's final atlas slot before sdf writes into it.
+            const cell: u16 = GlyphAtlas.CELL_PX + 2 * GlyphAtlas.PAD;
+            if (shelf.x + cell > GlyphAtlas.ATLAS_W) {
+                shelf.x = 0;
+                shelf.y += shelf.row_h;
+                shelf.row_h = 0;
+            }
+
+            const glyph_size = sdf.rasterInto(
+                .{
+                    .pixels = atlas.pixels,
+                    .stride = atlas.w,
+                    .gx = shelf.x,
+                    .gy = shelf.y,
+                },
+                &glyph_data,
+                GlyphAtlas.CELL_PX,
+                GlyphAtlas.PAD,
+            );
+
+            // metrics EM-NORMALIZED ([0,1] == one em) to match glyph.points
+            const em_f: f32 = @floatFromInt(units_per_em);
+            const hm = hMetrics.items[@min(glyphIndex, hMetrics.items.len - 1)];
+            const entry: GlyphEntry = .{
+                .u0 = @as(f32, @floatFromInt(shelf.x)) / atlas_w_f,
+                .v0 = @as(f32, @floatFromInt(shelf.y)) / atlas_h_f,
+                .u1 = @as(f32, @floatFromInt(shelf.x + glyph_size.w)) / atlas_w_f,
+                .v1 = @as(f32, @floatFromInt(shelf.y + glyph_size.h)) / atlas_h_f,
+                .advance = @as(f32, @floatFromInt(hm.advance_width)) / em_f,
+                .bearing = .{
+                    .x = @as(f32, @floatFromInt(header.xMin)) / em_f,
+                    .y = @as(f32, @floatFromInt(header.yMax)) / em_f,
+                },
+                .size_px = .{
+                    .x = @floatFromInt(glyph_size.w),
+                    .y = @floatFromInt(glyph_size.h),
+                },
+            };
+            try atlas.entries.put(@intCast(glyphIndex), entry);
+
+            shelf.x += glyph_size.w + GlyphAtlas.PAD;
+            shelf.row_h = @max(shelf.row_h, glyph_size.h);
         }
 
         return Font{
@@ -451,7 +545,7 @@ pub const Font = struct {
             .char_to_glyph = map_indicies,
             .glyph_advance_width = hMetrics,
             .glyph_shapes = glyphs,
-            .glyph_triangles = std.AutoHashMap(u16, [][3]usize).init(gpa),
+            .atlas = atlas,
         };
     }
 
@@ -465,11 +559,7 @@ pub const Font = struct {
             self.gpa.free(glyph.contour_ends);
         }
         self.glyph_shapes.deinit();
-        var tri_iter = self.glyph_triangles.iterator();
-        while (tri_iter.next()) |entry| {
-            self.gpa.free(entry.value_ptr.*);
-        }
-        self.glyph_triangles.deinit();
+        self.atlas.deinit(self.gpa);
     }
 
     pub fn measureText(
@@ -483,8 +573,9 @@ pub const Font = struct {
         for (text) |char| {
             const ascii_val: u32 = @intCast(char);
             const glyph_index = self.char_to_glyph.get(ascii_val) orelse continue;
-            const advance_f: f32 = @floatFromInt(self.glyph_advance_width.items[glyph_index].advance_width);
-            width += (advance_f / em_f) * scale;
+            const glyph_entry = self.atlas.entries.get(glyph_index);
+            const advance = if (glyph_entry) |ge| ge.advance else 0.0;
+            width += advance * scale;
         }
 
         const height: f32 = @as(f32, @floatFromInt(
@@ -502,18 +593,19 @@ fn getBytesOfPadding(comptime T: type) usize {
         CmapFormat4Header => 16 / 8,
         HeadTable => 80 / 8,
         FontDirHeader => 32 / 8,
-        GlyfHeader => 48 / 8,
+        GlyphHeader => 48 / 8,
         else => 0,
     };
 }
 
-fn getTable(tables: *const std.array_hash_map.Auto(u32, TableEntry), name: []const u8) ?TableEntry {
+fn getTable(tables: *const std.array_hash_map.Auto(
+    u32,
+    TableEntry,
+), name: []const u8) ?TableEntry {
     const tag = std.mem.readInt(u32, name[0..4], .big);
     return tables.get(tag);
 }
 
-/// Look up a required TrueType table, logging which one is missing before
-/// returning `err`. Keeps the per-table call sites in initFromData to one line.
 fn requireTable(
     tables: *const std.array_hash_map.Auto(u32, TableEntry),
     name: []const u8,
@@ -528,6 +620,9 @@ fn requireTable(
 fn printData(comptime T: type, value: T, label: []const u8) void {
     std.debug.print("{s}\n", .{label});
     inline for (@typeInfo(T).@"struct".fields) |field| {
-        std.debug.print("{s}: {any}\n", .{ field.name, @field(value, field.name) });
+        std.debug.print("{s}: {any}\n", .{
+            field.name,
+            @field(value, field.name),
+        });
     }
 }

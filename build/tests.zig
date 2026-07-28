@@ -264,6 +264,14 @@ pub fn addAllTests(
         .{ .name = "font-tests", .path = "tests/assets/test_font.zig", .imports = &.{
             .{ "assets", mod(modules, .assets) },
         }, .link_engine = true },
+        .{ .name = "sdf-tests", .path = "tests/assets/test_sdf.zig", .imports = &.{
+            .{ "assets", mod(modules, .assets) },
+            .{ "math", mod(modules, .math) },
+        }, .link_engine = true },
+        .{ .name = "glyph-atlas-tests", .path = "tests/assets/test_glyph_atlas.zig", .imports = &.{
+            .{ "assets", mod(modules, .assets) },
+            .{ "math", mod(modules, .math) },
+        }, .link_engine = true },
     };
 
     // ========================================

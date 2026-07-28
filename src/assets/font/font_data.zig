@@ -238,7 +238,7 @@ pub const Hmetric = packed struct {
 // 6      | i16  | xMax            | Maximum x for coordinate data
 // 8      | i16  | yMax            | Maximum y for coordinate data
 
-pub const GlyfHeader = packed struct {
+pub const GlyphHeader = packed struct {
     number_of_contours: i16,
     xMin: i16,
     yMin: i16,

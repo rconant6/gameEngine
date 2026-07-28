@@ -6,6 +6,7 @@ const UIManager = @import("UIManager.zig");
 const Event = @import("event.zig").Event;
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
+const Texture = Renderer.Texture;
 const RenderContext = rend.RenderContext;
 const assets = @import("assets");
 const Font = assets.Font;
@@ -74,9 +75,9 @@ pub const UILayer = struct {
         }
     }
 
-    pub fn render(self: *UILayer, renderer: *Renderer, font: *const Font, rctx: RenderContext) void {
+    pub fn render(self: *UILayer, renderer: *Renderer, font: *const Font, tex: *Texture, rctx: RenderContext) void {
         for (self.views.values()) |*view| {
-            view.manager.render(renderer, font, rctx);
+            view.manager.render(renderer, font, tex, rctx);
         }
     }
 

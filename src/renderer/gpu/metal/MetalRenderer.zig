@@ -6,7 +6,7 @@ const WorldPoint = math.WorldPoint;
 const bridge = @import("metal_bridge.zig");
 const BridgeError = bridge.BridgeError;
 const mb = bridge.MetalBridge;
-const Batch = @import("../../batch.zig").Batch;
+const Batch = @import("../../batch.zig").IndexedBatch;
 const tess = @import("../../tess.zig");
 const LocalXTransform = tess.LocalXform;
 const ClipMap = tess.ClipMap;
@@ -23,32 +23,35 @@ const ShapeData = @import("registry").ShapeData;
 const log = @import("debug").log;
 
 const metal = @import("metal_types.zig");
-const MTLDevice = metal.MTLDevice;
-const MTLRenderCommandEncoder = metal.MTLRenderCommandEncoder;
-const MTLCommandQueue = metal.MTLCommandQueue;
-const MTLCommandBuffer = metal.MTLCommandBuffer;
-const CAMetalLayer = metal.CAMetalLayer;
 const CAMetalDrawable = metal.CAMetalDrawable;
-const MTLRenderPipelineState = metal.MTLRenderPipelineState;
-const MTLBuffer = metal.MTLBuffer;
-const MTLLibrary = metal.MTLLibrary;
-const MTLPixelFormat = metal.MTLPixelFormat;
+const CAMetalLayer = metal.CAMetalLayer;
 const ClearColor = metal.ClearColor;
-const MetalVertex = metal.MetalVertex;
-const MetalTextureVertex = metal.MetalTextureVertex;
-const MTLResourceOptions = metal.MTLResourceOptions;
+const DrawKey = metal.DrawKey;
+const MTLBuffer = metal.MTLBuffer;
+const MTLCommandBuffer = metal.MTLCommandBuffer;
+const MTLCommandQueue = metal.MTLCommandQueue;
+const MTLDevice = metal.MTLDevice;
 const MTLError = metal.MetalError;
+const MTLLibrary = metal.MTLLibrary;
 const MTLLoadAction = metal.MTLLoadAction;
+const MTLPixelFormat = metal.MTLPixelFormat;
+const MTLRenderCommandEncoder = metal.MTLRenderCommandEncoder;
+const MTLRenderPipelineState = metal.MTLRenderPipelineState;
+const MTLResourceOptions = metal.MTLResourceOptions;
 const MTLStoreAction = metal.MTLStoreAction;
 const MTLTexture = metal.MTLTexture;
-const MetalFrameContext = metal.MetalFrameContext;
 const MetalFrame = metal.MetalFrame;
+const MetalFrameContext = metal.MetalFrameContext;
+const MetalVertex = metal.MetalVertex;
 
 const Self = @This();
-const SLOT_BYTES: usize = 2 * 1024 * 1024;
-const TEX_SLOT_BYTES: usize = 512 * 1024;
-const FRAMES_IN_FLIGHT: usize = 3;
+// Sized for content-heavy scenes (zixelart's 64×64 bordered-cell grid). The 28B
+// vertex + per-cell fill+4-stroke quads push ~82k verts; 4 MB gives headroom until
+// smart-stroke / ring-grow lands (see pipeline perf backlog).
+const SLOT_BYTES: usize = 4 * 1024 * 1024;
+const INDEX_SLOT_BYTES: usize = 4 * 1024 * 1024;
 const XFORM_SLOT_BYTES: usize = 1024 * 1024;
+const FRAMES_IN_FLIGHT: usize = 3;
 
 pub const Texture = MTLTexture;
 pub const Device = MTLDevice;
@@ -56,26 +59,25 @@ pub const Device = MTLDevice;
 device: *MTLDevice,
 command_queue: *MTLCommandQueue,
 layer: *CAMetalLayer,
+submission_seq: u32,
 clip_world: ClipMap = .{},
 clip_screen: ClipMap = .{},
 
 pipeline_state: *MTLRenderPipelineState,
-
-batch: Batch(MetalVertex, metal.GeomKey),
-
-texture_pipeline_state: *MTLRenderPipelineState,
-texture_batch: Batch(MetalTextureVertex, metal.TexKey),
-
+batch: Batch(MetalVertex, DrawKey),
 frame_ctx: *MetalFrameContext,
 frame_index: u8, // ring cursor (0..2)
 vertex_buffers: [3]*MTLBuffer, // geometry ring
-texture_vertex_buffers: [3]*MTLBuffer, // sprite ring
-xforms: ArrayList(LocalXTransform),
+index_buffers: [3]*MTLBuffer, // sprite ring
 xform_buffers: [3]*MTLBuffer, // xform ring
+xforms: ArrayList(LocalXTransform),
 
 width: u32,
 height: u32,
+
 clear_color: Color,
+white_texture: *MTLTexture,
+
 frame_number: u64,
 start_time: f64,
 last_frame_time: f64,
@@ -98,10 +100,8 @@ pub fn init(
     const library = try mb.createLibraryFromFile(device, shader_path_z);
     const vertex_fn = try mb.createFunction(library, "vertex_main");
     const fragment_fn = try mb.createFunction(library, "fragment_main");
-    const tex_vertex_fn = try mb.createFunction(library, "texture_vertex_main");
-    const tex_fragment_fn = try mb.createFunction(library, "texture_fragment_main");
 
-    // Both pipelines' rasterSampleCount MUST match the render target's sample
+    // Pipeline's rasterSampleCount MUST match the render target's sample
     // count (the MSAA texture below), or Metal throws at draw.
     const pipeline_state = try mb.createRenderPipelineState(
         device,
@@ -110,31 +110,23 @@ pub fn init(
         MTLPixelFormat.bgra8Unorm_sRGB,
         config.msaa_samples,
     );
-    const texture_pipeline_state = try mb.createTexturePipelineState(
-        device,
-        tex_vertex_fn,
-        tex_fragment_fn,
-        MTLPixelFormat.bgra8Unorm_sRGB,
-        config.msaa_samples,
-    );
 
     // CPU-side batches
-    const batch = Batch(MetalVertex, metal.GeomKey).init(p_gpa);
-    const tex_batch = Batch(MetalTextureVertex, metal.TexKey).init(p_gpa);
+    const batch = Batch(MetalVertex, DrawKey).init(p_gpa);
 
     // Vertex buffers: rings of FRAMES_IN_FLIGHT
     const options = @intFromEnum(MTLResourceOptions.storageModeShared);
     var vertex_buffers: [3]*MTLBuffer = undefined;
-    var texture_vertex_buffers: [3]*MTLBuffer = undefined;
+    var index_buffers: [3]*MTLBuffer = undefined;
     var xform_buffers: [3]*MTLBuffer = undefined;
     for (&vertex_buffers) |*b| b.* = try mb.createBuffer(
         device,
         SLOT_BYTES,
         options,
     );
-    for (&texture_vertex_buffers) |*b| b.* = try mb.createBuffer(
+    for (&index_buffers) |*b| b.* = try mb.createBuffer(
         device,
-        TEX_SLOT_BYTES,
+        INDEX_SLOT_BYTES,
         options,
     );
     for (&xform_buffers) |*b| b.* = try mb.createBuffer(
@@ -143,14 +135,17 @@ pub fn init(
         options,
     );
 
+    const white_tex = try mb.createTexture(device, 1, 1, .rgba8Unorm);
+    const white_px = [_]u8{ 255, 255, 255, 255 };
+    mb.uploadTextureData(white_tex, 1, 1, &white_px, 4);
+
     const frame_ctx = try mb.frameContextCreate(
         device,
         queue,
         layer,
         FRAMES_IN_FLIGHT,
     );
-    // Create the MSAA color texture the render pass resolves from. Sized to the
-    // physical drawable (config.width/height). msaa_samples <= 1 → nil → MSAA off.
+
     mb.frameContextSetMsaa(
         frame_ctx,
         config.msaa_samples,
@@ -164,21 +159,21 @@ pub fn init(
         .layer = layer,
         .pipeline_state = pipeline_state,
         .batch = batch,
-        .texture_pipeline_state = texture_pipeline_state,
-        .texture_batch = tex_batch,
         .frame_ctx = frame_ctx,
         .frame_index = 0,
         .vertex_buffers = vertex_buffers,
-        .texture_vertex_buffers = texture_vertex_buffers,
+        .index_buffers = index_buffers,
         .width = config.width,
         .height = config.height,
         .clear_color = Colors.MAGENTA,
+        .white_texture = white_tex,
         .frame_number = 0,
         .start_time = 0.0,
         .last_frame_time = 0.0,
         .persistent = p_gpa,
         .xforms = .empty,
         .xform_buffers = xform_buffers,
+        .submission_seq = 0,
     };
 }
 fn getShaderPath(gpa: std.mem.Allocator, io: std.Io) ![]const u8 {
@@ -196,21 +191,29 @@ pub fn deinit(self: *Self) void {
     mb.frameContextWaitIdle(self.frame_ctx);
 
     self.batch.deinit();
-    self.texture_batch.deinit();
 
     for (self.vertex_buffers) |b| mb.release(b);
-    for (self.texture_vertex_buffers) |tb| mb.release(tb);
+    for (self.index_buffers) |tb| mb.release(tb);
     for (self.xform_buffers) |xb| mb.release(xb);
 
     mb.release(self.pipeline_state);
-    mb.release(self.texture_pipeline_state);
     mb.frameContextDestroy(self.frame_ctx);
 
     self.xforms.deinit(self.persistent);
 }
 
-pub fn createTexture(self: *Self, width: u32, height: u32) !*MTLTexture {
-    return mb.createTexture(self.device, width, height);
+// Narrow the engine's backend-agnostic PixelFormat to Metal's native type. The
+// only place MTLPixelFormat meets the engine enum — nothing above here sees MTL*.
+fn toMTL(f: rt.PixelFormat) MTLPixelFormat {
+    return switch (f) {
+        .r8 => .r8Unorm,
+        .rgba8 => .rgba8Unorm,
+        .bgra8_srgb => .bgra8Unorm_sRGB,
+    };
+}
+
+pub fn createTexture(self: *Self, width: u32, height: u32, format: rt.PixelFormat) !*MTLTexture {
+    return mb.createTexture(self.device, width, height, toMTL(format));
 }
 
 pub fn uploadTextureData(
@@ -240,95 +243,28 @@ pub fn setClearColor(self: *Self, color: Color) void {
     self.clear_color = color;
 }
 
+// TODO:TODO sprites route through render() as a textured Renderable
+// (unified vertex + one batch). The old CPU-baked addSprite path is gone.
 pub fn drawTextureQuad(
-    self: *Self,
-    texture: *MTLTexture,
-    // position: WorldPoint, // center position in world space
-    width: f32, // world-space width
-    height: f32, // world-space height
-    origin: [2]f32, // normalized origin [0-1, 0-1] within the sprite
-    transform: ?Transform, // scale/rotate/translate
-    ctx: RenderContext,
-    flip_h: bool,
-    flip_v: bool,
-    tint: Color,
-) void {
-    const half_w = width / 2;
-    const half_h = height / 2;
-    const ox = (origin[0] - 0.5) * width;
-    const oy = (origin[1] - 0.5) * height;
-    const tl: WorldPoint = .{ .x = -half_w - ox, .y = half_h - oy };
-    const tr: WorldPoint = .{ .x = half_w - ox, .y = half_h - oy };
-    const bl: WorldPoint = .{ .x = -half_w - ox, .y = -half_h - oy };
-    const br: WorldPoint = .{ .x = half_w - ox, .y = -half_h - oy };
-
-    // Same local→clip pipeline as tess.emit: LocalXform (scale/rotate/translate)
-    // then ClipMap. Sprites are always world-space. Keeps sprites and shapes on
-    // one transform path so 2.2's camera-on-GPU move only touches one place.
-    const xf = tess.LocalXform.from(transform);
-    const map = tess.ClipMap.fromWorld(ctx);
-    const clip_tl = map.apply(xf.apply(tl));
-    const clip_tr = map.apply(xf.apply(tr));
-    const clip_bl = map.apply(xf.apply(bl));
-    const clip_br = map.apply(xf.apply(br));
-
-    const u_tl: f32 = if (flip_h) 1.0 else 0.0;
-    const u_tr: f32 = if (flip_h) 0.0 else 1.0;
-    const u_bl: f32 = if (flip_h) 1.0 else 0.0;
-    const u_br: f32 = if (flip_h) 0.0 else 1.0;
-
-    const v_tl: f32 = if (flip_v) 1.0 else 0.0;
-    const v_tr: f32 = if (flip_v) 1.0 else 0.0;
-    const v_bl: f32 = if (flip_v) 0.0 else 1.0;
-    const v_br: f32 = if (flip_v) 0.0 else 1.0;
-
-    self.addSprite(texture, .{ clip_tl, clip_tr, clip_bl, clip_br }, .{
-        .{ u_tl, v_tl },
-        .{ u_tr, v_tr },
-        .{ u_bl, v_bl },
-        .{ u_br, v_br },
-    }, tint.linearOpacity(1.0)) catch |err| {
-        log.err(.renderer, "Failed to batch textured sprite {any}", .{err});
-    };
-}
-
-// Emits a textured quad (2 tris, 6 verts) into the texture batch. Metal-specific
-// sprite geometry — lives with the renderer that owns MetalTextureVertex/TexKey.
-fn addSprite(
-    self: *Self,
-    texture: *MTLTexture,
-    clip_corners: [4][2]f32, // TL, TR, BL, BR in clip space
-    uvs: [4][2]f32, // TL, TR, BL, BR in uv coords
-    color: [4]f32,
-) !void {
-    const start: u32 = self.texture_batch.mark();
-    const c: [4]f16 = .{
-        @floatCast(color[0]),
-        @floatCast(color[1]),
-        @floatCast(color[2]),
-        @floatCast(color[3]),
-    };
-    const verts = [6]MetalTextureVertex{
-        // TRI 1
-        .{ .position = clip_corners[0], .texcoord = uvs[0], .color = c },
-        .{ .position = clip_corners[1], .texcoord = uvs[1], .color = c },
-        .{ .position = clip_corners[2], .texcoord = uvs[2], .color = c },
-        // TRI 2
-        .{ .position = clip_corners[1], .texcoord = uvs[1], .color = c },
-        .{ .position = clip_corners[3], .texcoord = uvs[3], .color = c },
-        .{ .position = clip_corners[2], .texcoord = uvs[2], .color = c },
-    };
-    for (verts) |v| try self.texture_batch.vertex(v);
-    try self.texture_batch.pushCall(.{ .tex = texture }, start, 6);
-}
+    _: *Self,
+    _: *MTLTexture,
+    _: f32,
+    _: f32,
+    _: [2]f32,
+    _: ?Transform,
+    _: RenderContext,
+    _: bool,
+    _: bool,
+    _: Color,
+) void {}
 
 pub fn render(self: *Self, r: Renderable, ctx: RenderContext) void {
-    // Identity (null transform — all text glyphs, most UI) reuses the shared slot 0
-    // seeded in beginFrame; only real transforms append their own entry. Kills the
-    // per-glyph-triangle identity flood (see beginFrame).
     const xform_index: u16 = if (r.transform == null) 0 else blk: {
         const idx: u16 = @intCast(self.xforms.items.len);
-        self.xforms.append(self.persistent, tess.LocalXform.from(r.transform)) catch |err| {
+        self.xforms.append(
+            self.persistent,
+            tess.LocalXform.from(r.transform),
+        ) catch |err| {
             log.err(.renderer, "Failed to store xform {any}", .{err});
             break :blk 0; // fall back to identity rather than a bad index
         };
@@ -336,37 +272,40 @@ pub fn render(self: *Self, r: Renderable, ctx: RenderContext) void {
     };
 
     const is_screen = r.space == .screen;
-    const px_per_unit =
-        if (is_screen) 1.0 else @as(
-            f32,
-            @floatFromInt(ctx.height),
-        ) / (2.0 * ctx.ortho_size);
 
-    // Each call updates ONLY its own space's map, from its own ctx. World calls
-    // carry the world ctx (physical dims), screen calls the UI ctx (logical dims).
-    // Writing both from one ctx clobbers whichever the last caller wasn't.
     if (is_screen) {
         self.clip_screen = ClipMap.fromScreen(ctx);
     } else {
         self.clip_world = ClipMap.fromWorld(ctx);
     }
-    const key: metal.GeomKey = .{
-        .prim = .triangle,
-        .space = if (is_screen) .screen else .world,
-    };
+
+    const tex: *MTLTexture = if (r.texture) |t|
+        @ptrCast(@alignCast(t))
+    else
+        self.white_texture;
+
+    const base = self.batch.vertexMark();
+    const idx0 = self.batch.indexMark();
+
+    const px_per_unit =
+        if (is_screen)
+            1.0
+        else
+            @as(f32, @floatFromInt(ctx.height)) / (2.0 * ctx.ortho_size);
 
     const half = r.style.stroke_width / 2.0;
+
     const hw: f32 = if (is_screen) half else blk: {
         break :blk half / px_per_unit;
     };
 
     tess.tessellate(
         MetalVertex,
-        metal.GeomKey,
+        DrawKey,
         &self.batch,
         metal.makeVertex,
-        key,
         r.shape,
+        r.uv,
         xform_index,
         r.style,
         hw,
@@ -374,11 +313,30 @@ pub fn render(self: *Self, r: Renderable, ctx: RenderContext) void {
     ) catch {
         log.err(.renderer, "Failed to tessellate shape {any}", .{@TypeOf(r.shape)});
     };
+
+    const key: DrawKey = .{
+        .prim = .triangle,
+        .space = @enumFromInt(@intFromEnum(r.space)),
+        .tex = tex,
+        .is_sdf = r.sdf,
+    };
+
+    const sort_key = (@as(u64, @bitCast(@as(i64, r.layer))) << 32) | self.submission_seq;
+    self.submission_seq += 1;
+
+    self.batch.pushIndexed(
+        key,
+        sort_key,
+        idx0,
+        self.batch.indexMark() - idx0,
+        base,
+    ) catch |err| {
+        log.err(.renderer, "Failed to push draw call {any}", .{err});
+    };
 }
 
 pub fn beginFrame(self: *Self) !void {
     self.batch.clear();
-    self.texture_batch.clear();
     self.xforms.clearRetainingCapacity();
     try self.xforms.append(self.persistent, LocalXTransform.identity);
     self.frame_index +%= 1;
@@ -394,107 +352,113 @@ pub fn endFrame(self: *Self) !void {
     const idx = @mod(self.frame_index, 3);
     const enc = mb.frameEncoder(frame);
 
-    try self.flushGeometryBatch(enc, idx);
-    try self.flushTextureBatch(enc, idx);
+    try self.flushOrdered(enc, idx);
 
     mb.frameEnd(self.frame_ctx, frame);
 }
 
-fn flushGeometryBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !void {
-    const vertices = self.batch.vertices.items;
-    if (vertices.len == 0) return;
+fn flushOrdered(self: *Self, encoder: *MTLRenderCommandEncoder, idx: usize) !void {
+    if (self.batch.vertices.items.len == 0) return;
 
-    const buffer = self.vertex_buffers[idx];
-    const buffer_ptr = try mb.getBufferContents(buffer);
-    const vertex_size = @sizeOf(MetalVertex);
-    const bytes_to_copy = vertices.len * vertex_size;
-
-    const copy_bytes = if (bytes_to_copy > SLOT_BYTES) blk: {
-        const clamped = (SLOT_BYTES / vertex_size) * vertex_size;
-        log.err(
-            .renderer,
-            "Geometry overflow: {d}B > slot {d} B; truncated to {d} verts",
-            .{ bytes_to_copy, SLOT_BYTES, clamped / vertex_size },
-        );
-        break :blk clamped;
-    } else bytes_to_copy;
-    const copied_vertex_count = copy_bytes / vertex_size;
-
-    @memcpy(
-        @as([*]u8, @ptrCast(buffer_ptr))[0..copy_bytes],
-        @as([*]const u8, @ptrCast(vertices.ptr))[0..copy_bytes],
+    const v_copied = try uploadRing(
+        MetalVertex,
+        self.vertex_buffers[idx],
+        self.batch.vertices.items,
+        SLOT_BYTES,
+        "vertex",
     );
+    const i_copied = try uploadRing(
+        u16,
+        self.index_buffers[idx],
+        self.batch.indices.items,
+        INDEX_SLOT_BYTES,
+        "index",
+    );
+    const x_copied = try uploadRing(
+        LocalXTransform,
+        self.xform_buffers[idx],
+        self.xforms.items,
+        XFORM_SLOT_BYTES,
+        "xform",
+    );
+    _ = x_copied;
 
     mb.setPipelineState(encoder, self.pipeline_state);
-    mb.setVertexBuffer(encoder, buffer, 0, 0);
+    mb.setVertexBuffer(encoder, self.vertex_buffers[idx], 0, 0);
+    mb.setVertexBuffer(encoder, self.xform_buffers[idx], 0, 2);
 
-    if (self.xforms.items.len > 0) {
-        const xf_buf = self.xform_buffers[idx];
-        const xf_ptr = try mb.getBufferContents(xf_buf);
-        const xf_size = @sizeOf(LocalXTransform);
-        const xf_bytes = self.xforms.items.len * xf_size;
-        // Clamp to the slot. Truncation here leaves high-index vertices reading
-        // stale buffer memory -> shapes flicker/jump, so it MUST be loud.
-        const xf_copy = if (xf_bytes > XFORM_SLOT_BYTES) blk: {
-            const clamped = (XFORM_SLOT_BYTES / xf_size) * xf_size;
-            log.err(
-                .renderer,
-                "Xform overflow: {d}B > slot {d}B; truncated to {d} xforms (verts past this read garbage)",
-                .{ xf_bytes, XFORM_SLOT_BYTES, clamped / xf_size },
-            );
-            break :blk clamped;
-        } else xf_bytes;
-        @memcpy(
-            @as([*]u8, @ptrCast(xf_ptr))[0..xf_copy],
-            @as([*]const u8, @ptrCast(self.xforms.items.ptr))[0..xf_copy],
-        );
-        mb.setVertexBuffer(encoder, xf_buf, 0, 2);
-    }
+    self.batch.sortCalls();
+
+    if (self.frame_number % 60 == 0)
+        log.info(.renderer, "draw_calls={d} verts={d} idxs={d}", .{
+            self.batch.draw_calls.items.len,
+            self.batch.vertices.items.len,
+            self.batch.indices.items.len,
+        });
+
+    var cur_tex: ?*MTLTexture = null;
+    var cur_space: ?metal.Space = null;
+    var cur_sdf: ?bool = null;
 
     for (self.batch.draw_calls.items) |call| {
-        if (call.vertex_start + call.vertex_count > copied_vertex_count) break;
-        const map = if (call.key.space == .screen) self.clip_screen else self.clip_world;
-        mb.setVertexBytes(encoder, &map, @sizeOf(ClipMap), 1);
+        if (call.index_start + call.index_count > i_copied) break;
+        if (call.base_vertex > v_copied) break;
 
-        mb.drawPrimitives(
+        if (cur_space == null or cur_space.? != call.key.space) {
+            const map = if (call.key.space == .screen)
+                &self.clip_screen
+            else
+                &self.clip_world;
+
+            mb.setVertexBytes(encoder, map, @sizeOf(ClipMap), 1);
+            cur_space = call.key.space;
+        }
+
+        if (cur_tex == null or cur_tex.? != call.key.tex) {
+            mb.setFragmentTexture(encoder, call.key.tex, 0);
+            cur_tex = call.key.tex;
+        }
+
+        if (cur_sdf == null or cur_sdf.? != call.key.is_sdf) {
+            var cfg: u32 = if (call.key.is_sdf) 1 else 0;
+            mb.setFragmentBytes(encoder, &cfg, 4, 3);
+            cur_sdf = call.key.is_sdf;
+        }
+
+        mb.drawIndexedPrimitives(
             encoder,
             call.key.prim,
-            call.vertex_start,
-            call.vertex_count,
+            call.index_count,
+            self.index_buffers[idx],
+            call.index_start * @sizeOf(u16), // byte offset into the index buffer
+            @intCast(call.base_vertex),
         );
     }
 }
 
-fn flushTextureBatch(self: *Self, encoder: *MTLRenderCommandEncoder, idx: u8) !void {
-    const vertices = self.texture_batch.vertices.items;
-    if (vertices.len == 0) return;
+fn uploadRing(
+    comptime T: type,
+    dst: *MTLBuffer,
+    items: []const T,
+    slot_bytes: usize,
+    label: []const u8,
+) !usize {
+    const dst_ptr = try mb.getBufferContents(dst);
+    const elem = @sizeOf(T);
+    const want = items.len * elem;
+    const copy_bytes = @min(want, slot_bytes - slot_bytes % elem);
 
-    const buffer = self.texture_vertex_buffers[idx];
-    const buffer_ptr = try mb.getBufferContents(buffer);
-    const vertex_size = @sizeOf(MetalTextureVertex);
-    const bytes_to_copy = vertices.len * vertex_size;
-
-    const copy_bytes = if (bytes_to_copy > TEX_SLOT_BYTES) blk: {
-        const clamped = (TEX_SLOT_BYTES / vertex_size) * vertex_size;
-        log.err(.renderer, "Texture overflow: {d} B > slot {d} B; truncating to {d} verts", .{
-            bytes_to_copy, TEX_SLOT_BYTES, clamped / vertex_size,
-        });
-        break :blk clamped;
-    } else bytes_to_copy;
-    const copied_vertex_count = copy_bytes / vertex_size;
+    if (want > slot_bytes) {
+        log.err(
+            .renderer,
+            "{s} ring overflow: {d} B > slot {d} B; truncating to {d} items",
+            .{ label, want, slot_bytes, copy_bytes / elem },
+        );
+    }
 
     @memcpy(
-        @as([*]u8, @ptrCast(buffer_ptr))[0..copy_bytes],
-        @as([*]const u8, @ptrCast(vertices.ptr))[0..copy_bytes],
+        @as([*]u8, @ptrCast(dst_ptr))[0..copy_bytes],
+        @as([*]const u8, @ptrCast(items.ptr))[0..copy_bytes],
     );
-
-    mb.setPipelineState(encoder, self.texture_pipeline_state);
-    mb.setVertexBuffer(encoder, buffer, 0, 0);
-
-    for (self.texture_batch.draw_calls.items) |call| {
-        if (call.vertex_start + call.vertex_count > copied_vertex_count) break;
-
-        mb.setFragmentTexture(encoder, call.key.tex, 0);
-        mb.drawPrimitives(encoder, .triangle, call.vertex_start, call.vertex_count);
-    }
+    return copy_bytes / elem;
 }

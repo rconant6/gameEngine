@@ -113,7 +113,8 @@ pub fn main(init: std.process.Init) !void {
             app.mouse.buttons.isReleased(.Left),
         );
         flushHierarchySelection(&ui_layer, &state);
-        ui_layer.render(&app.renderer, &ui_font, ctx);
+        const ui_tex = try assets.atlasTexture(&app.renderer, &ui_font);
+        ui_layer.render(&app.renderer, &ui_font, ui_tex, ctx);
 
         try app.endFrame();
     }

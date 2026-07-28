@@ -49,6 +49,9 @@ pub fn main(init: std.process.Init) !void {
         .ortho_size = logical_height / 2,
     };
 
+    // Font atlas texture (font is fixed → fetch once, lazy-created on first use).
+    const font_tex = try assets.atlasTexture(&app.renderer, &font);
+
     // One UIManager per independent test region
     var test1 = ui.UIManager.init(gpa);
     defer test1.deinit();
@@ -90,7 +93,7 @@ pub fn main(init: std.process.Init) !void {
             const a = test1.allocator();
             test1.setRoot(make.label(a, "Test 1: Single Label", .{ .color = Colors.UI_HEALTH_CRITICAL }));
             test1.layoutAt(20, 20, 400, 40);
-            test1.render(&app.renderer, &font, ctx);
+            test1.render(&app.renderer, &font, font_tex, ctx);
         }
 
         // ────────────────────────────────────────
@@ -108,7 +111,7 @@ pub fn main(init: std.process.Init) !void {
                 }),
             );
             test2.layoutAt(20, 80, 500, 60);
-            test2.render(&app.renderer, &font, ctx);
+            test2.render(&app.renderer, &font, font_tex, ctx);
         }
 
         // ────────────────────────────────────────
@@ -129,7 +132,7 @@ pub fn main(init: std.process.Init) !void {
                 }),
             );
             test3.layoutAt(20, 180, 600, 50);
-            test3.render(&app.renderer, &font, ctx);
+            test3.render(&app.renderer, &font, font_tex, ctx);
         }
 
         // ────────────────────────────────────────
@@ -160,7 +163,7 @@ pub fn main(init: std.process.Init) !void {
                 }),
             );
             test4.layoutAt(0, screen_h - 40, screen_w, 40);
-            test4.render(&app.renderer, &font, ctx);
+            test4.render(&app.renderer, &font, font_tex, ctx);
         }
 
         // ────────────────────────────────────────
@@ -194,7 +197,7 @@ pub fn main(init: std.process.Init) !void {
                 app.mouse.buttons.isPressed(.Left),
                 app.mouse.buttons.isReleased(.Left),
             );
-            test5.render(&app.renderer, &font, ctx);
+            test5.render(&app.renderer, &font, font_tex, ctx);
         }
 
         // ────────────────────────────────────────
@@ -248,7 +251,7 @@ pub fn main(init: std.process.Init) !void {
                 app.mouse.buttons.isPressed(.Left),
                 app.mouse.buttons.isReleased(.Left),
             );
-            test6.render(&app.renderer, &font, ctx);
+            test6.render(&app.renderer, &font, font_tex, ctx);
         }
 
         // ────────────────────────────────────────
@@ -270,7 +273,7 @@ pub fn main(init: std.process.Init) !void {
                 }),
             );
             test7.layoutAt(340, 280, 500, 50);
-            test7.render(&app.renderer, &font, ctx);
+            test7.render(&app.renderer, &font, font_tex, ctx);
         }
 
         // ────────────────────────────────────────
@@ -292,7 +295,7 @@ pub fn main(init: std.process.Init) !void {
                 }),
             );
             test8.layoutAt(340, 350, 200, 300);
-            test8.render(&app.renderer, &font, ctx);
+            test8.render(&app.renderer, &font, font_tex, ctx);
         }
 
         // ────────────────────────────────────────
@@ -326,7 +329,7 @@ pub fn main(init: std.process.Init) !void {
                 }),
             );
             test9.layoutAt(560, 350, 300, 300);
-            test9.render(&app.renderer, &font, ctx);
+            test9.render(&app.renderer, &font, font_tex, ctx);
         }
 
         // ────────────────────────────────────────
@@ -370,7 +373,7 @@ pub fn main(init: std.process.Init) !void {
                 app.mouse.buttons.isPressed(.Left),
                 app.mouse.buttons.isReleased(.Left),
             );
-            test10.render(&app.renderer, &font, ctx);
+            test10.render(&app.renderer, &font, font_tex, ctx);
         }
 
         // ────────────────────────────────────────
@@ -434,7 +437,7 @@ pub fn main(init: std.process.Init) !void {
                 app.mouse.buttons.isPressed(.Left),
                 app.mouse.buttons.isReleased(.Left),
             );
-            test11.render(&app.renderer, &font, ctx);
+            test11.render(&app.renderer, &font, font_tex, ctx);
         }
 
         try app.endFrame();

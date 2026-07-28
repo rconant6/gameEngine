@@ -3,6 +3,7 @@ const std = @import("std");
 const rend = @import("renderer");
 const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
+const Texture = Renderer.Texture;
 const Circle = rend.Shapes.Circle;
 const Line = rend.Shapes.Line;
 const Rectangle = rend.Shapes.Rectangle;
@@ -23,11 +24,13 @@ const Font = assets.Font;
 
 renderer: *Renderer,
 default_font: *const Font,
+default_tex: *Texture,
 
-pub fn init(renderer: *Renderer, default_font: *const Font) Self {
+pub fn init(renderer: *Renderer, default_font: *const Font, default_tex: *Texture) Self {
     return .{
         .renderer = renderer,
         .default_font = default_font,
+        .default_tex = default_tex,
     };
 }
 
@@ -121,6 +124,7 @@ pub fn renderRect(self: *Self, rect: DebugRect, ctx: RenderContext) void {
 pub fn renderText(self: *Self, text: DebugText, ctx: RenderContext) void {
     self.renderer.drawText(
         self.default_font,
+        self.default_tex,
         text.text,
         text.position,
         text.size,

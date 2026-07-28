@@ -1,0 +1,224 @@
+// Pong — world units: ~26.67 wide x 20.0 tall at ortho_size=10
+// Paddles are rectangles, ball is a circle, walls are invisible colliders
+
+[PongScene:scene]
+
+  // ── Ball ──
+  [Ball:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {7.0, 5.0}
+      angular:f32 0.0
+    [Sprite:circle]
+      origin:vec2 {0.0, 0.0}
+      radius:f32 0.4
+      fill_color:color #FFFFFF
+      stroke_color:color #AAAAAA
+      stroke_width:f32 0.5
+      visible:bool true
+    [Collider:circle]
+      radius:f32 0.4
+    [Tag]
+      tags:string "ball"
+    // Bounce is a physics property now. PhysicsSys.response reflects about the
+    // contact normal — for pong's axis-aligned walls/paddles that IS the old
+    // per-axis flip (wall normal (0,±1) → y-flip; paddle face (±1,0) → x-flip).
+    [Physics]
+      mass:f32 1.0
+      restitution:f32 1.0
+
+  // ── Left Paddle (W/S) ──
+  [PaddleLeft:entity]
+    [Transform]
+      position:vec3 {-12.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {0.0, 0.0}
+      angular:f32 0.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.4
+      half_height:f32 1.5
+      fill_color:color #4488FF
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.4
+      half_height:f32 1.5
+    [Tag]
+      tags:string "paddle paddle_left"
+    [OnInput]
+      [trigger]
+        key:string "W"
+        phase:string "held"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 10.0}
+          priority:i32 0
+      [trigger]
+        key:string "S"
+        phase:string "held"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, -10.0}
+          priority:i32 0
+      [trigger]
+        key:string "W"
+        phase:string "released"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 0.0}
+          priority:i32 0
+      [trigger]
+        key:string "S"
+        phase:string "released"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 0.0}
+          priority:i32 0
+    [Physics]
+      mass:f32 0.0
+      restitution:f32 1.0
+
+  // ── Right Paddle (Up/Down) ──
+  [PaddleRight:entity]
+    [Transform]
+      position:vec3 {12.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Velocity]
+      linear:vec2 {0.0, 0.0}
+      angular:f32 0.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.4
+      half_height:f32 1.5
+      fill_color:color #FF4444
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.4
+      half_height:f32 1.5
+    [Tag]
+      tags:string "paddle paddle_right"
+    [OnInput]
+      [trigger]
+        key:string "Up"
+        phase:string "held"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 10.0}
+          priority:i32 0
+      [trigger]
+        key:string "Down"
+        phase:string "held"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, -10.0}
+          priority:i32 0
+      [trigger]
+        key:string "Up"
+        phase:string "released"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 0.0}
+          priority:i32 0
+      [trigger]
+        key:string "Down"
+        phase:string "released"
+        [action]
+          type:string "set_velocity"
+          target:string "self"
+          velocity:vec2 {0.0, 0.0}
+          priority:i32 0
+    [Physics]
+      mass:f32 0.0
+      restitution:f32 1.0
+
+  // ── Top Wall ── (solid: stops the paddles at the top edge — replaces the old
+  // clampPaddleVelocity in main.zig. The ball also gets clean separation here.)
+  [WallTop:entity]
+    [Transform]
+      position:vec3 {0.0, 10.3, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 14.0
+      half_height:f32 0.3
+      fill_color:color #555555
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 14.0
+      half_height:f32 0.3
+      solid:bool true
+    [Tag]
+      tags:string "wall"
+    [Physics]
+      mass:f32 0.0
+      restitution:f32 1.0
+
+  // ── Bottom Wall ── (solid: stops the paddles at the bottom edge)
+  [WallBottom:entity]
+    [Transform]
+      position:vec3 {0.0, -10.3, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 14.0
+      half_height:f32 0.3
+      fill_color:color #555555
+      visible:bool true
+    [Collider:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 14.0
+      half_height:f32 0.3
+      solid:bool true
+    [Tag]
+      tags:string "wall"
+    [Physics]
+      mass:f32 0.0
+      restitution:f32 1.0
+
+  // ── Center Line (visual only) ──
+  [CenterLine:entity]
+    [Transform]
+      position:vec3 {0.0, 0.0, 0.0}
+      scale:f32 1.0
+    [Sprite:rectangle]
+      center:vec2 {0.0, 0.0}
+      half_width:f32 0.05
+      half_height:f32 10.0
+      fill_color:color #333333
+      visible:bool true
+
+  // ── Score HUD (bound to state vars via StateTextSys) ──
+  [ScoreLeft:entity]
+    [Transform]
+      position:vec3 {-6.0, 8.5, 0.0}
+      scale:f32 1.0
+    [Text]
+      text:string "0"
+      size:f32 1.5
+      text_color:color #4488FF
+    [StateText]
+      key:string "score_left"
+
+  [ScoreRight:entity]
+    [Transform]
+      position:vec3 {6.0, 8.5, 0.0}
+      scale:f32 1.0
+    [Text]
+      text:string "0"
+      size:f32 1.5
+      text_color:color #FF4444
+    [StateText]
+      key:string "score_right"

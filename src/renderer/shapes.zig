@@ -73,17 +73,8 @@ pub const Rectangle = struct {
     }
 
     pub fn getCorners(self: *const @This()) [4]V2 {
-        const XType = @TypeOf(self.center.x);
-
-        const hw = if (XType == i32) @as(
-            i32,
-            @intFromFloat(self.half_width),
-        ) else self.half_width;
-
-        const hh = if (XType == i32) @as(
-            i32,
-            @intFromFloat(self.half_height),
-        ) else self.half_height;
+        const hw = self.half_width;
+        const hh = self.half_height;
 
         const top_left: V2 = .{
             .x = self.center.x - hw,
@@ -101,7 +92,7 @@ pub const Rectangle = struct {
             .x = self.center.x - hw,
             .y = self.center.y - hh,
         };
-        return .{ top_left, top_right, bottom_right, bottom_left };
+        return .{ bottom_left, bottom_right, top_right, top_left };
     }
 };
 
@@ -175,18 +166,8 @@ pub const RoundedRect = struct {
     }
 
     pub fn getCorners(self: *const @This()) [4]V2 {
-        const XType = @TypeOf(self.center.x);
-
-        const hw = if (XType == i32) @as(
-            i32,
-            @intFromFloat(self.half_width),
-        ) else self.half_width;
-
-        const hh = if (XType == i32) @as(
-            i32,
-            @intFromFloat(self.half_height),
-        ) else self.half_height;
-
+        const hw = self.half_width;
+        const hh = self.half_height;
         const top_left: V2 = .{
             .x = self.center.x - hw,
             .y = self.center.y + hh,
@@ -203,7 +184,7 @@ pub const RoundedRect = struct {
             .x = self.center.x - hw,
             .y = self.center.y - hh,
         };
-        return .{ top_left, top_right, bottom_right, bottom_left };
+        return .{ bottom_left, bottom_right, top_right, top_left };
     }
 };
 

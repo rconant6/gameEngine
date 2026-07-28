@@ -24,7 +24,7 @@ fonts: FontManager,
 textures: TextureManager,
 
 pub fn init(mem: *Memory, io: std.Io, renderer: *Renderer) !Self {
-    var fonts = FontManager.init(mem, io);
+    var fonts = FontManager.init(mem, io, renderer);
     try fonts.setFontPath("assets/fonts/");
     try fonts.loadFromMemory("__default__", embedded_orbitron_font);
 
@@ -49,8 +49,14 @@ pub fn loadFontFromPath(self: *Self, name: []const u8, path: []const u8) !void {
     try self.fonts.loadFromPath(name, path);
 }
 
-pub fn getFont(self: *Self, name: []const u8) ?*Font {
+pub fn getFont(self: *Self, name: []const u8) ?*const Font {
     return self.fonts.get(name);
+}
+
+// Lazy GPU atlas texture for a font (mirrors getOrCreateFrameTexture). The mutable
+// font stays inside FontManager; callers only ever hold *const Font + this texture.
+pub fn getOrCreateAtlasTexture(self: *Self, name: []const u8) !?*Texture {
+    return self.fonts.getOrCreateAtlasTexture(name);
 }
 
 // MARK: Textures

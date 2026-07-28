@@ -10,6 +10,7 @@ const DebugText = d_draw.DebugText;
 const DebugRenderer = @import("DebugRenderer.zig");
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
+const Texture = Renderer.Texture;
 const RenderContext = rend.RenderContext;
 const Colors = rend.Colors;
 const Color = rend.Color;
@@ -38,13 +39,14 @@ pub fn init(
     persistent: Allocator,
     renderer: *Renderer,
     default_font: *const Font,
+    default_tex: *Texture,
 ) Self {
     return .{
         .frame = frame,
         .persistent = persistent,
         .timed_texts = .empty,
         .draw = .init(frame, persistent),
-        .renderer = .init(renderer, default_font),
+        .renderer = .init(renderer, default_font, default_tex),
     };
 }
 

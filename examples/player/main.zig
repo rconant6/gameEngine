@@ -319,19 +319,21 @@ pub fn main(init: std.process.Init) !void {
             .width = logical_width,
             .ortho_size = logical_height / 2,
         };
-        game.app.renderer.drawTextScreen(font, "test screen", .{ .x = 100, .y = 100 }, 30.0, engine.Colors.WHITE, ctx);
+        const font_tex = game.getFontAtlasTexture("__default__") catch unreachable;
+        game.app.renderer.drawTextScreen(font, font_tex, "test screen", .{ .x = 100, .y = 100 }, 30.0, engine.Colors.WHITE, ctx);
 
-        // Phase 3.4 gradient test — radial circle + linear rect, screen space.
         game.app.renderer.render(.{
             .shape = engine.ShapeRegistry.createShapeUnion(
                 engine.Circle,
                 .{ .origin = .{ .x = 300, .y = 200 }, .radius = 80 },
             ),
-            .style = .{ .gradient = .{ // gradient-only (no explicit fill) now works
-                .kind = .radial,
-                .start_color = engine.Colors.YELLOW,
-                .end_color = engine.Colors.RED,
-            } },
+            .style = .{
+                .gradient = .{ // gradient-only (no explicit fill) now works
+                    .kind = .radial,
+                    .start_color = engine.Colors.YELLOW,
+                    .end_color = engine.Colors.RED,
+                },
+            },
             .space = .screen,
         }, ctx);
         game.app.renderer.render(.{
@@ -349,13 +351,5 @@ pub fn main(init: std.process.Init) !void {
         }, ctx);
 
         game.endFrame();
-
-        // if (game.hasErrors()) {
-        //     const errs = game.getErrors();
-        //     for (errs) |err| {
-        //         std.debug.print("{s}\n", .{err.message});
-        //     }
-        // }
-        // game.clearErrors();
     }
 }

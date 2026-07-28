@@ -195,6 +195,7 @@ pub const Engine = struct {
         engine.services.ctx = engine; // engine is already *Engine
         engine.action_system.services = &engine.services;
         engine.assets.textures.renderer = &engine.app.renderer;
+        engine.assets.fonts.renderer = &engine.app.renderer; // re-seat like textures (was undefined at AssetManager.init)
         engine.instantiator = .init(
             mem.persistent,
             &engine.world,
@@ -210,11 +211,16 @@ pub const Engine = struct {
             "Default Font Loading",
             error.FontNotFound,
         );
+        // Debug always draws with the default font — fetch its atlas texture once
+        // (font is fixed, so the handle is stable) and hand it to the debugger.
+        const default_font_tex = (engine.assets.getOrCreateAtlasTexture("__default__") catch null) orelse
+            fatal("Default Font Atlas Texture", error.FontNotFound);
         engine.debugger = .init(
             mem.frame,
             mem.persistent,
             &engine.app.renderer,
             default_font,
+            default_font_tex,
         );
 
         log.info(.engine, "Engine successfully started", .{});
@@ -487,6 +493,7 @@ pub const Engine = struct {
 
     // MARK: Asset methods
     pub const getFont = @import("EngineAssets.zig").getFont;
+    pub const getFontAtlasTexture = @import("EngineAssets.zig").getFontAtlasTexture;
 
     // MARK: Collision methods
     pub const clearCollisionEvents = @import("EngineCollision.zig").clearCollisionEvents;

@@ -72,7 +72,7 @@ pub const TextureManager = struct {
         const rgba_data = try asset.image.toRgbaBuffer(frame_index);
         defer asset.image.gpa.free(rgba_data);
 
-        const texture = try self.renderer.createTexture(frame.width, frame.height);
+        const texture = try self.renderer.createTexture(frame.width, frame.height, .rgba8);
         self.renderer.uploadTextureData(texture, frame.width, frame.height, rgba_data.ptr, @as(u32, frame.width) * 4);
 
         asset.frame_textures.items[frame_index] = texture;

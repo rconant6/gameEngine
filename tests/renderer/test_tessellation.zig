@@ -25,6 +25,7 @@ const V2 = math.V2;
 
 const TestVertex = struct {
     pos: [2]f32,
+    uv: [2]f32,
     color: u32, // linear rgba packed RRGGBBAA (test-side storage for byte assertions)
 };
 
@@ -39,9 +40,9 @@ fn packLinear(c: [4]f32) u32 {
     return (b.q(c[0]) << 24) | (b.q(c[1]) << 16) | (b.q(c[2]) << 8) | b.q(c[3]);
 }
 
-fn makeTestVertex(pos: [2]f32, color: [4]f32, xform_index: u16) TestVertex {
+fn makeTestVertex(pos: [2]f32, uv: [2]f32, color: [4]f32, xform_index: u16) TestVertex {
     _ = xform_index; // tests assert on pos/color only; transform is applied GPU-side
-    return .{ .pos = pos, .color = packLinear(color) };
+    return .{ .pos = pos, .uv = uv, .color = packLinear(color) };
 }
 
 // Single-primitive key; eql required by Batch.pushCall.
@@ -60,8 +61,8 @@ fn tessShape(batch: *TestBatch, shape_data: ShapeData, style: DrawStyle) !void {
         TestKey,
         batch,
         makeTestVertex,
-        .{ .id = 0 },
         shape_data,
+        null, // uv (untextured — shapes emit {0,0})
         0, // xform_index (identity slot; transform is applied GPU-side now)
         style,
         0.1, // hw (stroke half-width)
@@ -90,17 +91,19 @@ fn expectAllColor(batch: *const TestBatch, expected: u32) !void {
 // Geometry: vertex counts (implemented arms)
 // ============================================================
 
-test "NGon fill emits 3 verts per side (fan)" {
+test "NGon fill: fan dedups to w+1 verts, 3w indices" {
     var batch = TestBatch.init(testing.allocator);
     defer batch.deinit();
 
     const hex = shape(Shapes.NGon, .{ .origin = .{ .x = 0, .y = 0 }, .radius = 5, .sides = 6 });
     try tessShape(&batch, hex, .{ .fill = Color.initRgba(255, 0, 0, 255) });
 
-    try testing.expectEqual(@as(usize, 6 * 3), batch.vertices.items.len);
+    // fan: center + 6 rim = 7 unique verts; 6 tris = 18 indices
+    try testing.expectEqual(@as(usize, 6 + 1), batch.vertices.items.len);
+    try testing.expectEqual(@as(usize, 6 * 3), batch.indices.items.len);
 }
 
-test "Star fill emits 3 verts per spoke (2*points triangles)" {
+test "Star fill: fan dedups to 2n+1 verts, 2n*3 indices" {
     var batch = TestBatch.init(testing.allocator);
     defer batch.deinit();
 
@@ -112,10 +115,12 @@ test "Star fill emits 3 verts per spoke (2*points triangles)" {
     });
     try tessShape(&batch, star, .{ .fill = Color.initRgba(0, 255, 0, 255) });
 
-    try testing.expectEqual(@as(usize, 2 * 5 * 3), batch.vertices.items.len);
+    // 2*5 rim + center = 11 verts; 10 tris = 30 indices
+    try testing.expectEqual(@as(usize, 2 * 5 + 1), batch.vertices.items.len);
+    try testing.expectEqual(@as(usize, 2 * 5 * 3), batch.indices.items.len);
 }
 
-test "PolyLine stroke emits 6 verts per open segment (N-1 segments)" {
+test "PolyLine stroke: 4 verts + 6 indices per open segment" {
     var batch = TestBatch.init(testing.allocator);
     defer batch.deinit();
 
@@ -130,33 +135,36 @@ test "PolyLine stroke emits 6 verts per open segment (N-1 segments)" {
 
     try tessShape(&batch, shape(Shapes.PolyLine, pl), .{ .stroke = Color.initRgba(0, 0, 255, 255) });
 
-    // 4 points → 3 open segments → 3 * 6
-    try testing.expectEqual(@as(usize, 3 * 6), batch.vertices.items.len);
+    // 4 points → 3 open segments; each butt-join segment = 4 verts, 6 indices
+    try testing.expectEqual(@as(usize, 3 * 4), batch.vertices.items.len);
+    try testing.expectEqual(@as(usize, 3 * 6), batch.indices.items.len);
 }
 
-test "NGon fill+stroke emits both (fan + closed stroke ring)" {
+test "NGon fill+stroke: fan + strip verts, both index runs" {
     var batch = TestBatch.init(testing.allocator);
     defer batch.deinit();
 
-    const sides: u32 = 5;
-    const pent = shape(Shapes.NGon, .{ .origin = .{ .x = 0, .y = 0 }, .radius = 3, .sides = sides });
+    const sides: usize = 5;
+    const pent = shape(Shapes.NGon, .{ .origin = .{ .x = 0, .y = 0 }, .radius = 3, .sides = @intCast(sides) });
     try tessShape(&batch, pent, .{
         .fill = Color.initRgba(255, 255, 0, 255),
         .stroke = Color.initRgba(255, 255, 255, 255),
     });
 
-    // fill fan: sides*3 ; closed stroke: sides segments * 6
-    try testing.expectEqual(@as(usize, sides * 3 + sides * 6), batch.vertices.items.len);
+    // fill fan: sides+1 verts, sides*3 idx ; closed stroke: sides*4 verts, sides*6 idx
+    try testing.expectEqual(@as(usize, (sides + 1) + sides * 4), batch.vertices.items.len);
+    try testing.expectEqual(@as(usize, sides * 3 + sides * 6), batch.indices.items.len);
 }
 
-test "Rectangle fill emits 6 verts (2 tris)" {
+test "Rectangle fill: 4 verts, 6 indices (quad)" {
     var batch = TestBatch.init(testing.allocator);
     defer batch.deinit();
 
     const rect = shape(Shapes.Rectangle, Shapes.Rectangle.initFromCenter(.{ .x = 0, .y = 0 }, 4, 2));
     try tessShape(&batch, rect, .{ .fill = Color.initRgba(10, 20, 30, 255) });
 
-    try testing.expectEqual(@as(usize, 6), batch.vertices.items.len);
+    try testing.expectEqual(@as(usize, 4), batch.vertices.items.len);
+    try testing.expectEqual(@as(usize, 6), batch.indices.items.len);
 }
 
 test "no-style shape emits nothing" {
@@ -246,7 +254,8 @@ test "Arc wedge (thickness 0) fill emits a fan" {
     // a filled wedge must emit triangles; exact count depends on segment choice,
     // but it must be a positive multiple of 3 and non-empty.
     try testing.expect(batch.vertices.items.len > 0);
-    try testing.expectEqual(@as(usize, 0), batch.vertices.items.len % 3);
+    // topology lives in the index buffer now; it must be whole triangles
+    try testing.expectEqual(@as(usize, 0), batch.indices.items.len % 3);
 }
 
 test "Capsule fill emits geometry" {
@@ -257,7 +266,8 @@ test "Capsule fill emits geometry" {
     try tessShape(&batch, cap, .{ .fill = Color.initRgba(0, 200, 120, 255) });
 
     try testing.expect(batch.vertices.items.len > 0);
-    try testing.expectEqual(@as(usize, 0), batch.vertices.items.len % 3);
+    // topology lives in the index buffer now; it must be whole triangles
+    try testing.expectEqual(@as(usize, 0), batch.indices.items.len % 3);
 }
 
 test "RoundedRect fill emits geometry" {
@@ -268,7 +278,8 @@ test "RoundedRect fill emits geometry" {
     try tessShape(&batch, rr, .{ .fill = Color.initRgba(60, 130, 255, 255) });
 
     try testing.expect(batch.vertices.items.len > 0);
-    try testing.expectEqual(@as(usize, 0), batch.vertices.items.len % 3);
+    // topology lives in the index buffer now; it must be whole triangles
+    try testing.expectEqual(@as(usize, 0), batch.indices.items.len % 3);
 }
 
 // ============================================================

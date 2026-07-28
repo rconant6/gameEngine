@@ -32,6 +32,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
     const text_y = bounds.y + ascent + (bounds.height - measured.height) / 2;
     ri.renderer.drawTextScreen(
         font,
+        ri.tex,
         self.tb.text,
         .{ .x = bounds.x, .y = text_y },
         self.tb.font_scale,

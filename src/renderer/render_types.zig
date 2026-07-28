@@ -9,6 +9,10 @@ const ShapeData = reg.ShapeData;
 
 pub const CoordinateSpace = enum { world, screen };
 
+// Backend-agnostic texture formats. The engine speaks these; each backend maps
+// them to its native type at its own boundary (no MTL*/VK* above the backend).
+pub const PixelFormat = enum { r8, rgba8, bgra8_srgb };
+
 pub const RendererConfig = struct {
     width: u32,
     height: u32,
@@ -53,6 +57,10 @@ pub const DrawStyle = struct {
     // renders even without an explicit fill — no silent no-op. null = no fill.
     pub fn fillColor(self: DrawStyle) ?Color {
         return self.fill orelse if (self.gradient) |g| g.start_color else null;
+    }
+
+    pub inline fn draws(self: DrawStyle) bool {
+        return self.fillColor() != null or self.stroke != null;
     }
 };
 
@@ -106,4 +114,8 @@ pub const Renderable = struct {
     transform: ?Transform = null,
     style: DrawStyle = .{},
     space: CoordinateSpace = .world,
+    layer: i32 = 0, // band + z_order
+    texture: ?*anyopaque = null, // null => {0, 0}
+    uv: ?[4][2]f32 = null, // null => {0, 0}
+    sdf: bool = false,
 };

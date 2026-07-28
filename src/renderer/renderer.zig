@@ -23,7 +23,7 @@ pub const Family = col.Family;
 pub const TaggedColor = col.TaggedColor;
 pub const Generator = col.generators;
 const batch = @import("batch.zig");
-pub const Batch = batch.Batch;
+pub const Batch = batch.IndexedBatch;
 pub const DrawCall = batch.DrawCall;
 const tess = @import("tess.zig");
 pub const ClipMap = tess.ClipMap;
@@ -33,6 +33,7 @@ const text_module = @import("text.zig");
 const Font = text_module.Font;
 const rt = @import("render_types.zig");
 pub const CoordinateSpace = rt.CoordinateSpace;
+pub const PixelFormat = rt.PixelFormat;
 pub const DrawStyle = rt.DrawStyle;
 pub const Gradient = rt.Gradient;
 pub const Renderable = rt.Renderable;
@@ -111,8 +112,8 @@ pub const Renderer = struct {
         return self.backend.device;
     }
 
-    pub fn createTexture(self: *Renderer, width: u32, height: u32) !*Texture {
-        return self.backend.createTexture(width, height);
+    pub fn createTexture(self: *Renderer, width: u32, height: u32, format: PixelFormat) !*Texture {
+        return self.backend.createTexture(width, height, format);
     }
 
     pub fn uploadTextureData(
@@ -154,24 +155,26 @@ pub const Renderer = struct {
     pub fn drawText(
         self: *Renderer,
         font: *const Font,
+        tex: *Texture,
         text: []const u8,
         position: WorldPoint,
         scale: f32,
         color: Color,
         ctx: RenderContext,
     ) void {
-        text_module.drawText(self, font, text, position, scale, color, ctx);
+        text_module.drawText(self, font, tex, text, position, scale, color, ctx);
     }
 
     pub fn drawTextScreen(
         self: *Renderer,
         font: *const Font,
+        tex: *Texture,
         text: []const u8,
         position: ScreenPoint,
         scale: f32,
         color: Color,
         ctx: RenderContext,
     ) void {
-        text_module.drawTextScreen(self, font, text, position, scale, color, ctx);
+        text_module.drawTextScreen(self, font, tex, text, position, scale, color, ctx);
     }
 };

@@ -16,7 +16,7 @@ pub fn IndexedBatch(comptime Vertex: type, comptime Key: type) type {
         const Self = @This();
 
         vertices: std.ArrayList(Vertex),
-        idxs: std.ArrayList(u16),
+        indices: std.ArrayList(u16),
         draw_calls: std.ArrayList(DrawCall(Key)),
         persistent: Allocator, // renderer.persistent
 
@@ -46,13 +46,13 @@ pub fn IndexedBatch(comptime Vertex: type, comptime Key: type) type {
             return @intCast(self.indices.items.len);
         }
 
-        pub fn vertex(self: *Self, v: Vertex) !void {
+        pub fn appendVertex(self: *Self, v: Vertex) !void {
             try self.vertices.append(self.persistent, v);
         }
-        pub fn index(self: *Self, i: u16) !void {
+        pub fn appendIndex(self: *Self, i: u16) !void {
             try self.indices.append(self.persistent, i);
         }
-        pub fn indices(self: *Self, idxs: []u16) !void {
+        pub fn appendIndices(self: *Self, idxs: []const u16) !void {
             try self.indices.appendSlice(self.persistent, idxs);
         }
 
@@ -69,8 +69,6 @@ pub fn IndexedBatch(comptime Vertex: type, comptime Key: type) type {
                 .{
                     .key = key,
                     .sort_key = sort_key,
-                    .vertex_start = base_vertex,
-                    .vertex_count = self.vertices.items.len - base_vertex,
                     .index_start = index_start,
                     .index_count = index_count,
                     .base_vertex = base_vertex,
@@ -87,7 +85,7 @@ pub fn IndexedBatch(comptime Vertex: type, comptime Key: type) type {
             );
         }
 
-        fn lessBySortKey(a: DrawCall(Key), b: DrawCall(Key)) bool {
+        fn lessBySortKey(_: void, a: DrawCall(Key), b: DrawCall(Key)) bool {
             return a.sort_key < b.sort_key;
         }
     };

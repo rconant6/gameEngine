@@ -124,6 +124,7 @@ extern fn metal_create_texture(
     device: *MTLDevice,
     width: u32,
     height: u32,
+    pixel_format: u64,
 ) ?*MTLTexture;
 
 extern fn metal_texture_replace_region(
@@ -159,6 +160,12 @@ extern fn metal_frame_context_set_msaa(
 ) void;
 
 extern fn metal_render_encoder_set_vertex_bytes(
+    encoder: *MTLRenderCommandEncoder,
+    bytes: *const anyopaque,
+    length: u64,
+    index: u64,
+) void;
+extern fn metal_render_encoder_set_fragment_bytes(
     encoder: *MTLRenderCommandEncoder,
     bytes: *const anyopaque,
     length: u64,
@@ -350,7 +357,7 @@ pub const MetalBridge = struct {
             device,
             width,
             height,
-            format,
+            @intFromEnum(format),
         ) orelse MTLError.TextureCreationFailed;
     }
 
@@ -400,8 +407,17 @@ pub const MetalBridge = struct {
         encoder: *MTLRenderCommandEncoder,
         bytes: *const anyopaque,
         length: u64,
-        index: u46,
+        index: u64,
     ) void {
         metal_render_encoder_set_vertex_bytes(encoder, bytes, length, index);
+    }
+
+    pub fn setFragmentBytes(
+        encoder: *MTLRenderCommandEncoder,
+        bytes: *const anyopaque,
+        length: u64,
+        index: u64,
+    ) void {
+        metal_render_encoder_set_fragment_bytes(encoder, bytes, length, index);
     }
 };

@@ -124,6 +124,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
 
     ri.renderer.drawTextScreen(
         font,
+        ri.tex,
         self.text_info.text,
         .{ .x = bounds.x + indent_offset, .y = text_y },
         self.text_info.font_scale,

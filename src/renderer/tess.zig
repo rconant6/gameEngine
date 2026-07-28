@@ -8,7 +8,7 @@ const V2 = math.V2;
 const reg = @import("registry");
 const ShapeData = reg.ShapeData;
 const Shapes = @import("shapes");
-const Batch = @import("batch.zig").Batch;
+const Batch = @import("batch.zig").IndexedBatch;
 const rt = @import("render_types.zig");
 const DrawStyle = rt.DrawStyle;
 const RenderContext = rt.RenderContext;
@@ -201,11 +201,11 @@ fn topoVertCount(comptime t: Topology) u16 {
     };
 }
 fn topoIndexCount(comptime t: Topology) u16 {
-    return switch (t) {
+    return @intCast(switch (t) {
         .tri => topo_table.tri.len,
         .quad => topo_table.quad.len,
         .strip => topo_table.strip.len,
-    };
+    });
 }
 
 fn topoRef(comptime t: Topology) []const V2 {
@@ -231,15 +231,12 @@ fn topoRef(comptime t: Topology) []const V2 {
 }
 
 fn signedArea(a: V2, b: V2, c: V2) f32 {
-    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
-}
-fn isCounterClockWinding(a: V2, b: V2, c: V2) bool {
-    return ((b.x - a.x) * (c.y - a.y) -
-        (b.y - a.y) * (c.x - a.x)) >= 0;
+    return (b.x - a.x) * (c.y - a.y) -
+        (b.y - a.y) * (c.x - a.x);
 }
 
 comptime {
-    for (std.meta.tag(Topology)) |t| {
+    for (std.meta.tags(Topology)) |t| {
         const run = topoRun(t);
         const ref = topoRef(t);
         if (@mod(run.len, 3) != 0)
@@ -264,19 +261,19 @@ fn Tess(comptime V: type, comptime K: type) type {
         const Self = @This();
         batch: *Batch(V, K),
         makeVertex: *const fn ([2]f32, [2]f32, [4]f32, u16) V,
+        uv: ?[4][2]f32, // 4 corner uvs for textured quad; null emit {0, 0}
         xform_index: u16,
-        tri_key: K, // triangle draw-call key
         hw: f32,
         px_per_unit: f32,
         base: u32,
 
         // This is for emitting a unique vertex and getting its index
-        fn emitV(self: Self, p: V2, paint: Paint) !u16 {
+        fn emitV(self: Self, p: V2, uv: ?[2]f32, paint: Paint) !u16 {
             const idx: u16 = @intCast(self.batch.vertexMark() - self.base);
 
-            try self.batch.vertex(self.makeVertex(
+            try self.batch.appendVertex(self.makeVertex(
                 .{ p.x, p.y },
-                .{ 0, 0 },
+                uv orelse .{ 0, 0 },
                 paint.at(p),
                 self.xform_index,
             ));
@@ -284,34 +281,48 @@ fn Tess(comptime V: type, comptime K: type) type {
             return idx;
         }
 
-        fn emitIs(self: Self, idxs: []u16) !void {
+        fn emitIs(self: Self, idxs: []const u16) !void {
             assert(idxs.len > 2);
 
-            self.batch.indices(idxs);
+            try self.batch.appendIndices(idxs);
         }
 
         fn emitTopology(self: Self, comptime t: Topology, base: u16) !void {
             var ii: [topoRun(t).len]u16 = undefined;
-            inline for (topoRun(t), 0..) |off, k| ii[k] = base + off;
+
+            for (topoRun(t), 0..) |off, k| ii[k] = base + off;
+
             try self.emitIs(&ii);
         }
 
         fn emitSegment(self: Self, p0: V2, p1: V2, paint: Paint, hw: f32) !void {
             const dir = p1.sub(p0).normalize();
             const norm = dir.perp();
-            const base_vertex = self.batch.vertexMark();
 
             const a = p0.add(norm.mul(hw));
             const b = p0.sub(norm.mul(hw));
             const e = p1.add(norm.mul(hw));
             const f = p1.sub(norm.mul(hw));
 
-            try self.emitV(a, paint);
-            try self.emitV(b, paint);
-            try self.emitV(e, paint);
-            try self.emitV(f, paint);
+            const base = try self.emitV(a, null, paint);
+            _ = try self.emitV(b, null, paint);
+            _ = try self.emitV(e, null, paint);
+            _ = try self.emitV(f, null, paint);
 
-            try self.emitTopology(.strip, base_vertex);
+            try self.emitTopology(.strip, base);
+        }
+
+        fn rectFill(
+            self: Self,
+            corners: []const V2,
+            paint: Paint,
+        ) !void {
+            const base = try self.emitV(corners[0], null, paint);
+            for (corners[1..]) |corner| {
+                _ = try self.emitV(corner, null, paint);
+            }
+
+            try self.emitTopology(.quad, base);
         }
 
         fn fanFill(
@@ -324,8 +335,8 @@ fn Tess(comptime V: type, comptime K: type) type {
             var vi: [MAX_SEG + 1]u16 = undefined; // vertex-index scratch
             var ii: [3 * MAX_SEG]u16 = undefined; // index scratch (pts[] eqiv of verts)
             var k: usize = 0;
-            const c = try self.emitV(center, paint);
-            for (rim, 0..) |p, i| vi[i] = try self.emitV(p, paint);
+            const c = try self.emitV(center, null, paint);
+            for (rim, 0..) |p, i| vi[i] = try self.emitV(p, null, paint);
             const w = rim.len;
             const last = if (closed) w else w - 1;
             for (0..last) |i| {
@@ -338,18 +349,21 @@ fn Tess(comptime V: type, comptime K: type) type {
             try self.emitIs(ii[0..k]);
         }
 
-        fn rectFill(
+        fn fillStroke(
             self: Self,
-            corners: []const V2,
-            paint: Paint,
+            rim: []const V2,
+            center: V2,
+            radius: f32,
+            style: DrawStyle,
+            closed: bool,
         ) !void {
-            const base = self.batch.markVertex();
-            var ii: []u16 = undefined;
-            for (corners, 0..) |corner, i| {
-                ii[i] = try self.emitV(corner, paint);
+            if (style.fillColor) |fc| {
+                const paint = buildFillPaint(style, fc, center, radius);
+                try self.fanFill(center, rim, closed, paint);
             }
-
-            try self.emitTopology(.quad, base);
+            if (style.stroke) |_| {
+                strokeClosed(rim, style);
+            }
         }
 
         fn arcSegment(self: Self, radius: f32, sweep: f32) u32 {
@@ -404,7 +418,6 @@ fn Tess(comptime V: type, comptime K: type) type {
 
             const paint = Paint{ .flat = style.stroke.?.linearOpacity(style.opacity) };
             const hw = self.hw;
-            const start = self.batch.mark();
 
             const n = points.len;
             for (0..n) |i| {
@@ -413,11 +426,6 @@ fn Tess(comptime V: type, comptime K: type) type {
 
                 try self.emitSegment(p0, p1, paint, hw);
             }
-            try self.batch.pushCall(
-                self.tri_key,
-                start,
-                self.batch.mark() - start,
-            );
         }
 
         fn strokeOpen(self: Self, points: []const V2, style: DrawStyle) !void {
@@ -425,7 +433,6 @@ fn Tess(comptime V: type, comptime K: type) type {
 
             const paint = Paint{ .flat = style.stroke.?.linearOpacity(style.opacity) };
             const hw = self.hw;
-            const start = self.batch.mark();
 
             const n = points.len - 1;
             for (0..n) |i| {
@@ -434,11 +441,6 @@ fn Tess(comptime V: type, comptime K: type) type {
 
                 try self.emitSegment(p0, p1, paint, hw);
             }
-            try self.batch.pushCall(
-                self.tri_key,
-                start,
-                self.batch.mark() - start,
-            );
         }
 
         fn arcPoints(
@@ -465,7 +467,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn circle(self: Self, c: Shapes.Circle, style: DrawStyle) !void {
-            if (style.fillColor() == null and style.stroke == null) return;
+            if (!style.draws()) return;
 
             const bucket = bucketFor(c.radius, self.px_per_unit);
             const num_steps = seg_buckets[bucket];
@@ -479,17 +481,8 @@ fn Tess(comptime V: type, comptime K: type) type {
 
             if (style.fillColor()) |fc| {
                 const paint = self.buildFillPaint(style, fc, c.origin, c.radius);
-                const start = self.batch.mark();
-                for (0..num_steps) |i| {
-                    try self.emit(c.origin, paint);
-                    try self.emit(perimeter[i], paint);
-                    try self.emit(perimeter[(i + 1) % num_steps], paint);
-                }
-                try self.batch.pushCall(
-                    self.tri_key,
-                    start,
-                    self.batch.mark() - start,
-                );
+
+                try self.fanFill(c.origin, perimeter, true, paint);
             }
 
             if (style.stroke) |_| {
@@ -498,7 +491,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn ellipse(self: Self, e: Shapes.Ellipse, style: DrawStyle) !void {
-            if (style.fillColor() == null and style.stroke == null) return;
+            if (!style.draws()) return;
 
             const bucket = bucketFor(@max(e.semi_major, e.semi_minor), self.px_per_unit);
             const num_steps = seg_buckets[bucket];
@@ -513,17 +506,8 @@ fn Tess(comptime V: type, comptime K: type) type {
 
             if (style.fillColor()) |fc| {
                 const paint = self.buildFillPaint(style, fc, e.origin, @max(e.semi_major, e.semi_minor));
-                const start = self.batch.mark();
-                for (0..num_steps) |i| {
-                    try self.emit(e.origin, paint);
-                    try self.emit(perimeter[i], paint);
-                    try self.emit(perimeter[(i + 1) % num_steps], paint);
-                }
-                try self.batch.pushCall(
-                    self.tri_key,
-                    start,
-                    self.batch.mark() - start,
-                );
+
+                try self.fanFill(e.origin, perimeter, true, paint);
             }
 
             if (style.stroke) |_| {
@@ -531,7 +515,7 @@ fn Tess(comptime V: type, comptime K: type) type {
             }
         }
         fn arc(self: Self, a: Shapes.Arc, style: DrawStyle) !void {
-            if (style.fillColor() == null and style.stroke == null) return;
+            if (!style.draws()) return;
 
             const sweep = a.end_angle - a.start_angle;
             if (@abs(sweep) >= std.math.tau) {
@@ -557,18 +541,7 @@ fn Tess(comptime V: type, comptime K: type) type {
                 if (style.fillColor()) |fc| {
                     const paint = self.buildFillPaint(style, fc, a.origin, a.radius);
 
-                    const start = self.batch.mark();
-                    for (0..n) |i| {
-                        try self.emit(perimeter[0], paint);
-                        try self.emit(perimeter[i], paint);
-                        try self.emit(perimeter[i + 1], paint);
-                    }
-
-                    try self.batch.pushCall(
-                        self.tri_key,
-                        start,
-                        self.batch.mark() - start,
-                    );
+                    try self.fanFill(a.origin, perimeter, true, paint);
                 }
 
                 if (style.stroke) |_| {
@@ -583,7 +556,6 @@ fn Tess(comptime V: type, comptime K: type) type {
 
                 if (style.fillColor()) |fc| {
                     const paint = self.buildFillPaint(style, fc, a.origin, r_out);
-                    const start = self.batch.mark();
 
                     for (0..n - 1) |i| {
                         const outer0 = buf[i];
@@ -591,20 +563,13 @@ fn Tess(comptime V: type, comptime K: type) type {
                         const inner0 = buf[2 * n - 1 - i];
                         const inner1 = buf[2 * n - 2 - i];
 
-                        try self.emit(outer0, paint);
-                        try self.emit(inner0, paint);
-                        try self.emit(outer1, paint);
+                        const base = try self.emitV(outer0, null, paint);
+                        _ = try self.emitV(outer1, null, paint);
+                        _ = try self.emitV(inner0, null, paint);
+                        _ = try self.emitV(inner1, null, paint);
 
-                        try self.emit(outer1, paint);
-                        try self.emit(inner0, paint);
-                        try self.emit(inner1, paint);
+                        try self.emitTopology(.strip, base);
                     }
-
-                    try self.batch.pushCall(
-                        self.tri_key,
-                        start,
-                        self.batch.mark() - start,
-                    );
                 }
 
                 if (style.stroke) |_| {
@@ -614,7 +579,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn capsule(self: Self, c: Shapes.Capsule, style: DrawStyle) !void {
-            if (style.fillColor() == null and style.stroke == null) return;
+            if (!style.draws()) return;
             const pi: f32 = std.math.pi;
 
             const horizontal = c.half_width >= c.half_height;
@@ -668,18 +633,7 @@ fn Tess(comptime V: type, comptime K: type) type {
                     @max(c.half_width, c.half_height),
                 );
 
-                const start = self.batch.mark();
-                for (0..w) |i| {
-                    try self.emit(c.center, paint);
-                    try self.emit(perimeter[i], paint);
-                    try self.emit(perimeter[@mod((i + 1), w)], paint);
-                }
-
-                try self.batch.pushCall(
-                    self.tri_key,
-                    start,
-                    self.batch.mark() - start,
-                );
+                try self.fanFill(c.center, perimeter, true, paint);
             }
 
             if (style.stroke) |_| {
@@ -688,7 +642,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn line(self: Self, l: Shapes.Line, style: DrawStyle) !void {
-            if (style.fillColor() == null and style.stroke == null) return;
+            if (!style.draws()) return;
 
             if (style.stroke) |_| {
                 try self.strokeOpen(
@@ -699,7 +653,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn polyline(self: Self, l: Shapes.PolyLine, style: DrawStyle) !void {
-            if (style.fillColor() == null and style.stroke == null) return;
+            if (!style.draws()) return;
 
             if (style.stroke) |_| {
                 try self.strokeOpen(
@@ -710,21 +664,22 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn poly(self: Self, p: Shapes.Polygon, style: DrawStyle) !void {
-            if (style.fillColor() == null and style.stroke == null) return;
+            if (!style.draws()) return;
 
             if (style.fillColor()) |fc| {
                 const cache = p.triangle_cache orelse return error.InvalidPolygon;
                 // radius = farthest point from centroid (for radial/linear extent)
-                var rad: f32 = 0.0001;
-                for (p.points) |pt| rad = @max(rad, pt.sub(p.center).magnitude());
-                const paint = self.buildFillPaint(style, fc, p.center, rad);
-                const start = self.batch.mark();
+                var radius: f32 = 0.0001;
+                for (p.points) |pt| radius = @max(radius, pt.sub(p.center).magnitude());
+                const paint = self.buildFillPaint(style, fc, p.center, radius);
+
                 for (cache) |t| {
-                    try self.emit(t[0], paint);
-                    try self.emit(t[1], paint);
-                    try self.emit(t[2], paint);
+                    const start = try self.emitV(t[0], null, paint);
+                    _ = try self.emitV(t[1], null, paint);
+                    _ = try self.emitV(t[2], null, paint);
+
+                    try self.emitTopology(.tri, start);
                 }
-                try self.batch.pushCall(self.tri_key, start, self.batch.mark() - start);
             }
             if (style.stroke) |_| {
                 try self.strokeClosed(p.points, style);
@@ -732,7 +687,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn nGon(self: Self, g: Shapes.NGon, style: DrawStyle) !void {
-            if (style.fillColor() == null and style.stroke == null) return;
+            if (!style.draws()) return;
 
             const n = std.math.clamp(g.sides, 3, MAX_SEG);
             const step: f32 = std.math.tau / @as(f32, @floatFromInt(g.sides));
@@ -740,27 +695,13 @@ fn Tess(comptime V: type, comptime K: type) type {
             var points: [MAX_SEG]V2 = undefined;
             for (0..n) |i| {
                 const fi: f32 = @floatFromInt(i);
-                points[i] = g.origin.add(.{
-                    .x = @cos(fi * step),
-                    .y = @sin(fi * step),
-                });
+                points[i] = g.origin.add(direction(step * fi));
             }
 
             if (style.fillColor()) |fc| {
                 const paint = self.buildFillPaint(style, fc, g.origin, g.radius);
-                const start = self.batch.mark();
 
-                for (0..n) |i| {
-                    try self.emit(g.origin, paint);
-                    try self.emit(points[i], paint);
-                    try self.emit(points[@mod((i + 1), n)], paint);
-                }
-
-                try self.batch.pushCall(
-                    self.tri_key,
-                    start,
-                    self.batch.mark() - start,
-                );
+                try self.fanFill(g.origin, points[0..n], true, paint);
             }
 
             if (style.stroke) |_| {
@@ -769,7 +710,7 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn star(self: Self, s: Shapes.Star, style: DrawStyle) !void {
-            if (style.fillColor() == null and style.stroke == null) return;
+            if (!style.draws()) return;
 
             const n = std.math.clamp(s.points, 2, MAX_SEG / 2);
             const w = 2 * n;
@@ -785,19 +726,8 @@ fn Tess(comptime V: type, comptime K: type) type {
 
             if (style.fillColor()) |fc| {
                 const paint = self.buildFillPaint(style, fc, s.origin, s.outer_radius);
-                const start = self.batch.mark();
 
-                for (0..w) |i| {
-                    try self.emit(s.origin, paint);
-                    try self.emit(points[i], paint);
-                    try self.emit(points[@mod((i + 1), w)], paint);
-                }
-
-                try self.batch.pushCall(
-                    self.tri_key,
-                    start,
-                    self.batch.mark() - start,
-                );
+                try self.fanFill(s.origin, points[0..w], true, paint);
             }
 
             if (style.stroke) |_| {
@@ -806,26 +736,25 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn rect(self: Self, r: Shapes.Rectangle, style: DrawStyle) !void {
-            if (style.fillColor() == null and style.stroke == null) return;
+            if (!style.draws()) return;
 
             const corners = r.getCorners();
+
             if (style.fillColor()) |fc| {
-                const half_diag = (V2{ .x = r.half_width, .y = r.half_height }).magnitude();
+                const uv: [4][2]f32 = self.uv orelse [_][2]f32{.{ 0, 0 }} ** 4;
+
+                const half_diag = (V2{
+                    .x = r.half_width,
+                    .y = r.half_height,
+                }).magnitude();
                 const paint = self.buildFillPaint(style, fc, r.center, half_diag);
-                const start = self.batch.mark();
 
-                try self.emit(corners[0], paint);
-                try self.emit(corners[1], paint);
-                try self.emit(corners[2], paint);
-                try self.emit(corners[0], paint);
-                try self.emit(corners[2], paint);
-                try self.emit(corners[3], paint);
+                const base = try self.emitV(corners[0], uv[0], paint);
+                for (corners[1..], 1..) |corner, i| {
+                    _ = try self.emitV(corner, uv[i], paint);
+                }
 
-                try self.batch.pushCall(
-                    self.tri_key,
-                    start,
-                    self.batch.mark() - start,
-                );
+                try self.emitTopology(.quad, base);
             }
             if (style.stroke) |_| {
                 try self.strokeClosed(
@@ -836,9 +765,9 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn roundedRect(self: Self, r: Shapes.RoundedRect, style: DrawStyle) !void {
-            if (style.fillColor() == null and style.stroke == null) return;
-            const pi: f32 = std.math.pi;
+            if (!style.draws()) return;
 
+            const pi: f32 = std.math.pi;
             const rad = @min(r.radius, r.half_width, r.half_height);
             const ix = r.half_width - rad;
             const iy = r.half_height - rad;
@@ -863,17 +792,8 @@ fn Tess(comptime V: type, comptime K: type) type {
             if (style.fillColor()) |fc| {
                 const half_diag = (V2{ .x = r.half_width, .y = r.half_height }).magnitude();
                 const paint = self.buildFillPaint(style, fc, r.center, half_diag);
-                const start = self.batch.mark();
-                for (0..w) |i| {
-                    try self.emit(r.center, paint);
-                    try self.emit(perimeter[i], paint);
-                    try self.emit(perimeter[(i + 1) % w], paint);
-                }
-                try self.batch.pushCall(
-                    self.tri_key,
-                    start,
-                    self.batch.mark() - start,
-                );
+
+                try self.fanFill(r.center, perimeter, true, paint);
             }
 
             if (style.stroke) |_| {
@@ -885,18 +805,19 @@ fn Tess(comptime V: type, comptime K: type) type {
         }
 
         fn tri(self: Self, t: Shapes.Triangle, style: DrawStyle) !void {
+            if (!style.draws()) return;
+
             if (style.fillColor()) |fc| {
                 const centroid = t.v0.add(t.v1).add(t.v2).mul(1.0 / 3.0);
                 var rad: f32 = 0.0001;
                 for ([_]V2{ t.v0, t.v1, t.v2 }) |v| rad = @max(rad, v.sub(centroid).magnitude());
                 const paint = self.buildFillPaint(style, fc, centroid, rad);
-                const start = self.batch.mark();
 
-                try self.emit(t.v0, paint);
-                try self.emit(t.v1, paint);
-                try self.emit(t.v2, paint);
+                const b = try self.emitV(t.v0, null, paint);
+                _ = try self.emitV(t.v1, null, paint);
+                _ = try self.emitV(t.v2, null, paint);
 
-                try self.batch.pushCall(self.tri_key, start, self.batch.mark() - start);
+                try self.emitTopology(.tri, b);
             }
             if (style.stroke) |_| {
                 try self.strokeClosed(
@@ -912,19 +833,20 @@ pub fn tessellate(
     comptime V: type,
     comptime K: type,
     batch: *Batch(V, K),
-    comptime makeVertex: fn ([2]f32, [4]f32, u16) V,
-    tri_key: K,
+    comptime makeVertex: fn ([2]f32, [2]f32, [4]f32, u16) V,
     shape: ShapeData,
+    uv: ?[4][2]f32,
     xf_idx: u16,
     style: DrawStyle,
     hw: f32,
     px_per_unit: f32,
 ) !void {
     const ts = Tess(V, K){
+        .base = batch.vertexMark(),
         .batch = batch,
         .makeVertex = makeVertex,
+        .uv = uv,
         .xform_index = xf_idx,
-        .tri_key = tri_key,
         .hw = hw,
         .px_per_unit = px_per_unit,
     };

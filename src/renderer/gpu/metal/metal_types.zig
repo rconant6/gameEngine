@@ -90,6 +90,10 @@ pub const MTLPixelFormat = enum(u64) {
     rgba16Float = 115,
     rgba32Float = 125,
 };
+pub const MTLInxedType = enum(u64) {
+    uint16 = 0,
+    uint32 = 1,
+};
 pub const MTLLoadAction = enum(u64) {
     dontCare = 0,
     load = 1,
@@ -114,16 +118,12 @@ pub const DrawKey = struct {
     prim: MTLPrimitiveType,
     space: Space,
     tex: *MTLTexture,
+    is_sdf: bool,
 
     pub fn eql(a: DrawKey, b: DrawKey) bool {
         return a.tex == b.tex and
             a.prim == b.prim and
             a.space == b.space;
-    }
-};
-pub const TexKey = struct {
-    pub fn eql(a: TexKey, b: TexKey) bool {
-        return a.tex == b.tex;
     }
 };
 

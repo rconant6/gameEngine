@@ -43,7 +43,18 @@ vertex VertexOut vertex_main(VertexIn in [[stage_in]],
           .color = in.color};
 }
 
-fragment float4 fragment_main(VertexOut input [[stage_in]]) {
-  constexpr sampler s(mag_filter::nearest, min_filter::nearest);
+struct FragCfg {
+  uint is_sdf;
+};
+
+fragment float4 fragment_main(VertexOut input [[stage_in]],
+                              texture2d<float> tex [[texture(0)]],
+                              constant FragCfg &cfg [[buffer(3)]]) {
+  constexpr sampler s(mag_filter::nearest, min_filter::linear);
+  if (cfg.is_sdf != 0) {
+    float cov = tex.sample(s, input.texcoord).r;
+    return float4(input.color.rgb, input.color.a * cov);
+  }
+
   return tex.sample(s, input.texcoord) * input.color;
 }

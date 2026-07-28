@@ -5,6 +5,7 @@ const Color = rend.Color;
 const Colors = rend.Colors;
 const ColorLibrary = rend.ColorLibrary;
 const Renderer = rend.Renderer;
+const Texture = Renderer.Texture;
 const RenderContext = rend.RenderContext;
 const Rect = @import("Rect.zig");
 const V2 = @import("math").V2;
@@ -24,6 +25,7 @@ pub const RenderInfo = struct {
     renderer: *Renderer,
     ctx: RenderContext,
     font: *const Font,
+    tex: *Texture, // font's atlas texture (resolved alongside font)
     bounds: Rect,
 };
 

@@ -111,7 +111,8 @@
 <section id="summary">
 <h2>0. Executive summary</h2>
 <p>The renderer's architecture is right: an immediate-mode draw API feeding a CPU-side batch that flushes once per frame into pre-allocated GPU buffers. The problem is that the implementation defeats the batch at the last step — <strong>nearly every triangle and line becomes its own GPU draw call</strong> — and the Metal frame lifecycle has correctness gaps (no CPU/GPU synchronization, per-frame object leaks, no blending on shapes) that will bite harder as scenes grow.</p>
-<p>The plan is six phases. Phase 0 makes frames safe (sync, leaks, buffers, blending, resize). Phase 1 is a one-sitting change that merges adjacent draw calls and adds stats counters — it should take a PONG frame from ~80 draw calls to under 5. Phase 2 centralizes tessellation into a backend-agnostic module, which makes <code>stroke_width</code> real, removes the World/Screen code duplication, and is the platform every new shape lands on. Phase 3 is the visible payoff: rounded rects, capsules, arcs/rings, n-gons, MSAA, working opacity, gradients. Phase 4 makes <code>RenderLayer.z_order</code> real and fixes the "sprites always render on top of shapes" ordering flaw. Phase 5 is on-demand scaling work (atlases, culling, indexed drawing).</p>
+<p>The plan is six phases. Phase 0 makes frames safe (sync, leaks, buffers, blending, resize). Phase 1 is a one-sitting change that merges adjacent draw calls and adds stats counters — it should take a PONG frame from ~80 draw calls to under 5. Phase 2 centralizes tessellation into a backend-agnostic module, which makes <code>stroke_width</code> real, removes the World/Screen code duplication, and is the platform every new shape lands on. Phase 3 is the visible payoff: rounded rects, capsules, arcs/rings, n-gons, MSAA, working opacity, gradients. Phase 4 makes <code>RenderLayer.z_order</code> real and fixes the "sprites always render on top of shapes" ordering flaw. Phase 5 is on-demand scaling work (atlases, culling).</p>
+<p><span class="badge dec">status 2026-07-15</span> <strong>Phases 0 (−resize), 1, 2, 3 are DONE</strong>, plus a GPU-transform staircase that reversed <a href="#decisions">D2</a> (linear color + camera→clip + LocalXform all on the GPU). <strong>Phase 4 is the frontier</strong> and grew in scope: it is now <a href="#phase4a">4a</a> (single unified <em>indexed</em> pipeline + z-order — reverses <a href="#decisions">D3</a>, pulls indexed drawing forward from P5, and rewrites <code>tess.zig</code> ~500→~80 lines) and <a href="#phase4b">4b</a> (SDF text atlas + producer-seam collapse — supersedes P5's glyph-atlas item). The original Phase 4 sketch below is kept for the decision trail; <strong>4a/4b are authoritative</strong>.</p>
 <p>Decisions are made throughout and collected in the <a href="#decisions">decision log</a> — each one notes what was rejected and why, so any of them can be re-litigated before implementation.</p>
 </section>
 
@@ -793,46 +794,158 @@ Polyline     // owned points + width; miter joins, butt caps (round caps later)
 
 <!-- ===================================================== -->
 <section id="phase4a">
-<h2>Phase 4a — Indexed unified pipeline + ordering <span class="badge crit">fixes S7</span> <span class="badge dec">planned 2026-07-15</span></h2>
-<p><strong>Goal:</strong> collapse the two-pipeline / two-vertex-format / geometry-then-texture flush into <em>one</em> ordered, indexed pipeline; <code>RenderLayer.z_order</code> becomes real. Staged before 4b (SDF text) because it fixes S7 and is verifiable on its own.</p>
+<h2>Phase 4a — Indexed unified pipeline + ordering <span class="badge crit">fixes S7</span> <span class="badge dec">2026-07-16</span></h2>
+
+<h3>The model</h3>
+<p><strong>The vertex buffer holds every drawable's vertices; the index buffer says how to connect them; a DrawCall is a slice of the index buffer plus where its vertices begin.</strong></p>
+<p>GPU call: <code>drawIndexedPrimitives(index_count, ibuf, index_start*2, base_vertex)</code>. For each index <code>i</code> it fetches <code>vertices[base_vertex + i]</code>.</p>
+<table>
+  <tr><th>field</th><th>meaning</th><th>set by</th></tr>
+  <tr><td class="mono">base_vertex</td><td>where this shape's verts begin</td><td><code>vertexMark()</code> before tess runs</td></tr>
+  <tr><td class="mono">index_start</td><td>where this shape's indices begin</td><td><code>indexMark()</code> before tess runs</td></tr>
+  <tr><td class="mono">index_count</td><td>how many indices it wrote</td><td><code>indexMark()</code> after − before</td></tr>
+  <tr><td class="mono">sort_key</td><td>z-order</td><td>caller — only it knows the layer</td></tr>
+</table>
+<p><strong>The invariant everything rests on:</strong> <code>emitV</code> returns <em>base-relative</em> indices (<code>vertexMark() - self.base</code>), so a shape's own indices are always <code>0..n</code>. That is why <code>topo_table.quad = {0,1,2,0,2,3}</code> can be a compile-time constant — it is true for every rect, anywhere in the buffer. The GPU adds <code>base_vertex</code> back at fetch.</p>
+<p><strong>Consequence:</strong> indexed draws <em>imply</em> the vertex range. <code>vertex_start</code>/<code>vertex_count</code> are the non-indexed model — they are dead.</p>
+<p><span class="badge crit">two bases, don't confuse them</span></p>
+<ul>
+  <li><code>Tess.base</code> — <code>u32</code>, <strong>absolute</strong>, set once per <code>tessellate()</code>. What <code>emitV</code> subtracts.</li>
+  <li><code>emitTopology(t, base)</code> — <code>u16</code>, <strong>shape-relative</strong>: the index returned by the first <code>emitV</code> of that primitive.</li>
+</ul>
 
 <h3>Locked decisions</h3>
 <table>
   <tr><th>#</th><th>Question</th><th>Resolution</th></tr>
-  <tr><td>L1</td><td>Coalesce model</td><td><strong>Single unified pipeline</strong> — one vertex format, one buffer, one draw-call list, one shader. <code>MetalTextureVertex</code> + texture pipeline/shader <strong>die</strong>. (Takes <a href="#decisions">D3</a>'s escape hatch as the default.)</td></tr>
+  <tr><td>L1</td><td>Coalesce model</td><td><strong>Single unified pipeline</strong> — one vertex format, one buffer, one draw-call list, one shader. <code>MetalTextureVertex</code> + texture pipeline/shader die. (Takes <a href="#decisions">D3</a>'s escape hatch as default.)</td></tr>
   <tr><td>L2</td><td>Solid-geometry sampling</td><td>Shapes/text sample a <strong>1×1 white texture</strong> (created once at init). <code>texel*color</code> is identity.</td></tr>
-  <tr><td>L3</td><td>Draw model</td><td><strong>Indexed.</strong> <code>drawIndexedPrimitives</code> + a <code>u16</code> index buffer; <strong>one vertex buffer + <code>baseVertex</code></strong> so cached &amp; per-frame verts share index space and the sink stays kind-blind.</td></tr>
-  <tr><td>L4</td><td>Sprite transform</td><td><strong>Sprites join the GPU xform path.</strong> Vertex carries local pos + uv + color + xform_index; sprite appends a <code>LocalXform</code>. <code>drawTextureQuad</code>'s CPU matrix math dies.</td></tr>
+  <tr><td>L3</td><td>Draw model</td><td><strong>Indexed.</strong> <code>drawIndexedPrimitives</code> + <code>u16</code> index buffer; one vertex buffer + <code>baseVertex</code>, sink stays kind-blind.</td></tr>
+  <tr><td>L4</td><td>Sprite transform</td><td><strong>Sprites join the GPU xform path.</strong> Vertex carries local pos + uv + color + xform_index. <code>drawTextureQuad</code>'s CPU matrix bake dies.</td></tr>
   <tr><td>L5</td><td>z granularity</td><td><strong>Full per-entity z_order.</strong> <code>sort_key = (band + z_order) &lt;&lt; 32 | submission_seq</code>. <code>RenderLayer</code> becomes read.</td></tr>
-  <tr><td>L6</td><td>Bands</td><td>world <code>0</code>, debug <code>+1000</code>, UI <code>+2000</code>. <code>UIElement</code>/screen-space implies UI band unless an explicit <code>RenderLayer</code> overrides.</td></tr>
+  <tr><td>L6</td><td>Bands</td><td>world <code>0</code>, debug <code>+1000</code>, UI <code>+2000</code>.</td></tr>
+  <tr><td>L7</td><td>uv path</td><td><code>emitV</code> takes uv (a vertex attribute belongs on the vertex emitter). Shapes pass <code>.{0,0}</code>; sprites/glyphs pass real corners.</td></tr>
+  <tr><td>L8</td><td>Coalescing</td><td>One indexed draw per <code>tessellate</code>. The sort clusters same-key runs so <em>rebinds</em> stay rare. Merging contiguous same-base runs = P5.</td></tr>
 </table>
-
-<p><strong>Verification (distinct claims):</strong></p>
-<ol>
-  <li>ZxlSprite with <code>RenderLayer.z_order = -1</code> renders <em>under</em> a shape at z 0 — <span class="warn-inline">S7 fixed</span> (sprite no longer forced on top).</li>
-  <li>Debug draws render <em>over</em> world sprites (band +1000 &gt; 0), where today they render under.</li>
-  <li>UI panel (shape, UI band) renders over a world sprite.</li>
-  <li>Pong unchanged; <strong>1 pipeline bind per frame</strong> (texture + ClipMap + baseVertex rebind only on key change).</li>
-</ol>
 
 <h3>Files at a glance</h3>
 <table>
   <tr><th>File</th><th>Action</th></tr>
-  <tr><td class="mono">platform/macos/swift/shaders.metal</td><td>REWRITE — collapse 2 vertex/fragment pairs → 1; all geometry samples a texture</td></tr>
-  <tr><td class="mono">platform/macos/swift/MetalBridge.swift</td><td>EDIT — add <code>metal_render_encoder_draw_indexed_primitives</code>; add pixel-format arg to <code>metal_create_texture</code></td></tr>
-  <tr><td class="mono">renderer/gpu/metal/metal_bridge.zig</td><td>EDIT — extern + wrapper for indexed draw; R8 texture create; add <code>r8Unorm</code> to <code>MTLPixelFormat</code></td></tr>
-  <tr><td class="mono">renderer/gpu/metal/metal_types.zig</td><td>EDIT — <code>MetalVertex</code> gains <code>uv</code>; delete <code>MetalTextureVertex</code>; <code>GeomKey</code>+<code>TexKey</code>→<code>DrawKey{prim,space,tex}</code>; <code>makeVertex</code> gains uv arg</td></tr>
-  <tr><td class="mono">renderer/batch.zig</td><td>REWRITE — <code>IndexedBatch(V,K)</code>: verts + indices + draw-calls with <code>sort_key</code> + <code>base_vertex</code>; <code>pushIndexed</code> + <code>sortCalls</code></td></tr>
-  <tr><td class="mono">renderer/tess.zig</td><td>EDIT — emit into vert <em>and</em> index arena; <code>makeVertex</code>/<code>emit</code> gain uv (always <code>(0,0)</code> for shapes)</td></tr>
-  <tr><td class="mono">renderer/render_types.zig</td><td>EDIT — <code>Renderable</code> gains <code>texture</code>, uv-carrying, <code>layer: i32</code></td></tr>
-  <tr><td class="mono">renderer/gpu/metal/MetalRenderer.zig</td><td>REWRITE flush/render — one batch, one buffer ring + index ring, white texture, sort, indexed draw; sprites append xform</td></tr>
-  <tr><td class="mono">renderer/renderer.zig</td><td>EDIT — own white texture; thread <code>layer</code> through <code>render</code>/<code>drawText*</code>/<code>drawTextureQuad</code></td></tr>
-  <tr><td class="mono">systems/RenderSys.zig</td><td>EDIT — read <code>RenderLayer</code>, compute band+z, pass <code>layer</code> on every submit</td></tr>
-  <tr><td class="mono">debug/DebugRenderer.zig</td><td>EDIT — pass debug-band layer (+1000)</td></tr>
+  <tr><td class="mono">renderer/batch.zig</td><td>EDIT — compile fixes</td></tr>
+  <tr><td class="mono">renderer/tess.zig</td><td>EDIT — uv on <code>emitV</code>, base bugs, finish shapes</td></tr>
+  <tr><td class="mono">renderer/gpu/metal/metal_types.zig</td><td>EDIT — <code>DrawKey</code>; kill <code>MetalTextureVertex</code>/<code>TexKey</code>/<code>GeomKey</code></td></tr>
+  <tr><td class="mono">renderer/gpu/metal/metal_bridge.zig</td><td>EDIT — indexed draw + texture format</td></tr>
+  <tr><td class="mono">platform/macos/swift/MetalBridge.swift</td><td>EDIT — indexed draw + texture format</td></tr>
+  <tr><td class="mono">platform/macos/swift/shaders.metal</td><td>REWRITE — one vertex/fragment pair</td></tr>
+  <tr><td class="mono">renderer/render_types.zig</td><td>EDIT — <code>Renderable</code> gains <code>layer</code>/<code>texture</code>/<code>uv</code>; <code>DrawStyle.draws()</code></td></tr>
+  <tr><td class="mono">renderer/gpu/metal/MetalRenderer.zig</td><td>REWRITE — one batch, one flush, indexed</td></tr>
+  <tr><td class="mono">renderer/renderer.zig</td><td>EDIT — thread <code>layer</code></td></tr>
+  <tr><td class="mono">systems/RenderSys.zig</td><td>EDIT — read <code>RenderLayer</code>, bands</td></tr>
+  <tr><td class="mono">debug/DebugRenderer.zig</td><td>EDIT — debug band</td></tr>
 </table>
 
-<h4>shaders.metal — REWRITE</h4>
-<p>Collapse to <strong>one</strong> vertex/fragment pair; <code>texture_vertex_main</code>/<code>texture_fragment_main</code> die (sampling reappears inside <code>fragment_main</code>).</p>
+<h3><code>src/renderer/batch.zig</code></h3>
+<p><strong>Data types.</strong> <code>DrawCall(Key)</code> — fields correct as shipped, no change. <code>IndexedBatch(Vertex, Key)</code> — field is <code>idxs</code>, but <code>init</code>/<code>deinit</code>/<code>clear</code>/<code>indexMark</code>/<code>index</code> all say <code>self.indices</code>. Pick one name.</p>
+<p><strong>Fixes</strong></p>
+<ul>
+  <li><code>pub fn indices(self, idxs)</code> collides with the field name → rename <code>appendIndices</code>.</li>
+  <li><code>pushIndexed</code> sets <code>.vertex_start</code>/<code>.vertex_count</code> — not fields, and meaningless under indexing. Delete both lines.</li>
+  <li><code>lessBySortKey</code> needs pdq's context param: <code>fn lessBySortKey(_: void, a: DrawCall(Key), b: DrawCall(Key)) bool</code>.</li>
+  <li><code>appendIndices</code> takes <code>[]u16</code> → <code>[]const u16</code> (<code>emitTopology</code> passes a stack array).</li>
+</ul>
+
+<h3><code>src/renderer/tess.zig</code></h3>
+<p><strong>Data types.</strong> <code>Tess(V,K)</code>: <code>batch: *Batch(V,K)</code> → <code>*IndexedBatch(V,K)</code>. <code>tri_key: K</code> dies — the caller owns the key now.</p>
+<p><strong>Functions</strong></p>
+<pre><code>fn emitV(self: Self, p: V2, uv: [2]f32, paint: Paint) !u16
+fn emitIs(self: Self, idxs: []const u16) !void
+fn emitTopology(self: Self, comptime t: Topology, base: u16) !void
+fn emitSegment(self: Self, p0: V2, p1: V2, paint: Paint, hw: f32) !void
+fn fanFill(self: Self, center: V2, rim: []const V2, closed: bool, paint: Paint) !void
+fn rectFill(self: Self, corners: []const V2, paint: Paint) !void
+fn fillStroke(self: Self, rim: []const V2, center: V2, radius: f32, style: DrawStyle, closed: bool) !void
+pub fn tessellate(comptime V, comptime K, batch: *IndexedBatch(V,K),
+    comptime makeVertex: fn([2]f32,[2]f32,[4]f32,u16) V,
+    shape: ShapeData, xf_idx: u16, style: DrawStyle, hw: f32, px_per_unit: f32) !void</code></pre>
+<p><strong>Bugs in shipped code</strong></p>
+<ul>
+  <li><code>emitV</code> hardcodes <code>.{0,0}</code> uv → add the param. Shapes pass <code>.{0,0}</code>; sprites/glyphs pass real corners.</li>
+  <li><code>emitIs</code> — <code>self.batch.indices(idxs)</code> missing <code>try</code>, and the method is being renamed.</li>
+  <li><code>emitSegment</code> — <code>base_vertex = self.batch.vertexMark()</code> is <em>absolute</em>; <code>emitTopology</code> wants <em>shape-relative</em>. Capture the first <code>emitV</code>'s return instead. Also <code>try self.emitV(...)</code> discards the <code>u16</code> → needs <code>_ =</code>.</li>
+  <li><code>rectFill</code> — <code>markVertex()</code> doesn't exist (<code>vertexMark</code>); <code>var ii: []u16 = undefined</code> is an undefined slice, writing to it is UB; same absolute-vs-relative base bug. It only needs the first <code>emitV</code>'s return.</li>
+  <li><code>comptime</code> block — <code>std.meta.tag</code> → <code>std.meta.tags</code>; <code>@compileError(... ++ k)</code> won't compile, <code>k</code> is a <code>usize</code> not a string → <code>comptimePrint</code>.</li>
+  <li><code>topoIndexCount</code> returns <code>.len</code> (usize) as <code>u16</code> → <code>@intCast</code>.</li>
+  <li><code>signedArea</code>/<code>isCounterClockWinding</code> duplicate each other. Keep <code>signedArea</code>.</li>
+</ul>
+<p><strong>Pseudo — <code>fillStroke</code></strong> (the driver; absorbs the skeleton 11 shapes repeat)</p>
+<pre><code>if style.fillColor() |fc|:
+    paint = buildFillPaint(style, fc, center, radius)
+    fanFill(center, rim, closed, paint)
+if style.stroke != null:
+    strokeClosed(rim, style)</code></pre>
+<p><strong>Pseudo — <code>tessellate</code></strong></p>
+<pre><code>ts = Tess{ .base = batch.vertexMark(), ... }   // no tri_key
+switch (shape) → shape method
+// no pushCall — caller brackets with indexMark()</code></pre>
+<p><strong>Shapes.</strong> Each becomes: <code>if (!style.draws()) return;</code> → build rim into stack buf → <code>fillStroke(rim, center, radius, style, closed)</code>. Strip every <code>pushCall</code>, <code>batch.mark()</code>, and inline fan loop.</p>
+<table>
+  <tr><th>fn</th><th class="num">now</th><th class="num">after</th><th>rim source</th></tr>
+  <tr><td class="mono">circle</td><td class="num">33</td><td class="num">~4</td><td><code>unit_rings[bucket]</code> × radius</td></tr>
+  <tr><td class="mono">ellipse</td><td class="num">33</td><td class="num">~5</td><td>LUT × semi_major/semi_minor</td></tr>
+  <tr><td class="mono">nGon</td><td class="num">37</td><td class="num">~5</td><td>n pts @ <code>τ/sides</code></td></tr>
+  <tr><td class="mono">star</td><td class="num">37</td><td class="num">~6</td><td>2n pts alt outer/inner</td></tr>
+  <tr><td class="mono">roundedRect</td><td class="num">49</td><td class="num">~10</td><td>4× <code>arcInto</code></td></tr>
+  <tr><td class="mono">capsule</td><td class="num">74</td><td class="num">~12</td><td>2× <code>arcInto</code></td></tr>
+  <tr><td class="mono">arc wedge</td><td class="num">83</td><td class="num">~8</td><td><code>arcInto</code>, origin at <code>[0]</code>, <code>closed=false</code></td></tr>
+  <tr><td class="mono">arc ring</td><td class="num">↑</td><td class="num">~12</td><td>own path — quad-strip</td></tr>
+  <tr><td class="mono">rect</td><td class="num">30</td><td class="num">~4</td><td><code>rectFill(corners)</code> + <code>strokeClosed</code></td></tr>
+  <tr><td class="mono">tri</td><td class="num">86</td><td class="num">~4</td><td>3× <code>emitV</code> + <code>emitTopology(.tri, base)</code></td></tr>
+  <tr><td class="mono">poly</td><td class="num">22</td><td class="num">~6</td><td>cache tris — raw <code>emitIs</code>, ear-clipper winding isn't CCW</td></tr>
+  <tr><td class="mono">line / polyline</td><td class="num">22</td><td class="num">~6</td><td><code>strokeOpen</code> only</td></tr>
+</table>
+<p><strong>Ring arc.</strong> <code>buf[0..n]</code> outer forward, <code>buf[n..2n]</code> inner <em>reversed</em> (keeps <code>buf[0..2n]</code> a continuous loop for <code>strokeClosed</code>, and pairs <code>outer[i]</code> with <code>buf[2n-1-i]</code> at the same angle). Emit all <code>2n</code> rails once → <code>vidx[]</code>; per quad: <code>{vidx[i], vidx[2n-1-i], vidx[i+1]}</code> + <code>{vidx[i+1], vidx[2n-1-i], vidx[2n-2-i]}</code>.</p>
+
+<h3><code>src/renderer/render_types.zig</code></h3>
+<pre><code>Renderable = struct {
+    shape: ShapeData,
+    transform: ?Transform = null,
+    style: DrawStyle = .{},
+    space: CoordinateSpace = .world,
+    layer: i32 = 0,                    // band + z_order
+    texture: ?*anyopaque = null,       // null ⇒ white texel
+    uv: ?[4][2]f32 = null,             // null ⇒ (0,0)
+}
+// on DrawStyle — kills 11 duplicated guards:
+pub inline fn draws(self: DrawStyle) bool  → fillColor() != null or stroke != null</code></pre>
+
+<h3><code>src/renderer/gpu/metal/metal_types.zig</code></h3>
+<pre><code>DrawKey = struct {
+    prim: MTLPrimitiveType,
+    space: Space,
+    tex: *MTLTexture,        // white texel for solid geometry
+    pub fn eql(a: DrawKey, b: DrawKey) bool
+}
+MTLPixelFormat — add r8Unorm = 10
+MTLIndexType = enum(u64) { uint16 = 0, uint32 = 1 }
+// MetalTextureVertex, TexKey, GeomKey die.
+// makeVertex(pos, uv, color, xform_index) — already correct.</code></pre>
+<p><span class="badge crit">size regression</span> <code>MetalVertex</code> is <strong>28B</strong> (8+8+8+2+2), was 16B. <code>SLOT_BYTES=2MB</code> → 74k verts, was 131k. Indexing claws it back (rect 6→4, circle fan 3w→w+1) but zixelart's 4096-cell grid is the canary — verify at step 6.</p>
+
+<h3><code>metal_bridge.zig</code> + <code>MetalBridge.swift</code></h3>
+<pre><code>extern fn metal_render_encoder_draw_indexed_primitives(
+    encoder, primitive_type: u64, index_count: u64, index_type: u64,
+    index_buffer: *MTLBuffer, index_offset: u64, base_vertex: i64) void
+
+pub fn drawIndexedPrimitives(encoder, prim: MTLPrimitiveType, index_count: u64,
+    index_buf: *MTLBuffer, index_offset: u64, base_vertex: i64) void
+
+pub fn createTexture(device, width: u32, height: u32, format: MTLPixelFormat) !*MTLTexture
+
+// Swift: enc.drawIndexedPrimitives(type:indexCount:indexType:indexBuffer:
+//          indexBufferOffset:instanceCount:1, baseVertex:, baseInstance:0)
+//        metal_create_texture gains pixelFormat: UInt64</code></pre>
+<p><strong>Ripple:</strong> <code>createTexture</code> gains a param → every caller breaks (<code>renderer.zig</code>, <code>TextureManager</code>, zxl frame textures). Pass <code>.rgba8Unorm</code>. <strong>Pre-existing:</strong> <code>setVertexBytes(… index: u46)</code> — typo, should be <code>u64</code>.</p>
+
+<h3><code>src/platform/macos/swift/shaders.metal</code></h3>
 <pre><code>struct LocalXFrom { float2 m0; float2 m1; float2 t; };   // UNCHANGED, 24B
 struct Uniforms   { float2 scale; float2 offset; };       // UNCHANGED (ClipMap)
 struct VertexIn {
@@ -843,323 +956,84 @@ struct VertexIn {
 };
 struct VertexOut { float4 position [[position]]; float2 texcoord; float4 color; };
 
-vertex VertexOut vertex_main(VertexIn in [[stage_in]],
-    constant Uniforms& u [[buffer(1)]], constant LocalXFrom* xforms [[buffer(2)]]) {
-  LocalXFrom xf = xforms[in.xform_index];
-  float2 world = float2(xf.m0.x*in.position.x + xf.m0.y*in.position.y + xf.t.x,
-                        xf.m1.x*in.position.x + xf.m1.y*in.position.y + xf.t.y);
-  float2 clip  = world * u.scale + u.offset;
-  return { float4(clip,0,1), in.texcoord, in.color };
-}
-fragment float4 fragment_main(VertexOut in [[stage_in]], texture2d&lt;float&gt; tex [[texture(0)]]) {
-  constexpr sampler s(mag_filter::nearest, min_filter::nearest);
-  return tex.sample(s, in.texcoord) * in.color;   // white texel ⇒ identity for shapes
-}</code></pre>
+vertex vertex_main(VertexIn, constant Uniforms& u [[buffer(1)]],
+                   constant LocalXFrom* xforms [[buffer(2)]]):
+    xf    = xforms[in.xform_index]
+    world = (xf.m0.x*px + xf.m0.y*py + xf.t.x,  xf.m1.x*px + xf.m1.y*py + xf.t.y)
+    clip  = world * u.scale + u.offset
+    → { float4(clip,0,1), in.texcoord, in.color }
 
-<h4>MetalBridge.swift — EDIT</h4>
-<p>Add one <code>@_cdecl</code>; give <code>metal_create_texture</code> a pixel-format arg (or add <code>_r8</code>). Swift compile is part of <code>zig build</code> on macOS — this is the only FFI surface change in 4a.</p>
-<pre><code>metal_render_encoder_draw_indexed_primitives(
-    encoder, primitiveType:UInt64, indexCount:UInt64,
-    indexType:UInt64,          // 0=uint16, 1=uint32 (MTLIndexType raw)
-    indexBuffer:OpaquePointer, indexBufferOffset:UInt64, baseVertex:Int64)
-  → enc.drawIndexedPrimitives(type:, indexCount:, indexType:, indexBuffer:,
-        indexBufferOffset:, instanceCount:1, baseVertex:, baseInstance:0)
-// metal_create_texture gains pixelFormat:UInt64; .rgba8Unorm literal
-// → MTLPixelFormat(rawValue:) ?? .rgba8Unorm  (R8Unorm=10 for SDF atlas)</code></pre>
+fragment fragment_main(VertexOut, texture2d&lt;float&gt; tex [[texture(0)]]):
+    → tex.sample(s, in.texcoord) * in.color      // white texel ⇒ identity for shapes
 
-<h4>metal_bridge.zig — EDIT</h4>
-<pre><code>extern fn metal_render_encoder_draw_indexed_primitives(
-    encoder:*MTLRenderCommandEncoder, primitive_type:u64, index_count:u64,
-    index_type:u64, index_buffer:*MTLBuffer, index_offset:u64, base_vertex:i64) void;
+// texture_vertex_main / texture_fragment_main DIE.</code></pre>
 
-pub fn drawIndexedPrimitives(encoder:*MTLRenderCommandEncoder, prim:MTLPrimitiveType,
-    index_count:u64, index_buf:*MTLBuffer, index_offset:u64, base_vertex:i64) void
-  → metal_render_encoder_draw_indexed_primitives(encoder, @intFromEnum(prim),
-        index_count, 0 /*uint16*/, index_buf, index_offset, base_vertex);
-
-pub fn createTexture(device:*MTLDevice, width:u32, height:u32, format:MTLPixelFormat) !*MTLTexture
-// add r8Unorm = 10 to MTLPixelFormat in metal_types.zig</code></pre>
-
-<h4>metal_types.zig — EDIT</h4>
-<pre><code>pub const MetalVertex = extern struct {
-    position: [2]f32,   // LOCAL coords (GPU applies xform+clip)
-    texcoord: [2]f32,   // (0,0) shapes; real uv sprites/SDF glyphs
-    color:    [4]f16,   // LINEAR
-    xform_index: u16,
-    _pad: u16 = 0,
-};                       // 24B. MetalTextureVertex DELETED.
-
-pub const Space = enum(u8) { world, screen };
-
-// GeomKey + TexKey collapse. tex lets shapes (white tex) coalesce together and
-// sprites coalesce per-texture; space selects ClipMap. Ordering rides sort_key on
-// the DrawCall (batch.zig), NOT the key.
-pub const DrawKey = struct {
-    prim: MTLPrimitiveType, space: Space, tex: *MTLTexture,
-    pub fn eql(a:DrawKey, b:DrawKey) bool
-      → a.prim==b.prim and a.space==b.space and a.tex==b.tex;
-};
-pub fn makeVertex(pos:[2]f32, uv:[2]f32, color:[4]f32, xform_index:u16) MetalVertex</code></pre>
-
-<h4>batch.zig — REWRITE</h4>
-<pre><code>pub fn DrawCall(comptime Key:type) type = struct {
-    key: Key,
-    sort_key: u64,      // (band+z)&lt;&lt;32 | submission_seq — set at push
-    index_start: u32,   // into indices
-    index_count: u32,
-    base_vertex: u32,   // added to each index by the GPU (baseVertex draw arg)
-};
-pub fn IndexedBatch(comptime Vertex:type, comptime Key:type) type = struct {
-    vertices:   std.ArrayList(Vertex),
-    indices:    std.ArrayList(u16),
-    draw_calls: std.ArrayList(DrawCall(Key)),
-    persistent: Allocator,
-
-    pub fn init(gpa:Allocator) Self
-    pub fn deinit(self:*Self) void
-    pub fn clear(self:*Self) void            // clearRetainingCapacity all three
-    pub fn vertexMark(self:*const Self) u32  // vertices.len (== base for next shape)
-    pub fn indexMark(self:*const Self) u32   // indices.len
-    pub fn vertex(self:*Self, v:Vertex) !void
-    pub fn index(self:*Self, i:u16) !void
-    // One draw call per shape. base = vertexMark before the shape emitted, so its
-    // local indices (0..n) are baseVertex-relative. NO merge here.
-    pub fn pushIndexed(self:*Self, key:Key, sort_key:u64,
-                       index_start:u32, index_count:u32, base_vertex:u32) !void
-    // Stable pdq sort by sort_key; called once at flush before the walk.
-    pub fn sortCalls(self:*Self) void
-};</code></pre>
-<p><span class="badge dec">tradeoff</span> With indexed draws + per-shape <code>base_vertex</code>, adjacent same-key calls can't be trivially merged into one <code>drawIndexedPrimitives</code> unless their index ranges are contiguous <em>and</em> share a base. <strong>4a: one indexed draw per DrawCall</strong>, rely on the sort to cluster same-key runs so pipeline/texture/ClipMap <em>rebinds</em> (the real cost) stay rare. Merging contiguous same-base runs is a P5 micro-opt — leave a <code>// TODO</code>. Indexing buys vertex-sharing now; draw-call merging is separable.</p>
-
-<h4>tess.zig — EDIT</h4>
-<p><strong>Today (grounded in the code):</strong> every fill emits a <em>fully-expanded triangle list</em> — no vertex sharing. A circle fan emits <code>3·w</code> verts (re-emitting <code>origin</code> per triangle); <code>rect</code> emits 6 (two corners duplicated); <code>emitSegment</code> emits 6 per edge. <code>Paint.at(local_p)</code> computes gradient color <em>per emitted vertex from its position</em>, so two verts at the same position get the same color — <strong>this is why dedup is color-safe</strong>. <code>poly</code> fills from a precomputed <code>p.triangle_cache</code>.</p>
-<p><strong>The whole rewrite is two primitives, and every shape is a combination of them:</strong> <code>emitV</code> (one unique vertex → its base-relative index) and <code>emitI</code> (push a run of connectivity indices). Fan/ring loops fill a stack index-scratch and flush it with one <code>emitI</code> (mirroring how the vertex side already fills a <code>pts:[MAX_SEG]V2</code> scratch); quad/segment push a static run directly. No convenience wrappers — <code>emitV</code> + <code>emitI</code> compose everything.</p>
-<pre><code>// ── Tess(V,K) field changes ──
-makeVertex: *const fn ([2]f32, [2]f32, [4]f32, u16) V,   // + uv arg (shapes pass (0,0))
-base: u32,   // = batch.vertexMark() at Tess construction → makes emitV indices base-relative
-
-// ── the two primitives ──
-fn emitV(self: Self, p: V2, paint: Paint) !u16 {        // vertex → base-relative index
-    const idx: u16 = @intCast(self.batch.vertexMark() - self.base);
-    try self.batch.vertex(self.makeVertex(.{p.x,p.y}, .{0,0}, paint.at(p), self.xform_index));
-    return idx;
-}
-fn emitI(self: Self, idx: []const u16) !void {          // index run → batch
-    for (idx) |i| try self.batch.index(i);
-}</code></pre>
-
-<p>The ~12 shapes collapse into <strong>5 emission patterns</strong>. Rewrite the shared helpers; each shape calls them.</p>
-
-<h4>tess.zig — fixed topologies: <code>Topo</code> enum + comptime winding guard</h4>
-<p>The <em>fixed</em>-size topologies (quad, strip, raw tri) get a comptime table of <code>base</code>-relative index runs. The table's real job isn't typo-proofing 3 obvious constants — it's <strong>freezing a winding convention (CCW) across every topology before back-face culling exists to punish inconsistency.</strong> <span class="badge crit">confirmed 2026-07-15</span> there is NO cull/winding state anywhere in the Metal path today (Metal default = no culling), so winding is invisible <em>now</em> — which is exactly why locking it while nothing punishes a wrong choice is the right moment. Flip <code>cullMode=.back</code> in Phase 5 and everything already agrees, or the build already failed. Parametric patterns (fan, ring) can't join the table but bind to the <em>same</em> convention via a shared <code>signedArea</code> formula + a one-shot debug assert.</p>
-<pre><code>const Topo = enum { tri, quad, strip };
-
-// Offset patterns RELATIVE to a primitive's first vertex; emitTopo adds `base`.
-// CONVENTION: every triangle is wound CCW — the guard below enforces it.
-const topo_table = struct {
-    const tri:   []const u16 = &.{ 0, 1, 2 };
-    const quad:  []const u16 = &.{ 0, 1, 2,  0, 2, 3 };   // 4 verts CCW
-    const strip: []const u16 = &.{ 0, 1, 2,  2, 1, 3 };   // 4 verts, 2 tris share edge 1-2
-};
-fn topoRun(comptime t: Topo) []const u16
-  → switch: .tri→tri, .quad→quad, .strip→strip;
-fn topoVerts(comptime t: Topo) u16
-  → switch: .tri→3, .quad→4, .strip→4;
-
-// Canonical CCW reference positions so the guard can verify the runs actually
-// produce CCW triangles (mirrors how shapes emit: quad corners CCW from bottom-left).
-fn topoRef(comptime t: Topo) []const V2
-  → .tri:   {(0,0),(1,0),(0,1)}
-    .quad:  {(0,0),(1,0),(1,1),(0,1)}
-    .strip: {(0,0),(1,0),(0,1),(1,1)}
-
-fn signedArea(a: V2, b: V2, c: V2) f32          // shared by guard AND fan/ring asserts
-  → (b.x-a.x)*(c.y-a.y) - (b.y-a.y)*(c.x-a.x);  // >0 == CCW
-
-comptime {
-    for (std.meta.tags(Topo)) |t| {
-        const run = topoRun(t); const ref = topoRef(t);
-        if (run.len % 3 != 0)        @compileError(@tagName(t) ++ ": indices not multiple of 3");
-        if (ref.len != topoVerts(t)) @compileError(@tagName(t) ++ ": ref count != topoVerts");
-        var k: usize = 0;
-        while (k < run.len) : (k += 3)
-            if (signedArea(ref[run[k]], ref[run[k+1]], ref[run[k+2]]) <= 0)
-                @compileError(@tagName(t) ++ ": triangle at " ++
-                    comptimePrint("{d}", .{k}) ++ " is not CCW");
-    }
-}
-
-fn emitTopo(self: Self, comptime t: Topo, base: u16) !void {
-    var ii: [topoRun(t).len]u16 = undefined;    // comptime-sized, stack
-    inline for (topoRun(t), 0..) |off, k| ii[k] = base + off;
-    try self.emitI(&ii);
-}</code></pre>
-<p>Typo <code>.quad = {0,1,2, 0,3,2}</code> (flipped winding) → build fails with <code>quad: triangle at 3 is not CCW</code>. The guard catches the invisible bug the day it's written, not the day culling exposes it. <strong>Precondition on <code>emitTopo</code>:</strong> the <code>topoVerts(t)</code> verts must have been emitted <em>contiguously</em> from <code>base</code> (true because <code>emitV</code> appends sequentially — don't interleave another shape's <code>emitV</code> between them; a debug <code>assert(vertexMark()-self.base == base + topoVerts(t))</code> catches it).</p>
-
-<p><span class="badge dec">Pattern 1 — fan fill</span> circle, ellipse, nGon, star, capsule, roundedRect, wedge-arc (thickness 0). <code>3w</code> verts → <code>w+1</code> verts + <code>3w</code> indices. This is the <code>fanFill</code> extract the plan already flagged as deferred — it lands here and the (now 7) duplicated fan loops collapse into it.</p>
-<pre><code>fn fanFill(self: Self, center: V2, rim: []const V2, closed: bool, paint: Paint) !void {
-    var vi: [MAX_SEG + 1]u16 = undefined;               // vertex-index scratch
-    var ii: [3 * MAX_SEG]u16 = undefined;               // index scratch (mirrors pts[] on vert side)
-    var k: usize = 0;
-    const c = try self.emitV(center, paint);
-    for (rim, 0..) |p, i| vi[i] = try self.emitV(p, paint);
-    const w = rim.len;
-    const last = if (closed) w else w - 1;              // closed wraps i→(i+1)%w
-    for (0..last) |i| {
-        const j = (i + 1) % w;
-        ii[k] = c; ii[k+1] = vi[i]; ii[k+2] = vi[j]; k += 3;
-    }
-    try self.emitI(ii[0..k]);
-}
-// circle/ellipse/nGon/star/capsule/roundedRect: build `rim` into the stack buf exactly
-//   as today, then ONE call: try self.fanFill(center, rim, true, paint);
-// wedge-arc (thickness==0): fanFill(origin, arc_points, false, paint)  — open, no wrap.
-// WINDING: tris are {center, rim[i], rim[i+1]} — CCW iff rim is traversed CCW.
-//   unit_rings is CCW by construction. One-shot debug assert binds it to the .quad/.strip
-//   convention:  std.debug.assert(signedArea(center, rim[0], rim[1]) > 0);</code></pre>
-
-<p><span class="badge dec">Pattern 2 — quad fill</span> rect (also sprite quad + SDF glyph quad in 4b). 6 verts → 4 verts + 6 indices. Emit the 4 corners contiguously, then <code>emitTopo(.quad, base)</code> — no inline run, winding guaranteed by the guarded table.</p>
-<pre><code>const b = try self.emitV(corners[0], paint);   // base = first corner's index
-_ = try self.emitV(corners[1], paint);
-_ = try self.emitV(corners[2], paint);
-_ = try self.emitV(corners[3], paint);
-try self.emitTopo(.quad, b);                    // {b,b+1,b+2, b,b+2,b+3} from the table
-// corners must be CCW (rect.getCorners already is) to match the .quad convention.</code></pre>
-
-<p><span class="badge dec">Pattern 3 — ring quad-strip</span> thick arc (<code>thickness &gt; 0</code>). <code>6(n−1)</code> verts → <code>2n</code> verts + <code>6(n−1)</code> indices. <strong>The buffer layout is load-bearing and unchanged:</strong> <code>buf[0..n]</code> is the outer arc forward (<code>start→end</code>); <code>buf[n..2n]</code> is the inner arc written <em>reversed</em> (<code>end→start</code>) so <code>buf[0..2n]</code> is one continuous perimeter loop (what <code>strokeClosed</code> needs). Today's fill re-emits 6 verts per quad, pairing <code>outer[i]=buf[i]</code> with <code>inner[i]=buf[2n-1-i]</code> — reaching into the reversed inner tail so <code>inner[i]</code> sits at the <em>same angle</em> as <code>outer[i]</code>. Indexed version: emit all <code>2n</code> rail verts ONCE in <code>buf</code> order, capture each index, then reuse the identical <code>2n-1-i</code> pairing over captured indices.</p>
-<pre><code>const n = arcSegs(r_out, sweep, self.px_per_unit);
-var buf: [2 * MAX_SEG]V2 = undefined;
-arcInto(buf[0..], a.origin, r_out, a.start_angle, a.end_angle, n);   // outer, forward
-arcInto(buf[n..], a.origin, r_in,  a.end_angle, a.start_angle, n);   // inner, REVERSED
-
-if (style.fillColor()) |fc| {
-    const paint = self.buildFillPaint(style, fc, a.origin, r_out);
-
-    // 1. emit every rail vertex ONCE, in buf order; keep its index. vidx[j] is the
-    //    index of buf[j], so the reversed-inner pairing carries straight over.
-    var vidx: [2 * MAX_SEG]u16 = undefined;
-    for (0..2 * n) |j| vidx[j] = try self.emitV(buf[j], paint);
-
-    // 2. two triangles per quad, SAME pairing as the old emit loop:
-    //    outer0=vidx[i]  outer1=vidx[i+1]  inner0=vidx[2n-1-i]  inner1=vidx[2n-2-i]
-    var ii: [6 * MAX_SEG]u16 = undefined;                 // index scratch
-    var k: usize = 0;
-    for (0..n - 1) |i| {
-        const outer0 = vidx[i];
-        const outer1 = vidx[i + 1];
-        const inner0 = vidx[2 * n - 1 - i];
-        const inner1 = vidx[2 * n - 2 - i];
-        ii[k] = outer0; ii[k+1] = inner0; ii[k+2] = outer1;    // tri A (was emit outer0,inner0,outer1)
-        ii[k+3] = outer1; ii[k+4] = inner0; ii[k+5] = inner1;  // tri B (was emit outer1,inner0,inner1)
-        k += 6;
-    }
-    try self.emitI(ii[0..k]);
-}
-if (style.stroke) |_| try self.strokeClosed(buf[0 .. 2 * n], style);   // UNCHANGED — one loop</code></pre>
-<p><span class="badge crit">the bug that bit before</span> the inner arc MUST be written to <code>buf[n..]</code> (not <code>buf[2*n..]</code>) and REVERSED — that's what makes <code>vidx[2n-1-i]</code> the same-angle inner partner of <code>vidx[i]</code> and keeps <code>buf[0..2n]</code> a valid stroke loop. Winding of tri A/B is preserved verbatim from the working emit order, so front-face culling (if ever enabled) can't regress.</p>
-
-<p><span class="badge dec">Pattern 4 — cache-list fill</span> poly. <strong>4a keeps poly expanded</strong> (ear-clipped triangulation has little to share): emit each cache triangle's 3 verts, index them. Cross-edge dedup via a position→index map is <code>// TODO</code> — poly earns dedup least and costs a hash map. <strong>Uses raw <code>emitI(&amp;.{a,b,c})</code>, NOT <code>emitTopo(.tri)</code></strong> — the ear-clipper's triangle winding isn't guaranteed CCW, so poly is (like strokes) outside the CCW convention and must not be back-face culled.</p>
-<pre><code>for (cache) |t| {
-    const a = try self.emitV(t[0], paint); const b = try self.emitV(t[1], paint);
-    const c = try self.emitV(t[2], paint); try self.emitI(&.{ a, b, c });
-}</code></pre>
-
-<p><span class="badge crit">Pattern 5 — stroke</span> strokeClosed / strokeOpen → emitSegment. <strong>The one place vertex-sharing is limited</strong> — <code>emitSegment</code> computes corners <code>a,b,e,f</code> from <em>that edge's own normal</em> (butt joins), so a shared endpoint yields <em>different</em> corners per edge; adjacent edges do <strong>not</strong> share verts. Win is 6→4 <em>within</em> a segment only; that's the honest ceiling. No cross-segment dedup.</p>
-<pre><code>fn emitSegment(self: Self, p0: V2, p1: V2, paint: Paint, hw: f32) !void {
-    ... compute a,b,e,f from this edge's normal as today ...
-    // emit contiguously in strip-ref order (a,b,e,f) → emitTopo(.strip, base).
-    const base = try self.emitV(a, paint);
-    _ = try self.emitV(b, paint);
-    _ = try self.emitV(e, paint);
-    _ = try self.emitV(f, paint);
-    try self.emitTopo(.strip, base);            // {base, +1,+2, +2,+1,+3} from the table
-}
-// strokeClosed/strokeOpen: loop edges calling emitSegment — UNCHANGED except they no
-//   longer call pushCall (the caller does it; see below).</code></pre>
-<p><span class="badge crit">winding caveat</span> a butt-join strip's CCW-ness flips with edge direction (<code>dir = p1-p0</code>), so the <em>fixed</em> <code>.strip</code> table can't guarantee CCW for every segment the way <code>.quad</code> can for a rect. Two honest resolutions — pick at impl: <strong>(a)</strong> keep <code>.strip</code> as the shared run and accept that stroke winding is direction-dependent (fine as long as culling stays OFF for the stroke draws, or strokes are excluded from back-face culling — they're thin quads, culling buys little); <strong>(b)</strong> order the 4 emitted corners by the sign of the edge normal so the strip is always CCW, then the guard covers strokes too. Lean (a): don't cull strokes. Note it where <code>cullMode</code> gets set in Phase 5.</p>
-
-<h4>tess.zig — who pushes the draw call (moved OUT of shape methods)</h4>
-<p>Today each method ends with <code>self.batch.pushCall(tri_key, start, count)</code>. Under indexing the draw call needs <code>index_start</code>/<code>index_count</code>/<code>base_vertex</code> <em>and</em> the caller's <code>sort_key</code> — which the shape method doesn't know (layer lives at the <code>render()</code> site). So:</p>
-<ul>
-  <li><strong>Remove every <code>pushCall(...)</code> from the shape methods.</strong> They only emit verts + indices now.</li>
-  <li><code>tessellate()</code> sets <code>Tess.base = batch.vertexMark()</code>, dispatches, and the <strong>caller</strong> brackets with <code>indexMark()</code> to build the one <code>pushIndexed(key, sort_key, i0, i_count, base)</code>.</li>
-  <li><strong>Fill+stroke shapes:</strong> today they push <em>two</em> draw calls (fill tris, then stroke tris, same key). Now they become <em>one</em> — fill indices then stroke indices are contiguous under one <code>base</code>, sharing the shape's <code>LocalXform</code> + key. <span class="ok-inline">Simpler than today, not harder.</span></li>
-</ul>
-<pre><code>pub fn tessellate(comptime V, comptime K, batch:*IndexedBatch(V,K),
-    comptime makeVertex:fn([2]f32,[2]f32,[4]f32,u16)V,
-    shape:ShapeData, xf_idx:u16, style:DrawStyle, hw:f32, px_per_unit:f32) !void
-// drops tri_key. Sets Tess.base = batch.vertexMark(); dispatches to the shape method
-// (emit-only). Caller reads indexMark() before/after → builds the DrawCall.</code></pre>
-
-<h4>tess.zig — vertex-count deltas (verification numbers)</h4>
-<table>
-  <tr><th>Shape</th><th>before (verts)</th><th>after (verts / indices)</th></tr>
-  <tr><td>circle / nGon fan (w segs)</td><td class="mono">3w</td><td class="mono">w+1 / 3w</td></tr>
-  <tr><td>rect fill</td><td class="mono">6</td><td class="mono">4 / 6</td></tr>
-  <tr><td>stroke edge (each)</td><td class="mono">6</td><td class="mono">4 / 6</td></tr>
-  <tr><td>thick-arc ring (n)</td><td class="mono">6(n−1)</td><td class="mono">2n / 6(n−1)</td></tr>
-  <tr><td>poly (t tris)</td><td class="mono">3t</td><td class="mono">3t / 3t (dedup deferred)</td></tr>
-</table>
-<p>Log vert/index counts for a known scene (e.g. one circle at a fixed radius) and check against the table.</p>
-
-<h4>render_types.zig — EDIT</h4>
-<pre><code>pub const Renderable = struct {
-    shape:     ShapeData,
-    transform: ?Transform = null,
-    style:     DrawStyle = .{},
-    space:     CoordinateSpace = .world,
-    layer:     i32 = 0,                 // NEW: band+z_order, computed by producer
-    texture:   ?*anyopaque = null,      // NEW: null ⇒ white texel; sprites set it
-    uv:        ?[4][2]f32 = null,       // NEW: null ⇒ derived (0,0); quads carry corners
-};
-// 4a: layer used immediately (shapes/text/debug). texture/uv are the 4b conduit —
-// sprites still enter via drawTextureQuad (now writing the ONE batch) until 4b.</code></pre>
-
-<h4>MetalRenderer.zig — REWRITE (render + flush)</h4>
-<pre><code>// Fields (delta):
-batch: IndexedBatch(MetalVertex, DrawKey),   // was two batches
-vertex_buffers: [3]*MTLBuffer,               // one geom ring
-index_buffers:  [3]*MTLBuffer,               // NEW ring
-xform_buffers:  [3]*MTLBuffer,               // unchanged
-white_texture:  *MTLTexture,                 // 1×1 opaque white, created init
-submission_seq: u32,                         // per-frame monotonic tiebreaker
-// texture_pipeline_state / texture_batch / texture_vertex_buffers → DELETED
-
-// render(r, ctx) — the ONE ingest (shapes/text/debug/sprites):
-xform_index = if (r.transform==null) 0 else append LocalXform.from(r.transform)
-is_screen   = r.space==.screen; update clip_world/clip_screen from ctx (unchanged rule)
-tex  = @ptrCast(r.texture) orelse self.white_texture
-base = batch.vertexMark();  i0 = batch.indexMark()
-tess.tessellate(MetalVertex, DrawKey, &batch, makeVertex, r.shape, xform_index,
-                r.style, hw, px_per_unit)
-i_count  = batch.indexMark() - i0
-key      = .{ .prim=.triangle, .space = if(is_screen).screen else .world, .tex=tex }
-sort_key = (@as(u64,@bitCast(@as(i64,r.layer))) &lt;&lt; 32) | submission_seq
+<h3><code>src/renderer/gpu/metal/MetalRenderer.zig</code></h3>
+<p><strong>Data types (delta)</strong></p>
+<pre><code>batch: IndexedBatch(MetalVertex, DrawKey)
+vertex_buffers: [3]*MTLBuffer
+index_buffers:  [3]*MTLBuffer     // NEW
+xform_buffers:  [3]*MTLBuffer
+white_texture:  *MTLTexture       // 1×1 opaque white, init
+submission_seq: u32
+// dead: texture_batch, texture_pipeline_state, texture_vertex_buffers,
+//       flushGeometryBatch, flushTextureBatch, addSprite</code></pre>
+<p><strong>Pseudo — <code>render(r, ctx)</code></strong></p>
+<pre><code>xform_index = if (r.transform == null) 0 else append LocalXform.from(r.transform)
+is_screen = r.space == .screen
+update clip_screen or clip_world from ctx     // ONLY its own — clobber bug
+tex  = if (r.texture) |t| @ptrCast(t) else self.white_texture
+base = batch.vertexMark()
+i0   = batch.indexMark()
+tessellate(MetalVertex, DrawKey, &batch, makeVertex, r.shape, xform_index,
+           r.style, hw, px_per_unit)
+key      = .{ .prim = .triangle, .space = …, .tex = tex }
+sort_key = (@as(u64, @bitCast(@as(i64, r.layer))) &lt;&lt; 32) | submission_seq
 submission_seq += 1
-batch.pushIndexed(key, sort_key, i0, i_count, base)
-
-// flushOrdered(enc, idx) — replaces flushGeometryBatch + flushTextureBatch:
-memcpy verts / indices / xforms → ring[idx]   (overflow-clamp+log each; keep loud xform log)
-setPipelineState(enc, pipeline_state)          // ONCE
-setVertexBuffer(enc, vertex_buffers[idx], 0, 0); setVertexBuffer(xform_buffers[idx], 0, 2)
+batch.pushIndexed(key, sort_key, i0, batch.indexMark() - i0, base)</code></pre>
+<p><strong>Pseudo — <code>flushOrdered(enc, idx)</code></strong></p>
+<pre><code>memcpy vertices → vbuf[idx]   (clamp + log)
+memcpy idxs     → ibuf[idx]   (clamp + log)
+memcpy xforms   → xbuf[idx]   (clamp + LOUD log — silent clamp caused the flicker)
+setPipelineState(pipeline_state)              // ONCE
+setVertexBuffer(vbuf[idx], 0, 0)
+setVertexBuffer(xbuf[idx], 0, 2)
 batch.sortCalls()
-cur_tex=null; cur_space=null
-for calls |c| {
-    if bounds exceed copied → break
-    if cur_space != c.key.space { setVertexBytes(map, 1); cur_space = c.key.space }
-    if cur_tex   != c.key.tex   { setFragmentTexture(c.key.tex, 0); cur_tex = c.key.tex }
-    drawIndexedPrimitives(enc, .triangle, c.index_count,
-        index_buffers[idx], c.index_start*2, @intCast(c.base_vertex))
-}
-// beginFrame: batch.clear(); xforms→[identity]; submission_seq=0; frame_index+%=1
-// drawTextureQuad (4a-transitional): stop CPU-baking — emit 4 local verts + uv +
-//   6 indices, append a real LocalXform, tex=texture, layer param. Dies in 4b.</code></pre>
+cur_tex = null; cur_space = null
+for calls |c|:
+    if c.index_start + c.index_count > copied_indices: break
+    if cur_space != c.key.space: setVertexBytes(map_for(c.key.space), 1); cur_space = …
+    if cur_tex   != c.key.tex:   setFragmentTexture(c.key.tex, 0); cur_tex = …
+    drawIndexedPrimitives(enc, .triangle, c.index_count, ibuf[idx],
+                          c.index_start * 2, c.base_vertex)</code></pre>
+<p><strong><code>beginFrame</code></strong> — <code>batch.clear()</code>; xforms → <code>[identity]</code>; <code>submission_seq = 0</code>; <code>frame_index +%= 1</code>.</p>
+<p><strong><code>drawTextureQuad</code></strong> — 4 local verts + real uv + real <code>LocalXform</code>, <code>tex = texture</code>, <code>layer</code> param → the one batch. (Dies in 4b.)</p>
 
-<h4>RenderSys.zig / DebugRenderer.zig — EDIT</h4>
-<pre><code>fn layerFor(world, entity, base_band:i32) i32
-  → base_band + (world.getComponent(entity, RenderLayer)?.z_order orelse 0)
-// world shapes/text/zxl: layerFor(entity, 0)   ·   UI queries: layerFor(entity, 2000)
-// DebugRenderer: every render()/drawText call sets .layer = 1000 (debug band)</code></pre>
+<h3><code>systems/RenderSys.zig</code> + <code>debug/DebugRenderer.zig</code></h3>
+<pre><code>fn layerFor(world, entity, band: i32) i32
+    → band + (getComponent(entity, RenderLayer)?.z_order orelse 0)
+
+// world shapes/text/zxl: band 0    ·    UI queries: band 2000
+// DebugRenderer: .layer = 1000 on every render()/drawText call</code></pre>
+
+<h3>Order</h3>
+<ol>
+  <li><code>batch.zig</code> compile fixes</li>
+  <li><code>tess.zig</code> — uv param, base bugs, comptime block, <code>fillStroke</code>, shapes</li>
+  <li>shader + bridge + Swift (indexed draw, texture format)</li>
+  <li><code>MetalRenderer</code> — one batch, one flush</li>
+  <li>sprites through <code>render()</code> — <strong class="ok-inline">S7 dies, z_order works</strong></li>
+  <li>zixelart — confirm 28B vertex + indexing nets under <code>SLOT_BYTES</code></li>
+</ol>
+
+<h3>Verification</h3>
+<ol>
+  <li>ZxlSprite <code>z_order=-1</code> renders under a shape at z 0</li>
+  <li>Debug draws over world sprites</li>
+  <li>UI panel over world sprite</li>
+  <li>Pong unchanged, 1 pipeline bind/frame</li>
+  <li>zixelart no overflow</li>
+</ol>
 </section>
 
 <!-- ===================================================== -->
@@ -1269,8 +1143,9 @@ return float4(in.color.rgb, in.color.a * alpha);
 <ul>
   <li><strong>Culling (P6):</strong> camera AABB vs. conservative shape AABB before tessellation. <code>Polygon</code>/<code>Polyline</code> cache bounds at init; circles/rects derive trivially. UI band never culled. ~Day of work, gated on actually building scenes larger than the screen.</li>
   <li><strong>Texture atlas (P3's other half):</strong> TextureManager shelf-packs all frames of a Zxl asset into one texture at load; frames become UV rects, animation stops breaking batches. Pixel-art frames are small — a 1024² atlas holds hundreds.</li>
-  <li><strong>Indexed drawing:</strong> ring of index buffers + <code>drawIndexedPrimitives</code> bridge fn. Rect 6→4 verts, circle fan 96→33. Worth it only if vertex volume shows up in stats.</li>
-  <li><strong>Glyph atlas for small text:</strong> only if profiling shows CPU tessellation cost on text-heavy UI. Vector text is a genuine feature (crisp at any zoom) — keep it as the default and for large sizes.</li>
+  <li><strong>Indexed drawing</strong> — <span class="badge dec">MOVED to <a href="#phase4a">4a</a></span> pulled forward: index-buffer ring + <code>drawIndexedPrimitives</code> land in 4a (the ordered flush needs the seam anyway). Remaining P5 slice: <em>merging contiguous same-base runs</em> into one indexed draw (4a does one draw per tessellate).</li>
+  <li><strong>Glyph atlas for small text</strong> — <span class="badge dec">SUPERSEDED by <a href="#phase4b">4b</a></span> 4b goes further: SDF atlas, not a coverage atlas, and it becomes the DEFAULT text path (not a small-text special case). The "vector text crisp at any zoom" argument is what SDF preserves — one cached texture, sharp at any scale. Vector-triangle glyphs die.</li>
+  <li><strong>Back-face culling:</strong> <code>cullMode=.back</code>, front-face CCW. 4a's comptime winding guard already froze the convention for the fixed topologies + fan/ring. <strong>Must exclude poly</strong> (ear-clipper winding) <strong>and strokes</strong> (butt-join winding flips with edge direction) — see 4a's <code>emitTopology</code> note.</li>
   <li><strong>Vulkan parity:</strong> the tessellator + ordered stream are backend-agnostic by construction; the Vulkan backend (currently a 276-line skeleton) implements the same ring-buffer flush against the existing swapchain plan docs. Explicitly out of scope until the Metal path proves the interfaces.</li>
 </ul>
 </section>
@@ -1281,8 +1156,8 @@ return float4(in.color.rgb, in.color.a * alpha);
 <table>
   <tr><th>#</th><th>Decision</th><th>Rationale</th><th>Rejected alternative</th></tr>
   <tr><td>D1</td><td><strong>Triangles-only geometry; strokes tessellated as quads</strong> (Phase 2)</td><td>Makes <code>stroke_width</code> real; one primitive type = maximal merging; Metal can't widen lines and Vulkan wide-lines is optional, so this is also the portability play.</td><td>Keep line primitives + accept 1px strokes; SDF-only strokes (more shader work, doesn't cover polylines).</td></tr>
-  <tr><td>D2</td><td><strong>CPU does local transform, GPU does camera→clip via per-run <code>ClipMap</code> uniform</strong> (Phase 2)</td><td>Halves per-vertex CPU math, kills per-vertex sin/cos, keeps the batch dead simple (no per-shape uniforms or instancing needed at this scale).</td><td>Full GPU path (per-shape matrices via instancing) — overkill for 2D shape counts; all-CPU status quo — wastes the vertex shader entirely.</td></tr>
-  <tr><td>D3</td><td><strong>Keep two pipelines (geometry, texture); fix ordering by sorting</strong> (Phase 4)</td><td>Sort-then-batch reduces pipeline switches to a handful per frame; avoids forcing UV+texture reads onto every solid pixel.</td><td>Single unified pipeline + white texture — classic and simple, kept as the documented escape hatch if counters disagree.</td></tr>
+  <tr><td>D2</td><td><s>CPU does local transform, GPU does camera→clip</s> → <strong class="warn-inline">REVERSED 2026-07-13 (GPU-transform staircase, SHIPPED):</strong> <strong>GPU does ALL of it</strong> — <code>LocalXform</code> via per-vertex <code>xform_index</code> + transform buffer, then <code>ClipMap</code></td><td>Vertices leave tess in LOCAL coords; shader does <code>ClipMap(xform_buf[idx] · localPos)</code>. Coalescing SURVIVES — every vertex self-identifies, so one draw call spans many shapes+transforms. The "rejected" full-GPU path was right after all; the batch-simplicity worry was paid honestly via <code>GeomKey.space</code> + per-draw-call ClipMap binds. 4a extends it to sprites (last CPU-baked holdout).</td><td>The original call (CPU local transform) — it wasted the vertex shader and forced a CPU matrix multiply per vertex.</td></tr>
+  <tr><td>D3</td><td><s>Keep two pipelines (geometry, texture); fix ordering by sorting</s> → <strong class="warn-inline">REVERSED 2026-07-15:</strong> <strong>single unified pipeline + 1×1 white texture</strong> (<a href="#phase4a">4a</a>)</td><td>The escape hatch became the default. Ordering <em>disappears</em> instead of being managed: one vertex format, one buffer, one draw-call list, zero pipeline switches forever. Also kills the two-of-everything seam (2 vertex types, 2 pipelines, 2 shaders, 2 flushes). Cost accepted: solid geometry carries uv + samples a cached 1×1 texel — negligible on TBDR.</td><td>The original call (keep 2 pipelines, sort-then-batch) — it managed the switch cost instead of eliminating it, and left the duplication in place.</td></tr>
   <tr><td>D4</td><td><strong>MSAA 4× default-on, configurable</strong> (Phase 3)</td><td>Near-free on Apple TBDR; biggest visual-quality lever for tessellated edges and vector text; zero content changes.</td><td>SDF everything (big rewrite); post-process AA (worse quality, more work).</td></tr>
   <tr><td>D5</td><td><strong>Rounded rect &amp; friends via tessellation now; SDF later as targeted upgrade</strong></td><td>One mechanism for every shape including polylines/stars; resolution handled by adaptive segments + MSAA; SDF can later replace circle/rrect/ring fills for zoom-proof edges without API change.</td><td>SDF-first for rounded shapes — prettier at extreme zoom but splits the pipeline in two mechanisms on day one.</td></tr>
   <tr><td>D6</td><td><strong>Straight (non-premultiplied) alpha everywhere</strong> (Phase 0)</td><td>Matches the existing texture pipeline; one consistent rule; teaching-friendly.</td><td>Premultiplied — technically better for atlas filtering; revisit alongside the Phase 5 atlas work where it actually matters.</td></tr>

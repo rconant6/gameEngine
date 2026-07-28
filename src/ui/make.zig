@@ -47,7 +47,7 @@ fn alloc(arena: Allocator, widget_data: anytype) *WidgetNode {
 }
 
 const LabelOpts = struct {
-    font: ?*Font = null,
+    font: ?*const Font = null, // measure-only; never mutated
     font_scale: f32 = 24.0,
     color: Color = Colors.WHITE,
 };

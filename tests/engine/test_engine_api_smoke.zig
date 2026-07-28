@@ -44,6 +44,7 @@ const api = [_][]const u8{
     "findEntitiesByTag", "findEntitiesByPattern", "clearEntitiesByTag",
     // assets (EngineAssets.zig)
     "getFont",
+    "getFontAtlasTexture",
     // collision (EngineCollision.zig) — getCollisionEvents was the known-broken one
     "clearCollisionEvents", "getCollisionEvents",
     // scene (EngineScene.zig)

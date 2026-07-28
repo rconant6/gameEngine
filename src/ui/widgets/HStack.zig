@@ -111,6 +111,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
             .renderer = ri.renderer,
             .ctx = ri.ctx,
             .font = ri.font,
+            .tex = ri.tex,
             .bounds = child.bounds,
         });
     }

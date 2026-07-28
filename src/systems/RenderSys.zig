@@ -91,20 +91,21 @@ pub fn run(
         const transform = entry.get(0);
         const text = entry.get(1);
 
-        const font = asset_manager.getFont(text.font_name) orelse
-            asset_manager.getFont("__default__") orelse {
-            log.warn(
-                .assets,
-                "Text font '{s}' missing, no default",
-                .{text.font_name},
-            );
+        const font_name = if (asset_manager.getFont(text.font_name) != null)
+            text.font_name
+        else
+            "__default__";
+        const font = asset_manager.getFont(font_name) orelse {
+            log.warn(.assets, "Text font '{s}' missing, no default", .{text.font_name});
             continue;
         };
+        const tex = (asset_manager.getOrCreateAtlasTexture(font_name) catch null) orelse continue;
 
         const offset = text.alignOffsetX(font.measureText(text.text, text.size).x);
 
         renderer.drawText(
             font,
+            tex,
             text.text,
             .{
                 .x = transform.position.x + offset,
@@ -158,15 +159,15 @@ pub fn run(
     while (ui_text_query.next()) |entry| {
         const ui_element = entry.get(0);
         const text = entry.get(1);
-        const font = asset_manager.getFont(text.font_name) orelse
-            asset_manager.getFont("__default__") orelse {
-            log.warn(
-                .assets,
-                "Text font '{s}' missing, no default",
-                .{text.font_name},
-            );
+        const font_name = if (asset_manager.getFont(text.font_name) != null)
+            text.font_name
+        else
+            "__default__";
+        const font = asset_manager.getFont(font_name) orelse {
+            log.warn(.assets, "Text font '{s}' missing, no default", .{text.font_name});
             continue;
         };
+        const tex = (asset_manager.getOrCreateAtlasTexture(font_name) catch null) orelse continue;
         const anchor_pos = rend.getAnchorPos(ui_element.anchor, ui_ctx);
         const screen_pos = WorldPoint{
             .x = anchor_pos.x + ui_element.offset.x,
@@ -174,6 +175,7 @@ pub fn run(
         };
         renderer.drawTextScreen(
             font,
+            tex,
             text.text,
             ScreenPoint{ .x = screen_pos.x, .y = screen_pos.y },
             text.size,
