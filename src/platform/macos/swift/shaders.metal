@@ -43,18 +43,22 @@ vertex VertexOut vertex_main(VertexIn in [[stage_in]],
           .color = in.color};
 }
 
-struct FragCfg {
-  uint is_sdf;
-};
+// Two fragment entry points instead of one uniform-branched shader. The
+// renderer binds the matching pipeline per draw (keyed on DrawKey.is_sdf), so
+// there's no per-draw config buffer and no in-shader branch.
+constexpr sampler tex_sampler(mag_filter::nearest, min_filter::linear);
 
-fragment float4 fragment_main(VertexOut input [[stage_in]],
-                              texture2d<float> tex [[texture(0)]],
-                              constant FragCfg &cfg [[buffer(3)]]) {
-  constexpr sampler s(mag_filter::nearest, min_filter::linear);
-  if (cfg.is_sdf != 0) {
-    float cov = tex.sample(s, input.texcoord).r;
-    return float4(input.color.rgb, input.color.a * cov);
-  }
+// Shapes & sprites: modulate the sampled texel by the vertex color. Untextured
+// shapes sample the 1x1 white texel, so this is just the vertex color.
+fragment float4 fragment_shape(VertexOut input [[stage_in]],
+                               texture2d<float> tex [[texture(0)]]) {
+  return tex.sample(tex_sampler, input.texcoord) * input.color;
+}
 
-  return tex.sample(s, input.texcoord) * input.color;
+// SDF/coverage glyphs: the R channel is coverage; tint by vertex color, scale
+// alpha by coverage.
+fragment float4 fragment_sdf(VertexOut input [[stage_in]],
+                             texture2d<float> tex [[texture(0)]]) {
+  float cov = tex.sample(tex_sampler, input.texcoord).r;
+  return float4(input.color.rgb, input.color.a * cov);
 }

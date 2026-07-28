@@ -46,8 +46,8 @@ const MetalVertex = metal.MetalVertex;
 
 const Self = @This();
 
-const SLOT_BYTES: usize = 4 * 1024 * 1024;
-const INDEX_SLOT_BYTES: usize = 4 * 1024 * 1024;
+const SLOT_BYTES: usize = 2 * 1024 * 1024;
+const INDEX_SLOT_BYTES: usize = 2 * 1024 * 1024;
 const XFORM_SLOT_BYTES: usize = 1024 * 1024;
 const FRAMES_IN_FLIGHT: usize = 3;
 
@@ -61,7 +61,8 @@ submission_seq: u32,
 clip_world: ClipMap = .{},
 clip_screen: ClipMap = .{},
 
-pipeline_state: *MTLRenderPipelineState,
+pipeline_shape: *MTLRenderPipelineState, // fragment_shape (tex * color)
+pipeline_sdf: *MTLRenderPipelineState, // fragment_sdf (coverage blend)
 batch: Batch(MetalVertex, DrawKey),
 frame_ctx: *MetalFrameContext,
 frame_index: u8, // ring cursor (0..2)
@@ -97,14 +98,21 @@ pub fn init(
     defer p_gpa.free(shader_path_z);
     const library = try mb.createLibraryFromFile(device, shader_path_z);
     const vertex_fn = try mb.createFunction(library, "vertex_main");
-    const fragment_fn = try mb.createFunction(library, "fragment_main");
+    const fragment_shape_fn = try mb.createFunction(library, "fragment_shape");
+    const fragment_sdf_fn = try mb.createFunction(library, "fragment_sdf");
 
-    // Pipeline's rasterSampleCount MUST match the render target's sample
-    // count (the MSAA texture below), or Metal throws at draw.
-    const pipeline_state = try mb.createRenderPipelineState(
+    // Two pipelines sharing everything but the fragment fn. Selected per draw by
+    const pipeline_shape = try mb.createRenderPipelineState(
         device,
         vertex_fn,
-        fragment_fn,
+        fragment_shape_fn,
+        MTLPixelFormat.bgra8Unorm_sRGB,
+        config.msaa_samples,
+    );
+    const pipeline_sdf = try mb.createRenderPipelineState(
+        device,
+        vertex_fn,
+        fragment_sdf_fn,
         MTLPixelFormat.bgra8Unorm_sRGB,
         config.msaa_samples,
     );
@@ -155,7 +163,8 @@ pub fn init(
         .device = device,
         .command_queue = queue,
         .layer = layer,
-        .pipeline_state = pipeline_state,
+        .pipeline_shape = pipeline_shape,
+        .pipeline_sdf = pipeline_sdf,
         .batch = batch,
         .frame_ctx = frame_ctx,
         .frame_index = 0,
@@ -194,7 +203,8 @@ pub fn deinit(self: *Self) void {
     for (self.index_buffers) |tb| mb.release(tb);
     for (self.xform_buffers) |xb| mb.release(xb);
 
-    mb.release(self.pipeline_state);
+    mb.release(self.pipeline_shape);
+    mb.release(self.pipeline_sdf);
     mb.frameContextDestroy(self.frame_ctx);
 
     self.xforms.deinit(self.persistent);
@@ -379,7 +389,8 @@ fn flushOrdered(self: *Self, encoder: *MTLRenderCommandEncoder, idx: usize) !voi
     );
     _ = x_copied;
 
-    mb.setPipelineState(encoder, self.pipeline_state);
+    // Pipeline is bound inside the loop, keyed on is_sdf (see cur_sdf guard).
+    // Vertex buffers are pipeline-independent, bind once here.
     mb.setVertexBuffer(encoder, self.vertex_buffers[idx], 0, 0);
     mb.setVertexBuffer(encoder, self.xform_buffers[idx], 0, 2);
 
@@ -417,8 +428,11 @@ fn flushOrdered(self: *Self, encoder: *MTLRenderCommandEncoder, idx: usize) !voi
         }
 
         if (cur_sdf == null or cur_sdf.? != call.key.is_sdf) {
-            var cfg: u32 = if (call.key.is_sdf) 1 else 0;
-            mb.setFragmentBytes(encoder, &cfg, 4, 3);
+            const pipeline = if (call.key.is_sdf)
+                self.pipeline_sdf
+            else
+                self.pipeline_shape;
+            mb.setPipelineState(encoder, pipeline);
             cur_sdf = call.key.is_sdf;
         }
 

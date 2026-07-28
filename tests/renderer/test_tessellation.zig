@@ -151,8 +151,8 @@ test "NGon fill+stroke: fan + strip verts, both index runs" {
         .stroke = Color.initRgba(255, 255, 255, 255),
     });
 
-    // fill fan: sides+1 verts, sides*3 idx ; closed stroke: sides*4 verts, sides*6 idx
-    try testing.expectEqual(@as(usize, (sides + 1) + sides * 4), batch.vertices.items.len);
+    // fill fan: sides+1 verts, sides*3 idx ; closed stroke ring: sides*2 verts, sides*6 idx
+    try testing.expectEqual(@as(usize, (sides + 1) + sides * 2), batch.vertices.items.len);
     try testing.expectEqual(@as(usize, sides * 3 + sides * 6), batch.indices.items.len);
 }
 
@@ -165,6 +165,86 @@ test "Rectangle fill: 4 verts, 6 indices (quad)" {
 
     try testing.expectEqual(@as(usize, 4), batch.vertices.items.len);
     try testing.expectEqual(@as(usize, 6), batch.indices.items.len);
+}
+
+test "closed rect stroke: mitered ring = 8 verts, 24 indices" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const rect = shape(Shapes.Rectangle, Shapes.Rectangle.initFromCenter(.{ .x = 0, .y = 0 }, 4, 2));
+    // stroke only — isolate the border ring (no fill verts in the count)
+    try tessShape(&batch, rect, .{ .stroke = Color.initRgba(255, 255, 255, 255) });
+
+    // 4 corners → ring of 2*4 = 8 verts (outer+inner loop), 4 edges * 6 = 24 idx
+    try testing.expectEqual(@as(usize, 8), batch.vertices.items.len);
+    try testing.expectEqual(@as(usize, 24), batch.indices.items.len);
+
+    // butt-join emitted overlapping corner verts; the ring must not duplicate any
+    for (batch.vertices.items, 0..) |v, i| {
+        for (batch.vertices.items[i + 1 ..]) |w| {
+            const same = v.pos[0] == w.pos[0] and v.pos[1] == w.pos[1];
+            try testing.expect(!same);
+        }
+    }
+}
+
+test "ring stroke has an outer and inner loop straddling the path" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    // axis-aligned rect centered at origin; corners are all at the same distance
+    // from center, so the ring's two loops land at exactly two distance bands.
+    const rect = shape(Shapes.Rectangle, Shapes.Rectangle.initFromCenter(.{ .x = 0, .y = 0 }, 4, 4));
+    try tessShape(&batch, rect, .{ .stroke = Color.initRgba(255, 255, 255, 255) });
+
+    var bands: [8]f32 = undefined;
+    for (batch.vertices.items, 0..) |v, i| {
+        bands[i] = @sqrt(v.pos[0] * v.pos[0] + v.pos[1] * v.pos[1]);
+    }
+    // exactly two distinct distance bands (inner corner dist < outer corner dist)
+    var lo: f32 = std.math.inf(f32);
+    var hi: f32 = 0;
+    for (bands) |d| {
+        lo = @min(lo, d);
+        hi = @max(hi, d);
+    }
+    try testing.expect(hi > lo); // outer loop strictly farther than inner loop
+    // every vert sits on one of the two bands (square corners are symmetric)
+    for (bands) |d| {
+        const on_lo = @abs(d - lo) < 0.001;
+        const on_hi = @abs(d - hi) < 0.001;
+        try testing.expect(on_lo or on_hi);
+    }
+}
+
+test "star (concave) stroke closes without inversion under miter clamp" {
+    var batch = TestBatch.init(testing.allocator);
+    defer batch.deinit();
+
+    const n: usize = 5;
+    const star = shape(Shapes.Star, .{
+        .origin = .{ .x = 0, .y = 0 },
+        .outer_radius = 4,
+        .inner_radius = 1.5,
+        .points = @intCast(n),
+    });
+    try tessShape(&batch, star, .{ .stroke = Color.initRgba(255, 255, 255, 255) });
+
+    // ring over 2n perimeter points: 2n edges * 6 = 2n*6 indices
+    try testing.expectEqual(@as(usize, 2 * n * 6), batch.indices.items.len);
+
+    // every emitted triangle is non-degenerate — the miter clamp must keep even
+    // the reflex (inner) corners from collapsing/inverting to zero area.
+    const idx = batch.indices.items;
+    const verts = batch.vertices.items;
+    var t: usize = 0;
+    while (t < idx.len) : (t += 3) {
+        const a = verts[idx[t]].pos;
+        const b = verts[idx[t + 1]].pos;
+        const c = verts[idx[t + 2]].pos;
+        const area = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+        try testing.expect(@abs(area) > 1e-6);
+    }
 }
 
 test "no-style shape emits nothing" {

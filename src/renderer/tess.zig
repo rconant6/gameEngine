@@ -406,19 +406,69 @@ fn Tess(comptime V: type, comptime K: type) type {
             }
         }
 
+        // A closed border as ONE mitered ring: an outer offset loop + an inner
+        // offset loop stitched as a single triangle strip. 2N verts (vs the
+        // butt-joint N×4) and no corner overlap. `points` is a closed loop; the
+        // first point is NOT repeated. Miter length is clamped (MITER_LIMIT) so
+        // sharp/reflex (concave, e.g. star inner) corners bevel instead of
+        // spiking/inverting — one uniform path, no caller carve-out.
+        const MITER_LIMIT: f32 = 4.0;
+        const MITER_EPS: f32 = 1e-4;
+
+        fn ringStroke(self: Self, points: []const V2, paint: Paint, hw: f32) !void {
+            const n = points.len;
+            if (n < 2) return;
+
+            var outer: [MAX_SEG]u32 = undefined;
+            var inner: [MAX_SEG]u32 = undefined;
+
+            for (0..n) |i| {
+                const prev = points[(i + n - 1) % n];
+                const cur = points[i];
+                const next = points[(i + 1) % n];
+
+                const d_in = cur.sub(prev).normalize();
+                const d_out = next.sub(cur).normalize();
+                const n_in = d_in.perp(); // left normal (CCW convention, matches emitSegment)
+                const n_out = d_out.perp();
+
+                const sum = n_in.add(n_out);
+                const miter: V2 = if (sum.magnitude() < MITER_EPS)
+                    n_out // ~180° straight run: no corner, just the edge normal
+                else blk: {
+                    const md = sum.normalize();
+                    const cosb = md.dot(n_out); // cos(half-angle)
+                    const scale = std.math.clamp(1.0 / cosb, 1.0, MITER_LIMIT);
+                    break :blk md.mul(scale);
+                };
+
+                const off = miter.mul(hw);
+                outer[i] = try self.emitV(cur.add(off), null, paint);
+                inner[i] = try self.emitV(cur.sub(off), null, paint);
+            }
+
+            // Stitch: per edge i→j a border quad (outer[i], inner[i], inner[j], outer[j]),
+            // split into two CCW triangles (outer loop is the "left" side per perp).
+            var ii: [6 * MAX_SEG]u32 = undefined;
+            var k: usize = 0;
+            for (0..n) |i| {
+                const j = (i + 1) % n;
+                ii[k + 0] = outer[i];
+                ii[k + 1] = inner[i];
+                ii[k + 2] = outer[j];
+                ii[k + 3] = outer[j];
+                ii[k + 4] = inner[i];
+                ii[k + 5] = inner[j];
+                k += 6;
+            }
+            try self.emitIs(ii[0..k]);
+        }
+
         fn strokeClosed(self: Self, points: []const V2, style: DrawStyle) !void {
             if (points.len < 2) return;
 
             const paint = Paint{ .flat = style.stroke.?.linearOpacity(style.opacity) };
-            const hw = self.hw;
-
-            const n = points.len;
-            for (0..n) |i| {
-                const p0 = points[i];
-                const p1 = points[(i + 1) % n];
-
-                try self.emitSegment(p0, p1, paint, hw);
-            }
+            try self.ringStroke(points, paint, self.hw);
         }
 
         fn strokeOpen(self: Self, points: []const V2, style: DrawStyle) !void {
