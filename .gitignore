@@ -3,3 +3,4 @@
 zig-out
 src/platform/macos/MetalDemo.playground/
 src/platform/macos/.build/
+docs
