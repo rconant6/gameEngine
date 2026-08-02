@@ -30,8 +30,8 @@ pub const Token = struct {
 };
 
 pub const Loc = struct {
-    start: u32,
-    end: u32,
+    start: u32 = undefined,
+    end: u32 = undefined,
 
     pub fn slice(loc: Loc, src: [:0]const u8) []const u8 {
         assert(loc.end <= src.len);

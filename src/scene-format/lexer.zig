@@ -1,4 +1,5 @@
 const std = @import("std");
+const assert = std.debug.assert;
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
@@ -43,6 +44,8 @@ pub const Lexer = struct {
         var tok_start: u32 = undefined;
         var hex_count: u32 = 0;
         var seen_dot = false;
+
+        assert(self.idx <= self.src.len);
 
         return state: switch (State.start) {
             .start => switch (self.src[self.idx]) {

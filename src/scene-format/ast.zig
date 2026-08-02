@@ -1,244 +1,350 @@
 const std = @import("std");
+const assert = std.debug.assert;
 const Writer = std.Io.Writer;
 const Allocator = std.mem.Allocator;
 const tok = @import("token.zig");
-pub const Token = tok.Token;
-pub const SourceLocation = tok.SourceLocation;
+const Token = tok.Token;
+const Loc = tok.Loc;
+const diag = @import("diagnostic.zig");
+const Diagnostic = diag.Diagnostic;
+const parse = @import("parser.zig");
+const Parser = parse.Parser;
 
-pub const SceneFile = struct {
-    decls: []Declaration,
-    source_file_name: []const u8,
+pub const Ast = struct {
+    nodes: []const Node,
+    values: []const RawValue,
+    errors: []const Diagnostic,
 
-    pub fn deinit(self: *SceneFile, gpa: Allocator) void {
-        for (self.decls) |*decl| {
-            decl.deinit(gpa);
-        }
-        gpa.free(self.decls);
-        gpa.free(self.source_file_name);
+    pub fn init(perm: Allocator, src: [:0]const u8) error{OutOfMemory}!Ast {
+        var parser: Parser = .{
+            .perm = perm,
+            .src = src,
+        };
+        defer parser.meta.deinit(perm);
+
+        return parser.parse();
     }
-};
-
-pub const Declaration = union(enum) {
-    scene: SceneDeclaration,
-    entity: EntityDeclaration,
-    asset: AssetDeclaration,
-    component: ComponentDeclaration,
-    template: TemplateDeclaration,
-
-    pub fn deinit(self: *Declaration, gpa: Allocator) void {
-        switch (self.*) {
-            .scene => |*s| s.deinit(gpa),
-            .entity => |*e| e.deinit(gpa),
-            .asset => |*a| a.deinit(gpa),
-            .component => |*c| c.deinit(gpa),
-            .template => |*t| t.deinit(gpa),
-        }
-    }
-};
-
-pub const TemplateDeclaration = struct {
-    name: []const u8,
-    components: []ComponentDeclaration,
-    location: SourceLocation,
-
-    pub fn deinit(self: *TemplateDeclaration, gpa: Allocator) void {
-        for (self.components) |*comp| {
-            comp.deinit(gpa);
-        }
-        gpa.free(self.name);
-        gpa.free(self.components);
-    }
-};
-
-pub const SceneDeclaration = struct {
-    name: []const u8,
-    decls: []Declaration,
-    is_container: bool,
-    location: SourceLocation,
-
-    pub fn deinit(self: *SceneDeclaration, gpa: Allocator) void {
-        gpa.free(self.name);
-        for (self.decls) |*decl| {
-            decl.deinit(gpa);
-        }
-        gpa.free(self.decls);
-    }
-};
-pub const EntityDeclaration = struct {
-    name: []const u8,
-    components: []ComponentDeclaration,
-    location: SourceLocation,
-
-    pub fn deinit(self: *EntityDeclaration, gpa: Allocator) void {
-        gpa.free(self.name);
-        for (self.components) |*comp| {
-            comp.deinit(gpa);
-        }
-        gpa.free(self.components);
-    }
-};
-pub const AssetDeclaration = struct {
-    name: []const u8,
-    asset_type: AssetType,
-    properties: ?[]Property,
-    location: SourceLocation,
-
-    pub fn deinit(self: *AssetDeclaration, gpa: Allocator) void {
-        gpa.free(self.name);
-        if (self.properties) |props| {
-            for (props) |*prop| {
-                prop.deinit(gpa);
+    pub fn deinit(self: *Ast, perm: Allocator) void {
+        for (self.values) |v| {
+            switch (v) {
+                .vec => |floats| perm.free(floats),
+                else => {},
             }
-            gpa.free(props);
         }
+        perm.free(self.values);
+
+        perm.free(self.nodes);
+        perm.free(self.errors);
     }
-};
-pub const ComponentDeclaration = union(enum) {
-    generic: GenericBlock,
-    sprite: SpriteBlock,
-    collider: SpriteBlock,
-
-    pub fn deinit(self: *ComponentDeclaration, gpa: Allocator) void {
-        _ = gpa;
-        switch (self.*) {
-            inline else => |*block| {
-                block.deinit();
-            },
-        }
-    }
-};
-pub const GenericBlock = struct {
-    name: []const u8,
-    properties: ?[]Property,
-    location: SourceLocation,
-    nested_blocks: ?[]GenericBlock,
-    gpa: Allocator,
-
-    pub fn deinit(self: *GenericBlock) void {
-        if (self.properties) |props| {
-            for (props) |*prop| {
-                prop.deinit(self.gpa);
-            }
-            self.gpa.free(props);
-        }
-        if (self.nested_blocks) |blocks| {
-            for (blocks) |*block| {
-                block.deinit();
-            }
-            self.gpa.free(blocks);
-        }
-        self.gpa.free(self.name);
-    }
-};
-pub const SpriteBlock = struct {
-    name: []const u8,
-    shape_type: []const u8,
-    properties: ?[]Property,
-    location: SourceLocation,
-    gpa: Allocator,
-
-    pub fn deinit(self: *SpriteBlock) void {
-        if (self.properties) |props| {
-            for (props) |*prop| {
-                prop.deinit(self.gpa);
-            }
-            self.gpa.free(props);
-        }
-        self.gpa.free(self.name);
-        self.gpa.free(self.shape_type);
-    }
-};
-
-pub const Property = struct {
-    name: []const u8,
-    type_annotation: TypeAnnotation,
-    value: Value,
-    location: SourceLocation,
-
-    pub fn deinit(self: *Property, gpa: Allocator) void {
-        gpa.free(self.name);
-        self.value.deinit(gpa);
-    }
-};
-
-pub const TypeAnnotation = struct {
-    base_type: BaseType,
-    is_array: bool,
-};
-
-pub const AssetType = enum {
-    font,
-    zxl,
-    // TODO(asset-types): Add when engine implements:
-    // audio,     // Sound effects and music
-    // shader,    // Custom shader programs
-    // material,  // Material/appearance data
-    // mesh,      // 3D model data (future 3D support)
-    // NOTE: Lexer will need to have added to keywords
-
-    pub fn fromString(str: []const u8) ?AssetType {
-        if (std.mem.eql(u8, str, "font")) return .font;
-        if (std.mem.eql(u8, str, "zxl")) return .zxl;
-        return null;
-    }
-
-    pub fn toString(self: AssetType) []const u8 {
-        return switch (self) {
-            .font => "font",
-            .zxl => "zxl",
+    pub fn iterator(ast: *const Ast) Iterator {
+        return .{
+            .nodes = ast.nodes,
         };
     }
 };
 
-pub const BaseType = enum {
-    asset,
-    bool,
-    color,
-    f32,
-    i32,
-    string,
-    u32,
-    vec2,
-    vec3,
-    // custom, // TODO: this is coming later
+pub const Node = struct {
+    tag: Tag,
+    loc: Loc,
+    parent_idx: u32,
+    next_idx: u32 = 0,
+    name_loc: Loc = .{},
+    type_loc: Loc = .{},
+    value_idx: u32 = 0,
 
-    pub fn format(self: @This(), w: *Writer) !void {
-        const str: []const u8 = switch (self) {
-            .asset => "asset",
-            .bool => "bool",
-            .color => "color",
-            .f32 => "f32",
-            .i32 => "i32",
-            .string => "string",
-            .u32 => "u32",
-            .vec2 => "vec2",
-            .vec3 => "vec3",
-        };
-        try w.print("{s}", .{str});
-    }
+    pub const Tag = enum(u8) { root, node, property, flag, missing };
 };
 
-pub const Value = union(enum) {
+pub const RawValue = union(enum) {
     number: f64,
     string: []const u8,
     color: u32,
     boolean: bool,
-    vector: []f64,
-    assetRef: []const u8,
-    array: []Value,
+    vec: []f64,
+    ident: []const u8,
+};
 
-    pub fn deinit(self: *Value, gpa: Allocator) void {
-        switch (self.*) {
-            .string => |s| gpa.free(s),
-            .vector => |v| gpa.free(v),
-            .assetRef => |a| gpa.free(a),
-            .array => |arr| {
-                for (arr) |*val| {
-                    val.deinit(gpa);
+pub const Iterator = struct {
+    nodes: []const Node,
+    last_entered: u32 = 0,
+    state: State = .{ .enter = .{ .idx = 0, .next = 1 } },
+
+    pub const Event = union(enum) {
+        enter: struct { idx: u32, node: *const Node },
+        exit: struct { idx: u32, node: *const Node },
+        done: void,
+    };
+
+    const State = union(enum) {
+        enter: struct { // About to 'enter' a node (idx), the pre-order successor is next
+            idx: u32,
+            next: u32,
+        },
+        exit: struct { // About to leave (idx), target when I go back enough
+            idx: u32,
+            target: u32,
+        },
+        done: void,
+    };
+
+    pub fn next(it: *Iterator) ?Event {
+        return switch (it.state) {
+            .enter => |e| {
+                it.last_entered = e.idx;
+
+                const node = &it.nodes[e.idx];
+                if (e.next == it.nodes.len) {
+                    it.state = .{ .exit = .{
+                        .idx = e.idx,
+                        .target = @intCast(it.nodes.len),
+                    } };
+                    return .{ .enter = .{ .idx = e.idx, .node = node } };
                 }
-                gpa.free(arr);
+
+                const next_node = &it.nodes[e.next];
+                if (next_node.parent_idx == e.idx) {
+                    it.state = .{ .enter = .{
+                        .idx = e.next,
+                        .next = e.next + 1,
+                    } };
+                    return .{ .enter = .{ .idx = e.idx, .node = node } };
+                }
+
+                it.state = .{ .exit = .{
+                    .idx = e.idx,
+                    .target = e.next,
+                } };
+                return .{ .enter = .{ .idx = e.idx, .node = node } };
             },
-            .number, .color, .boolean => {},
+            .exit => |x| {
+                const node = &it.nodes[x.idx];
+                if (x.target == it.nodes.len) {
+                    if (x.idx == 0) it.state = .done else it.state = .{ .exit = .{
+                        .idx = node.parent_idx,
+                        .target = x.target,
+                    } };
+                    return .{ .exit = .{ .idx = x.idx, .node = node } };
+                }
+                const idx_parent = node.parent_idx;
+                const target_parent = it.nodes[x.target].parent_idx;
+                if (idx_parent == target_parent) {
+                    it.state = .{ .enter = .{
+                        .idx = x.target,
+                        .next = x.target + 1,
+                    } };
+                    return .{ .exit = .{ .idx = x.idx, .node = node } };
+                } else {
+                    if (x.idx == 0) it.state =
+                        .done else it.state = .{
+                        .exit = .{
+                            .idx = node.parent_idx,
+                            .target = x.target,
+                        },
+                    };
+                    return .{ .exit = .{ .idx = x.idx, .node = node } };
+                }
+            },
+            .done => {
+                return .done;
+            },
+        };
+    }
+    pub fn skip(it: *Iterator) void {
+        const e = switch (it.state) {
+            .enter => |e| e,
+            else => return,
+        };
+
+        var t: u32 = e.idx + 1;
+        while (t < it.nodes.len) {
+            var cur = t;
+            var under = false;
+            while (cur != 0) {
+                cur = it.nodes[cur].parent_idx;
+                if (cur == it.last_entered) {
+                    under = true;
+                    break;
+                }
+            }
+            if (!under) break; // first node NOT under e.idx → subtree ends here
+            t += 1;
         }
+        it.state = .{ .exit = .{ .idx = it.last_entered, .target = t } };
     }
 };
+
+// MARK: TESTS
+const testing = std.testing;
+
+// A step in the expected event stream (a tag + which node index it refers to).
+const Step = struct {
+    kind: enum { enter, exit, done },
+    idx: u32 = 0, // ignored for .done
+};
+
+// Drive the iterator to completion and check it matches `expected`.
+fn expectWalk(nodes: []const Node, expected: []const Step) !void {
+    var it = Iterator{ .nodes = nodes };
+    for (expected, 0..) |step, i| {
+        errdefer std.debug.print("mismatch at step {d}\n", .{i});
+        const ev = it.next();
+        switch (step.kind) {
+            .enter => {
+                try testing.expect(ev == .enter);
+                // identity check: the event points at nodes[idx]
+                try testing.expectEqual(&nodes[step.idx], ev.enter.node);
+                try testing.expectEqual(step.idx, ev.enter.idx);
+            },
+            .exit => {
+                try testing.expect(ev == .exit);
+                try testing.expectEqual(&nodes[step.idx], ev.exit.node);
+                try testing.expectEqual(step.idx, ev.exit.idx);
+            },
+            .done => try testing.expect(ev == .done),
+        }
+    }
+    // after the stream, it should keep returning .done
+    try testing.expect(it.next() == .done);
+}
+
+// helper to make a node with just tag + parent (loc/etc. don't matter for the walk)
+fn n(tag: Node.Tag, parent: u32) Node {
+    return .{ .tag = tag, .loc = .{}, .parent_idx = parent };
+}
+
+test "iterator: single root, no children" {
+    // root
+    const nodes = [_]Node{n(.root, 0)};
+    try expectWalk(&nodes, &.{
+        .{ .kind = .enter, .idx = 0 },
+        .{ .kind = .exit, .idx = 0 },
+        .{ .kind = .done },
+    });
+}
+
+test "iterator: root with two leaf children" {
+    // root { a  b }   (a and b are children of root=0)
+    const nodes = [_]Node{
+        n(.root, 0), // 0
+        n(.node, 0), // 1  a
+        n(.node, 0), // 2  b
+    };
+    try expectWalk(&nodes, &.{
+        .{ .kind = .enter, .idx = 0 }, // root
+        .{ .kind = .enter, .idx = 1 }, //   a
+        .{ .kind = .exit, .idx = 1 }, //   /a
+        .{ .kind = .enter, .idx = 2 }, //   b
+        .{ .kind = .exit, .idx = 2 }, //   /b
+        .{ .kind = .exit, .idx = 0 }, // /root
+        .{ .kind = .done },
+    });
+}
+
+test "iterator: nested — root { a { c } b }" {
+    // pre-order: root(0), a(1,parent0), c(2,parent1), b(3,parent0)
+    const nodes = [_]Node{
+        n(.root, 0), // 0  root
+        n(.node, 0), // 1  a  (child of root)
+        n(.node, 1), // 2  c  (child of a)
+        n(.node, 0), // 3  b  (child of root)
+    };
+    try expectWalk(&nodes, &.{
+        .{ .kind = .enter, .idx = 0 }, // root
+        .{ .kind = .enter, .idx = 1 }, //   a
+        .{ .kind = .enter, .idx = 2 }, //     c
+        .{ .kind = .exit, .idx = 2 }, //     /c
+        .{ .kind = .exit, .idx = 1 }, //   /a  (unwind: c's parent(1) != b's parent(0))
+        .{ .kind = .enter, .idx = 3 }, //   b
+        .{ .kind = .exit, .idx = 3 }, //   /b
+        .{ .kind = .exit, .idx = 0 }, // /root
+        .{ .kind = .done },
+    });
+}
+
+test "iterator: deep chain — root { a { b { c } } }" {
+    // each node is the sole child of the previous — tests multi-level unwind
+    const nodes = [_]Node{
+        n(.root, 0), // 0
+        n(.node, 0), // 1  a
+        n(.node, 1), // 2  b
+        n(.node, 2), // 3  c
+    };
+    try expectWalk(&nodes, &.{
+        .{ .kind = .enter, .idx = 0 },
+        .{ .kind = .enter, .idx = 1 },
+        .{ .kind = .enter, .idx = 2 },
+        .{ .kind = .enter, .idx = 3 },
+        .{ .kind = .exit, .idx = 3 }, // unwind all the way back up
+        .{ .kind = .exit, .idx = 2 },
+        .{ .kind = .exit, .idx = 1 },
+        .{ .kind = .exit, .idx = 0 },
+        .{ .kind = .done },
+    });
+}
+
+test "iterator: mixed depths — root { a { c d } b }" {
+    // root(0) a(1,0) c(2,1) d(3,1) b(4,0)
+    const nodes = [_]Node{
+        n(.root, 0), // 0 root
+        n(.node, 0), // 1 a
+        n(.node, 1), // 2 c
+        n(.node, 1), // 3 d
+        n(.node, 0), // 4 b
+    };
+    try expectWalk(&nodes, &.{
+        .{ .kind = .enter, .idx = 0 }, // root
+        .{ .kind = .enter, .idx = 1 }, //   a
+        .{ .kind = .enter, .idx = 2 }, //     c
+        .{ .kind = .exit, .idx = 2 }, //     /c
+        .{ .kind = .enter, .idx = 3 }, //     d  (sibling of c under a)
+        .{ .kind = .exit, .idx = 3 }, //     /d
+        .{ .kind = .exit, .idx = 1 }, //   /a
+        .{ .kind = .enter, .idx = 4 }, //   b
+        .{ .kind = .exit, .idx = 4 }, //   /b
+        .{ .kind = .exit, .idx = 0 }, // /root
+        .{ .kind = .done },
+    });
+}
+
+//MARK: SkipTests
+// Drive with a skip requested right after entering node `skip_after_idx`.
+fn expectWalkSkip(nodes: []const Node, skip_at: u32, expected: []const Step) !void {
+    var it = Iterator{ .nodes = nodes };
+    for (expected, 0..) |step, i| {
+        errdefer std.debug.print("mismatch at step {d}\n", .{i});
+        const ev = it.next();
+        switch (step.kind) {
+            .enter => {
+                try testing.expect(ev == .enter);
+                try testing.expectEqual(&nodes[step.idx], ev.enter.node);
+                if (ev.enter.idx == skip_at) it.skip(); // prune this subtree
+            },
+            .exit => {
+                try testing.expect(ev == .exit);
+                try testing.expectEqual(&nodes[step.idx], ev.exit.node);
+            },
+            .done => try testing.expect(ev == .done),
+        }
+    }
+    try testing.expect(it.next() == .done);
+}
+
+test "iterator: skip prunes a subtree" {
+    // root { a { c d } b } — skip `a` (idx 1): should NOT visit c,d; exit a, go to b
+    const nodes = [_]Node{
+        n(.root, 0), // 0 root
+        n(.node, 0), // 1 a  <- skipped
+        n(.node, 1), // 2 c  (should be skipped)
+        n(.node, 1), // 3 d  (should be skipped)
+        n(.node, 0), // 4 b
+    };
+    try expectWalkSkip(&nodes, 1, &.{
+        .{ .kind = .enter, .idx = 0 }, // root
+        .{ .kind = .enter, .idx = 1 }, //   a  (skip requested here)
+        .{ .kind = .exit, .idx = 1 }, //   /a  — c,d NOT visited
+        .{ .kind = .enter, .idx = 4 }, //   b
+        .{ .kind = .exit, .idx = 4 }, //   /b
+        .{ .kind = .exit, .idx = 0 }, // /root
+        .{ .kind = .done },
+    });
+}

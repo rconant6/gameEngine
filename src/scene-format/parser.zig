@@ -1,609 +1,345 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
+const ast = @import("ast.zig");
+const Ast = ast.Ast;
+const Node = ast.Node;
+const NodeTag = Node.Tag;
+const RawValue = ast.RawValue;
+const diag = @import("diagnostic.zig");
+const Diagnostic = diag.Diagnostic;
 const lex = @import("lexer.zig");
 const Lexer = lex.Lexer;
-const LexerError = lex.LexerError;
-const lexeme = lex.lexeme;
-const ast = @import("ast.zig");
-const SceneFile = ast.SceneFile;
-const Declaration = ast.Declaration;
-const Property = ast.Property;
-const Value = ast.Value;
-const AssetType = ast.AssetType;
-const log = @import("debug").log;
-
-pub const ParseError = error{
-    NoPreviousTokens,
-    NoTokenReturned,
-    UnclosedArrayBrackets,
-    UnexpectedToken,
-    Unimplemented,
-    UnknownDeclarationType,
-    UnknownType,
-    UnknownAssetType,
-    UnsupportedVectorLength,
-    UnknownComponentType,
-} || LexerError || @TypeOf(error.OutOfMemory) || @TypeOf(error.Overflow);
-
-const toks = @import("token.zig");
-const Token = toks.Token;
-const TokenTag = toks.Token.Tag;
+const tok = @import("token.zig");
+const Token = tok.Token;
+const Tag = Token.Tag;
+const Loc = tok.Loc;
 
 pub const Parser = struct {
-    gpa: Allocator,
-    lexer: Lexer,
-    current_tok: Token,
-    previous_tok: ?Token,
-    file_name: []const u8,
+    perm: Allocator,
 
-    pub fn init(gpa: Allocator, src: [:0]const u8, file_name: []const u8) !Parser {
-        var lexer = Lexer.init(src);
-        const first = lexer.next() catch |err| {
-            log.err(.sceneFormat, "Lexer returned error on initialization {}", .{err});
-            return err;
-        } orelse {
-            log.err(.sceneFormat, "Lexer did not produce a token", .{});
-            return ParseError.NoTokenReturned;
-        };
-        return Parser{
-            .gpa = gpa,
-            .lexer = lexer,
-            .current_tok = first,
-            .previous_tok = null,
-            .file_name = file_name,
-        };
-    }
+    src: [:0]const u8,
+    node_idx: u32 = 0,
 
-    pub fn parse(self: *Parser) !SceneFile {
-        return self.parseSceneFile();
-    }
+    nodes: ArrayList(Node) = .empty,
+    values: ArrayList(RawValue) = .empty,
+    errors: ArrayList(Diagnostic) = .empty,
+    meta: ArrayList(struct { last_child_idx: u32 = 0 }) = .empty,
 
-    fn advance(self: *Parser) !Token {
-        self.previous_tok = self.current_tok;
-        self.current_tok = try self.lexer.next() orelse
-            return ParseError.NoTokenReturned;
+    lexer: Lexer = undefined,
+    tok: Token = .{ .tag = .invalid, .loc = .{ .start = 0, .end = 0 } },
+    prev_loc: Loc = undefined,
 
-        return self.previous_tok orelse unreachable;
-    }
+    // AST constructor — never fails except OOM
+    // Syntax errors are data in `errors`.
+    pub fn parse(p: *Parser) error{OutOfMemory}!Ast {
+        p.lexer = .init(p.src);
 
-    fn check(self: *Parser, token_type: TokenTag) bool {
-        return self.current_tok.tag == token_type;
-    }
+        // node 0 is the root
+        try p.nodes.append(p.perm, .{
+            .tag = .root,
+            .loc = .{ .start = 0, .end = 0 },
+            .parent_idx = 0,
+        });
+        try p.meta.append(p.perm, .{});
 
-    fn consume(self: *Parser, token_type: TokenTag) !Token {
-        if (self.current_tok.tag != token_type) {
-            const curr = lexeme(self.lexer.src, self.current_tok);
-            log.err(
-                .sceneFormat,
-                "CONSUME: {} {s}, FOUND: {} at {f}",
-                .{ token_type, curr, self.current_tok.tag, self.current_tok.src_loc },
-            );
-            return ParseError.UnexpectedToken;
-        }
+        p.consume();
 
-        const token = self.current_tok;
-        _ = try self.advance();
-        return token;
-    }
-
-    fn parseSceneFile(self: *Parser) !SceneFile {
-        var declarations: ArrayList(Declaration) = .empty;
-        errdefer {
-            for (declarations.items) |*declaration| {
-                declaration.deinit(self.gpa);
-            }
-            declarations.deinit(self.gpa);
-        }
-        while (self.current_tok.tag != .eof) {
-            const decl = try self.parseDeclaration();
-            try declarations.append(self.gpa, decl);
-        }
-        return .{
-            .decls = try declarations.toOwnedSlice(self.gpa),
-            .source_file_name = try self.gpa.dupe(u8, self.file_name),
-        };
-    }
-
-    // MARK: Declarations
-    fn parseDeclaration(self: *Parser) ParseError!Declaration {
-        // NOTE: consume [name:, dispatch on keyword
-        _ = try self.consume(.l_bracket);
-        const name_token = try self.consume(.identifier);
-        _ = try self.consume(.colon);
-        switch (self.current_tok.tag) {
-            .scene => return .{ .scene = try self.parseSceneDeclaration(name_token) },
-            .entity => return .{ .entity = try self.parseEntityDeclaration(name_token) },
-            .asset => return .{ .asset = try self.parseAssetDeclaration(name_token) },
-            .template => return .{ .template = try self.parseTemplateDeclaration(name_token) },
-            else => return ParseError.UnknownDeclarationType,
-        }
-    }
-
-    fn parseSceneDeclaration(self: *Parser, name_token: Token) !ast.SceneDeclaration {
-        // NOTE: [name:scene], check for INDENT, parse children or label
-        const name_str = lex.lexeme(self.lexer.src, name_token);
-        const name = try self.gpa.dupe(u8, name_str);
-        errdefer self.gpa.free(name);
-        _ = try self.consume(.scene);
-        _ = try self.consume(.r_bracket);
-
-        var is_container = false;
-        var declarations: ArrayList(ast.Declaration) = .empty;
-        errdefer {
-            for (declarations.items) |*declaration| {
-                declaration.deinit(self.gpa);
-            }
-            declarations.deinit(self.gpa);
-        }
-        if (self.check(.indent)) {
-            _ = try self.consume(.indent);
-            is_container = true;
-            while (!self.check(.dedent)) {
-                const decl = try self.parseDeclaration();
-                try declarations.append(self.gpa, decl);
-            }
-            _ = try self.consume(.dedent);
-        }
-
-        return .{
-            .name = name,
-            .is_container = is_container,
-            .decls = try declarations.toOwnedSlice(self.gpa),
-            .location = name_token.src_loc,
-        };
-    }
-
-    fn parseTemplateDeclaration(self: *Parser, name_token: Token) !ast.TemplateDeclaration {
-        // NOTE: [name:template], expect INDENT, loop components
-        const name_str = lex.lexeme(self.lexer.src, name_token);
-        const name = try self.gpa.dupe(u8, name_str);
-        errdefer self.gpa.free(name);
-        _ = try self.consume(.template);
-        _ = try self.consume(.r_bracket);
-
-        var components: ArrayList(ast.ComponentDeclaration) = .empty;
-        errdefer {
-            for (components.items) |*component| {
-                component.deinit(self.gpa);
-            }
-            components.deinit(self.gpa);
-        }
-        if (self.check(.indent)) {
-            _ = try self.consume(.indent);
-            while (!self.check(.dedent)) {
-                _ = try self.consume(.l_bracket);
-                const comp_name_token = try self.consume(.identifier);
-                const comp = try self.parseComponentBlock(comp_name_token);
-                try components.append(self.gpa, comp);
-            }
-            _ = try self.consume(.dedent);
-        }
-
-        return .{
-            .name = name,
-            .components = try components.toOwnedSlice(self.gpa),
-            .location = name_token.src_loc,
-        };
-    }
-
-    fn parseEntityDeclaration(self: *Parser, name_token: Token) !ast.EntityDeclaration {
-        // NOTE: [name:entity], expect INDENT, loop components
-        const name_str = lex.lexeme(self.lexer.src, name_token);
-        const name = try self.gpa.dupe(u8, name_str);
-        errdefer self.gpa.free(name);
-        _ = try self.consume(.entity);
-        _ = try self.consume(.r_bracket);
-
-        var components: ArrayList(ast.ComponentDeclaration) = .empty;
-        errdefer {
-            for (components.items) |*component| {
-                component.deinit(self.gpa);
-            }
-            components.deinit(self.gpa);
-        }
-        if (self.check(.indent)) {
-            _ = try self.consume(.indent);
-            while (!self.check(.dedent)) {
-                _ = try self.consume(.l_bracket);
-                const comp_name_token = try self.consume(.identifier);
-                const comp = try self.parseComponentBlock(comp_name_token);
-                try components.append(self.gpa, comp);
-            }
-            _ = try self.consume(.dedent);
-        }
-
-        return .{
-            .name = name,
-            .components = try components.toOwnedSlice(self.gpa),
-            .location = name_token.src_loc,
-        };
-    }
-
-    fn parseAssetDeclaration(self: *Parser, name_token: Token) !ast.AssetDeclaration {
-        // NOTE: [name:asset type], parse properties
-        const name = lex.lexeme(self.lexer.src, name_token);
-        _ = try self.consume(.asset);
-
-        const asset_type: ast.AssetType = switch (self.current_tok.tag) {
-            .font => .font,
-            .zxl => .zxl,
-            else => return ParseError.UnknownAssetType,
-        };
-        _ = try self.advance(); // Consume the asset type token
-        _ = try self.consume(.r_bracket);
-
-        var properties: ArrayList(Property) = .empty;
-        errdefer properties.deinit(self.gpa);
-        if (self.check(.indent)) {
-            _ = try self.consume(.indent);
-            while (!self.check(.dedent)) {
-                const prop = try self.parseProperty();
-                try properties.append(self.gpa, prop);
-            }
-            _ = try self.consume(.dedent);
-        }
-
-        return .{
-            .name = try self.gpa.dupe(u8, name),
-            .properties = try properties.toOwnedSlice(self.gpa),
-            .location = name_token.src_loc,
-            .asset_type = asset_type,
-        };
-    }
-
-    fn parseComponentDeclaration(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
-        return try self.parseComponentBlock(name_token);
-    }
-
-    fn parseComponentBlock(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
-        const component_name = lex.lexeme(self.lexer.src, name_token);
-
-        if (std.mem.eql(u8, "Sprite", component_name)) {
-            return try self.parseSpriteBlock(name_token);
-        }
-        if (std.mem.eql(u8, "Collider", component_name)) {
-            return try self.parseColliderBlock(name_token);
-        }
-        _ = try self.consume(.r_bracket);
-
-        const block_name = try self.gpa.dupe(u8, component_name);
-        errdefer self.gpa.free(block_name);
-
-        var properties: ArrayList(Property) = .empty;
-        errdefer {
-            for (properties.items) |*prop| {
-                prop.deinit(self.gpa);
-            }
-            properties.deinit(self.gpa);
-        }
-
-        var nested_blocks: ?[]ast.GenericBlock = null;
-        errdefer {
-            if (nested_blocks) |blocks| {
-                for (blocks) |*block| {
-                    block.deinit();
+        parser: switch (p.tok.tag) {
+            .eof => {
+                // any still-open nodes = unclosed braces
+                while (p.node_idx != 0) {
+                    try p.err(.missing_brace, p.tok.loc);
+                    p.up();
                 }
-                self.gpa.free(blocks);
-            }
+                break :parser;
+            },
+
+            .r_brace => {
+                if (p.node_idx == 0) {
+                    // stray '}' at top level
+                    try p.err(.unexpected_token, p.tok.loc);
+                    p.consume();
+                    continue :parser p.tok.tag;
+                }
+                p.consume();
+                p.up();
+                continue :parser p.tok.tag;
+            },
+
+            .identifier => {
+                const name = p.tok;
+                p.consume();
+
+                switch (p.tok.tag) {
+                    .colon => { // Name : type {
+                        p.consume();
+                        if (p.tok.tag != .identifier) {
+                            try p.err(.unexpected_token, p.tok.loc);
+                            p.recover();
+                            continue :parser p.tok.tag;
+                        }
+                        const type_tok = p.tok;
+                        p.consume();
+                        if (p.tok.tag != .l_brace) {
+                            try p.err(.missing_brace, p.tok.loc);
+                            p.recover();
+                            continue :parser p.tok.tag;
+                        }
+                        p.consume();
+                        const idx = try p.addChild(.node, name.loc, type_tok.loc);
+                        p.down(idx);
+                        continue :parser p.tok.tag;
+                    },
+
+                    .l_brace => { // Name {  (typeless container)
+                        p.consume();
+                        const idx = try p.addChild(.node, name.loc, .{});
+                        p.down(idx);
+                        continue :parser p.tok.tag;
+                    },
+
+                    else => { // member of the current node
+                        if (startsValue(p.tok.tag)) { // field value -> property
+                            const vidx = p.parseValue() orelse {
+                                p.recover();
+                                continue :parser p.tok.tag;
+                            };
+                            const c = try p.addChild(.property, name.loc, .{});
+                            p.nodes.items[c].value_idx = vidx;
+                        } else { // bare word -> flag
+                            _ = try p.addChild(.flag, name.loc, .{});
+                        }
+                        continue :parser p.tok.tag;
+                    },
+                }
+            },
+
+            else => {
+                try p.err(.unexpected_token, p.tok.loc);
+                p.recover();
+                continue :parser p.tok.tag;
+            },
         }
 
-        if (self.check(.indent)) {
-            _ = try self.consume(.indent);
-
-            // NOTE: all properties must precede the nested blocks
-            while (!self.check(.dedent) and
-                !self.check(.indent) and
-                !self.check(.l_bracket))
-            {
-                const prop = try self.parseProperty();
-                try properties.append(self.gpa, prop);
-            }
-
-            if (self.check(.dedent)) {
-                _ = try self.consume(.dedent);
-                return ast.ComponentDeclaration{ .generic = .{
-                    .gpa = self.gpa,
-                    .location = name_token.src_loc,
-                    .name = block_name,
-                    .nested_blocks = null,
-                    .properties = if (properties.items.len > 0) try properties.toOwnedSlice(self.gpa) else null,
-                } };
-            }
-
-            if (self.check(.l_bracket)) {
-                nested_blocks = try self.parseNestedBlocks();
-                _ = try self.consume(.dedent);
-            }
-        }
-
-        return ast.ComponentDeclaration{ .generic = .{
-            .gpa = self.gpa,
-            .location = name_token.src_loc,
-            .name = block_name,
-            .nested_blocks = nested_blocks,
-            .properties = if (properties.items.len > 0) try properties.toOwnedSlice(self.gpa) else null,
-        } };
+        return p.finalize();
     }
 
-    fn parseNestedBlocks(self: *Parser) ![]ast.GenericBlock {
-        var siblings: ArrayList(ast.GenericBlock) = .empty;
-        errdefer {
-            for (siblings.items) |*block| {
-                block.deinit();
-            }
-            siblings.deinit(self.gpa);
+    pub fn deinit(p: *Parser) void {
+        p.nodes.deinit(p.perm);
+        p.errors.deinit(p.perm);
+        p.values.deinit(p.perm);
+        p.meta.deinit(p.perm);
+    }
+
+    fn finalize(p: *Parser) error{OutOfMemory}!Ast {
+        return .{
+            .nodes = try p.nodes.toOwnedSlice(p.perm),
+            .values = try p.values.toOwnedSlice(p.perm),
+            .errors = try p.errors.toOwnedSlice(p.perm),
+        };
+    }
+
+    fn parseValue(p: *Parser) ?u32 {
+        switch (p.tok.tag) {
+            .number => {
+                const f = std.fmt.parseFloat(
+                    f64,
+                    p.tok.loc.slice(p.src),
+                ) catch {
+                    p.err(.invalid_token, p.tok.loc) catch return null;
+                    return null;
+                };
+                p.consume();
+                return p.push(.{ .number = f });
+            },
+            .minus => {
+                p.consume();
+                if (p.tok.tag != .number) {
+                    p.err(.unexpected_token, p.tok.loc) catch {};
+                    return null;
+                }
+                const f = std.fmt.parseFloat(
+                    f64,
+                    p.tok.loc.slice(p.src),
+                ) catch {
+                    p.err(.invalid_token, p.tok.loc) catch {};
+                    return null;
+                };
+                p.consume();
+                return p.push(.{ .number = -f });
+            },
+            .string_lit => {
+                const s = p.tok.loc.slice(p.src); // span already excludes quotes
+                p.consume();
+                return p.push(.{ .string = s });
+            },
+            .color_lit => {
+                const c = std.fmt.parseInt(
+                    u32,
+                    p.tok.loc.slice(p.src),
+                    16,
+                ) catch {
+                    p.err(.invalid_token, p.tok.loc) catch {};
+                    return null;
+                };
+                p.consume();
+                return p.push(.{ .color = c });
+            },
+            .true => {
+                p.consume();
+                return p.push(.{ .boolean = true });
+            },
+            .false => {
+                p.consume();
+                return p.push(.{ .boolean = false });
+            },
+            .identifier => {
+                const w = p.tok.loc.slice(p.src);
+                p.consume();
+                return p.push(.{ .ident = w });
+            },
+            .l_brace => return p.parseVec(),
+            else => {
+                p.err(.unexpected_token, p.tok.loc) catch {};
+                return null;
+            },
         }
+    }
 
-        while (!self.check(.dedent)) {
-            _ = try self.consume(.l_bracket);
-            const name_token = try self.consume(.identifier);
-            const component_name = lex.lexeme(self.lexer.src, name_token);
-            _ = try self.consume(.r_bracket);
+    // { number (, number)* }
+    // arity checked later.
+    fn parseVec(p: *Parser) ?u32 {
+        p.consume(); // '{'
+        var nums: ArrayList(f64) = .empty;
+        errdefer nums.deinit(p.perm);
 
-            const block_name = try self.gpa.dupe(u8, component_name);
-            errdefer self.gpa.free(block_name);
-
-            var properties: ArrayList(Property) = .empty;
-            errdefer {
-                for (properties.items) |*prop| {
-                    prop.deinit(self.gpa);
-                }
-                properties.deinit(self.gpa);
+        while (true) {
+            var neg = false;
+            if (p.tok.tag == .minus) {
+                p.consume();
+                neg = true;
             }
-
-            var nested_blocks: ?[]ast.GenericBlock = null;
-            errdefer {
-                if (nested_blocks) |blocks| {
-                    for (blocks) |*block| {
-                        block.deinit();
-                    }
-                    self.gpa.free(blocks);
-                }
+            if (p.tok.tag != .number) {
+                p.err(.unexpected_token, p.tok.loc) catch {};
+                nums.deinit(p.perm);
+                return null;
             }
-
-            if (self.check(.indent)) {
-                _ = try self.consume(.indent);
-
-                while (!self.check(.dedent) and !self.check(.l_bracket)) {
-                    const prop = try self.parseProperty();
-                    try properties.append(self.gpa, prop);
-                }
-
-                if (self.check(.l_bracket)) {
-                    nested_blocks = try self.parseNestedBlocks();
-                }
-
-                _ = try self.consume(.dedent);
-            }
-
-            const parent_block = ast.GenericBlock{
-                .gpa = self.gpa,
-                .location = name_token.src_loc,
-                .name = block_name,
-                .nested_blocks = nested_blocks,
-                .properties = if (properties.items.len > 0) try properties.toOwnedSlice(self.gpa) else null,
+            var n = std.fmt.parseFloat(f64, p.tok.loc.slice(p.src)) catch {
+                p.err(.invalid_token, p.tok.loc) catch {};
+                nums.deinit(p.perm);
+                return null;
             };
+            if (neg) n = -n;
+            nums.append(p.perm, n) catch {
+                nums.deinit(p.perm);
+                return null;
+            };
+            p.consume();
 
-            try siblings.append(self.gpa, parent_block);
-        }
-
-        return try siblings.toOwnedSlice(self.gpa);
-    }
-
-    fn parseSpriteBlock(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
-        const name_str = lex.lexeme(self.lexer.src, name_token);
-        const name = try self.gpa.dupe(u8, name_str);
-        errdefer self.gpa.free(name);
-        _ = try self.consume(.colon);
-
-        const shape_type_token = try self.consume(.identifier);
-        const type_name = lex.lexeme(self.lexer.src, shape_type_token);
-        _ = try self.consume(.r_bracket);
-
-        var properties: ArrayList(Property) = .empty;
-        errdefer properties.deinit(self.gpa);
-        if (self.check(.indent)) {
-            _ = try self.consume(.indent);
-            while (!self.check(.dedent)) {
-                const prop = try self.parseProperty();
-                try properties.append(self.gpa, prop);
+            if (p.tok.tag == .comma) {
+                p.consume();
+                continue;
             }
-            _ = try self.consume(.dedent);
+            break;
         }
 
-        return ast.ComponentDeclaration{ .sprite = .{
-            .name = name,
-            .shape_type = try self.gpa.dupe(u8, type_name),
-            .properties = try properties.toOwnedSlice(self.gpa),
-            .location = name_token.src_loc,
-            .gpa = self.gpa,
-        } };
-    }
-    fn parseColliderBlock(self: *Parser, name_token: Token) !ast.ComponentDeclaration {
-        const name_str = lex.lexeme(self.lexer.src, name_token);
-        const name = try self.gpa.dupe(u8, name_str);
-        errdefer self.gpa.free(name);
-        _ = try self.consume(.colon);
-
-        const shape_type_token = try self.consume(.identifier);
-        const type_name = lex.lexeme(self.lexer.src, shape_type_token);
-        _ = try self.consume(.r_bracket);
-
-        var properties: ArrayList(Property) = .empty;
-        errdefer properties.deinit(self.gpa);
-        if (self.check(.indent)) {
-            _ = try self.consume(.indent);
-            while (!self.check(.dedent)) {
-                const prop = try self.parseProperty();
-                try properties.append(self.gpa, prop);
-            }
-            _ = try self.consume(.dedent);
+        if (p.tok.tag != .r_brace) {
+            p.err(.unexpected_token, p.tok.loc) catch {};
+            nums.deinit(p.perm);
+            return null;
         }
+        p.consume(); // '}'
 
-        return ast.ComponentDeclaration{ .collider = .{
-            .name = name,
-            .shape_type = try self.gpa.dupe(u8, type_name),
-            .properties = try properties.toOwnedSlice(self.gpa),
-            .location = name_token.src_loc,
-            .gpa = self.gpa,
-        } };
+        const owned = nums.toOwnedSlice(p.perm) catch return null;
+        return p.push(.{ .vec = owned });
     }
 
-    fn parseProperty(self: *Parser) !Property {
-        const name_token = try self.consume(.identifier);
-        const name = lex.lexeme(self.lexer.src, name_token);
-
-        _ = try self.consume(.colon);
-
-        const type_annotation = try self.parseTypeAnnotation();
-        var value = try self.parseValue(type_annotation);
-        errdefer value.deinit(self.gpa);
-        const location = name_token.src_loc;
-
-        return Property{
-            .name = try self.gpa.dupe(u8, name),
-            .type_annotation = type_annotation,
-            .value = value,
-            .location = location,
-        };
+    fn push(p: *Parser, v: RawValue) ?u32 {
+        const idx: u32 = @intCast(p.values.items.len);
+        p.values.append(p.perm, v) catch return null;
+        return idx;
     }
 
-    fn parseTypeAnnotation(self: *Parser) !ast.TypeAnnotation {
-        const base_type: ast.BaseType = switch (self.current_tok.tag) {
-            .vec2 => .vec2,
-            .vec3 => .vec3,
-            .f32 => .f32,
-            .i32 => .i32,
-            .u32 => .u32,
-            .bool => .bool,
-            .string => .string,
-            .color => .color,
-            .asset_ref => .asset,
-            else => return ParseError.UnknownType,
-        };
-        _ = try self.advance(); // Consume the type token
+    // MARK: Tree building
+    fn addChild(p: *Parser, tag: NodeTag, name_loc: Loc, type_loc: Loc) error{OutOfMemory}!u32 {
+        const idx: u32 = @intCast(p.nodes.items.len);
 
-        const is_array = if (self.check(.l_bracket)) blk: {
-            _ = try self.consume(.l_bracket);
-            _ = try self.consume(.r_bracket);
-            break :blk true;
-        } else false;
+        try p.nodes.append(p.perm, .{
+            .tag = tag,
+            .loc = name_loc,
+            .parent_idx = p.node_idx,
+            .next_idx = 0,
+            .name_loc = name_loc,
+            .type_loc = type_loc,
+            .value_idx = 0,
+        });
+        try p.meta.append(p.perm, .{});
 
-        return .{
-            .base_type = base_type,
-            .is_array = is_array,
-        };
+        const parent_meta = &p.meta.items[p.node_idx];
+        if (parent_meta.last_child_idx != 0)
+            p.nodes.items[parent_meta.last_child_idx].next_idx = idx;
+        parent_meta.last_child_idx = idx;
+
+        return idx;
     }
 
-    fn parseValue(self: *Parser, type_annotation: ast.TypeAnnotation) !Value {
-        if (type_annotation.is_array == true) {
-            return try self.parseArrayValue(type_annotation.base_type);
-        } else {
-            return try self.parseSingleValue(type_annotation.base_type);
-        }
+    fn up(p: *Parser) void {
+        p.node_idx = p.nodes.items[p.node_idx].parent_idx;
+    }
+    fn down(p: *Parser, idx: u32) void {
+        p.node_idx = idx;
     }
 
-    fn parseArrayValue(self: *Parser, element_type: ast.BaseType) !Value {
-        _ = try self.consume(.l_brace);
-
-        const has_indent = self.check(.indent);
-        if (has_indent) _ = try self.advance();
-
-        var vals: ArrayList(Value) = .empty;
-        errdefer {
-            for (vals.items) |*item| {
-                item.deinit(self.gpa);
-            }
-            vals.deinit(self.gpa);
-        }
-        if (!self.check(.r_brace)) {
-            var val = try self.parseSingleValue(element_type);
-            try vals.append(self.gpa, val);
-
-            while (!self.check(.r_brace) and !self.check(.dedent)) {
-                _ = try self.consume(.comma);
-                val = try self.parseSingleValue(element_type);
-                try vals.append(self.gpa, val);
-            }
-        }
-
-        if (has_indent and self.check(.dedent)) _ = try self.advance();
-        _ = try self.consume(.r_brace);
-
-        return Value{ .array = try vals.toOwnedSlice(self.gpa) };
-    }
-
-    fn parseSingleValue(self: *Parser, base_type: ast.BaseType) !Value {
-        return switch (base_type) {
-            .vec2 => try self.parseVectorValue(2),
-            .vec3 => try self.parseVectorValue(3),
-
-            .f32, .i32, .u32 => Value{ .number = try self.parseNumber() },
-
-            .bool => blk: {
-                const val = if (self.check(.true)) true else false;
-                _ = try self.consume(if (val) .true else .false);
-                break :blk Value{ .boolean = val };
+    fn recover(p: *Parser) void {
+        recover: switch (p.tok.tag) {
+            .eof, .r_brace => return,
+            .identifier => {
+                const pk = p.peek();
+                if (pk == .colon or pk == .l_brace) return; // start of a real member/node
+                p.consume();
+                continue :recover p.tok.tag;
             },
-
-            .string => blk: {
-                const str_token = try self.consume(.string_lit);
-                const str_lexeme = lex.lexeme(self.lexer.src, str_token);
-                const str_copy = try self.gpa.dupe(u8, str_lexeme);
-                break :blk Value{ .string = str_copy };
+            else => {
+                p.consume();
+                continue :recover p.tok.tag;
             },
-
-            .color => blk: {
-                const color_token = try self.consume(.color_lit);
-                const hex_str = lex.lexeme(self.lexer.src, color_token);
-                const color_val = try std.fmt.parseInt(u32, hex_str, 16);
-                break :blk Value{ .color = color_val };
-            },
-
-            .asset => blk: {
-                const asset_token = try self.consume(.string_lit);
-                const asset_name = lex.lexeme(self.lexer.src, asset_token);
-                const asset_copy = try self.gpa.dupe(u8, asset_name);
-                break :blk Value{ .assetRef = asset_copy };
-            },
-        };
+        }
     }
 
-    fn parseVectorValue(self: *Parser, arity: u8) !Value {
-        _ = try self.consume(.l_brace);
-
-        if (arity != 2 and arity != 3) {
-            std.log.err("Only supporting vec2 or vec3 not vec{d}", .{arity});
-            return ParseError.UnsupportedVectorLength;
-        }
-
-        var arr = try self.gpa.alloc(f64, arity);
-        errdefer self.gpa.free(arr);
-
-        var num = try self.parseNumber();
-        arr[0] = num;
-        for (1..arity) |i| {
-            _ = try self.consume(.comma);
-            num = try self.parseNumber();
-            arr[i] = num;
-        }
-
-        _ = try self.consume(.r_brace);
-
-        return Value{ .vector = arr };
+    // MARK: Token streams
+    fn consume(p: *Parser) void {
+        p.prev_loc = p.tok.loc;
+        p.tok = p.lexer.next();
+    }
+    fn peek(p: *Parser) Tag {
+        var save = p.lexer; // Lexer is a small value struct; copy + advance the copy
+        return save.next().tag;
+    }
+    fn peek2(p: *Parser) struct { t1: Tag, t2: Tag } {
+        var save = p.lexer;
+        const t1 = save.next().tag;
+        const t2 = save.next().tag;
+        return .{ .t1 = t1, .t2 = t2 };
     }
 
-    fn parseNumber(self: *Parser) !f64 {
-        const isNegative = self.check(.minus);
-        if (isNegative) {
-            _ = try self.consume(.minus);
-        }
-
-        const num_token = try self.consume(.number);
-        const num_str = lex.lexeme(self.lexer.src, num_token);
-        const value = try std.fmt.parseFloat(f64, num_str);
-
-        return if (isNegative) -value else value;
+    // append a bare-tag diagnostic (no payload)
+    fn err(p: *Parser, comptime tag: anytype, loc: Loc) error{OutOfMemory}!void {
+        try p.errors.append(p.perm, .{ .severity = .err, .loc = loc, .tag = tag });
     }
 };
+
+fn startsValue(t: Tag) bool {
+    return switch (t) {
+        .number,
+        .minus,
+        .string_lit,
+        .color_lit,
+        .true,
+        .false,
+        .l_brace,
+        .identifier,
+        => true,
+        else => false,
+    };
+}
