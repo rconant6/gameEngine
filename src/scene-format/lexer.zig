@@ -1,71 +1,35 @@
 const std = @import("std");
+const testing = std.testing;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const tok = @import("token.zig");
 const Token = tok.Token;
-const SourceLocation = tok.SourceLocation;
-const DataLocation = tok.DataLocation;
+const Tag = tok.Token.Tag;
 
-pub const LexerError = error{
-    InvalidCharacter,
-    InvalidColor,
-    InvalidIndentation,
-    InvalidNumber,
-    TabIndentationFound,
-    UnclosedString,
-};
+const single_char_tokens = std.StaticStringMap(Token.Tag).initComptime(.{
+    .{ "{", .l_brace }, .{ "}", .r_brace },
+    .{ ",", .comma },   .{ "-", .minus },
+    .{ ":", .colon },
+});
 
-pub fn lexeme(src: [:0]const u8, token: Token) []const u8 {
-    const start = token.loc.start;
-    const end = token.loc.end;
-    return src[start..end];
-}
+const keywords = std.StaticStringMap(Token.Tag).initComptime(.{
+    .{ "true", .true }, .{ "false", .false },
+});
 
 pub const Lexer = struct {
-    const single_char_tokens = std.StaticStringMap(Token.Tag).initComptime(.{
-        .{ "[", .l_bracket }, .{ "]", .r_bracket },
-        .{ "{", .l_brace },   .{ "}", .r_brace },
-        .{ ",", .comma },     .{ ".", .dot },
-        .{ "-", .minus },     .{ ":", .colon },
-    });
-
-    const keywords = std.StaticStringMap(Token.Tag).initComptime(.{
-        .{ "true", .true },           .{ "false", .false },
-        .{ "scene", .scene },         .{ "string", .string },
-        .{ "asset", .asset },         .{ "entity", .entity },
-        .{ "shape", .shape },         .{ "vec2", .vec2 },
-        .{ "vec3", .vec3 },           .{ "f32", .f32 },
-        .{ "i32", .i32 },             .{ "u32", .u32 },
-        .{ "bool", .bool },           .{ "color", .color },
-        .{ "asset_ref", .asset_ref }, .{ "font", .font },
-        .{ "zxl", .zxl },            .{ "template", .template },
-    });
-
     src: [:0]const u8,
-    index: u32 = 0,
-    token_start: u32 = 0,
-    src_loc: SourceLocation = .{ .line = 1, .col = 1, .len = 0 },
-
-    hex_color_count: u32 = 0,
-    indent_level: u32 = 0,
-    dedents_left: u32 = 0,
-    space_count: u32 = 0,
+    idx: u32 = 0,
 
     const State = enum {
         start,
-        comment,
-        comment_start,
-        fresh_line,
         identifier,
         number,
-        number_after_dot,
         string,
         color,
-        dedent_end,
-        end,
+        comment,
+        invalid,
+        invalid_number,
     };
-
-    const MAX_ERRORS: usize = 32;
 
     pub fn init(
         src: [:0]const u8,
@@ -75,243 +39,313 @@ pub const Lexer = struct {
         };
     }
 
-    pub fn next(self: *Lexer) !?Token {
-        if (self.dedents_left > 0) {
-            self.dedents_left -= 1;
-            return self.consumeToken(.dedent);
-        }
-        state: switch (State.start) {
-            .fresh_line => _fresh_line: switch (self.src[self.index]) {
-                ' ' => {
-                    self.advance();
-                    self.space_count += 1;
-                    self.token_start = self.index;
-                    continue :_fresh_line self.src[self.index];
+    pub fn next(self: *Lexer) Token {
+        var tok_start: u32 = undefined;
+        var hex_count: u32 = 0;
+        var seen_dot = false;
+
+        return state: switch (State.start) {
+            .start => switch (self.src[self.idx]) {
+                ' ', '\t', '\r', '\n' => {
+                    self.idx += 1;
+                    continue :state .start;
                 },
-                '\n' => {
-                    self.newline();
-                    self.advance();
-                    self.space_count = 0;
-                    self.token_start = self.index;
-                    continue :_fresh_line self.src[self.index];
+                0 => return .{
+                    .tag = .eof,
+                    .loc = .{ .start = self.idx, .end = self.idx },
                 },
                 '/' => {
-                    self.space_count = 0;
-                    self.advance();
-                    continue :state .comment_start;
-                },
-                '\t' => {
-                    self.space_count = 0;
-
-                    return LexerError.TabIndentationFound;
-                },
-                0 => continue :state .dedent_end,
-                else => {
-                    self.token_start = self.index;
-                    if (self.space_count == self.indent_level) {
-                        self.space_count = 0;
-                        continue :state .start;
-                    } else if (self.space_count > self.indent_level) {
-                        if (self.space_count != self.indent_level + 2) {
-                            return LexerError.InvalidIndentation;
-                        }
-
-                        self.indent_level = self.space_count;
-                        self.space_count = 0;
-
-                        return self.consumeToken(.indent);
-                    } else {
-                        const delta = self.indent_level - self.space_count;
-                        if (delta % 2 != 0) {
-                            return LexerError.InvalidIndentation;
-                        }
-                        self.indent_level = self.space_count;
-                        self.dedents_left = (delta / 2) - 1;
-                        self.space_count = 0;
-                        return self.consumeToken(.dedent);
+                    if (self.src[self.idx + 1] == '/')
+                        continue :state .comment
+                    else {
+                        tok_start = self.idx;
+                        self.idx += 1;
+                        continue :state .invalid;
                     }
                 },
-            },
-            .start => _start: switch (self.src[self.index]) {
-                else => return LexerError.InvalidCharacter,
-                0 => continue :state .dedent_end,
-                ' ', '\t', '\r' => {
-                    if (self.src_loc.col == 1) {
-                        self.space_count = 0;
-                        continue :state .fresh_line;
-                    }
-                    self.advance();
-                    continue :_start self.src[self.index];
-                },
-                '\n' => {
-                    self.advance();
-                    self.newline();
-                    continue :state .fresh_line;
-                },
-                '/' => {
-                    self.token_start = self.index;
-                    self.advance();
-                    continue :state .comment_start;
+                '{', '}', ':', ',', '-' => |c| {
+                    const tag = single_char_tokens.get(&.{c}) orelse .invalid;
+                    self.idx += 1;
+                    return .{
+                        .tag = tag,
+                        .loc = .{ .start = self.idx - 1, .end = self.idx },
+                    };
                 },
                 '"' => {
-                    self.token_start = self.index;
-                    self.advance();
+                    tok_start = self.idx;
+                    self.idx += 1;
                     continue :state .string;
                 },
                 '#' => {
-                    self.token_start = self.index;
-                    self.advance();
-                    self.hex_color_count = 0;
+                    tok_start = self.idx;
+                    self.idx += 1;
                     continue :state .color;
                 },
-                '[', ']', ',', '-', '{', '}', ':' => |c| {
-                    // self.token_start = self.index;
-                    const tag = single_char_tokens.get(&.{c}) orelse
-                        return LexerError.InvalidCharacter;
-                    self.advance();
-                    return self.consumeToken(tag);
-                },
-                'A'...'Z', 'a'...'z', '_' => {
-                    self.token_start = self.index;
-                    continue :state .identifier;
-                },
                 '0'...'9' => {
-                    self.token_start = self.index;
+                    tok_start = self.idx;
                     continue :state .number;
                 },
-            },
-            .comment_start => {
-                if (self.src[self.index] == '/') continue :state .comment;
-                return LexerError.InvalidCharacter;
-            },
-            .comment => _comment: switch (self.src[self.index]) {
-                0 => continue :state .dedent_end,
-                '\n' => {
-                    self.advance();
-                    self.newline();
-                    self.space_count = 0;
-                    self.token_start = self.index;
-                    continue :state .fresh_line;
+                'A'...'Z', 'a'...'z', '_' => {
+                    tok_start = self.idx;
+                    continue :state .identifier;
                 },
                 else => {
-                    self.advance();
-                    continue :_comment self.src[self.index];
+                    tok_start = self.idx;
+                    self.idx += 1;
+                    continue :state .invalid;
                 },
             },
-            .identifier => _id: switch (self.src[self.index]) {
-                'A'...'Z', 'a'...'z', '0'...'9', '_' => {
-                    self.advance();
-                    continue :_id self.src[self.index];
-                },
-                else => {
-                    const str = self.src[self.token_start..self.index];
-                    const tag = keywords.get(str) orelse .identifier;
-
-                    return self.consumeToken(tag);
-                },
-            },
-            .number => _number: switch (self.src[self.index]) {
-                else => return self.consumeToken(.number),
-                '0'...'9' => {
-                    self.advance();
-                    continue :_number self.src[self.index];
-                },
-                '.' => {
-                    self.advance();
-                    continue :state .number_after_dot;
-                },
-            },
-            .number_after_dot => {
-                const c = self.src[self.index];
-
-                if (c < '0' or c > '9') return LexerError.InvalidNumber;
-
-                frac: switch (c) {
-                    '0'...'9' => {
-                        self.advance();
-                        continue :frac self.src[self.index];
+            .comment => {
+                switch (self.src[self.idx]) {
+                    '\n', 0 => continue :state .start,
+                    else => {
+                        self.idx += 1;
+                        continue :state .comment;
                     },
-                    else => break :frac,
                 }
-
-                return self.consumeToken(.number);
             },
-            .string => _string: switch (self.src[self.index]) {
-                0 => {
-                    // TODO: Need error system
-                    return LexerError.UnclosedString;
-                },
-                '"' => {
-                    self.advance();
-                    // Adjust token_start to skip opening quote, end already excludes closing quote
-                    const token = self.consumeToken(.string_lit);
-                    return Token{
-                        .tag = token.tag,
-                        .loc = .{ .start = token.loc.start + 1, .end = token.loc.end - 1 },
-                        .src_loc = token.src_loc,
-                    };
-                },
-                '\n' => {
-                    self.newline();
-                    self.advance();
-                    continue :_string self.src[self.index];
-                },
-                else => {
-                    self.advance();
-                    continue :_string self.src[self.index];
-                },
+            .string => {
+                switch (self.src[self.idx]) {
+                    '"' => {
+                        self.idx += 1;
+                        return .{
+                            .tag = .string_lit,
+                            .loc = .{ .start = tok_start + 1, .end = self.idx - 1 },
+                        };
+                    },
+                    0 => return .{
+                        .tag = .invalid,
+                        .loc = .{ .start = tok_start, .end = self.idx },
+                    },
+                    else => {
+                        self.idx += 1;
+                        continue :state .string;
+                    },
+                }
             },
-            .color => _color: switch (self.src[self.index]) {
-                '0'...'9', 'a'...'f', 'A'...'F' => {
-                    self.advance();
-                    self.hex_color_count += 1;
-                    continue :_color self.src[self.index];
-                },
-                else => {
-                    if (self.hex_color_count != 6 and self.hex_color_count != 8)
-                        return LexerError.InvalidColor;
-                    // Adjust token_start to skip '#'
-                    const token = self.consumeToken(.color_lit);
-                    return Token{
-                        .tag = token.tag,
-                        .loc = .{ .start = token.loc.start + 1, .end = token.loc.end },
-                        .src_loc = token.src_loc,
-                    };
-                },
+            .color => {
+                switch (self.src[self.idx]) {
+                    '0'...'9', 'a'...'f', 'A'...'F' => {
+                        self.idx += 1;
+                        hex_count += 1;
+                        continue :state .color;
+                    },
+                    else => {
+                        if (hex_count == 6 or hex_count == 8) {
+                            return .{
+                                .tag = .color_lit,
+                                .loc = .{ .start = tok_start + 1, .end = self.idx },
+                            };
+                        } else return .{
+                            .tag = .invalid,
+                            .loc = .{ .start = tok_start, .end = self.idx },
+                        };
+                    },
+                }
             },
-            .dedent_end => {
-                if (self.indent_level == 0) continue :state .end;
+            .number => {
+                switch (self.src[self.idx]) {
+                    '0'...'9' => {
+                        self.idx += 1;
+                        continue :state .number;
+                    },
+                    '.' => {
+                        if (seen_dot)
+                            continue :state .invalid_number;
 
-                self.indent_level -= 2;
-
-                return self.consumeToken(.dedent);
+                        seen_dot = true;
+                        switch (self.src[self.idx + 1]) {
+                            '0'...'9' => {
+                                self.idx += 1;
+                                continue :state .number;
+                            },
+                            else => return .{
+                                .tag = .number,
+                                .loc = .{ .start = tok_start, .end = self.idx },
+                            },
+                        }
+                    },
+                    else => return .{
+                        .tag = .number,
+                        .loc = .{ .start = tok_start, .end = self.idx },
+                    },
+                }
             },
-            .end => {
-                return self.consumeToken(.eof);
+            .identifier => {
+                switch (self.src[self.idx]) {
+                    'A'...'Z', 'a'...'z', '0'...'9', '_' => {
+                        self.idx += 1;
+                        continue :state .identifier;
+                    },
+                    else => {
+                        const word = self.src[tok_start..self.idx];
+                        const tag = keywords.get(word) orelse .identifier;
+                        return .{
+                            .tag = tag,
+                            .loc = .{ .start = tok_start, .end = self.idx },
+                        };
+                    },
+                }
             },
-        }
-
-        return null;
-    }
-
-    inline fn advance(self: *Lexer) void {
-        self.index += 1;
-        self.src_loc.col += 1;
-    }
-    inline fn newline(self: *Lexer) void {
-        self.src_loc.line += 1;
-        self.src_loc.col = 1;
-    }
-    fn consumeToken(self: *Lexer, tag: Token.Tag) Token {
-        const len = self.index - self.token_start;
-        self.src_loc.len = len;
-        const token: Token = .{
-            .tag = tag,
-            .loc = .{ .start = self.token_start, .end = self.index },
-            .src_loc = self.src_loc,
+            .invalid => return .{
+                .tag = .invalid,
+                .loc = .{ .start = tok_start, .end = self.idx },
+            },
+            .invalid_number => {
+                switch (self.src[self.idx]) {
+                    '0'...'9', '.', '_' => {
+                        self.idx += 1;
+                        continue :state .invalid_number;
+                    },
+                    else => return .{
+                        .tag = .invalid,
+                        .loc = .{ .start = tok_start, .end = self.idx },
+                    },
+                }
+            },
         };
-        self.token_start = self.index;
+    }
 
-        return token;
+    inline fn single(self: *Lexer, tag: Token.Tag) Token {
+        self.idx += 1;
+        return .{
+            .tag = tag,
+            .loc = .{ .start = self.idx - 1, .end = self.idx },
+        };
     }
 };
+
+// Collect the tag stream (excluding the final .eof) for a source string.
+fn tags(src: [:0]const u8, buf: []Tag) []Tag {
+    var l = Lexer.init(src);
+    var n: usize = 0;
+    while (true) {
+        const t = l.next();
+        if (t.tag == .eof) break;
+        buf[n] = t.tag;
+        n += 1;
+    }
+    return buf[0..n];
+}
+
+fn expectTags(src: [:0]const u8, expected: []const Tag) !void {
+    var buf: [64]Tag = undefined;
+    try testing.expectEqualSlices(Tag, expected, tags(src, &buf));
+}
+
+// --- the milestone: a full noun ------------------------------------------------
+
+test "milestone: Ball : circle { radius 0.35 fill white collides }" {
+    try expectTags(
+        "Ball : circle { radius 0.35 fill white collides }",
+        &.{
+            .identifier, // Ball
+            .colon, //     :
+            .identifier, // circle
+            .l_brace, //   {
+            .identifier, // radius
+            .number, //    0.35
+            .identifier, // fill
+            .identifier, // white
+            .identifier, // collides   (a flag is just an identifier at the lexer level)
+            .r_brace, //   }
+        },
+    );
+}
+
+// --- single-char tokens --------------------------------------------------------
+
+test "delimiters each lex to one token" {
+    try expectTags("{}:,-", &.{ .l_brace, .r_brace, .colon, .comma, .minus });
+}
+
+// --- whitespace is insignificant ----------------------------------------------
+
+test "whitespace and newlines are skipped, no indent/dedent tokens" {
+    try expectTags("  {\n\t}  ", &.{ .l_brace, .r_brace });
+}
+
+// --- comments produce no tokens ------------------------------------------------
+
+test "line comment is skipped entirely" {
+    try expectTags("{ // this is a comment\n }", &.{ .l_brace, .r_brace });
+}
+
+test "comment running to EOF (no trailing newline)" {
+    try expectTags("{ } // trailing", &.{ .l_brace, .r_brace });
+}
+
+// --- identifiers & keywords ----------------------------------------------------
+
+test "true and false are keywords, other words are identifiers" {
+    try expectTags("true false circle radius", &.{ .true, .false, .identifier, .identifier });
+}
+
+test "identifiers may contain digits and underscores" {
+    try expectTags("half_width x2 _hidden", &.{ .identifier, .identifier, .identifier });
+}
+
+// --- numbers -------------------------------------------------------------------
+
+test "integer and float numbers" {
+    try expectTags("7 0.35 100", &.{ .number, .number, .number });
+}
+
+test "float numbers with missing digits" {
+    try expectTags("0.35 100. .045", &.{ .number, .number, .invalid, .invalid, .number });
+}
+
+test "multi-dot number is invalid, not a number" {
+    try expectTags("0.35.100", &.{.invalid}); // one bad number-token
+    try expectTags("1.2.3", &.{.invalid});
+}
+
+test "negative number lexes as minus then number" {
+    try expectTags("-6.0", &.{ .minus, .number });
+}
+
+// --- strings -------------------------------------------------------------------
+
+test "string literal, span excludes the quotes" {
+    var l = Lexer.init("\"ball\"");
+    const t = l.next();
+    try testing.expectEqual(Tag.string_lit, t.tag);
+    try testing.expectEqualStrings("ball", t.loc.slice("\"ball\""));
+}
+
+test "unterminated string is invalid, not a thrown error" {
+    try expectTags("\"oops", &.{.invalid});
+}
+
+// --- colors --------------------------------------------------------------------
+
+test "6-digit color, span excludes the hash" {
+    var l = Lexer.init("#4488FF");
+    const t = l.next();
+    try testing.expectEqual(Tag.color_lit, t.tag);
+    try testing.expectEqualStrings("4488FF", t.loc.slice("#4488FF"));
+}
+
+test "8-digit color is valid" {
+    try expectTags("#4488FFAA", &.{.color_lit});
+}
+
+test "wrong-length color is invalid" {
+    try expectTags("#123", &.{.invalid});
+}
+
+// --- bad input never throws ----------------------------------------------------
+
+test "a stray character is an invalid token, lexing continues" {
+    try expectTags("{ @,. }", &.{ .l_brace, .invalid, .comma, .invalid, .r_brace });
+}
+
+test "a stray character is not greedy, lexing continues" {
+    try expectTags("{ @foo }", &.{ .l_brace, .invalid, .identifier, .r_brace });
+}
+
+// --- vectors are just braces + numbers + commas (structure, not a vec token) ---
+
+test "a vec literal {7, 5} is delimiter tokens (typed later at ingest)" {
+    try expectTags("{7, 5}", &.{ .l_brace, .number, .comma, .number, .r_brace });
+}
