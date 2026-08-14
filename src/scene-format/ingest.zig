@@ -44,6 +44,7 @@ const ConcernBuilder = struct {
     name: []const u8,
     variant: ?[]const u8 = null,
     fields: ArrayList(ResolvedField) = .empty,
+    node_loc: Loc = .{},
 
     pub fn has(b: *ConcernBuilder, field: []const u8) bool {
         for (b.fields) |*f| {
@@ -108,13 +109,33 @@ fn resolveNode(ctx: *Ctx, node_idx: u32) error{OutOfMemory}!ResolvedNode {
     var builders: StringHashMap(ConcernBuilder) = .init(ctx.perm);
     defer builders.deinit();
 
-    // MARK: HERE!
     if (variant != null) {
-        const gb = try builders.getOrPut("geometry");
-        gb.value_ptr.variant = type_name;
+        var gb = try activateConcern(ctx, &builders, "geometry", node.name_loc);
+        gb.variant = type_name;
+        _ = activateConcern(ctx, &builders, "appearance", node.name_loc);
     }
-}
 
+  // 4. walk this node's direct members (childrenOf yields INDICES)
+  for member_idx in childrenOf(ast, node_idx):
+    member = ast.nodes[member_idx]
+    switch member.tag:
+      .property => resolveProperty(ctx, &builders, variant, member_idx)
+      .flag     => resolveFlag(ctx, &builders, member_idx, type_name)
+      .node     => {
+        // (b) a member-NODE may be a per-concern variant, e.g. `collides : rectangle`,
+        // OR genuine containment. Distinguish: if the member's NAME is a concern-
+        // activating word (a flag name), it's a concern-with-variant; else containment.
+        mname = member.name_loc.slice(src)
+        if flagConcern(mname) |cn|:
+          b = activateConcern(ctx, &builders, cn, node.name_loc)
+          b.variant = member.type_loc.slice(src)   // its OWN shape
+          // its nested properties (solid, etc.) resolve as that concern's fields
+          for sub_idx in childrenOf(ast, member_idx): resolveProperty(ctx, &builders, schema.findVariant(b.variant.?), sub_idx)
+        else:
+          {}  // genuine child node = containment; own ResolvedNode, linked by parent
+      }
+}
+    
 fn finalize(ctx: *Ctx) !LabelGraph {
     return .{
         .nodes = ctx.nodes.toOwnedSlice(ctx.perm),
@@ -124,6 +145,23 @@ fn finalize(ctx: *Ctx) !LabelGraph {
 }
 
 // MARK: Helpers
+fn activateConcern(
+    ctx: *Ctx,
+    builders: *BuilderMap,
+    name: []const u8,
+    node_loc: Loc,
+) error{OutOfMemory}!*ConcernBuilder {
+    const gp_res = try builders.getOrPut(ctx.perm, name);
+
+    if (gp_res.found_existing) return gp_res.value_ptr;
+
+    const cb = try ctx.perm.create(ConcernBuilder);
+    cb.* = .{ .name = name, .node_loc = node_loc };
+    gp_res.value_ptr = cb;
+
+    return cb;
+}
+
 fn parentResolvedIdx(ctx: *const Ctx, node_idx: u32) u32 {
     var curr_idx = node_idx;
     while (curr_idx != 0) {
