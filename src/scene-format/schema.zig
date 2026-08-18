@@ -39,7 +39,7 @@ pub const Literal = union(enum) {
     vec3: [3]f64,
     color: u32,
     string: []const u8,
-    ident: []const u8, // e.g. a named color default like `white`
+    ident: []const u8, // e.g. a named color default like `magenta`
 };
 
 pub const FieldSpec = struct {
@@ -87,6 +87,19 @@ pub const Schema = struct {
         }
         return null;
     }
+    pub fn ownerOfFieldSpec(
+        s: Schema,
+        name: []const u8,
+    ) ?struct { concern: *const Concern, spec: *const FieldSpec } {
+        for (s.concerns) |*c| {
+            for (c.fields) |*f| {
+                if (std.mem.eql(u8, f.name, name))
+                    return .{ .concern = c, .spec = f };
+            }
+        }
+
+        return null;
+    }
 
     pub fn variantHasField(v: *const Variant, name: []const u8) bool {
         for (v.fields) |field| {
@@ -96,10 +109,16 @@ pub const Schema = struct {
         return false;
     }
 
-    pub fn flagConcern(flag: []const u8) ?[]const u8 {
-        _ = flag;
-        // TODO: map this
+    pub fn variantFieldSpec(v: *const Variant, name: []const u8) ?*const FieldSpec {
+        for (v.fields) |*f| {
+            if (std.mem.eql(u8, f.name, name)) return f;
+        }
+
         return null;
+    }
+
+    pub fn flagConcern(flag: []const u8) ?[]const u8 {
+        return flags.get(flag);
     }
 
     pub fn isContainerType(name: []const u8) bool {
@@ -110,7 +129,41 @@ pub const Schema = struct {
         .{ "scene", true }, .{ "level", true },
         .{ "world", true }, .{ "entity", true },
     });
+
+    pub fn renderLiteral(lit: Literal, buf: []u8) []const u8 {
+        return switch (lit) {
+            .f32 => |n| std.fmt.bufPrint(buf, "{d}", .{n}) catch {
+                return "...";
+            },
+            .boolean => |b| if (b) "true" else "false",
+            .vec2 => |v| std.fmt.bufPrint(buf, "({d}, {d})", .{
+                v[0],
+                v[1],
+            }) catch {
+                return "...";
+            },
+            .vec3 => |v| std.fmt.bufPrint(buf, "({d}, {d}, {d})", .{
+                v[0],
+                v[1],
+                v[2],
+            }) catch {
+                return "...";
+            },
+            .color => |c| std.fmt.bufPrint(buf, "#{x:0>8}", .{c}) catch {
+                return "...";
+            },
+            .string, .ident => |s| s,
+            .none => "(unset)",
+        };
+    }
 };
+
+const flags = std.StaticStringMap([]const u8).initComptime(.{
+    .{ "collides", "collision" },
+    .{ "bounces", "collision" },
+    .{ "moves", "motion" },
+    .{ "expires", "lifetime" },
+});
 
 //MARK: Variant Pool
 const circle = Variant{ .name = "circle", .tag = .shape, .fields = &.{
@@ -164,7 +217,7 @@ const placement = Concern{
 const geometry = Concern{ .name = "geometry", .accepts = .shape };
 
 const appearance = Concern{ .name = "appearance", .fields = &.{
-    .{ .name = "fill", .type = .color, .default = .{ .ident = "white" } },
+    .{ .name = "fill", .type = .color, .default = .{ .ident = "magenta" } },
     .{ .name = "stroke", .type = .color, .default = .none },
     .{ .name = "stroke_width", .type = .f32, .default = .{ .f32 = 1 } },
     .{ .name = "opacity", .type = .f32, .default = .{ .f32 = 1 } },
@@ -199,7 +252,7 @@ const text = Concern{
     .fields = &.{
         .{ .name = "string", .type = .string, .default = .{ .string = "" } },
         .{ .name = "size", .type = .f32, .default = .{ .f32 = 1 } },
-        .{ .name = "color", .type = .color, .default = .{ .ident = "white" } },
+        .{ .name = "color", .type = .color, .default = .{ .ident = "magenta" } },
         .{ .name = "font", .type = .label_ref, .default = .none }, // references a font asset
     },
 };

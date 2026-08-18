@@ -66,6 +66,17 @@ pub const Parser = struct {
                 p.up();
                 continue :parser p.tok.tag;
             },
+            .r_bracket => {
+                if (p.node_idx == 0) {
+                    // stray ']' at top level
+                    try p.err(.unexpected_token, p.tok.loc);
+                    p.consume();
+                    continue :parser p.tok.tag;
+                }
+                p.consume();
+                p.up();
+                continue :parser p.tok.tag;
+            },
 
             .identifier => {
                 const name = p.tok;
@@ -199,7 +210,8 @@ pub const Parser = struct {
                 p.consume();
                 return p.push(.{ .ident = w });
             },
-            .l_brace => return p.parseVec(),
+            // .l_brace => return p.parseVec(),
+            .l_bracket => return p.parseVec(),
             else => {
                 p.err(.unexpected_token, p.tok.loc) catch {};
                 return null;
@@ -207,8 +219,8 @@ pub const Parser = struct {
         }
     }
 
-    // { number (, number)* }
-    // arity checked later.
+    // [ number (, number)* ]
+    // arity checked later at ingest.
     fn parseVec(p: *Parser) ?u32 {
         p.consume(); // '{'
         var nums: ArrayList(f64) = .empty;
@@ -244,7 +256,7 @@ pub const Parser = struct {
             break;
         }
 
-        if (p.tok.tag != .r_brace) {
+        if (p.tok.tag != .r_bracket) {
             p.err(.unexpected_token, p.tok.loc) catch {};
             nums.deinit(p.perm);
             return null;
@@ -293,10 +305,10 @@ pub const Parser = struct {
 
     fn recover(p: *Parser) void {
         recover: switch (p.tok.tag) {
-            .eof, .r_brace => return,
+            .eof, .r_brace, .r_bracket => return,
             .identifier => {
                 const pk = p.peek();
-                if (pk == .colon or pk == .l_brace) return; // start of a real member/node
+                if (pk == .colon or pk == .l_brace or pk == .l_bracket) return; // start of a real member/node
                 p.consume();
                 continue :recover p.tok.tag;
             },
@@ -338,6 +350,7 @@ fn startsValue(t: Tag) bool {
         .true,
         .false,
         .l_brace,
+        .l_bracket,
         .identifier,
         => true,
         else => false,

@@ -15,6 +15,8 @@ pub const Token = struct {
     pub const Tag = enum {
         l_brace,
         r_brace,
+        l_bracket,
+        r_bracket,
         colon,
         comma,
         identifier,

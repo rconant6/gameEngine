@@ -41,6 +41,22 @@ pub const Ast = struct {
             .nodes = ast.nodes,
         };
     }
+
+    pub fn childrenOf(ast: *const Ast, parent_idx: u32) ChildIterator {
+        const first = parent_idx + 1;
+
+        const curr = if (first < ast.nodes.len and
+            ast.nodes[first].parent_idx == parent_idx)
+            first
+        else
+            0;
+
+        return ChildIterator{
+            .nodes = ast.nodes,
+            .parent = parent_idx,
+            .curr = curr,
+        };
+    }
 };
 
 pub const Node = struct {
@@ -64,15 +80,28 @@ pub const RawValue = union(enum) {
     ident: []const u8,
 };
 
+pub const ChildIterator = struct {
+    nodes: []const Node,
+    parent: u32,
+    curr: u32,
+
+    pub fn next(it: *ChildIterator) ?u32 {
+        if (it.curr == 0) return null;
+        const result = it.curr;
+        it.curr = it.nodes[result].next_idx;
+        return result;
+    }
+};
+
 pub const Iterator = struct {
     nodes: []const Node,
     last_entered: u32 = 0,
     state: State = .{ .enter = .{ .idx = 0, .next = 1 } },
 
+    // Exhaustion is signalled by next() returning null, not by an event.
     pub const Event = union(enum) {
         enter: struct { idx: u32, node: *const Node },
         exit: struct { idx: u32, node: *const Node },
-        done: void,
     };
 
     const State = union(enum) {
@@ -145,7 +174,7 @@ pub const Iterator = struct {
                 }
             },
             .done => {
-                return .done;
+                return null;
             },
         };
     }
@@ -178,8 +207,8 @@ const testing = std.testing;
 
 // A step in the expected event stream (a tag + which node index it refers to).
 const Step = struct {
-    kind: enum { enter, exit, done },
-    idx: u32 = 0, // ignored for .done
+    kind: enum { enter, exit },
+    idx: u32 = 0,
 };
 
 // Drive the iterator to completion and check it matches `expected`.
@@ -190,21 +219,21 @@ fn expectWalk(nodes: []const Node, expected: []const Step) !void {
         const ev = it.next();
         switch (step.kind) {
             .enter => {
-                try testing.expect(ev == .enter);
+                try testing.expect(ev.? == .enter);
                 // identity check: the event points at nodes[idx]
-                try testing.expectEqual(&nodes[step.idx], ev.enter.node);
-                try testing.expectEqual(step.idx, ev.enter.idx);
+                try testing.expectEqual(&nodes[step.idx], ev.?.enter.node);
+                try testing.expectEqual(step.idx, ev.?.enter.idx);
             },
             .exit => {
-                try testing.expect(ev == .exit);
-                try testing.expectEqual(&nodes[step.idx], ev.exit.node);
-                try testing.expectEqual(step.idx, ev.exit.idx);
+                try testing.expect(ev.? == .exit);
+                try testing.expectEqual(&nodes[step.idx], ev.?.exit.node);
+                try testing.expectEqual(step.idx, ev.?.exit.idx);
             },
-            .done => try testing.expect(ev == .done),
         }
     }
-    // after the stream, it should keep returning .done
-    try testing.expect(it.next() == .done);
+    // the stream is exhausted: null, and it stays null
+    try testing.expectEqual(@as(?Iterator.Event, null), it.next());
+    try testing.expectEqual(@as(?Iterator.Event, null), it.next());
 }
 
 // helper to make a node with just tag + parent (loc/etc. don't matter for the walk)
@@ -218,7 +247,6 @@ test "iterator: single root, no children" {
     try expectWalk(&nodes, &.{
         .{ .kind = .enter, .idx = 0 },
         .{ .kind = .exit, .idx = 0 },
-        .{ .kind = .done },
     });
 }
 
@@ -236,7 +264,6 @@ test "iterator: root with two leaf children" {
         .{ .kind = .enter, .idx = 2 }, //   b
         .{ .kind = .exit, .idx = 2 }, //   /b
         .{ .kind = .exit, .idx = 0 }, // /root
-        .{ .kind = .done },
     });
 }
 
@@ -257,7 +284,6 @@ test "iterator: nested — root { a { c } b }" {
         .{ .kind = .enter, .idx = 3 }, //   b
         .{ .kind = .exit, .idx = 3 }, //   /b
         .{ .kind = .exit, .idx = 0 }, // /root
-        .{ .kind = .done },
     });
 }
 
@@ -278,7 +304,6 @@ test "iterator: deep chain — root { a { b { c } } }" {
         .{ .kind = .exit, .idx = 2 },
         .{ .kind = .exit, .idx = 1 },
         .{ .kind = .exit, .idx = 0 },
-        .{ .kind = .done },
     });
 }
 
@@ -302,7 +327,6 @@ test "iterator: mixed depths — root { a { c d } b }" {
         .{ .kind = .enter, .idx = 4 }, //   b
         .{ .kind = .exit, .idx = 4 }, //   /b
         .{ .kind = .exit, .idx = 0 }, // /root
-        .{ .kind = .done },
     });
 }
 
@@ -315,18 +339,17 @@ fn expectWalkSkip(nodes: []const Node, skip_at: u32, expected: []const Step) !vo
         const ev = it.next();
         switch (step.kind) {
             .enter => {
-                try testing.expect(ev == .enter);
-                try testing.expectEqual(&nodes[step.idx], ev.enter.node);
-                if (ev.enter.idx == skip_at) it.skip(); // prune this subtree
+                try testing.expect(ev.? == .enter);
+                try testing.expectEqual(&nodes[step.idx], ev.?.enter.node);
+                if (ev.?.enter.idx == skip_at) it.skip(); // prune this subtree
             },
             .exit => {
-                try testing.expect(ev == .exit);
-                try testing.expectEqual(&nodes[step.idx], ev.exit.node);
+                try testing.expect(ev.? == .exit);
+                try testing.expectEqual(&nodes[step.idx], ev.?.exit.node);
             },
-            .done => try testing.expect(ev == .done),
         }
     }
-    try testing.expect(it.next() == .done);
+    try testing.expectEqual(@as(?Iterator.Event, null), it.next());
 }
 
 test "iterator: skip prunes a subtree" {
@@ -345,6 +368,5 @@ test "iterator: skip prunes a subtree" {
         .{ .kind = .enter, .idx = 4 }, //   b
         .{ .kind = .exit, .idx = 4 }, //   /b
         .{ .kind = .exit, .idx = 0 }, // /root
-        .{ .kind = .done },
     });
 }

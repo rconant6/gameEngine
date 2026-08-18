@@ -8,8 +8,9 @@ const Token = tok.Token;
 const Tag = tok.Token.Tag;
 
 const single_char_tokens = std.StaticStringMap(Token.Tag).initComptime(.{
-    .{ "{", .l_brace }, .{ "}", .r_brace },
-    .{ ",", .comma },   .{ "-", .minus },
+    .{ "{", .l_brace },   .{ "}", .r_brace },
+    .{ "[", .l_bracket }, .{ "]", .r_bracket },
+    .{ ",", .comma },     .{ "-", .minus },
     .{ ":", .colon },
 });
 
@@ -66,7 +67,7 @@ pub const Lexer = struct {
                         continue :state .invalid;
                     }
                 },
-                '{', '}', ':', ',', '-' => |c| {
+                '{', '}', '[', ']', ':', ',', '-' => |c| {
                     const tag = single_char_tokens.get(&.{c}) orelse .invalid;
                     self.idx += 1;
                     return .{
@@ -347,8 +348,13 @@ test "a stray character is not greedy, lexing continues" {
     try expectTags("{ @foo }", &.{ .l_brace, .invalid, .identifier, .r_brace });
 }
 
-// --- vectors are just braces + numbers + commas (structure, not a vec token) ---
+// --- vectors are brackets + numbers + commas (structure, not a vec token) ---
+// Brackets, not braces: `{` is unambiguously a node body, `[` a vec value.
 
-test "a vec literal {7, 5} is delimiter tokens (typed later at ingest)" {
-    try expectTags("{7, 5}", &.{ .l_brace, .number, .comma, .number, .r_brace });
+test "a vec literal [7, 5] is delimiter tokens (typed later at ingest)" {
+    try expectTags("[7, 5]", &.{ .l_bracket, .number, .comma, .number, .r_bracket });
+}
+
+test "brackets and braces are distinct tokens" {
+    try expectTags("[]{}", &.{ .l_bracket, .r_bracket, .l_brace, .r_brace });
 }
