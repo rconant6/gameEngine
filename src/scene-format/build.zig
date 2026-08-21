@@ -22,6 +22,7 @@ pub fn build(b: *std.Build) void {
         "schema.zig",
         "graph.zig",
         "ingest_test.zig",
+        "resolve_refs.zig",
     };
 
     const test_step = b.step("test", "Run scene-format unit tests");

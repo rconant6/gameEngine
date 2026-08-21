@@ -25,6 +25,7 @@ const schema = schem.schema;
 const Literal = schem.Literal;
 const FieldType = schem.FieldType;
 const Asset = schem.Asset;
+const res = @import("resolve_refs.zig");
 
 const Ctx = struct {
     perm: Allocator,
@@ -59,6 +60,17 @@ const ConcernBuilder = struct {
         try b.fields.append(perm, f);
     }
 };
+
+pub fn ingestResolved(perm: Allocator, ast: *const Ast, src: [:0]const u8) error{OutOfMemory}!LabelGraph {
+    // Convenience: both passes. Callers wanting a PARTIAL graph (the LSP
+    // mid-keystroke) call ingest alone and skip this.
+    var g = try ingest(perm, ast, src);
+    errdefer g.deinit();
+
+    try res.resolveRefs(perm, &g);
+
+    return g;
+}
 
 pub fn ingest(
     perm: Allocator,
@@ -125,6 +137,16 @@ fn resolveNode(ctx: *Ctx, node_idx: u32) error{OutOfMemory}!ResolvedNode {
                 );
             }
         }
+
+        try fillAssetGaps(ctx, b, asset);
+
+        return .{
+            .label = label,
+            .type_name = type_name,
+            .loc = node.name_loc,
+            .parent = parentResolvedIdx(ctx, node_idx),
+            .concerns = try buildersToSlice(ctx.perm, &builders),
+        };
     }
 
     // resolve the type -> geometry or container kind
@@ -472,7 +494,7 @@ fn fillAssetGaps(ctx: *Ctx, b: *ConcernBuilder, asset: *const Asset) error{OutOf
                 },
             );
             var buf: [64]u8 = undefined;
-            ctx.diag(
+            try ctx.diag(
                 .warning,
                 .{
                     .default_placeholder = .{
