@@ -22,6 +22,11 @@ pub const Diagnostic = struct {
             field: []const u8,
             value_text: []const u8,
         },
+        wrong_ref: struct {
+            name: []const u8,
+            want: []const u8,
+            got: []const u8,
+        },
 
         // pub fn format(t: @This(), w: *std.Io.Writer) !void {
         //     try w.print("{t}", .{t.format});

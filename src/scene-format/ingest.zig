@@ -24,6 +24,7 @@ const Schema = schem.Schema;
 const schema = schem.schema;
 const Literal = schem.Literal;
 const FieldType = schem.FieldType;
+const Asset = schem.Asset;
 
 const Ctx = struct {
     perm: Allocator,
@@ -107,6 +108,25 @@ fn resolveNode(ctx: *Ctx, node_idx: u32) error{OutOfMemory}!ResolvedNode {
         };
     }
 
+    if (schema.findAsset(type_name)) |asset| {
+        var builders: BuilderMap = .empty;
+        defer builders.deinit(ctx.perm);
+
+        const b = try activateConcern(ctx, &builders, asset.name, node.name_loc);
+        var members = ctx.ast.childrenOf(node_idx);
+        while (members.next()) |member_idx| {
+            if (ctx.ast.nodes[member_idx].tag == .property) {
+                try resolveAssetField(ctx, b, asset, member_idx);
+            } else {
+                try ctx.diag(
+                    .err,
+                    .{ .unknown_field = "unknown property of asset" },
+                    node.name_loc,
+                );
+            }
+        }
+    }
+
     // resolve the type -> geometry or container kind
     const variant = schema.findVariant(type_name) orelse blk: {
         try ctx.diag(.err, .{ .unknown_type = type_name }, node.loc);
@@ -123,7 +143,7 @@ fn resolveNode(ctx: *Ctx, node_idx: u32) error{OutOfMemory}!ResolvedNode {
         _ = try activateConcern(ctx, &builders, "appearance", node.name_loc);
     }
 
-    // 4. walk this node's direct members (childrenOf yields INDICES)
+    // walk this node's direct members (childrenOf yields INDICES)
     var members = ctx.ast.childrenOf(node_idx);
     while (members.next()) |member_idx| {
         const member = ctx.ast.nodes[member_idx];
@@ -151,7 +171,7 @@ fn resolveNode(ctx: *Ctx, node_idx: u32) error{OutOfMemory}!ResolvedNode {
         }
     }
 
-    // 5. fill in the gaps. Value pointers to fill the builders in place
+    // fill in the gaps. Value pointers to fill the builders in place
     var val_it = builders.valueIterator();
     while (val_it.next()) |b| {
         try fillPlaceholders(ctx, b);
@@ -297,6 +317,30 @@ fn resolveProperty(
     try ctx.diag(.err, .{ .unknown_field = field_name }, member.name_loc);
 }
 
+fn resolveAssetField(
+    ctx: *Ctx,
+    b: *ConcernBuilder,
+    asset: *const Asset,
+    member_idx: u32,
+) error{OutOfMemory}!void {
+    const member = ctx.ast.nodes[member_idx];
+    const field_name = member.name_loc.slice(ctx.src);
+    const raw = ctx.ast.values[member.value_idx];
+
+    if (Schema.assetFieldSpec(asset, field_name)) |spec| {
+        try checkArity(ctx, spec.type, raw, member.name_loc);
+        try b.set(ctx.perm, .{
+            .name = field_name,
+            .value = try ownValue(ctx.perm, raw),
+            .source = .authored,
+            .loc = member.name_loc,
+        });
+        return;
+    }
+
+    try ctx.diag(.err, .{ .unknown_field = field_name }, member.name_loc);
+}
+
 fn resolveFlag(
     ctx: *Ctx,
     builders: *StringHashMapUnmanaged(ConcernBuilder),
@@ -403,6 +447,42 @@ fn fillDefaults(ctx: *Ctx, b: *ConcernBuilder) error{OutOfMemory}!void {
     const c = schema.findConcern(b.name).?;
     for (c.fields) |spec| {
         if (!b.has(spec.name) and spec.default != .none) {
+            try b.set(
+                ctx.perm,
+                .{
+                    .name = spec.name,
+                    .source = .default,
+                    .value = try literalToRaw(ctx.perm, spec.default),
+                },
+            );
+        }
+    }
+}
+
+fn fillAssetGaps(ctx: *Ctx, b: *ConcernBuilder, asset: *const Asset) error{OutOfMemory}!void {
+    for (asset.fields) |spec| {
+        if (b.has(spec.name)) continue;
+        if (spec.required) {
+            try b.set(
+                ctx.perm,
+                .{
+                    .name = spec.name,
+                    .source = .placeholder,
+                    .value = try literalToRaw(ctx.perm, spec.placeholder),
+                },
+            );
+            var buf: [64]u8 = undefined;
+            ctx.diag(
+                .warning,
+                .{
+                    .default_placeholder = .{
+                        .field = spec.name,
+                        .value_text = Schema.renderLiteral(spec.placeholder, &buf),
+                    },
+                },
+                b.node_loc,
+            );
+        } else if (spec.default != .none) {
             try b.set(
                 ctx.perm,
                 .{

@@ -45,6 +45,7 @@ pub const Literal = union(enum) {
 pub const FieldSpec = struct {
     name: []const u8,
     type: FieldType,
+    ref_kind: ?[]const u8 = null,
     required: bool = false,
     default: Literal = .none,
     placeholder: Literal = .none,
@@ -63,6 +64,20 @@ pub const Variant = struct {
     fields: []const FieldSpec,
 };
 
+pub const AssetTag = enum {
+    font,
+    sprite,
+    atlas,
+    sound,
+    mesh_data,
+};
+
+pub const Asset = struct {
+    name: []const u8,
+    tag: AssetTag,
+    fields: []const FieldSpec,
+};
+
 pub const Concern = struct {
     name: []const u8,
     fields: []const FieldSpec = &.{},
@@ -72,6 +87,7 @@ pub const Concern = struct {
 pub const Schema = struct {
     variants: []const Variant,
     concerns: []const Concern,
+    assets: []const Asset,
 
     pub fn findVariant(s: Schema, name: []const u8) ?*const Variant {
         for (s.variants) |*v| if (std.mem.eql(u8, v.name, name)) return v;
@@ -79,6 +95,10 @@ pub const Schema = struct {
     }
     pub fn findConcern(s: Schema, name: []const u8) ?*const Concern {
         for (s.concerns) |*c| if (std.mem.eql(u8, c.name, name)) return c;
+        return null;
+    }
+    pub fn findAsset(s: Schema, name: []const u8) ?*const Asset {
+        for (s.assets) |*a| if (std.mem.eql(u8, a.name, name)) return a;
         return null;
     }
     pub fn ownerOfField(s: Schema, field: []const u8) ?*const Concern {
@@ -116,13 +136,23 @@ pub const Schema = struct {
 
         return null;
     }
+    pub fn assetFieldSpec(a: *const Asset, name: []const u8) ?*const FieldSpec {
+        for (a.fields) |*f| {
+            if (std.mem.eql(u8, f.name, name)) return f;
+        }
+
+        return null;
+    }
 
     pub fn flagConcern(flag: []const u8) ?[]const u8 {
         return flags.get(flag);
     }
 
     pub fn isContainerType(name: []const u8) bool {
-        return containers.get(name) orelse false;
+        return containers.has(name);
+    }
+    pub fn isAssetType(name: []const u8) bool {
+        return findAsset(name) != null;
     }
 
     const containers = std.StaticStringMap(bool).initComptime(.{
@@ -158,14 +188,53 @@ pub const Schema = struct {
     }
 };
 
-const flags = std.StaticStringMap([]const u8).initComptime(.{
-    .{ "collides", "collision" },
-    .{ "bounces", "collision" },
-    .{ "moves", "motion" },
-    .{ "expires", "lifetime" },
-});
+// MARK: Asset Pool
+const path_req = FieldSpec{
+    .name = "path",
+    .type = .string,
+    .required = true,
+    .placeholder = .{ .string = "<missing file>" },
+};
 
-//MARK: Variant Pool
+const font_asset = Asset{ .name = "font", .tag = .font, .fields = &.{path_req} };
+const sprite_asset = Asset{ .name = "sprite", .tag = .sprite, .fields = &.{path_req} };
+
+const atlas_asset = Asset{
+    .name = "atlas",
+    .tag = .atlas,
+    .fields = &.{
+        path_req,
+        .{
+            .name = "cell_size",
+            .type = .vec2,
+            .required = true,
+            .placeholder = .{
+                .vec2 = .{ 16, 16 },
+            },
+        },
+    },
+};
+
+const sound_asset = Asset{
+    .name = "sound",
+    .tag = .sound,
+    .fields = &.{
+        path_req,
+        .{
+            .name = "volume",
+            .type = .f32,
+            .default = .{ .f32 = 1 },
+        },
+    },
+};
+
+const mesh_data_asset = Asset{
+    .name = "mesh_data",
+    .tag = .mesh_data,
+    .fields = &.{path_req},
+};
+
+// MARK: Variant Pool
 const circle = Variant{ .name = "circle", .tag = .shape, .fields = &.{
     .{ .name = "radius", .type = .f32, .required = true, .placeholder = .{ .f32 = 1.0 } },
     .{ .name = "origin", .type = .vec2, .default = .{ .vec2 = .{ 0, 0 } } },
@@ -200,7 +269,7 @@ const polygon = Variant{
 
 // The 3D/lego door: a geometry variant that's a REFERENCE, not owned geometry.
 const mesh = Variant{ .name = "mesh", .tag = .mesh, .fields = &.{
-    .{ .name = "ref", .type = .label_ref, .required = true },
+    .{ .name = "ref", .type = .label_ref, .ref_kind = "mesh_data", .required = true },
 } };
 
 // MARK: Concerns
@@ -253,7 +322,7 @@ const text = Concern{
         .{ .name = "string", .type = .string, .default = .{ .string = "" } },
         .{ .name = "size", .type = .f32, .default = .{ .f32 = 1 } },
         .{ .name = "color", .type = .color, .default = .{ .ident = "magenta" } },
-        .{ .name = "font", .type = .label_ref, .default = .none }, // references a font asset
+        .{ .name = "font", .type = .label_ref, .ref_kind = "font", .default = .none }, // references a font asset
     },
 };
 
@@ -265,6 +334,13 @@ const view = Concern{
     },
 };
 
+const flags = std.StaticStringMap([]const u8).initComptime(.{
+    .{ "collides", "collision" },
+    .{ "bounces", "collision" },
+    .{ "moves", "motion" },
+    .{ "expires", "lifetime" },
+});
+
 pub const schema = Schema{
     .variants = &.{ circle, rectangle, ellipse, ngon, polygon, mesh },
     .concerns = &.{
@@ -272,7 +348,29 @@ pub const schema = Schema{
         collision, identity, lifetime,   text,
         view,
     },
+    .assets = &.{ font_asset, sprite_asset, atlas_asset, sound_asset, mesh_data_asset },
 };
+
+comptime {
+    for (schema.assets) |a| {
+        for (a.fields) |f| checkRef(f);
+    }
+    for (schema.variants) |v| {
+        for (v.fields) |f| checkRef(f);
+    }
+    for (schema.concerns) |c| {
+        for (c.fields) |f| checkRef(f);
+    }
+
+    for (schema.assets) |a| {
+        if (schema.findVariant(a.name) != null or Schema.isContainerType(a.name))
+            @compileError("asset name collides with a variant or container" ++ a.name);
+    }
+}
+fn checkRef(f: FieldSpec) void {
+    if ((f.type == .label_ref) != (f.ref_kind != null))
+        @compileError("label_ref fields must declare ref_kind" ++ f.name);
+}
 
 // ---------------------------------------------------------------------------
 // Tests
