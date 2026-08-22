@@ -1,0 +1,149 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+const ArenaAllocator = std.heap.ArenaAllocator;
+const json = std.json;
+const Transport = @import("Transport.zig");
+const ds = @import("doc_store.zig");
+const DocStore = ds.DocStore;
+const rpc = @import("rpc.zig");
+const dc = @import("doc_store.zig");
+const Document = dc.Document;
+const tps = @import("types.zig");
+const InitializeResult = tps.InitializeResult;
+const ServerCapabilities = tps.ServerCapabilities;
+const PublishDiagnosticParams = tps.PublishDiagnosticParams;
+
+const Self = @This();
+
+gpa: Allocator,
+transport: Transport,
+docs: DocStore,
+state: State = .waiting_initialize,
+
+const State = enum { waiting_initialize, running, shutting_down };
+
+pub fn init(gpa: Allocator, transport: Transport) Self {
+    return .{
+        .gpa = gpa,
+        .transport = transport,
+        .docs = .{ .gpa = gpa },
+    };
+}
+pub fn deinit(self: *Self) void {
+    self.docs.deinit();
+}
+pub fn run(self: *Self) !void {
+    while (!self.state.shutting_down) {
+        const body = self.transport.readMessage() catch |e| switch (e) {
+            error.EndOfStream => break,
+            else => return e,
+        };
+        var inc = try rpc.parse(self.gpa, body);
+        defer inc.deinit();
+
+        self.gpa.free(body);
+        try self.handle(inc.msg);
+    }
+}
+
+fn handle(self: *Self, msg: rpc.Message) !void {
+    if (std.mem.eql(u8, msg.method, "initialize")) {
+        return self.onInitialize(msg.id);
+    }
+    if (std.mem.eql(u8, msg.method, "initialized")) {
+        // notification, ignore
+        return;
+    }
+    if (std.mem.eql(u8, msg.method, "textDocument/didOpen")) {
+        return self.onDidOpen(msg.params);
+    }
+    if (std.mem.eql(u8, msg.method, "textDocument/didChange")) {
+        return self.onDidChange(msg.params);
+    }
+    if (std.mem.eql(u8, msg.method, "textDocument/didClose")) {
+        return self.onDidClose(msg.params);
+    }
+    if (std.mem.eql(u8, msg.method, "shutdown")) {
+        return self.onShutdown(msg.id);
+    }
+    if (std.mem.eql(u8, msg.method, "exit")) {
+        return;
+    }
+
+    // TODO: handle this error if request
+}
+fn onInitialize(self: *Self, id: rpc.Id) !void {
+    rpc.writeResponse(
+        self.transport,
+        self.gpa,
+        id,
+        InitializeResult{
+            .capablilities = .{
+                ServerCapabilities.textDocumentSync,
+            },
+        },
+    );
+}
+fn onDidOpen(self: *Self, params: json.Value) !void {
+    const parsed = try json.parseFromValue(
+        tps.DidOpenParams,
+        self.gpa,
+        params,
+        .{},
+    );
+    const td = parsed.value.textDocument;
+    const doc = try self.docs.upsert(td.uri, td.version, td.text);
+
+    self.compileAndPublish(doc);
+}
+fn onDidChange(self: *Self, params: json.Value) !void {
+    const parsed = try json.parseFromValue(
+        tps.DidChangeParams,
+        self.gpa,
+        params,
+        .{},
+    );
+    const last = parsed.value.contentChanges.len - 1;
+    const lc = parsed.value.contentChanges[last];
+    const td = parsed.value.textDocument;
+    const doc = try self.docs.upsert(td.uri, td.version, lc.text);
+
+    self.compileAndPublish(doc);
+}
+fn onDidClose(self: *Self, params: json.Value) !void {
+    const parsed = try json.parseFromValue(
+        tps.DidCloseParams,
+        self.gpa,
+        params,
+        .{},
+    );
+    const uri = parsed.value.textDocument.uri;
+
+    self.docs.close(uri);
+}
+fn onShutdown(self: *Self, id: rpc.Id) !void {
+    _ = id;
+    self.state = .shutting_down;
+}
+fn compileAndPublish(self: *Self, doc: *Document) !void {
+    var arena = ArenaAllocator.init(self.gpa);
+    var alloc = arena.allocator();
+    defer arena.deinit();
+
+    // TODO: add in the diagnostics folder
+    const diags = try diagnostics.collect(
+        arena.allocator(),
+        doc.src,
+        doc.lines,
+    );
+
+    try rpc.writeNotification(
+        &self.transport,
+        arena.allocator(),
+        "textDocument/publishDiagnostics",
+        lsp.PublishDiagnosticsParams{
+            .uri = doc.uri,
+            .diagnostics = diags,
+        },
+    );
+}
