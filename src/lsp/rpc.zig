@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Transport = @import("Transport.zig");
 
-const Message = struct {
+pub const Message = struct {
     id: ?Id,
     method: []const u8,
     params: std.json.Value,
@@ -56,10 +56,9 @@ pub fn parse(gpa: Allocator, body: []const u8) !Incoming {
             return error.InvalidRequest;
         },
     };
-    const params = root.object.get("params") orelse {
-        parsed.deinit();
-        return error.InvalidRequest;
-    };
+    // params is OPTIONAL per JSON-RPC — a notification like `exit` omits it.
+    // Absent → a null value the handlers can parse an empty struct from.
+    const params = root.object.get("params") orelse std.json.Value{ .null = {} };
     const id_val = root.object.get("id");
     const id = if (id_val == null) null else blk: {
         break :blk Message.Id{ .int = id_val.?.integer };

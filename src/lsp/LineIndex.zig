@@ -4,7 +4,7 @@ const ArrayList = std.ArrayList;
 const ts = @import("types.zig");
 const Range = ts.Range;
 const Position = ts.Position;
-const sfmt = @import("scene_fmt");
+const sfmt = ts.sfmt;
 const Loc = sfmt.Loc;
 
 const Self = @This();
@@ -26,7 +26,7 @@ pub fn build(gpa: Allocator, src: [:0]const u8) !Self {
         .src = src,
     };
 }
-pub fn deinit(self: *Self, gpa: Allocator) void {
+pub fn deinit(self: *const Self, gpa: Allocator) void {
     gpa.free(self.line_starts);
 }
 

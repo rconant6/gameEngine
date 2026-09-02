@@ -52,6 +52,8 @@ pub fn build(b: *std.Build) void {
     const scene_fmt_tests = [_][]const u8{
         "types.zig",
         "LineIndex.zig",
+        "diagnostics.zig",
+        "doc_store.zig",
     };
     for (scene_fmt_tests) |file| {
         const mod = b.createModule(.{

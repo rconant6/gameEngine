@@ -13,6 +13,7 @@ const diag = @import("diagnostic.zig");
 pub const Diagnostic = diag.Diagnostic;
 pub const Severity = diag.Severity;
 const ast = @import("ast.zig");
+pub const Ast = ast.Ast;
 pub const AssetDeclaration = ast.AssetDeclaration;
 pub const AssetType = ast.AssetType;
 pub const BaseType = ast.BaseType;
@@ -28,6 +29,13 @@ pub const SpriteBlock = ast.SpriteBlock;
 pub const TypeAnnotation = ast.TypeAnnotation;
 pub const Value = ast.Value;
 pub const serialize = @import("writer.zig").serialize;
+pub const LabelGraph = @import("graph.zig").LabelGraph;
+const ingst = @import("ingest.zig");
+pub const ingest = ingst.ingest;
+pub const ingestResolved = ingst.ingestResolved;
+const schem = @import("schema.zig");
+pub const Schema = schem.Schema;
+pub const Literal = schem.Literal;
 
 pub fn lexeme(src: [:0]const u8, token: Token) []const u8 {
     const start = token.loc.start;

@@ -1,5 +1,6 @@
 const std = @import("std");
 const Loc = @import("token.zig").Loc;
+const Literal = @import("schema.zig").Literal;
 
 pub const Severity = enum { err, warning };
 
@@ -20,22 +21,16 @@ pub const Diagnostic = struct {
         },
         default_placeholder: struct {
             field: []const u8,
-            value_text: []const u8,
+            value: Literal, // the schema placeholder — comptime-borrowed; consumer renders the text
         },
         wrong_ref: struct {
             name: []const u8,
             want: []const u8,
             got: []const u8,
         },
-
-        // pub fn format(t: @This(), w: *std.Io.Writer) !void {
-        //     try w.print("{t}", .{t.format});
-        // }
     };
 
     severity: Severity,
     loc: Loc,
     tag: Tag,
-
-    // pub fn render(self: Diagnostic, src: [:0]const u8, w: *std.Io.Writer) !void {}
 };

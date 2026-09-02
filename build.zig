@@ -406,6 +406,30 @@ pub fn build(b: *std.Build) void {
     b.step("ui", "Run the UI Playground").dependOn(&run_ui_playground.step);
 
     // ========================================
+    // Scene LSP (language server for .scene files)
+    // ========================================
+    // Pure stdio tool — depends ONLY on scene-format (no engine/renderer/platform).
+    // The lsp sources @import("scene_fmt"); the engine registers scene-format under
+    // the name "scene-format", so we map that module to the "scene_fmt" import name.
+    const scene_lsp_module = b.addModule("scene_lsp", .{
+        .root_source_file = b.path("src/lsp/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    scene_lsp_module.addImport("scene_fmt", m.get(&modules, .scene_format));
+
+    const scene_lsp_exe = b.addExecutable(.{
+        .name = "scene-lsp",
+        .root_module = scene_lsp_module,
+    });
+    const install_scene_lsp = b.addInstallArtifact(scene_lsp_exe, .{});
+    b.getInstallStep().dependOn(&install_scene_lsp.step);
+
+    const run_scene_lsp = b.addRunArtifact(scene_lsp_exe);
+    run_scene_lsp.step.dependOn(&install_scene_lsp.step);
+    b.step("lsp", "Run the Scene LSP server over stdio").dependOn(&run_scene_lsp.step);
+
+    // ========================================
     // Player (scene viewer / development runtime)
     // ========================================
     const player_module = b.addModule("player", .{
@@ -524,6 +548,7 @@ pub fn build(b: *std.Build) void {
     build_all.dependOn(&install_pong.step);
     build_all.dependOn(&install_brickles.step);
     build_all.dependOn(&install_asteroids.step);
+    build_all.dependOn(&install_scene_lsp.step);
 
     // ========================================
     // Platform-specific linking (Swift runtime on macOS, xdg_ for linux, no-op elsewhere)

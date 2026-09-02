@@ -434,13 +434,14 @@ fn fillPlaceholders(ctx: *Ctx, b: *ConcernBuilder) error{OutOfMemory}!void {
                 },
             );
 
-            var buf: [64]u8 = undefined;
+            // carry the placeholder Literal (comptime-borrowed, no alloc); the
+            // consumer (LSP / terminal) renders it to text at display time.
             try ctx.diag(
                 .warning,
                 .{
                     .default_placeholder = .{
                         .field = spec.name,
-                        .value_text = Schema.renderLiteral(ph, &buf),
+                        .value = ph,
                     },
                 },
                 b.node_loc,
@@ -493,13 +494,13 @@ fn fillAssetGaps(ctx: *Ctx, b: *ConcernBuilder, asset: *const Asset) error{OutOf
                     .value = try literalToRaw(ctx.perm, spec.placeholder),
                 },
             );
-            var buf: [64]u8 = undefined;
+            // carry the Literal; consumer renders it (see fillPlaceholders)
             try ctx.diag(
                 .warning,
                 .{
                     .default_placeholder = .{
                         .field = spec.name,
-                        .value_text = Schema.renderLiteral(spec.placeholder, &buf),
+                        .value = spec.placeholder,
                     },
                 },
                 b.node_loc,

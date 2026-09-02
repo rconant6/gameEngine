@@ -1,16 +1,12 @@
-const sfmt = @import("scene_fmt");
-pub const Diagnostic = sfmt.Diagnostic;
+pub const sfmt = @import("scene_fmt");
+pub const SceneDiagnostic = sfmt.Diagnostic;
+pub const Ast = sfmt.Ast;
+pub const diag = @import("diagnostics.zig");
+const Diagnostic = diag.Diagnostic;
 
 // MARK: Outbound data types
 pub const Position = struct { line: u32, character: u32 };
 pub const Range = struct { start: Position, end: Position };
-
-const DiagnosticSeverity = enum(u8) {
-    err = 1,
-    warn = 2,
-    info = 3,
-    hint = 4,
-};
 
 pub const PublishDiagnosticParams = struct {
     uri: []const u8,
