@@ -1,0 +1,108 @@
+// Pong — NEW grammar (concern-based, flat).
+// World units: ~26.67 wide x 20.0 tall at ortho_size=10.
+//
+// What changed from pong.scene (old bracketed syntax):
+//   [Ball:entity] / [Transform] / position:vec3 {..}   →   Ball : circle { position [..] }
+//   components ([Sprite], [Collider], [Physics])        →   concerns (geometry+appearance,
+//                                                            collision, motion) the shape implies
+//   field:type {value}                                  →   field value   (no :type, no braces)
+//   vectors {x, y}                                      →   [x, y]        (square brackets)
+//
+// Flag words (bounces / collides) go LAST in a node, just before the `}` — the
+// parser disambiguates flag-vs-field by lookahead, so a bare flag must be
+// followed by `}`, not by another field name.
+//
+// NOTE — behavior is CODE now, not data. The old [OnInput]/[trigger]/[action]
+// blocks and [StateText] bindings are gone from the scene: paddle input and
+// score HUD are wired in the game's Zig, not declared here. This file is pure
+// nouns (the playfield), which is the redesign's whole point.
+
+PongScene : scene {
+
+  // ── Ball ── circle geometry implies appearance; `bounces` activates collision
+  Ball : circle {
+    position [0.0, 0.0]
+    radius 0.4
+    fill #FFFFFF
+    stroke #AAAAAA
+    stroke_width 0.5
+    velocity [7.0, 5.0]
+    restitution 1.0
+    mass 1.0
+    tag "ball"
+    bounces
+  }
+
+  // ── Left Paddle ── rectangle; solid collider so walls stop it, mass 0 = immovable
+  PaddleLeft : rectangle {
+    position [-12.0, 0.0]
+    half_width 0.4
+    half_height 1.5
+    fill #4488FF
+    solid true
+    mass 0.0
+    tag "paddle paddle_left"
+    collides
+  }
+
+  // ── Right Paddle ──
+  PaddleRight : rectangle {
+    position [12.0, 0.0]
+    half_width 0.4
+    half_height 1.5
+    fill #FF4444
+    solid true
+    mass 0.0
+    tag "paddle paddle_right"
+    collides
+  }
+
+  // ── Top Wall ── solid, immovable
+  WallTop : rectangle {
+    position [0.0, 10.3]
+    half_width 14.0
+    half_height 0.3
+    fill #555555
+    solid true
+    mass 0.0
+    tag "wall"
+    collides
+  }
+
+  // ── Bottom Wall ──
+  WallBottom : rectangle {
+    position [0.0, -10.3]
+    half_width 14.0
+    half_height 0.3
+    fill #555555
+    solid true
+    mass 0.0
+    tag "wall"
+    collides
+  }
+
+  // ── Center Line ── visual only, no collision
+  CenterLine : rectangle {
+    position [0.0, 0.0]
+    half_width 0.05
+    half_height 10.0
+    fill #333333
+  }
+
+  // ── Score HUD ── text concern; the live value is bound in game code, not here
+  ScoreLeft : entity {
+    position [-6.0, 8.5]
+    string "0"
+    size 1.5
+    color #4488FF
+    tag "score_left"
+  }
+
+  ScoreRight : entity {
+    position [6.0, 8.5]
+    string "0"
+    size 1.5
+    color #FF4444
+    tag "score_right"
+  }
+}

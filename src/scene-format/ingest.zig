@@ -48,7 +48,6 @@ const ConcernBuilder = struct {
     name: []const u8,
     variant: ?[]const u8 = null,
     fields: ArrayList(ResolvedField) = .empty,
-    node_loc: Loc = .{},
 
     pub fn has(b: *ConcernBuilder, field: []const u8) bool {
         for (b.fields.items) |*f| {
@@ -124,7 +123,7 @@ fn resolveNode(ctx: *Ctx, node_idx: u32) error{OutOfMemory}!ResolvedNode {
         var builders: BuilderMap = .empty;
         defer builders.deinit(ctx.perm);
 
-        const b = try activateConcern(ctx, &builders, asset.name, node.name_loc);
+        const b = try activateConcern(ctx, &builders, asset.name);
         var members = ctx.ast.childrenOf(node_idx);
         while (members.next()) |member_idx| {
             if (ctx.ast.nodes[member_idx].tag == .property) {
@@ -138,7 +137,7 @@ fn resolveNode(ctx: *Ctx, node_idx: u32) error{OutOfMemory}!ResolvedNode {
             }
         }
 
-        try fillAssetGaps(ctx, b, asset);
+        try fillAssetGaps(ctx, b, asset, node.loc);
 
         return .{
             .label = label,
@@ -160,9 +159,9 @@ fn resolveNode(ctx: *Ctx, node_idx: u32) error{OutOfMemory}!ResolvedNode {
     defer builders.deinit(ctx.perm);
 
     if (variant != null) {
-        var gb = try activateConcern(ctx, &builders, "geometry", node.name_loc);
+        var gb = try activateConcern(ctx, &builders, "geometry");
         gb.variant = type_name;
-        _ = try activateConcern(ctx, &builders, "appearance", node.name_loc);
+        _ = try activateConcern(ctx, &builders, "appearance");
     }
 
     // walk this node's direct members (childrenOf yields INDICES)
@@ -170,12 +169,22 @@ fn resolveNode(ctx: *Ctx, node_idx: u32) error{OutOfMemory}!ResolvedNode {
     while (members.next()) |member_idx| {
         const member = ctx.ast.nodes[member_idx];
         switch (member.tag) {
-            .property => try resolveProperty(ctx, &builders, variant, member_idx),
-            .flag => try resolveFlag(ctx, &builders, member_idx, type_name),
+            .property => try resolveProperty(
+                ctx,
+                &builders,
+                variant,
+                member_idx,
+            ),
+            .flag => try resolveFlag(
+                ctx,
+                &builders,
+                member_idx,
+                type_name,
+            ),
             .node => {
                 const mem_name = member.name_loc.slice(ctx.src);
                 if (Schema.flagConcern(mem_name)) |cn| {
-                    var b = try activateConcern(ctx, &builders, cn, node.name_loc);
+                    var b = try activateConcern(ctx, &builders, cn);
                     b.variant = member.type_loc.slice(ctx.src);
 
                     var subs = ctx.ast.childrenOf(member_idx);
@@ -196,7 +205,7 @@ fn resolveNode(ctx: *Ctx, node_idx: u32) error{OutOfMemory}!ResolvedNode {
     // fill in the gaps. Value pointers to fill the builders in place
     var val_it = builders.valueIterator();
     while (val_it.next()) |b| {
-        try fillPlaceholders(ctx, b);
+        try fillPlaceholders(ctx, b, node.loc);
         try fillDefaults(ctx, b);
     }
 
@@ -222,14 +231,13 @@ fn activateConcern(
     ctx: *Ctx,
     builders: *BuilderMap,
     name: []const u8,
-    node_loc: Loc,
 ) error{OutOfMemory}!*ConcernBuilder {
-    const gp_res = try builders.getOrPut(ctx.perm, name);
+    const gop = try builders.getOrPut(ctx.perm, name);
 
-    if (!gp_res.found_existing)
-        gp_res.value_ptr.* = .{ .name = name, .node_loc = node_loc };
+    if (!gop.found_existing)
+        gop.value_ptr.* = .{ .name = name };
 
-    return gp_res.value_ptr;
+    return gop.value_ptr;
 }
 
 fn parentResolvedIdx(ctx: *const Ctx, node_idx: u32) u32 {
@@ -310,8 +318,12 @@ fn resolveProperty(
     // 1) a field of the chosen variant?
     if (variant) |v| {
         if (Schema.variantFieldSpec(v, field_name)) |spec| {
-            try checkArity(ctx, spec.type, raw, member.name_loc);
-            var b = try activateConcern(ctx, builders, "geometry", member.name_loc);
+            try checkArity(ctx, spec.type, raw, member.name_loc); // arity = field-specific
+            var b = try activateConcern(
+                ctx,
+                builders,
+                "geometry",
+            );
             try b.set(ctx.perm, .{
                 .name = field_name,
                 .value = try ownValue(ctx.perm, raw),
@@ -325,8 +337,12 @@ fn resolveProperty(
 
     // 2) a flat field a concern owns?
     if (schema.ownerOfFieldSpec(field_name)) |owned| {
-        try checkArity(ctx, owned.spec.type, raw, member.name_loc);
-        var b = try activateConcern(ctx, builders, owned.concern.name, member.name_loc);
+        try checkArity(ctx, owned.spec.type, raw, member.name_loc); // arity = field-specific
+        var b = try activateConcern(
+            ctx,
+            builders,
+            owned.concern.name,
+        );
         try b.set(ctx.perm, .{
             .name = field_name,
             .value = try ownValue(ctx.perm, raw),
@@ -373,7 +389,7 @@ fn resolveFlag(
     const field_name = member.name_loc.slice(ctx.src);
 
     if (Schema.flagConcern(field_name)) |cn| {
-        const b = try activateConcern(ctx, builders, cn, member.name_loc);
+        const b = try activateConcern(ctx, builders, cn);
         // (b) a variant concern inherits the geometry variant unless it already
         // has its own (set by an explicit `collides : rectangle` member-node).
         if (schema.findConcern(cn)) |c| {
@@ -418,7 +434,11 @@ fn checkArity(
     }
 }
 
-fn fillPlaceholders(ctx: *Ctx, b: *ConcernBuilder) error{OutOfMemory}!void {
+fn fillPlaceholders(
+    ctx: *Ctx,
+    b: *ConcernBuilder,
+    node_loc: Loc,
+) error{OutOfMemory}!void {
     if (b.variant == null) return;
 
     const v = schema.findVariant(b.variant.?).?;
@@ -444,7 +464,7 @@ fn fillPlaceholders(ctx: *Ctx, b: *ConcernBuilder) error{OutOfMemory}!void {
                         .value = ph,
                     },
                 },
-                b.node_loc,
+                node_loc,
             );
         }
     }
@@ -482,7 +502,12 @@ fn fillDefaults(ctx: *Ctx, b: *ConcernBuilder) error{OutOfMemory}!void {
     }
 }
 
-fn fillAssetGaps(ctx: *Ctx, b: *ConcernBuilder, asset: *const Asset) error{OutOfMemory}!void {
+fn fillAssetGaps(
+    ctx: *Ctx,
+    b: *ConcernBuilder,
+    asset: *const Asset,
+    node_loc: Loc,
+) error{OutOfMemory}!void {
     for (asset.fields) |spec| {
         if (b.has(spec.name)) continue;
         if (spec.required) {
@@ -503,7 +528,7 @@ fn fillAssetGaps(ctx: *Ctx, b: *ConcernBuilder, asset: *const Asset) error{OutOf
                         .value = spec.placeholder,
                     },
                 },
-                b.node_loc,
+                node_loc,
             );
         } else if (spec.default != .none) {
             try b.set(
