@@ -53,7 +53,9 @@ pub fn messageOf(
     tag: SceneDiagnostic.Tag,
 ) error{OutOfMemory}![]const u8 {
     return switch (tag) {
-        .unexpected_token, .invalid_token, .missing_brace => "parsing error...TODO fix this",
+        .unexpected_token => "unexpected token",
+        .invalid_token => "invalid token - bad scene/template syntax",
+        .missing_brace => "missing '}' before end of input",
         .type_mismatch => "type mismatch",
         .unknown_type => |t| std.fmt.allocPrint(
             arena,
@@ -72,7 +74,7 @@ pub fn messageOf(
         ),
         .arity_mismatch => |a| std.fmt.allocPrint(
             arena,
-            "expected {d} compnents, got {d}",
+            "expected {d} components, got {d}",
             .{ a.expected, a.got },
         ),
         .default_placeholder => |d| blk: {
