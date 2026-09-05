@@ -30,6 +30,22 @@ pub fn deinit(self: *const Self, gpa: Allocator) void {
     gpa.free(self.line_starts);
 }
 
+pub fn byteOf(self: Self, pos: Position) u32 {
+    var idx = self.line_starts[pos.line];
+    var current_char: usize = 0;
+
+    while (current_char < pos.character) {
+        const cp_len = std.unicode.utf8ByteSequenceLength(self.src[idx]) catch unreachable;
+        const codepoint = std.unicode.utf8Decode(self.src[idx .. idx + cp_len]) catch unreachable;
+
+        // If the client (like an LSP) counts positions in UTF-16 code units (e.g., VS Code)
+        current_char += if (codepoint <= 0xFFFF) 1 else 2;
+        idx += cp_len; // You must advance idx by the actual UTF-8 byte length!
+    }
+
+    return @intCast(idx);
+}
+
 pub fn posOf(self: Self, byte: u32) Position {
     const S = struct {
         fn compareU32(context: u32, item: u32) std.math.Order {
@@ -75,6 +91,43 @@ pub fn rangeOf(self: Self, loc: Loc) Range {
 // Tests
 // ============================================================================
 const testing = std.testing;
+
+// --- byteOf: the reverse of posOf ({line,character} → byte). RED until implemented. ---
+
+test "byteOf: line 0 char 0 is byte 0" {
+    var li = try Self.build(testing.allocator, "radius 0.35");
+    defer li.deinit(testing.allocator);
+    try testing.expectEqual(@as(u32, 0), li.byteOf(.{ .line = 0, .character = 0 }));
+}
+
+test "byteOf: a character offset on line 0" {
+    var li = try Self.build(testing.allocator, "radius 0.35");
+    defer li.deinit(testing.allocator);
+    try testing.expectEqual(@as(u32, 7), li.byteOf(.{ .line = 0, .character = 7 }));
+}
+
+test "byteOf: a position on the second line" {
+    // "Ball\nradius" — line 1 char 0 is byte 5 (start of "radius")
+    var li = try Self.build(testing.allocator, "Ball\nradius");
+    defer li.deinit(testing.allocator);
+    try testing.expectEqual(@as(u32, 5), li.byteOf(.{ .line = 1, .character = 0 }));
+    try testing.expectEqual(@as(u32, 8), li.byteOf(.{ .line = 1, .character = 3 }));
+}
+
+test "byteOf: UTF-16 character maps back to the right byte" {
+    // "éx" — 'é' is 2 bytes / 1 UTF-16 unit; char 1 is the 'x' at byte 2
+    var li = try Self.build(testing.allocator, "\u{00E9}x");
+    defer li.deinit(testing.allocator);
+    try testing.expectEqual(@as(u32, 2), li.byteOf(.{ .line = 0, .character = 1 }));
+}
+
+test "byteOf is the inverse of posOf on ASCII" {
+    var li = try Self.build(testing.allocator, "ab\ncd\nef");
+    defer li.deinit(testing.allocator);
+    for ([_]u32{ 0, 1, 3, 4, 6, 7 }) |b| {
+        try testing.expectEqual(b, li.byteOf(li.posOf(b)));
+    }
+}
 
 test "posOf: byte 0 is line 0, character 0" {
     var li = try Self.build(testing.allocator, "radius 0.35");

@@ -54,6 +54,7 @@ pub fn build(b: *std.Build) void {
         "LineIndex.zig",
         "diagnostics.zig",
         "doc_store.zig",
+        "completion.zig",
     };
     for (scene_fmt_tests) |file| {
         const mod = b.createModule(.{

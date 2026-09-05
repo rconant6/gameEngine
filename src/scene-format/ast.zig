@@ -57,6 +57,20 @@ pub const Ast = struct {
             .curr = curr,
         };
     }
+
+    pub fn nodeAtByte(ast: *const Ast, byte: u32) ?u32 {
+        for (ast.nodes[1..], 1..) |node, i| {
+            const extent = if (node.body_end != 0)
+                node.body_end
+            else
+                node.name_loc.end;
+
+            if (byte <= extent and
+                byte >= node.name_loc.start) return @intCast(i);
+        }
+
+        return null;
+    }
 };
 
 pub const Node = struct {
@@ -67,6 +81,7 @@ pub const Node = struct {
     name_loc: Loc = .{},
     type_loc: Loc = .{},
     value_idx: u32 = 0,
+    body_end: u32 = 0,
 
     pub const Tag = enum(u8) { root, node, property, flag, missing };
 };
@@ -369,4 +384,45 @@ test "iterator: skip prunes a subtree" {
         .{ .kind = .exit, .idx = 4 }, //   /b
         .{ .kind = .exit, .idx = 0 }, // /root
     });
+}
+
+// MARK: nodeAtByte tests
+test "nodeAtByte: cursor inside a node's body returns that node" {
+    var ast = try Ast.init(testing.allocator, "Ball : circle { radius 1 }");
+    defer ast.deinit(testing.allocator);
+
+    const idx = ast.nodeAtByte(16) orelse return error.TestExpectedNode;
+    try testing.expectEqualStrings("Ball", ast.nodes[idx].name_loc.slice("Ball : circle { radius 1 }"));
+}
+
+test "nodeAtByte: cursor on the node name returns the node" {
+    var ast = try Ast.init(testing.allocator, "Ball : circle { radius 1 }");
+    defer ast.deinit(testing.allocator);
+    try testing.expect(ast.nodeAtByte(0) != null);
+}
+
+test "nodeAtByte: deepest node wins for a nested cursor" {
+    const src = "Level : level { Ball : circle { radius 1 } }";
+    var ast = try Ast.init(testing.allocator, src);
+    defer ast.deinit(testing.allocator);
+
+    const idx = ast.nodeAtByte(32) orelse return error.TestExpectedNode;
+    try testing.expectEqualStrings("Ball", ast.nodes[idx].name_loc.slice(src));
+}
+
+test "nodeAtByte: cursor between the outer and inner node is the outer" {
+    const src = "Level : level { Ball : circle { radius 1 } }";
+    var ast = try Ast.init(testing.allocator, src);
+    defer ast.deinit(testing.allocator);
+
+    const idx = ast.nodeAtByte(15) orelse return error.TestExpectedNode;
+    try testing.expectEqualStrings("Level", ast.nodes[idx].name_loc.slice(src));
+}
+
+test "nodeAtByte: an unclosed node still has an extent to EOF" {
+    const src = "Ball : circle { radius 1";
+    var ast = try Ast.init(testing.allocator, src);
+    defer ast.deinit(testing.allocator);
+
+    try testing.expect(ast.nodeAtByte(24) != null);
 }

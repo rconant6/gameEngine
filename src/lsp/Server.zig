@@ -14,6 +14,7 @@ const ServerCapabilities = tps.ServerCapabilities;
 const PublishDiagnosticParams = tps.PublishDiagnosticParams;
 const diag = @import("diagnostics.zig");
 const Diagnostic = diag.Diagnostic;
+const cmp = @import("completion.zig");
 
 const Self = @This();
 
@@ -75,6 +76,16 @@ fn handle(self: *Self, msg: rpc.Message) !void {
     if (std.mem.eql(u8, msg.method, "textDocument/didClose")) {
         return self.onDidClose(msg.params);
     }
+    if (std.mem.eql(u8, msg.method, "textDocument/completion")) {
+        const id = msg.id orelse return rpc.writeError(
+            &self.transport,
+            self.gpa,
+            null,
+            -32600, // InvalidRequest
+            "textDocument/completion requires an id",
+        );
+        return self.onCompletion(id, msg.params);
+    }
     if (std.mem.eql(u8, msg.method, "shutdown")) {
         const id = msg.id orelse return rpc.writeError(
             &self.transport,
@@ -99,12 +110,13 @@ fn onInitialize(self: *Self, id: rpc.Message.Id) !void {
         InitializeResult{ .capabilities = .{} }, // textDocumentSync defaults to 1 (Full)
     );
 }
+
 fn onDidOpen(self: *Self, params: json.Value) !void {
     const parsed = try json.parseFromValue(
         tps.DidOpenParams,
         self.gpa,
         params,
-        .{},
+        .{ .ignore_unknown_fields = true }, // clients send fields we don't model
     );
     defer parsed.deinit(); // upsert dupes the strings into the store; safe to free after
     const td = parsed.value.textDocument;
@@ -112,12 +124,13 @@ fn onDidOpen(self: *Self, params: json.Value) !void {
 
     try self.compileAndPublish(doc);
 }
+
 fn onDidChange(self: *Self, params: json.Value) !void {
     const parsed = try json.parseFromValue(
         tps.DidChangeParams,
         self.gpa,
         params,
-        .{},
+        .{ .ignore_unknown_fields = true }, // clients send fields we don't model
     );
     defer parsed.deinit();
     const last = parsed.value.contentChanges.len - 1;
@@ -127,12 +140,39 @@ fn onDidChange(self: *Self, params: json.Value) !void {
 
     try self.compileAndPublish(doc);
 }
+
+fn onCompletion(self: *Self, id: rpc.Message.Id, params: json.Value) !void {
+    const parsed = try json.parseFromValue(
+        tps.CompletionParams,
+        self.gpa,
+        params,
+        .{ .ignore_unknown_fields = true }, // clients send fields we don't model
+    );
+    defer parsed.deinit();
+
+    var arena = ArenaAllocator.init(self.gpa);
+    defer arena.deinit();
+
+    const doc = self.docs.get(parsed.value.textDocument.uri) orelse
+        return rpc.writeResponse(
+            &self.transport,
+            arena.allocator(),
+            id,
+            &[_]tps.CompletionItem{},
+        );
+
+    const byte = doc.lines.byteOf(parsed.value.position);
+    const items = try cmp.complete(arena.allocator(), doc.src, byte);
+
+    try rpc.writeResponse(&self.transport, arena.allocator(), id, items);
+}
+
 fn onDidClose(self: *Self, params: json.Value) !void {
     const parsed = try json.parseFromValue(
         tps.DidCloseParams,
         self.gpa,
         params,
-        .{},
+        .{ .ignore_unknown_fields = true }, // clients send fields we don't model
     );
     defer parsed.deinit();
     const uri = parsed.value.textDocument.uri;

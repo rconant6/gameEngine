@@ -34,8 +34,12 @@ const ingst = @import("ingest.zig");
 pub const ingest = ingst.ingest;
 pub const ingestResolved = ingst.ingestResolved;
 const schem = @import("schema.zig");
+pub const schema = schem.schema;
 pub const Schema = schem.Schema;
 pub const Literal = schem.Literal;
+pub const FieldSpec = schem.FieldSpec;
+pub const FieldType = schem.FieldType;
+pub const Variant = schem.Variant;
 
 pub fn lexeme(src: [:0]const u8, token: Token) []const u8 {
     const start = token.loc.start;

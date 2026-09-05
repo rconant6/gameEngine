@@ -155,6 +155,32 @@ pub const Schema = struct {
         return findAsset(name) != null;
     }
 
+    // MARK: enumeration (the LSP's list-shaped siblings of the by-name lookups)
+    // Everything is comptime-known → static comptime slices; no buf, no alloc.
+    // Each yields the spec/meta so completion builds `detail` with no re-lookup.
+    pub const TypeName = struct {
+        name: []const u8,
+        kind: enum { variant, container },
+    };
+    pub const FlagWord = struct {
+        word: []const u8,
+        activates: []const u8,
+    };
+
+    // TYPE position — variants + containers (the two things after ':').
+    pub fn typeNames(_: Schema) []const TypeName {
+        return &type_names_data;
+    }
+    // MEMBER position — every concern's fields, as SPECS (carry .type/.required/
+    // .default). The concern NAME is never emitted.
+    pub fn concernFields(_: Schema) []const *const FieldSpec {
+        return &concern_fields_data;
+    }
+    // MEMBER position — the bare words that activate a concern.
+    pub fn flagWords(_: Schema) []const FlagWord {
+        return &flag_words_data;
+    }
+
     const containers = std.StaticStringMap(bool).initComptime(.{
         .{ "scene", true }, .{ "level", true },
         .{ "world", true }, .{ "entity", true },
@@ -349,6 +375,44 @@ pub const schema = Schema{
         view,
     },
     .assets = &.{ font_asset, sprite_asset, atlas_asset, sound_asset, mesh_data_asset },
+};
+
+// MARK: enumeration data — built once at comptime from the schema above.
+const type_names_data = blk: {
+    var arr: [schema.variants.len + Schema.containers.keys().len]Schema.TypeName = undefined;
+    var i: usize = 0;
+    for (schema.variants) |v| {
+        arr[i] = .{ .name = v.name, .kind = .variant };
+        i += 1;
+    }
+    for (Schema.containers.keys()) |k| {
+        arr[i] = .{ .name = k, .kind = .container };
+        i += 1;
+    }
+    break :blk arr;
+};
+
+const concern_fields_data = blk: {
+    var count: usize = 0;
+    for (schema.concerns) |c| count += c.fields.len;
+    var arr: [count]*const FieldSpec = undefined;
+    var i: usize = 0;
+    for (schema.concerns) |*c| {
+        for (c.fields) |*f| {
+            arr[i] = f;
+            i += 1;
+        }
+    }
+    break :blk arr;
+};
+
+const flag_words_data = blk: {
+    const keys = flags.keys();
+    var arr: [keys.len]Schema.FlagWord = undefined;
+    for (keys, 0..) |k, i| {
+        arr[i] = .{ .word = k, .activates = flags.get(k).? };
+    }
+    break :blk arr;
 };
 
 comptime {

@@ -50,7 +50,7 @@ pub const Parser = struct {
                 // any still-open nodes = unclosed braces
                 while (p.node_idx != 0) {
                     try p.err(.missing_brace, p.tok.loc);
-                    p.up();
+                    p.closeNode(p.tok.loc.end);
                 }
                 break :parser;
             },
@@ -59,7 +59,9 @@ pub const Parser = struct {
                 if (p.node_idx == 0) {
                     // stray '}' at top level
                     try p.err(.unexpected_token, p.tok.loc);
+                    const end = p.tok.loc.end;
                     p.consume();
+                    p.closeNode(end);
                     continue :parser p.tok.tag;
                 }
                 p.consume();
@@ -70,7 +72,9 @@ pub const Parser = struct {
                 if (p.node_idx == 0) {
                     // stray ']' at top level
                     try p.err(.unexpected_token, p.tok.loc);
+                    const end = p.tok.loc.end;
                     p.consume();
+                    p.closeNode(end);
                     continue :parser p.tok.tag;
                 }
                 p.consume();
@@ -338,6 +342,11 @@ pub const Parser = struct {
     // append a bare-tag diagnostic (no payload)
     fn err(p: *Parser, comptime tag: anytype, loc: Loc) error{OutOfMemory}!void {
         try p.errors.append(p.perm, .{ .severity = .err, .loc = loc, .tag = tag });
+    }
+
+    fn closeNode(p: *Parser, end: u32) void {
+        p.nodes.items[p.node_idx].body_end = end;
+        p.up();
     }
 };
 

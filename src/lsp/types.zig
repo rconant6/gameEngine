@@ -15,6 +15,9 @@ pub const PublishDiagnosticParams = struct {
 
 pub const ServerCapabilities = struct {
     textDocumentSync: u8 = 1,
+    completionProvider: struct {
+        triggerCharacters: []const []const u8 = &.{ ":", " " },
+    } = .{},
 };
 
 pub const InitializeResult = struct { capabilities: ServerCapabilities };
@@ -26,6 +29,26 @@ pub const TextDocumentItem = struct {
     version: i64,
     text: []const u8,
 };
+pub const CompletionItemKind = enum(u8) {
+    text = 1,
+    method = 2,
+    field = 5,
+    value = 12,
+    keyword = 14,
+    enum_member = 20,
+    struct_ = 22,
+
+    pub fn jsonStringify(self: @This(), jw: anytype) !void {
+        try jw.write(@intFromEnum(self));
+    }
+};
+
+pub const CompletionItem = struct {
+    label: []const u8,
+    kind: CompletionItemKind,
+    detail: []const u8 = "",
+    documentation: []const u8 = "",
+};
 
 pub const DidOpenParams = struct { textDocument: TextDocumentItem };
 
@@ -36,3 +59,7 @@ pub const DidChangeParams = struct {
     contentChanges: []ContentChange,
 };
 pub const DidCloseParams = struct { textDocument: struct { uri: []const u8 } };
+pub const CompletionParams = struct {
+    textDocument: struct { uri: []const u8 },
+    position: Position,
+};
