@@ -23,6 +23,8 @@ pub const LayoutInfo = struct {
 /// Used to pass required info to widgets for rendering purposes
 pub const RenderInfo = struct {
     renderer: *Renderer,
+    // Concrete: a struct FIELD cannot be `anytype`. Renderer entry points take
+    // `ctx: anytype`; a carrier struct like this one has to name a type.
     ctx: RenderContext,
     font: *const Font,
     tex: *Texture, // font's atlas texture (resolved alongside font)

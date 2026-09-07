@@ -12,9 +12,9 @@ const Template = scene.Template;
 const Instantiator = scene.Instantiator;
 const asset = @import("assets");
 const AssetManager = asset.AssetManager;
-const core = @import("math");
-const V2 = core.V2;
-const GameMemory = core.GameMemory;
+const math = @import("math");
+const V2 = math.V2;
+const GameMemory = @import("memory");
 
 const Action = @import("Action");
 const ActionRegistry = Action.ActionRegistry;

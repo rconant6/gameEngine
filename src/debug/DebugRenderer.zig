@@ -1,7 +1,5 @@
 pub const Self = @This();
-const std = @import("std");
 const rend = @import("renderer");
-const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
 const Texture = Renderer.Texture;
 const Circle = rend.Shapes.Circle;
@@ -34,7 +32,7 @@ pub fn init(renderer: *Renderer, default_font: *const Font, default_tex: *Textur
     };
 }
 
-pub fn renderArrow(self: *Self, arrow: DebugArrow, ctx: RenderContext) void {
+pub fn renderArrow(self: *Self, arrow: DebugArrow, ctx: anytype) void {
     const delta = arrow.end.sub(arrow.start);
     const direction = delta.normalize();
     const perpendicular = V2{ .x = -direction.y, .y = direction.x };
@@ -70,7 +68,7 @@ pub fn renderArrow(self: *Self, arrow: DebugArrow, ctx: RenderContext) void {
         ctx,
     );
 }
-pub fn renderCircle(self: *Self, circle: DebugCircle, ctx: RenderContext) void {
+pub fn renderCircle(self: *Self, circle: DebugCircle, ctx: anytype) void {
     const geo = rend.Shapes.Circle{
         .origin = circle.origin,
         .radius = circle.radius,
@@ -86,7 +84,7 @@ pub fn renderCircle(self: *Self, circle: DebugCircle, ctx: RenderContext) void {
         ctx,
     );
 }
-pub fn renderLine(self: *Self, line: DebugLine, ctx: RenderContext) void {
+pub fn renderLine(self: *Self, line: DebugLine, ctx: anytype) void {
     const geo = rend.Shapes.Line{
         .start = line.start,
         .end = line.end,
@@ -101,7 +99,7 @@ pub fn renderLine(self: *Self, line: DebugLine, ctx: RenderContext) void {
         ctx,
     );
 }
-pub fn renderRect(self: *Self, rect: DebugRect, ctx: RenderContext) void {
+pub fn renderRect(self: *Self, rect: DebugRect, ctx: anytype) void {
     const half_w = (rect.max.x - rect.min.x) / 2;
     const half_h = (rect.max.y - rect.min.y) / 2;
     const center = rect.min.add(V2{ .x = half_w, .y = half_h });
@@ -121,7 +119,7 @@ pub fn renderRect(self: *Self, rect: DebugRect, ctx: RenderContext) void {
         ctx,
     );
 }
-pub fn renderText(self: *Self, text: DebugText, ctx: RenderContext) void {
+pub fn renderText(self: *Self, text: DebugText, ctx: anytype) void {
     self.renderer.drawText(
         self.default_font,
         self.default_tex,
@@ -133,7 +131,7 @@ pub fn renderText(self: *Self, text: DebugText, ctx: RenderContext) void {
     );
 }
 
-pub fn render(self: *Self, data: *const DebugDraw, ctx: RenderContext) void {
+pub fn render(self: *Self, data: *const DebugDraw, ctx: anytype) void {
     for (data.arrows.items) |a| {
         if (a.cat.matches(data.visible_categories)) {
             self.renderArrow(a, ctx);

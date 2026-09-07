@@ -69,10 +69,10 @@ const dummy_entity: scene_fmt.EntityDeclaration = .{
 };
 
 fn buildEmptyState(
-    arena: std.mem.Allocator,
+    ui_arena: std.mem.Allocator,
 ) *WidgetNode {
     return make.label(
-        arena,
+        ui_arena,
         "Nothing Selected",
         .{
             .color = Colors.LIGHT_GRAY,
@@ -81,30 +81,30 @@ fn buildEmptyState(
     );
 }
 
-fn buildPropertyRow(arena: Allocator, prop: Property) *WidgetNode {
+fn buildPropertyRow(ui_arena: Allocator, prop: Property) *WidgetNode {
     const title_txt = std.fmt.allocPrint(
-        arena,
+        ui_arena,
         "{s}: ",
         .{prop.name},
     ) catch "XXXXXX";
-    const title_label = make.label(arena, title_txt, .{
+    const title_label = make.label(ui_arena, title_txt, .{
         .color = Colors.ABYSS_BLUE,
     });
 
     const value_txt: []const u8 = switch (prop.value) {
-        .number => |n| std.fmt.allocPrint(arena, "{d}", .{n}) catch "???",
+        .number => |n| std.fmt.allocPrint(ui_arena, "{d}", .{n}) catch "???",
         .boolean => |b| if (b) "true" else "false",
         .string, .assetRef => |s| s,
-        .color => |c| std.fmt.allocPrint(arena, "#{x:0>6}", .{c}) catch "#???????",
-        .array => |a| std.fmt.allocPrint(arena, "...{d}", .{a.len}) catch "???",
+        .color => |c| std.fmt.allocPrint(ui_arena, "#{x:0>6}", .{c}) catch "#???????",
+        .array => |a| std.fmt.allocPrint(ui_arena, "...{d}", .{a.len}) catch "???",
         .vector => |v| switch (v.len) {
             2 => std.fmt.allocPrint(
-                arena,
+                ui_arena,
                 "[{d}, {d}]",
                 .{ v[0], v[1] },
             ) catch "[??, ??]",
             3 => std.fmt.allocPrint(
-                arena,
+                ui_arena,
                 "[{d}, {d}, {d}]",
                 .{ v[0], v[1], v[2] },
             ) catch "[??, ??, ??]",
@@ -112,26 +112,26 @@ fn buildPropertyRow(arena: Allocator, prop: Property) *WidgetNode {
         },
     };
 
-    const value_label = make.label(arena, value_txt, .{
+    const value_label = make.label(ui_arena, value_txt, .{
         .color = Colors.ABYSS_BLUE,
     });
 
-    return make.hstack(arena, &.{ title_label, value_label }, .{});
+    return make.hstack(ui_arena, &.{ title_label, value_label }, .{});
 }
 
 pub fn buildTree(
-    arena: Allocator,
+    ui_arena: Allocator,
     raw_state: ?*const anyopaque,
 ) *WidgetNode {
     const state: *const EditorState = @ptrCast(@alignCast(raw_state));
     _ = state;
 
-    const bg = make.colorRect(arena, Colors.ABYSS_BLUE, .{
+    const bg = make.colorRect(ui_arena, Colors.ABYSS_BLUE, .{
         .border_color = Colors.BLACK,
         .border_width = 1,
     });
-    return make.vstack(arena, &.{ buildPropertyRow(
-        arena,
+    return make.vstack(ui_arena, &.{ buildPropertyRow(
+        ui_arena,
         Property{
             .location = .{ .col = 0, .len = 0, .line = 0 },
             .name = "dummy",

@@ -25,18 +25,18 @@ const screen_w: f32 = @floatFromInt(logical_width);
 const screen_h: f32 = @floatFromInt(logical_height);
 
 pub fn main(init: std.process.Init) !void {
-    const gpa = init.gpa;
+    const backing = init.gpa;
     const io = init.io;
     const env = init.environ_map;
 
-    var app = try App.init(gpa, io, env, .{
+    var app = try App.init(backing, io, env, .{
         .title = "UI Playground",
         .width = @intCast(logical_width),
         .height = @intCast(logical_height),
     });
     defer app.deinit();
 
-    var font = Font.initFromMemory(gpa, assets.embedded_default_font) catch |err| {
+    var font = Font.initFromMemory(backing, assets.embedded_default_font) catch |err| {
         log.err(.application, "Failed to load font: {any}", .{err});
         @panic("Cannot load default engine font");
     };
@@ -53,27 +53,27 @@ pub fn main(init: std.process.Init) !void {
     const font_tex = try assets.atlasTexture(&app.renderer, &font);
 
     // One UIManager per independent test region
-    var test1 = ui.UIManager.init(gpa);
+    var test1 = ui.UIManager.init(backing);
     defer test1.deinit();
-    var test2 = ui.UIManager.init(gpa);
+    var test2 = ui.UIManager.init(backing);
     defer test2.deinit();
-    var test3 = ui.UIManager.init(gpa);
+    var test3 = ui.UIManager.init(backing);
     defer test3.deinit();
-    var test4 = ui.UIManager.init(gpa);
+    var test4 = ui.UIManager.init(backing);
     defer test4.deinit();
-    var test5 = ui.UIManager.init(gpa);
+    var test5 = ui.UIManager.init(backing);
     defer test5.deinit();
-    var test6 = ui.UIManager.init(gpa);
+    var test6 = ui.UIManager.init(backing);
     defer test6.deinit();
-    var test7 = ui.UIManager.init(gpa);
+    var test7 = ui.UIManager.init(backing);
     defer test7.deinit();
-    var test8 = ui.UIManager.init(gpa);
+    var test8 = ui.UIManager.init(backing);
     defer test8.deinit();
-    var test9 = ui.UIManager.init(gpa);
+    var test9 = ui.UIManager.init(backing);
     defer test9.deinit();
-    var test10 = ui.UIManager.init(gpa);
+    var test10 = ui.UIManager.init(backing);
     defer test10.deinit();
-    var test11 = ui.UIManager.init(gpa);
+    var test11 = ui.UIManager.init(backing);
     defer test11.deinit();
 
     while (app.isRunning()) {

@@ -1,5 +1,4 @@
 const std = @import("std");
-const Rect = @import("Rect.zig");
 const l_out = @import("layout.zig");
 const Constraints = l_out.Constraints;
 const LayoutInfo = l_out.LayoutInfo;
@@ -9,7 +8,6 @@ pub const WidgetState = @import("widgetState.zig").WidgetState;
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
 const Texture = Renderer.Texture;
-const RenderContext = rend.RenderContext;
 const assets = @import("assets");
 const Font = assets.Font;
 const evt = @import("event.zig");
@@ -20,7 +18,7 @@ const log = @import("debug").log;
 
 const Self = @This();
 
-gpa: std.mem.Allocator,
+persistent: std.mem.Allocator,
 arena: std.heap.ArenaAllocator,
 root: ?*WidgetNode,
 state_map: std.StringHashMap(WidgetState),
@@ -28,7 +26,7 @@ font: Font,
 
 pub fn init(backing_alloc: std.mem.Allocator) Self {
     return .{
-        .gpa = backing_alloc,
+        .persistent = backing_alloc,
         .arena = std.heap.ArenaAllocator.init(backing_alloc),
         .root = null,
         .state_map = .init(backing_alloc),
@@ -118,7 +116,7 @@ pub fn render(
     renderer: *Renderer,
     font: ?*const Font,
     tex: *Texture,
-    ctx: RenderContext,
+    ctx: anytype,
 ) void {
     const root = self.root orelse return;
     const render_info: RenderInfo = .{

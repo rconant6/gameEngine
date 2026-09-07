@@ -3,8 +3,8 @@ const testing = std.testing;
 const zxl = @import("zxl");
 const ZxlImage = zxl.ZxlImage;
 const ZxlPalette = zxl.ZxlPalette;
-const math = @import("math");
-const Rgba = math.Rgba;
+const visual = @import("visual");
+const Rgba = visual.Rgba;
 
 // ========================================
 // Palette

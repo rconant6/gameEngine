@@ -12,7 +12,7 @@ const rend = @import("renderer");
 const Renderer = rend.Renderer;
 const Texture = Renderer.Texture;
 const math = @import("math");
-const Memory = math.GameMemory;
+const Memory = @import("memory");
 
 const Self = @This();
 

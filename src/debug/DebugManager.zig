@@ -11,7 +11,6 @@ const DebugRenderer = @import("DebugRenderer.zig");
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
 const Texture = Renderer.Texture;
-const RenderContext = rend.RenderContext;
 const Colors = rend.Colors;
 const Color = rend.Color;
 const math = @import("math");
@@ -119,7 +118,7 @@ pub fn toggleCategory(self: *Self, category: DebugCategoryEnum) void {
     };
 }
 
-pub fn run(self: *Self, dt: f32, ctx: RenderContext) void {
+pub fn run(self: *Self, dt: f32, ctx: anytype) void {
     // tick timed entries, push survivors as borrows into draw.texts this frame
     var i: usize = 0;
     while (i < self.timed_texts.items.len) {

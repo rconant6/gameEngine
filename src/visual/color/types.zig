@@ -1,4 +1,3 @@
-const std = @import("std");
 const Color = @import("Color.zig").Color;
 
 pub const Hue = enum { // h from hsv

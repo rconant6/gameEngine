@@ -19,9 +19,9 @@ const V2 = math.V2;
 const WorldPoint = math.WorldPoint;
 const ScreenPoint = math.ScreenPoint;
 const ComponentRegistry = @import("ecs").ComponentRegistry;
-const ShapeRegistry = @import("renderer").ShapeRegistry;
+const ShapeRegistry = @import("visual").ShapeRegistry;
 const ColliderRegistry = @import("ecs").ColliderRegistry;
-const Shapes = @import("renderer").Shapes;
+const Shapes = @import("visual").Shapes;
 
 const ecs = @import("ecs");
 const World = ecs.World;

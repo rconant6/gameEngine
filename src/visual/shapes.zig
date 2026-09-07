@@ -1,10 +1,10 @@
 const std = @import("std");
+const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const math = @import("math");
 const V2 = math.V2;
 const hf = math.utils;
 const tris = @import("triangulation");
-const log = @import("debug").log;
 
 pub const Circle = struct {
     origin: V2,
@@ -193,16 +193,12 @@ pub const Triangle = struct {
     v1: V2,
     v2: V2,
 
-    pub fn init(
-        points: []const V2,
-    ) @This() {
-        log.err(
-            .renderer,
-            "Triangle creation without 3 points {d}",
-            .{points.len},
-        );
+    pub fn init(points: []const V2) @This() {
+        assert(points.len == 3);
+
         var verts = [3]V2{ points[0], points[1], points[2] };
         std.mem.sort(V2, &verts, {}, hf.sortPointByYThenX);
+
         return .{
             .v0 = verts[0],
             .v1 = verts[1],

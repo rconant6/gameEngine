@@ -22,7 +22,7 @@ fn begin(canvas: *Canvas, x: usize, y: usize, color: Color) void {
     const old_color = canvas.pixels[idx].color;
     canvas.pixels[idx].color = color;
 
-    canvas.changes.append(canvas.allocator, PixelChange{
+    canvas.changes.append(canvas.data, PixelChange{
         .x = x,
         .y = y,
         .old_color = old_color,
@@ -42,7 +42,7 @@ fn update(canvas: *Canvas, x: usize, y: usize, color: Color) void {
 fn commit(canvas: *Canvas) ?ToolCommand {
     if (canvas.changes.items.len == 0) return null;
 
-    const pixels = canvas.allocator.dupe(
+    const pixels = canvas.data.dupe(
         PixelChange,
         canvas.changes.items,
     ) catch return null;

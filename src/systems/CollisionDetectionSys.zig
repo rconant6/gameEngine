@@ -12,8 +12,7 @@ const db = @import("debug");
 const DebugCategory = db.DebugCategory;
 const DebugManager = db.DebugManager;
 const log = db.log;
-const rend = @import("renderer");
-const Colors = rend.Colors;
+const Colors = @import("visual").Colors;
 const math = @import("math");
 const V2 = math.V2;
 

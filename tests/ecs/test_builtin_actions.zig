@@ -31,7 +31,7 @@ const Velocity = ecs.Velocity;
 
 const math = @import("math");
 const V2 = math.V2;
-const GameMemory = math.GameMemory;
+const GameMemory = @import("memory");
 
 const game_state = @import("game_state");
 const GameStateManager = game_state.GameStateManager;

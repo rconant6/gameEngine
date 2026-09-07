@@ -571,3 +571,36 @@ test "gradient endpoints honor opacity" {
     // hub = start with alpha halved (opacity applied before pack, same as flat)
     try testing.expect(hasColor(&batch, expectedPacked(start, 0.5)));
 }
+
+// ── Structural render-context contract ────────────────────────────────────
+// The renderer takes `ctx: anytype` and reads only width/height/camera_loc/
+// ortho_size. This asserts that contract is REAL: a struct the renderer has
+// never heard of, carrying extra fields, satisfies it purely by shape.
+test "foreign ctx satisfies the structural contract" {
+    const MyCtx = struct {
+        width: u32,
+        height: u32,
+        camera_loc: math.V2,
+        ortho_size: f32,
+        shake_offset: math.V2, // extra fields the renderer knows nothing about
+        time_of_day: f32,
+    };
+    const c: MyCtx = .{
+        .width = 800,
+        .height = 600,
+        .camera_loc = .{ .x = 1, .y = 2 },
+        .ortho_size = 10,
+        .shake_offset = .{ .x = 0, .y = 0 },
+        .time_of_day = 0.5,
+    };
+
+    const w = rend.ClipMap.fromWorld(c);
+    const s = rend.ClipMap.fromScreen(c);
+
+    // world: sx = 1/(ortho*aspect), aspect = 800/600
+    try testing.expectApproxEqAbs(@as(f32, 0.075), w.scale[0], 0.0001);
+    try testing.expectApproxEqAbs(@as(f32, 0.1), w.scale[1], 0.0001);
+    // screen: 2/w, -2/h
+    try testing.expectApproxEqAbs(@as(f32, 0.0025), s.scale[0], 0.0001);
+    try testing.expectApproxEqAbs(@as(f32, -1.0 / 300.0), s.scale[1], 0.0001);
+}

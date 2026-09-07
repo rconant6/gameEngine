@@ -1,49 +1,15 @@
-const std = @import("std");
 const math = @import("math");
 const V2 = math.V2;
 const WorldPoint = math.WorldPoint;
 const col = @import("color.zig");
 const Color = col.Color;
-const reg = @import("registry");
-const ShapeData = reg.ShapeData;
+const ShapeData = @import("shape_data.zig").ShapeData;
 
 pub const CoordinateSpace = enum { world, screen };
 
 // Backend-agnostic texture formats. The engine speaks these; each backend maps
 // them to its native type at its own boundary (no MTL*/VK* above the backend).
 pub const PixelFormat = enum { r8, rgba8, bgra8_srgb };
-
-pub const RendererConfig = struct {
-    width: u32,
-    height: u32,
-
-    native_handle: ?*anyopaque = null,
-    enable_validation: bool = false,
-    vsync: bool = true,
-    msaa_samples: u8 = 4,
-};
-
-pub const RenderContext = struct {
-    const Self = @This();
-
-    width: u32,
-    height: u32,
-    camera_loc: WorldPoint,
-    ortho_size: f32,
-
-    scale_factor: f32 = 1.0,
-    frame_number: u64 = 0,
-
-    time: f64 = 0,
-    delta_time: f64 = 0,
-
-    pub fn aspectRatio(self: *const Self) f32 {
-        const fw: f32 = @floatFromInt(self.width);
-        const fh: f32 = @floatFromInt(self.height);
-        std.debug.assert(fh != 0);
-        return fw / fh;
-    }
-};
 
 pub const DrawStyle = struct {
     fill: ?Color = null,
@@ -88,7 +54,9 @@ pub const ScreenAnchor = enum {
     MiddleCenter,
     MiddleRight,
 };
-pub fn getAnchorPosition(anchor: ScreenAnchor, ctx: RenderContext) V2 {
+/// ctx: any struct with `width: u32` and `height: u32`.
+/// anytype because RenderContext lives in `renderer` — visual cannot name it.
+pub fn getAnchorPosition(anchor: ScreenAnchor, ctx: anytype) V2 {
     const f_width: f32 = @floatFromInt(ctx.width);
     const f_height: f32 = @floatFromInt(ctx.height);
     return switch (anchor) {

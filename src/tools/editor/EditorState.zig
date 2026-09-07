@@ -32,9 +32,9 @@ camera_pos: V2,
 camera_zoom: f32,
 // TODO: do we want to keep a quick list of the entities vice scanning every rebuild?
 
-pub fn init(gpa: Allocator) Self {
+pub fn init(persistent: Allocator) Self {
     return .{
-        .persistent = gpa,
+        .persistent = persistent,
         .scene_file = null,
         .scene_path = "",
         .selected = null,

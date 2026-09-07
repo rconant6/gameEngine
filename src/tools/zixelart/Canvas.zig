@@ -20,9 +20,9 @@ pub const PixelCell = struct {
     color: Color,
 };
 
-gpa: std.mem.Allocator,
+backing: std.mem.Allocator, // only to destroy(self)
 arena: std.heap.ArenaAllocator,
-allocator: std.mem.Allocator,
+data: std.mem.Allocator, // the arena above; all canvas data lives here
 
 width: usize,
 height: usize,
@@ -39,19 +39,19 @@ history: CommandHistory(ToolCommand),
 dispatcher: ToolDispatcher,
 
 pub fn init(
-    child_alloc: std.mem.Allocator,
+    backing_alloc: std.mem.Allocator,
     region: Region,
     pixel_count: usize,
 ) !*Self {
-    const self = try child_alloc.create(Self);
+    const self = try backing_alloc.create(Self);
 
-    self.gpa = child_alloc;
+    self.backing = backing_alloc;
 
-    self.arena = std.heap.ArenaAllocator.init(child_alloc);
-    self.allocator = self.arena.allocator();
+    self.arena = std.heap.ArenaAllocator.init(backing_alloc);
+    self.data = self.arena.allocator();
 
-    self.changes = try .initCapacity(self.allocator, 48);
-    self.history = .init(self.allocator);
+    self.changes = try .initCapacity(self.data, 48);
+    self.history = .init(self.data);
     self.dispatcher = .init();
 
     self.width = @intFromFloat(region.width);
@@ -62,7 +62,7 @@ pub fn init(
     self.y_offset = @intFromFloat(region.y);
     self.blank_color = Colors.LIGHT_GRAY;
 
-    self.pixels = try self.allocator.alloc(PixelCell, pixel_count * pixel_count);
+    self.pixels = try self.data.alloc(PixelCell, pixel_count * pixel_count);
 
     const ScreenRect = rend.ShapeRegistry.getShapeType("Rectangle") orelse {
         log.err(.application, "Canvas works with Screen Rectangles only", .{});
@@ -92,7 +92,7 @@ pub fn init(
 }
 pub fn deinit(self: *Self) void {
     self.arena.deinit();
-    self.gpa.destroy(self);
+    self.backing.destroy(self);
 }
 pub fn setPixel(self: *Self, state: *const ZixelState) void {
     self.pixels[

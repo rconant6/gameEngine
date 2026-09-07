@@ -38,7 +38,7 @@ pub fn addAllTests(
         .{ .name = "color-tests", .path = "tests/renderer/test_color.zig", .imports = &.{
             .{ "math", mod(modules, .math) },
         }, .anon_imports = &.{
-            .{ "color", "src/renderer/color.zig" },
+            .{ "color", "src/visual/color.zig" },
         } },
     };
 
@@ -123,6 +123,7 @@ pub fn addAllTests(
             .{ "ecs", mod(modules, .ecs) },
         }, .link_engine = true },
         .{ .name = "action-executor-tests", .path = "tests/ecs/test_action_executor.zig", .imports = &.{
+            .{ "memory", mod(modules, .memory) },
             .{ "math", mod(modules, .math) },
             .{ "Action", mod(modules, .action) },
             .{ "ecs", mod(modules, .ecs) },
@@ -135,6 +136,7 @@ pub fn addAllTests(
             .{ "scene-format", mod(modules, .scene_format) },
         }, .link_engine = true },
         .{ .name = "builtin-actions-tests", .path = "tests/ecs/test_builtin_actions.zig", .imports = &.{
+            .{ "memory", mod(modules, .memory) },
             .{ "math", mod(modules, .math) },
             .{ "Action", mod(modules, .action) },
             .{ "ecs", mod(modules, .ecs) },
@@ -146,6 +148,7 @@ pub fn addAllTests(
             .{ "systems", mod(modules, .systems) },
         }, .link_engine = true },
         .{ .name = "state-text-system-tests", .path = "tests/systems/test_state_text_system.zig", .imports = &.{
+            .{ "memory", mod(modules, .memory) },
             .{ "math", mod(modules, .math) },
             .{ "ecs", mod(modules, .ecs) },
             .{ "systems", mod(modules, .systems) },
@@ -159,6 +162,7 @@ pub fn addAllTests(
     // ========================================
     const game_state_tests = [_]TestSpec{
         .{ .name = "game-state-tests", .path = "tests/gameState/test_game_state_manager.zig", .imports = &.{
+            .{ "memory", mod(modules, .memory) },
             .{ "game_state", mod(modules, .game_state) },
             .{ "math", mod(modules, .math) },
         } },
@@ -198,6 +202,7 @@ pub fn addAllTests(
             .{ "scene-format", mod(modules, .scene_format) },
         } },
         .{ .name = "template-instantiation-tests", .path = "tests/scene/test_template_instantiation.zig", .imports = &.{
+            .{ "memory", mod(modules, .memory) },
             .{ "scene-format", mod(modules, .scene_format) },
             .{ "ecs", mod(modules, .ecs) },
             .{ "scene", mod(modules, .scene) },
@@ -207,6 +212,7 @@ pub fn addAllTests(
             .{ "game_state", mod(modules, .game_state) },
         }, .link_engine = true },
         .{ .name = "action-instantiation-tests", .path = "tests/scene/test_action_instantiation.zig", .imports = &.{
+            .{ "memory", mod(modules, .memory) },
             .{ "scene-format", mod(modules, .scene_format) },
             .{ "ecs", mod(modules, .ecs) },
             .{ "scene", mod(modules, .scene) },
@@ -215,6 +221,7 @@ pub fn addAllTests(
             .{ "Action", mod(modules, .action) },
         }, .link_engine = true },
         .{ .name = "point-ownership-tests", .path = "tests/scene/test_point_ownership.zig", .imports = &.{
+            .{ "memory", mod(modules, .memory) },
             .{ "scene-format", mod(modules, .scene_format) },
             .{ "ecs", mod(modules, .ecs) },
             .{ "scene", mod(modules, .scene) },
@@ -222,6 +229,7 @@ pub fn addAllTests(
             .{ "math", mod(modules, .math) },
         }, .link_engine = true },
         .{ .name = "shape-instantiation-tests", .path = "tests/scene/test_shape_instantiation.zig", .imports = &.{
+            .{ "memory", mod(modules, .memory) },
             .{ "scene-format", mod(modules, .scene_format) },
             .{ "ecs", mod(modules, .ecs) },
             .{ "scene", mod(modules, .scene) },
@@ -247,10 +255,12 @@ pub fn addAllTests(
         .{ .name = "shapes-tests", .path = "tests/renderer/test_shapes.zig", .imports = &.{
             .{ "math", mod(modules, .math) },
             .{ "renderer", mod(modules, .renderer) },
+            .{ "visual", mod(modules, .visual) },
         }, .link_engine = true },
         .{ .name = "tessellation-tests", .path = "tests/renderer/test_tessellation.zig", .imports = &.{
             .{ "math", mod(modules, .math) },
             .{ "renderer", mod(modules, .renderer) },
+            .{ "visual", mod(modules, .visual) },
         }, .link_engine = true },
     };
 
@@ -280,15 +290,15 @@ pub fn addAllTests(
     const zxl_tests = [_]TestSpec{
         .{ .name = "zxl-image-tests", .path = "tests/zxl/test_zxl_image.zig", .imports = &.{
             .{ "zxl", mod(modules, .zxl) },
-            .{ "math", mod(modules, .math) },
+            .{ "visual", mod(modules, .visual) },
         } },
         .{ .name = "zxl-reader-tests", .path = "tests/zxl/test_zxl_reader.zig", .imports = &.{
             .{ "zxl", mod(modules, .zxl) },
-            .{ "math", mod(modules, .math) },
+            .{ "visual", mod(modules, .visual) },
         } },
         .{ .name = "zxl-writer-tests", .path = "tests/zxl/test_zxl_writer.zig", .imports = &.{
             .{ "zxl", mod(modules, .zxl) },
-            .{ "math", mod(modules, .math) },
+            .{ "visual", mod(modules, .visual) },
         } },
     };
 

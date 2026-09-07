@@ -44,9 +44,9 @@ pub const ConsoleSink = struct {
         const self: *Self = @ptrCast(@alignCast(ptr));
         self.flush();
     }
-    fn deinitFn(ptr: *anyopaque, gpa: Allocator) void {
+    fn deinitFn(ptr: *anyopaque, persistent: Allocator) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        self.deinit(gpa);
+        self.deinit(persistent);
     }
     pub fn write(self: *Self, entry: LogEntry) void {
         const level_color = entry.level.getAnsiColor();
@@ -79,8 +79,8 @@ pub const ConsoleSink = struct {
         _ = self;
         // self.writer.flush() catch return;
     }
-    pub fn deinit(self: *Self, gpa: Allocator) void {
-        gpa.destroy(self);
+    pub fn deinit(self: *Self, persistent: Allocator) void {
+        persistent.destroy(self);
     }
 };
 
@@ -139,9 +139,9 @@ pub const FileSink = struct {
         const self: *Self = @ptrCast(@alignCast(ptr));
         self.flush();
     }
-    pub fn deinitFn(ptr: *anyopaque, gpa: Allocator) void {
+    pub fn deinitFn(ptr: *anyopaque, persistent: Allocator) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        self.deinit(gpa);
+        self.deinit(persistent);
     }
 
     pub fn write(self: *Self, entry: LogEntry) void {
@@ -196,11 +196,11 @@ pub const FileSink = struct {
         self.entry_count = 0;
     }
 
-    pub fn deinit(self: *Self, gpa: Allocator) void {
+    pub fn deinit(self: *Self, persistent: Allocator) void {
         self.flush();
         self.log_file.close(self.io);
         self.log_dir.close(self.io);
-        gpa.destroy(self);
+        persistent.destroy(self);
     }
 
     fn getLogDir(io: std.Io) !std.Io.Dir {
@@ -240,7 +240,7 @@ pub const Sink = struct {
     pub const VTable = struct {
         write: *const fn (ptr: *anyopaque, entry: LogEntry) void,
         flush: *const fn (ptr: *anyopaque) void,
-        deinit: *const fn (ptr: *anyopaque, gpa: Allocator) void,
+        deinit: *const fn (ptr: *anyopaque, persistent: Allocator) void,
     };
 
     pub fn write(self: Sink, entry: LogEntry) void {
@@ -251,7 +251,7 @@ pub const Sink = struct {
         self.vtable.flush(self.ptr);
     }
 
-    pub fn deinit(self: *Sink, gpa: Allocator) void {
-        self.vtable.deinit(self.ptr, gpa);
+    pub fn deinit(self: *Sink, persistent: Allocator) void {
+        self.vtable.deinit(self.ptr, persistent);
     }
 };

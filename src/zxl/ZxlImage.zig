@@ -1,8 +1,8 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-const math = @import("math");
-const Rgba = math.Rgba;
+const visual = @import("visual");
+const Rgba = visual.Rgba;
 
 const max_colors = 256;
 

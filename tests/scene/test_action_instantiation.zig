@@ -30,8 +30,8 @@ const ActionRegistry = Action.ActionRegistry;
 const ActionRunContext = Action.ActionRunContext;
 const OnCollision = Action.OnCollision;
 
-const core = @import("math");
-const GameMemory = core.GameMemory;
+const math = @import("math");
+const GameMemory = @import("memory");
 
 // A trivial custom action a game might register. Body is irrelevant to these
 // tests — they assert that scene → instantiation wires it up and that an

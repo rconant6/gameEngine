@@ -27,25 +27,25 @@ pub fn setState(state: *EditorState) void {
 }
 
 pub fn buildTree(
-    arena: Allocator,
+    ui_arena: Allocator,
     raw_state: ?*const anyopaque,
 ) *WidgetNode {
     const state: *const EditorState = @ptrCast(@alignCast(raw_state));
 
     const content = if (state.scene_file) |sf|
-        buildSceneContent(arena, sf, state.selected)
+        buildSceneContent(ui_arena, sf, state.selected)
     else
-        buildEmptyState(arena);
+        buildEmptyState(ui_arena);
 
-    return make.panel(arena, content, .{
+    return make.panel(ui_arena, content, .{
         .padding = .all(8),
         .fill = true,
     });
 }
 
-fn buildEmptyState(arena: Allocator) *WidgetNode {
-    return make.vstack(arena, &.{
-        make.label(arena, "No scene loaded", .{
+fn buildEmptyState(ui_arena: Allocator) *WidgetNode {
+    return make.vstack(ui_arena, &.{
+        make.label(ui_arena, "No scene loaded", .{
             .color = empty_label_color,
             .font_scale = font_scale,
         }),
@@ -63,7 +63,7 @@ fn isSelected(scene_name: ?[]const u8, entity_name: []const u8, selected: ?Entit
 
 // Collects entity and scene widgets only (assets/templates handled separately).
 fn collectDecls(
-    arena: Allocator,
+    ui_arena: Allocator,
     decls: []const scene_fmt.Declaration,
     scene_name: ?[]const u8,
     indent: u8,
@@ -76,11 +76,11 @@ fn collectDecls(
             .entity => |e| {
                 if (out_count.* >= out.len) return;
                 const id = std.fmt.allocPrint(
-                    arena,
+                    ui_arena,
                     "e:{s}:{s}",
                     .{ scene_name orelse "", e.name },
                 ) catch @panic("Hierarchy: out of memory");
-                out[out_count.*] = make.listItem(arena, id, e.name, .{
+                out[out_count.*] = make.listItem(ui_arena, id, e.name, .{
                     .colors = item_colors,
                     .indent = indent,
                     .selected = isSelected(scene_name, e.name, selected),
@@ -90,23 +90,23 @@ fn collectDecls(
             },
             .scene => |s| {
                 if (out_count.* >= out.len) return;
-                out[out_count.*] = make.label(arena, s.name, .{
+                out[out_count.*] = make.label(ui_arena, s.name, .{
                     .color = section_label_color,
                     .font_scale = section_font_scale,
                 });
                 out_count.* += 1;
-                collectDecls(arena, s.decls, s.name, indent + 1, selected, out, out_count);
+                collectDecls(ui_arena, s.decls, s.name, indent + 1, selected, out, out_count);
             },
             .asset, .template, .component => {},
         }
     }
 }
 
-fn buildSection(arena: Allocator, title: []const u8, items: []*WidgetNode, out: []*WidgetNode, out_count: *usize) void {
+fn buildSection(ui_arena: Allocator, title: []const u8, items: []*WidgetNode, out: []*WidgetNode, out_count: *usize) void {
     if (out_count.* + 2 + items.len > out.len) return;
-    out[out_count.*] = make.label(arena, title, .{ .color = section_label_color, .font_scale = section_font_scale });
+    out[out_count.*] = make.label(ui_arena, title, .{ .color = section_label_color, .font_scale = section_font_scale });
     out_count.* += 1;
-    out[out_count.*] = make.hdivider(arena, .{ .size = 1 });
+    out[out_count.*] = make.hdivider(ui_arena, .{ .size = 1 });
     out_count.* += 1;
     for (items) |item| {
         out[out_count.*] = item;
@@ -115,7 +115,7 @@ fn buildSection(arena: Allocator, title: []const u8, items: []*WidgetNode, out: 
 }
 
 fn buildSceneContent(
-    arena: Allocator,
+    ui_arena: Allocator,
     sf: *const scene_fmt.SceneFile,
     selected: ?EntityRef,
 ) *WidgetNode {
@@ -129,7 +129,7 @@ fn buildSceneContent(
         switch (decl) {
             .asset => |a| {
                 if (asset_count < asset_nodes.len) {
-                    asset_nodes[asset_count] = make.label(arena, a.name, .{
+                    asset_nodes[asset_count] = make.label(ui_arena, a.name, .{
                         .color = section_label_color,
                         .font_scale = font_scale,
                     });
@@ -138,7 +138,7 @@ fn buildSceneContent(
             },
             .template => |t| {
                 if (template_count < template_nodes.len) {
-                    template_nodes[template_count] = make.label(arena, t.name, .{
+                    template_nodes[template_count] = make.label(ui_arena, t.name, .{
                         .color = section_label_color,
                         .font_scale = font_scale,
                     });
@@ -153,21 +153,21 @@ fn buildSceneContent(
     var item_count: usize = 0;
 
     if (asset_count > 0)
-        buildSection(arena, "ASSETS", asset_nodes[0..asset_count], &items, &item_count);
+        buildSection(ui_arena, "ASSETS", asset_nodes[0..asset_count], &items, &item_count);
     if (template_count > 0)
-        buildSection(arena, "TEMPLATES", template_nodes[0..template_count], &items, &item_count);
+        buildSection(ui_arena, "TEMPLATES", template_nodes[0..template_count], &items, &item_count);
 
     // Entities/scenes
     if (asset_count > 0 or template_count > 0) {
         // divider before entities
         if (item_count < items.len) {
-            items[item_count] = make.hdivider(arena, .{ .size = 1 });
+            items[item_count] = make.hdivider(ui_arena, .{ .size = 1 });
             item_count += 1;
         }
     }
-    collectDecls(arena, sf.decls, null, 0, selected, &items, &item_count);
+    collectDecls(ui_arena, sf.decls, null, 0, selected, &items, &item_count);
 
-    if (item_count == 0) return buildEmptyState(arena);
+    if (item_count == 0) return buildEmptyState(ui_arena);
 
-    return make.vstack(arena, items[0..item_count], .{ .spacing = 2 });
+    return make.vstack(ui_arena, items[0..item_count], .{ .spacing = 2 });
 }

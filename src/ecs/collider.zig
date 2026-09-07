@@ -1,5 +1,5 @@
-const core = @import("math");
-const V2 = core.V2;
+const math = @import("math");
+const V2 = math.V2;
 
 pub const CircleCollider = struct {
     origin: V2 = .{ .x = 0, .y = 0 },

@@ -1,5 +1,5 @@
-const core = @import("math");
-pub const V2 = core.V2;
+const math = @import("math");
+pub const V2 = math.V2;
 // # TrueType File Structure (Top-Down)
 // ## Font Directory Header (File Start)
 // Offset | Size | Field           | Description
