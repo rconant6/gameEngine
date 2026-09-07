@@ -3,7 +3,7 @@ const Allocator = std.mem.Allocator;
 pub const Font = @import("font.zig").Font;
 const debug = @import("debug");
 const log = debug.log;
-const Memory = @import("math").GameMemory;
+const Memory = @import("memory");
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
 const Texture = Renderer.Texture;
@@ -15,7 +15,7 @@ const FontAsset = struct {
 };
 
 pub const FontManager = struct {
-    arena: Allocator,
+    fonts: Allocator,
     persistent: Allocator,
     io: std.Io,
     renderer: *Renderer, // for lazy atlas-texture upload (mirrors TextureManager)
@@ -24,7 +24,7 @@ pub const FontManager = struct {
 
     pub fn init(mem: *Memory, io: std.Io, renderer: *Renderer) FontManager {
         return .{
-            .arena = mem.asset.fonts,
+            .fonts = mem.asset.fonts,
             .persistent = mem.persistent,
             .io = io,
             .renderer = renderer,
@@ -37,50 +37,50 @@ pub const FontManager = struct {
         var iter = self.assets.iterator();
         while (iter.next()) |entry| {
             entry.value_ptr.font.deinit();
-            self.arena.destroy(entry.value_ptr.font);
-            self.arena.free(entry.value_ptr.source_path);
-            self.arena.free(entry.key_ptr.*);
+            self.fonts.destroy(entry.value_ptr.font);
+            self.fonts.free(entry.value_ptr.source_path);
+            self.fonts.free(entry.key_ptr.*);
         }
         self.assets.deinit();
-        if (self.font_path.len > 0) self.arena.free(self.font_path);
+        if (self.font_path.len > 0) self.fonts.free(self.font_path);
     }
 
     pub fn setFontPath(self: *FontManager, path: []const u8) !void {
-        if (self.font_path.len > 0) self.arena.free(self.font_path);
-        self.font_path = try self.arena.dupe(u8, path);
+        if (self.font_path.len > 0) self.fonts.free(self.font_path);
+        self.font_path = try self.fonts.dupe(u8, path);
     }
 
     // Load a font by filename, resolved relative to font_path
     pub fn load(self: *FontManager, name: []const u8, filename: []const u8) !void {
-        const joined = try std.fs.path.join(self.arena, &.{ self.font_path, filename });
-        defer self.arena.free(joined);
+        const joined = try std.fs.path.join(self.fonts, &.{ self.font_path, filename });
+        defer self.fonts.free(joined);
         try self.loadFromPath(name, joined);
     }
 
     // Load a font from an explicit path (relative or absolute)
     pub fn loadFromPath(self: *FontManager, name: []const u8, path: []const u8) !void {
-        const abs_path = try std.Io.Dir.cwd().realPathFileAlloc(self.io, path, self.arena);
-        errdefer self.arena.free(abs_path);
+        const abs_path = try std.Io.Dir.cwd().realPathFileAlloc(self.io, path, self.fonts);
+        errdefer self.fonts.free(abs_path);
 
         const mtime = statMtime(self.io, abs_path);
 
-        const font_ptr = try self.arena.create(Font);
-        errdefer self.arena.destroy(font_ptr);
-        font_ptr.* = try Font.init(self.arena, self.io, abs_path);
+        const font_ptr = try self.fonts.create(Font);
+        errdefer self.fonts.destroy(font_ptr);
+        font_ptr.* = try Font.init(self.fonts, self.io, abs_path);
 
         try self.store(name, font_ptr, abs_path, mtime);
     }
 
     // Load a font from an in-memory buffer (e.g. @embedFile)
     pub fn loadFromMemory(self: *FontManager, name: []const u8, data: []const u8) !void {
-        const source_path_slice = try std.fmt.allocPrint(self.arena, "<embedded:{s}>", .{name});
-        defer self.arena.free(source_path_slice);
-        const source_path = try self.arena.dupeZ(u8, source_path_slice);
-        errdefer self.arena.free(source_path);
+        const source_path_slice = try std.fmt.allocPrint(self.fonts, "<embedded:{s}>", .{name});
+        defer self.fonts.free(source_path_slice);
+        const source_path = try self.fonts.dupeZ(u8, source_path_slice);
+        errdefer self.fonts.free(source_path);
 
-        const font_ptr = try self.arena.create(Font);
-        errdefer self.arena.destroy(font_ptr);
-        font_ptr.* = try Font.initFromMemory(self.arena, data);
+        const font_ptr = try self.fonts.create(Font);
+        errdefer self.fonts.destroy(font_ptr);
+        font_ptr.* = try Font.initFromMemory(self.fonts, data);
 
         try self.store(name, font_ptr, source_path, 0);
     }
@@ -108,12 +108,12 @@ pub const FontManager = struct {
         // Embedded fonts cannot be reloaded
         if (entry.last_modified == 0) return;
 
-        const new_font = try self.arena.create(Font);
-        errdefer self.arena.destroy(new_font);
-        new_font.* = try Font.init(self.arena, self.io, entry.source_path);
+        const new_font = try self.fonts.create(Font);
+        errdefer self.fonts.destroy(new_font);
+        new_font.* = try Font.init(self.fonts, self.io, entry.source_path);
 
         entry.font.deinit();
-        self.arena.destroy(entry.font);
+        self.fonts.destroy(entry.font);
         entry.font = new_font;
         entry.last_modified = statMtime(self.io, entry.source_path);
 
@@ -141,11 +141,11 @@ pub const FontManager = struct {
         if (gop.found_existing) {
             // Replace: deinit old font and free old source_path
             gop.value_ptr.font.deinit();
-            self.arena.destroy(gop.value_ptr.font);
-            self.arena.free(gop.value_ptr.source_path);
+            self.fonts.destroy(gop.value_ptr.font);
+            self.fonts.free(gop.value_ptr.source_path);
             // key is already owned, no need to re-dupe
         } else {
-            gop.key_ptr.* = try self.arena.dupe(u8, name);
+            gop.key_ptr.* = try self.fonts.dupe(u8, name);
         }
         gop.value_ptr.* = .{
             .font = font_ptr,

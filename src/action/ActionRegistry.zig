@@ -22,13 +22,13 @@ pub const ActionRegistry = struct {
     pub const Entry = struct {
         name: []const u8, // duped into persistent; registry owns it
         execute: ExecuteFn,
-        // decode allocates the param struct into the GAME arena (per-playthrough)
+        // decode allocates the param struct into the GAME arena (persistent-playthrough)
         decode: DecodeFn,
     };
 
-    pub fn init(per: Allocator) ActionRegistry {
+    pub fn init(persistent: Allocator) ActionRegistry {
         return .{
-            .persistent = per,
+            .persistent = persistent,
             .entries = .empty,
         };
     }

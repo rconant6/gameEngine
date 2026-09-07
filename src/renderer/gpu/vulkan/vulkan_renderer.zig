@@ -15,11 +15,10 @@ const Swapchain = myvk.Swapchain;
 const Sync = myvk.Sync;
 const FrameSync = myvk.FrameSync;
 const rend = @import("../../renderer.zig");
-const RenderConfig = rend.RendererConfig;
 const Color = rend.Color;
 const ShapeData = rend.ShapeData;
 const Transform = rend.Transform;
-const RenderContext = rend.RenderContext;
+const RenderConfig = rend.RenderConfig;
 const log = @import("debug").log;
 
 const Self = @This();
@@ -220,7 +219,7 @@ pub fn drawShape(
     fill_color: ?Color,
     stroke_color: ?Color,
     stroke_width: f32,
-    ctx: RenderContext,
+    ctx: anytype,
 ) void {
     _ = self;
     _ = shape;
@@ -260,7 +259,7 @@ pub fn drawTextureQuad(
     height: f32, // world-space height
     origin: [2]f32, // normalized origin [0-1, 0-1] within the sprite
     transform: ?Transform, // scale/rotate/translate
-    ctx: RenderContext,
+    ctx: anytype,
     flip_h: bool,
     flip_v: bool,
 ) void {

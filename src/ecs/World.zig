@@ -6,8 +6,8 @@ const Storages = std.StringHashMap(StorageInterface);
 const Entity = @import("Entity.zig");
 const Query = @import("Query.zig").Query;
 const ComponentStorage = @import("ComponentStorage.zig").ComponentStorage;
-const core = @import("math");
-const V2 = core.V2;
+const math = @import("math");
+const V2 = math.V2;
 const scene = @import("scene");
 const TemplateManager = scene.TemplateManager;
 const comps = @import("Components.zig");
@@ -187,36 +187,36 @@ pub fn findEntityByTag(self: *Self, tag: []const u8) ?Entity {
 pub fn findEntitiesByTag(
     self: *Self,
     tag: []const u8,
-    f_gpa: Allocator,
+    frame: Allocator,
 ) []Entity {
     var entities: ArrayList(Entity) = .empty;
-    errdefer entities.deinit(f_gpa);
+    errdefer entities.deinit(frame);
     var q = self.query(.{Tag});
     while (q.next()) |entry| {
         const tags = entry.get(0);
         if (tags.hasTag(tag))
-            entities.append(f_gpa, entry.entity) catch |e| {
+            entities.append(frame, entry.entity) catch |e| {
                 log.err(.ecs, "Unable to append entity(tag) {t}", .{e});
             };
     }
-    return entities.toOwnedSlice(f_gpa) catch &[_]Entity{};
+    return entities.toOwnedSlice(frame) catch &[_]Entity{};
 }
 pub fn findEntitiesByPattern(
     self: *Self,
     pattern: []const u8,
-    f_gpa: Allocator,
+    frame: Allocator,
 ) []Entity {
     var entities: ArrayList(Entity) = .empty;
-    errdefer entities.deinit(f_gpa);
+    errdefer entities.deinit(frame);
     var q = self.query(.{Tag});
     while (q.next()) |entry| {
         const tags = entry.get(0);
         if (tags.matchesPattern(pattern))
-            entities.append(f_gpa, entry.entity) catch |e| {
+            entities.append(frame, entry.entity) catch |e| {
                 log.err(.ecs, "Unable to append entity(pattern) {t}", .{e});
             };
     }
-    return entities.toOwnedSlice(f_gpa) catch &[_]Entity{};
+    return entities.toOwnedSlice(frame) catch &[_]Entity{};
 }
 
 pub fn query(self: *Self, comptime component_types: anytype) Query(buildStorageTupleType(component_types)) {
@@ -291,9 +291,9 @@ fn wrapStorage(comptime T: type, storage: *ComponentStorage(T)) StorageInterface
             const self: *ComponentStorage(T) = @ptrCast(@alignCast(ptr));
             self.deinit();
         }
-        fn destroy(ptr: *anyopaque, allocator: Allocator) void {
+        fn destroy(ptr: *anyopaque, persistent: Allocator) void {
             const self: *ComponentStorage(T) = @ptrCast(@alignCast(ptr));
-            allocator.destroy(self);
+            persistent.destroy(self);
         }
 
         const vtable = StorageInterface.VTable{

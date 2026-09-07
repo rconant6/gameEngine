@@ -15,7 +15,7 @@ pub const MTLTexture = opaque {};
 pub const MetalFrameContext = opaque {};
 pub const MetalFrame = opaque {};
 
-const Color = @import("../../color.zig").Color;
+const Color = @import("visual").Color;
 
 pub const MetalError = error{
     DeviceCreationFailed,

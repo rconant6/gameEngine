@@ -6,8 +6,8 @@ const Camera = ecs.Camera;
 const CameraTracking = ecs.CameraTracking;
 const Transform = ecs.Transform;
 const ActiveCamera = ecs.ActiveCamera;
-const core = @import("math");
-const V2 = core.V2;
+const math = @import("math");
+const V2 = math.V2;
 
 pub fn createCamera(self: *Engine) !Entity {
     const camera = try self.world.createEntity();

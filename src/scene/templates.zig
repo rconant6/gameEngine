@@ -2,9 +2,8 @@ const std = @import("std");
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const Type = std.builtin.Type;
-const core = @import("math");
-const V2 = core.V2;
-const ComponentData = core.ComponentData;
+const math = @import("math");
+const V2 = math.V2;
 const ecs = @import("ecs");
 const Entity = ecs.Entity;
 const World = ecs.World;
@@ -26,21 +25,21 @@ pub const Template = struct {
 };
 
 pub const TemplateManager = struct {
-    gpa: Allocator,
+    persistent: Allocator,
     io: std.Io,
     template_files: std.ArrayList(*SceneFile),
     templates: std.StringHashMap(Template),
     instantiator: *Instantiator,
 
     pub fn init(
-        gpa: Allocator,
+        persistent: Allocator,
         io: std.Io,
         instantiator: *Instantiator,
     ) TemplateManager {
         return .{
-            .gpa = gpa,
+            .persistent = persistent,
             .io = io,
-            .templates = std.StringHashMap(Template).init(gpa),
+            .templates = std.StringHashMap(Template).init(persistent),
             .template_files = .empty,
             .instantiator = instantiator,
         };
@@ -49,16 +48,16 @@ pub const TemplateManager = struct {
     pub fn deinit(self: *TemplateManager) void {
         var iter = self.templates.iterator();
         while (iter.next()) |entry| {
-            self.gpa.free(entry.key_ptr.*); // Free lowercase key
-            self.gpa.free(entry.value_ptr.name); // Free original name
+            self.persistent.free(entry.key_ptr.*); // Free lowercase key
+            self.persistent.free(entry.value_ptr.name); // Free original name
         }
         self.templates.deinit();
 
         for (self.template_files.items) |file| {
-            file.deinit(self.gpa);
-            self.gpa.destroy(file);
+            file.deinit(self.persistent);
+            self.persistent.destroy(file);
         }
-        self.template_files.deinit(self.gpa);
+        self.template_files.deinit(self.persistent);
     }
 
     pub fn instantiate(
@@ -92,22 +91,22 @@ pub const TemplateManager = struct {
             return;
         }
 
-        const owned_file = try self.gpa.create(SceneFile);
-        errdefer self.gpa.destroy(owned_file);
-        owned_file.* = try load.loadTemplateFile(self.gpa, self.io, name);
-        try self.template_files.append(self.gpa, owned_file);
+        const owned_file = try self.persistent.create(SceneFile);
+        errdefer self.persistent.destroy(owned_file);
+        owned_file.* = try load.loadTemplateFile(self.persistent, self.io, name);
+        try self.template_files.append(self.persistent, owned_file);
 
         for (owned_file.decls) |decl| {
             switch (decl) {
                 .template => |t| {
                     const owned_name_lower = try std.ascii.allocLowerString(
-                        self.gpa,
+                        self.persistent,
                         t.name,
                     );
-                    errdefer self.gpa.free(owned_name_lower);
+                    errdefer self.persistent.free(owned_name_lower);
 
-                    const owned_name = try self.gpa.dupe(u8, t.name);
-                    errdefer self.gpa.free(owned_name);
+                    const owned_name = try self.persistent.dupe(u8, t.name);
+                    errdefer self.persistent.free(owned_name);
 
                     const template: Template = .{
                         .declaration = t,
@@ -130,10 +129,10 @@ pub const TemplateManager = struct {
                 .file => {
                     if (std.mem.endsWith(u8, entry.name, ".template")) {
                         const full_path = try std.fs.path.join(
-                            self.gpa,
+                            self.persistent,
                             &.{ dir_path, entry.name },
                         );
-                        defer self.gpa.free(full_path);
+                        defer self.persistent.free(full_path);
                         try self.loadTemplateFile(full_path);
                     }
                 },

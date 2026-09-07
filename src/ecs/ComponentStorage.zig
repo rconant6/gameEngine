@@ -37,9 +37,9 @@ pub fn ComponentStorage(comptime T: type) type {
 
         const DEFAULT_SPARSE_CAPACITY = 1024;
 
-        pub fn init(alloc: Allocator) !@This() {
+        pub fn init(persistent: Allocator) !@This() {
             var sparse_arry: ArrayList(?usize) = try .initCapacity(
-                alloc,
+                persistent,
                 DEFAULT_SPARSE_CAPACITY,
             );
             sparse_arry.items.len = DEFAULT_SPARSE_CAPACITY;
@@ -49,7 +49,7 @@ pub fn ComponentStorage(comptime T: type) type {
                 .sparse = sparse_arry,
                 .dense = .empty,
                 .entities = .empty,
-                .persistent = alloc,
+                .persistent = persistent,
             };
         }
         pub fn deinit(self: *@This()) void {

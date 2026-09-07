@@ -1,8 +1,7 @@
-const std = @import("std");
-const m = @import("math");
-
-pub const Rgba = m.Rgba;
-pub const Hsva = m.Hsva;
+// Color's own representations live here, beside the conversions that operate on
+// them. They were misfiled under `math` — a color format is not geometry.
+pub const Rgba = @import("Rgba.zig").Rgba;
+pub const Hsva = @import("Hsva.zig").Hsva;
 
 pub fn rgbToHsv(rgba: Rgba) Hsva {
     const r = @as(f32, @floatFromInt(rgba.r)) / 255.0;

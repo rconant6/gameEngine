@@ -26,15 +26,15 @@ pub const GlyphAtlas = struct {
     h: u16,
     entries: std.AutoHashMap(u16, GlyphEntry),
 
-    pub fn init(persistant: Allocator) !GlyphAtlas {
-        const pixels = try persistant.alloc(u8, ATLAS_W * ATLAS_H);
+    pub fn init(persistent: Allocator) !GlyphAtlas {
+        const pixels = try persistent.alloc(u8, ATLAS_W * ATLAS_H);
         @memset(pixels, 0); // unpacked regions must read as "outside", not garbage
         return .{
             .texture = null,
             .pixels = pixels,
             .w = @intCast(ATLAS_W),
             .h = @intCast(ATLAS_H),
-            .entries = .init(persistant),
+            .entries = .init(persistent),
         };
     }
 
@@ -42,8 +42,8 @@ pub const GlyphAtlas = struct {
         return self.entries.get(glyph_id);
     }
 
-    pub fn deinit(self: *GlyphAtlas, persistant: Allocator) void {
-        persistant.free(self.pixels);
+    pub fn deinit(self: *GlyphAtlas, persistent: Allocator) void {
+        persistent.free(self.pixels);
         self.entries.deinit();
     }
 };

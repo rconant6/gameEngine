@@ -3,8 +3,8 @@ const Allocator = std.mem.Allocator;
 const img = @import("ZxlImage.zig");
 const ZxlImage = img.ZxlImage;
 const ZxlPalette = img.ZxlPalette;
-const math = @import("math");
-const Rgba = math.Rgba;
+const visual = @import("visual");
+const Rgba = visual.Rgba;
 const log = @import("debug").log;
 
 pub const ReadError = error{

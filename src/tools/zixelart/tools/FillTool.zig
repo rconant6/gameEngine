@@ -29,11 +29,11 @@ fn begin(canvas: *Canvas, x: usize, y: usize, color: Color) void {
     const target_color = canvas.pixels[curr_idx].color;
     if (target_color.eql(color)) return;
 
-    const gpa = canvas.allocator;
+    const gpa = canvas.data;
 
     var stack: ArrayList(V2Usize) =
         ArrayList(V2Usize).initCapacity(gpa, 1024) catch return;
-    defer stack.deinit(canvas.allocator);
+    defer stack.deinit(canvas.data);
 
     stack.append(gpa, .{ .x = x, .y = y }) catch return;
     while (stack.items.len > 0) {
@@ -43,7 +43,7 @@ fn begin(canvas: *Canvas, x: usize, y: usize, color: Color) void {
         if (!curr_color.eql(target_color)) continue;
 
         canvas.pixels[idx].color = color;
-        canvas.changes.append(canvas.allocator, PixelChange{
+        canvas.changes.append(canvas.data, PixelChange{
             .x = curr.x,
             .y = curr.y,
             .old_color = curr_color,
@@ -81,7 +81,7 @@ fn update(canvas: *Canvas, x: usize, y: usize, color: Color) void {
 fn commit(canvas: *Canvas) ?ToolCommand {
     if (canvas.changes.items.len == 0) return null;
 
-    const pixels = canvas.allocator.dupe(
+    const pixels = canvas.data.dupe(
         PixelChange,
         canvas.changes.items,
     ) catch return null;

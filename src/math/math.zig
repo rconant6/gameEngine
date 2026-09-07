@@ -50,9 +50,4 @@ pub const ScreenPoint = V2;
 /// [2]f32
 ///     Origin is {0, 0} at the center
 ///     Bounds (-1..1) in both X and Y
-pub const Rgba = @import("Rgba.zig").Rgba;
-pub const Hsva = @import("Hsva.zig").Hsva;
-
 pub const utils = @import("utils.zig");
-
-pub const GameMemory = @import("GameMemory.zig");

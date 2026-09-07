@@ -16,7 +16,7 @@ const GameStateManager = game_state.GameStateManager;
 const TransitionResult = game_state.TransitionResult;
 
 const math = @import("math");
-const GameMemory = math.GameMemory;
+const GameMemory = @import("memory");
 
 fn resolveOk(mgr: *GameStateManager) !TransitionResult {
     return mgr.resolvePending() orelse error.ExpectedTransition;

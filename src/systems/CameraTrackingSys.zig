@@ -4,7 +4,6 @@ const World = ecs.World;
 const Transform = ecs.Transform;
 const ActiveCamera = ecs.ActiveCamera;
 const CameraTracking = ecs.CameraTracking;
-const CameraTarget = ecs.CameraTarget;
 const Camera = ecs.Camera;
 
 pub fn run(world: *World, dt: f32) void {

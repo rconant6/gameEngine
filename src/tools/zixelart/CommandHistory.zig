@@ -7,13 +7,13 @@ pub fn CommandHistory(comptime T: type) type {
     return struct {
         const Self = @This();
 
-        gpa: std.mem.Allocator,
+        data: std.mem.Allocator,
         cmds: ArrayList(T),
         cursor: usize,
 
-        pub fn init(alloc: std.mem.Allocator) Self {
+        pub fn init(data: std.mem.Allocator) Self {
             return .{
-                .gpa = alloc,
+                .data = data,
                 .cmds = .empty,
                 .cursor = 0,
             };
@@ -22,7 +22,7 @@ pub fn CommandHistory(comptime T: type) type {
         pub fn push(self: *Self, cmd: T) void {
             self.cmds.shrinkRetainingCapacity(self.cursor);
 
-            self.cmds.append(self.gpa, cmd) catch |err| {
+            self.cmds.append(self.data, cmd) catch |err| {
                 log.err(
                     .application,
                     "Unable to store command: {any} for: {any}",

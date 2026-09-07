@@ -8,7 +8,7 @@ const Input = platform.Input;
 const KeyCode = platform.KeyCode;
 const math = @import("math");
 const V2 = math.V2;
-const Memory = math.GameMemory;
+const Memory = @import("memory");
 const renderer = @import("renderer");
 const Color = renderer.Color;
 const Colors = renderer.Colors;
@@ -372,7 +372,7 @@ pub const Engine = struct {
                     .{fps},
                 ) catch "FPS: --";
                 self.debugger.draw.addText(.{
-                    .text = self.mem.frameDupe(u8, fps_text) catch "",
+                    .text = self.mem.frame.dupe(u8, fps_text) catch "",
                     .position = .{ .x = 10.0, .y = 9.0 },
                     .color = color,
                     .size = 0.5,

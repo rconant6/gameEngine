@@ -54,9 +54,9 @@ pub const CollisionTrigger = struct {
     next_count: u32 = 0,
     phase: Phase = .enter,
 
-    pub fn deinit(self: *CollisionTrigger, gpa: std.mem.Allocator) void {
-        if (self.pattern_owned) gpa.free(self.other_tag_pattern);
-        gpa.free(self.actions);
+    pub fn deinit(self: *CollisionTrigger, persistent: std.mem.Allocator) void {
+        if (self.pattern_owned) persistent.free(self.other_tag_pattern);
+        persistent.free(self.actions);
     }
 
     pub fn process(
@@ -172,8 +172,8 @@ pub const InputTrigger = struct {
     phase: Phase = .pressed,
     actions: []const Action,
 
-    pub fn deinit(self: *InputTrigger, gpa: std.mem.Allocator) void {
-        gpa.free(self.actions);
+    pub fn deinit(self: *InputTrigger, persistent: std.mem.Allocator) void {
+        persistent.free(self.actions);
     }
 
     pub fn process(
@@ -227,8 +227,8 @@ pub const TimeTrigger = struct {
     fired: bool = false,
     actions: []const Action,
 
-    pub fn deinit(self: *TimeTrigger, gpa: std.mem.Allocator) void {
-        gpa.free(self.actions);
+    pub fn deinit(self: *TimeTrigger, persistent: std.mem.Allocator) void {
+        persistent.free(self.actions);
     }
 
     pub fn process(world: *World, ctx: TriggerContext) !void {

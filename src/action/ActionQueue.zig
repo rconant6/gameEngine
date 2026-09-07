@@ -24,8 +24,8 @@ pub const ActionQueue = struct {
     frame: Allocator,
     actions: ArrayList(QueuedAction),
 
-    pub fn init(f_gpa: Allocator) ActionQueue {
-        return .{ .frame = f_gpa, .actions = .empty };
+    pub fn init(frame: Allocator) ActionQueue {
+        return .{ .frame = frame, .actions = .empty };
     }
     pub fn deinit(self: *ActionQueue) void {
         self.actions.deinit(self.frame);

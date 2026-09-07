@@ -3,8 +3,8 @@ const testing = std.testing;
 const zxl = @import("zxl");
 const ZxlReader = zxl.ZxlReader;
 const ZxlImage = zxl.ZxlImage;
-const math = @import("math");
-const Rgba = math.Rgba;
+const visual = @import("visual");
+const Rgba = visual.Rgba;
 
 const test_data = @embedFile("test_2x2.zxl");
 

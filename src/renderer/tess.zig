@@ -1,18 +1,15 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
-const cols = @import("color.zig");
-const Color = cols.Color;
 const math = @import("math");
 const V2 = math.V2;
-const reg = @import("registry");
-const ShapeData = reg.ShapeData;
-const Shapes = @import("shapes");
+const visual = @import("visual");
+const Color = visual.Color;
+const ShapeData = visual.ShapeData;
+const Shapes = visual.Shapes;
+const DrawStyle = visual.DrawStyle;
+const Transform = visual.Transform;
 const Batch = @import("batch.zig").IndexedBatch;
-const rt = @import("render_types.zig");
-const DrawStyle = rt.DrawStyle;
-const RenderContext = rt.RenderContext;
-const Transform = rt.Transform;
 const log = @import("debug").log;
 
 const seg_buckets = [_]u32{ 8, 12, 16, 24, 32, 48, 64, 96 };
@@ -57,8 +54,15 @@ pub const ClipMap = struct {
 
     // camera + ortho + aspect -> scale/offset.
     // world→clip: (p - cam) / (ortho * {aspect, 1}), factored to p*scale + offset.
-    pub fn fromWorld(ctx: RenderContext) ClipMap {
-        const aspect = ctx.aspectRatio();
+    //
+    // ctx: any struct with `width: u32`, `height: u32`, `camera_loc: V2`,
+    // `ortho_size: f32`. That four-field shape IS the render context contract —
+    // a structural promise, not a named type. Add fields freely; we read these.
+    pub fn fromWorld(ctx: anytype) ClipMap {
+        const fw: f32 = @floatFromInt(ctx.width);
+        const fh: f32 = @floatFromInt(ctx.height);
+        assert(fh != 0);
+        const aspect = fw / fh;
         const sx = 1.0 / (ctx.ortho_size * aspect);
         const sy = 1.0 / ctx.ortho_size;
         return .{
@@ -67,7 +71,8 @@ pub const ClipMap = struct {
         };
     }
     // pixels -> clip (w/ y-flip). x: (sx/w)*2 - 1;  y: 1 - (sy/h)*2 (flip = -y scale).
-    pub fn fromScreen(ctx: RenderContext) ClipMap {
+    // ctx: any struct with `width: u32`, `height: u32`.
+    pub fn fromScreen(ctx: anytype) ClipMap {
         const fw: f32 = @floatFromInt(ctx.width);
         const fh: f32 = @floatFromInt(ctx.height);
         return .{

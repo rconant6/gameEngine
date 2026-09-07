@@ -29,8 +29,8 @@ const Size = lo.Size;
 const EdgeInsets = lo.EdgeInsets;
 const Alignment = @import("alignment.zig").Alignment;
 
-fn alloc(arena: Allocator, widget_data: anytype) *WidgetNode {
-    const node = arena.create(WidgetNode) catch |err| {
+fn alloc(ui: Allocator, widget_data: anytype) *WidgetNode {
+    const node = ui.create(WidgetNode) catch |err| {
         log.fatal(.ui, "Unable to create widget: {any}", .{err});
         @panic("UI: out of memory");
     };
@@ -52,14 +52,14 @@ const LabelOpts = struct {
     color: Color = Colors.WHITE,
 };
 
-pub fn label(arena: Allocator, text: []const u8, opts: LabelOpts) *WidgetNode {
+pub fn label(ui: Allocator, text: []const u8, opts: LabelOpts) *WidgetNode {
     const raw_size: V2 = if (opts.font) |f| f.measureText(
         text,
         opts.font_scale,
     ) else .{ .x = 0, .y = 0 };
 
     const size: Size = .{ .width = raw_size.x, .height = raw_size.y };
-    return alloc(arena, Label{
+    return alloc(ui, Label{
         .tb = .{
             .text = text,
             .font = opts.font,
@@ -77,8 +77,8 @@ const PanelOpts = struct {
     padding: EdgeInsets = .all(5),
     fill: bool = false,
 };
-pub fn panel(arena: Allocator, child: *WidgetNode, opts: PanelOpts) *WidgetNode {
-    return alloc(arena, Panel{
+pub fn panel(ui: Allocator, child: *WidgetNode, opts: PanelOpts) *WidgetNode {
+    return alloc(ui, Panel{
         .background = opts.background,
         .border_color = opts.border_color,
         .border_width = opts.border_width,
@@ -95,9 +95,9 @@ pub const HStackOpts = struct {
     cross_axis: Alignment.Vertical = .center,
 };
 
-pub fn hstack(arena: Allocator, children: []const *WidgetNode, opts: HStackOpts) *WidgetNode {
-    const nodes = allocChildren(arena, children);
-    return alloc(arena, HStack{
+pub fn hstack(ui: Allocator, children: []const *WidgetNode, opts: HStackOpts) *WidgetNode {
+    const nodes = allocChildren(ui, children);
+    return alloc(ui, HStack{
         .children = nodes,
         .spacing = opts.spacing,
         .cross_axis = opts.cross_axis,
@@ -111,9 +111,9 @@ pub const VStackOpts = struct {
     cross_axis: Alignment.Horizontal = .start,
 };
 
-pub fn vstack(arena: Allocator, children: []const *WidgetNode, opts: VStackOpts) *WidgetNode {
-    const nodes = allocChildren(arena, children);
-    return alloc(arena, VStack{
+pub fn vstack(ui: Allocator, children: []const *WidgetNode, opts: VStackOpts) *WidgetNode {
+    const nodes = allocChildren(ui, children);
+    return alloc(ui, VStack{
         .children = nodes,
         .spacing = opts.spacing,
         .cross_axis = opts.cross_axis,
@@ -127,8 +127,8 @@ pub const ColorRectOpts = struct {
     border_width: f32 = 0,
 };
 
-pub fn colorRect(arena: Allocator, color: Color, opts: ColorRectOpts) *WidgetNode {
-    return alloc(arena, ColorRect{
+pub fn colorRect(ui: Allocator, color: Color, opts: ColorRectOpts) *WidgetNode {
+    return alloc(ui, ColorRect{
         .color = color,
         .border_color = opts.border_color,
         .border_width = opts.border_width,
@@ -147,8 +147,8 @@ pub const ChickletOpts = struct {
     on_click: ?*const fn () void = null,
 };
 
-pub fn chicklet(arena: Allocator, name: []const u8, opts: ChickletOpts) *WidgetNode {
-    return alloc(arena, Chicklet{
+pub fn chicklet(ui: Allocator, name: []const u8, opts: ChickletOpts) *WidgetNode {
+    return alloc(ui, Chicklet{
         .colors = opts.colors,
         .id = name,
         .selected = opts.is_selected,
@@ -172,12 +172,12 @@ pub const ListItemOps = struct {
 };
 
 pub fn listItem(
-    arena: Allocator,
+    ui: Allocator,
     id: []const u8,
     text: []const u8,
     opts: ListItemOps,
 ) *WidgetNode {
-    return alloc(arena, ListItem{
+    return alloc(ui, ListItem{
         .id = id,
         .text_info = .{
             .text = text,
@@ -202,12 +202,12 @@ pub const ButtonOpts = struct {
 };
 
 pub fn button(
-    arena: Allocator,
+    ui: Allocator,
     id: []const u8,
     text: []const u8,
     opts: ButtonOpts,
 ) *WidgetNode {
-    return alloc(arena, Button{
+    return alloc(ui, Button{
         .id = id,
         .text_info = .{
             .text = text,
@@ -228,8 +228,8 @@ pub const SliderOpts = struct {
     thumb_color: Color = Colors.WHITE,
 };
 
-pub fn slider(arena: Allocator, id: []const u8, opts: SliderOpts) *WidgetNode {
-    return alloc(arena, Slider{
+pub fn slider(ui: Allocator, id: []const u8, opts: SliderOpts) *WidgetNode {
+    return alloc(ui, Slider{
         .id = id,
         .min = opts.min,
         .max = opts.max,
@@ -247,8 +247,8 @@ pub const DividerOpts = struct {
 };
 
 /// Horizontal rule — full width, fixed height. Use inside VStack.
-pub fn hdivider(arena: Allocator, opts: DividerOpts) *WidgetNode {
-    return alloc(arena, Divider{
+pub fn hdivider(ui: Allocator, opts: DividerOpts) *WidgetNode {
+    return alloc(ui, Divider{
         .axis = .horizontal,
         .size = opts.size,
         .color = opts.color,
@@ -256,8 +256,8 @@ pub fn hdivider(arena: Allocator, opts: DividerOpts) *WidgetNode {
 }
 
 /// Vertical rule — fixed width, full height. Use inside HStack.
-pub fn vdivider(arena: Allocator, opts: DividerOpts) *WidgetNode {
-    return alloc(arena, Divider{
+pub fn vdivider(ui: Allocator, opts: DividerOpts) *WidgetNode {
+    return alloc(ui, Divider{
         .axis = .vertical,
         .size = opts.size,
         .color = opts.color,
@@ -267,16 +267,16 @@ pub fn vdivider(arena: Allocator, opts: DividerOpts) *WidgetNode {
 // ── Spacer ──
 
 /// Vertical spacer — expands along the main axis of a VStack.
-pub fn vspacer(arena: Allocator, min_size: ?f32) *WidgetNode {
-    return alloc(arena, Spacer{
+pub fn vspacer(ui: Allocator, min_size: ?f32) *WidgetNode {
+    return alloc(ui, Spacer{
         .axis = .vertical,
         .min_size = min_size,
     });
 }
 
 /// Horizontal spacer — expands along the main axis of an HStack.
-pub fn hspacer(arena: Allocator, min_size: ?f32) *WidgetNode {
-    return alloc(arena, Spacer{
+pub fn hspacer(ui: Allocator, min_size: ?f32) *WidgetNode {
+    return alloc(ui, Spacer{
         .axis = .horizontal,
         .min_size = min_size,
     });
@@ -290,9 +290,9 @@ pub const GridOpts = struct {
     v_spacing: f32 = 4,
 };
 
-pub fn grid(arena: Allocator, children: []const *WidgetNode, opts: GridOpts) *WidgetNode {
-    const nodes = allocChildren(arena, children);
-    return alloc(arena, Grid{
+pub fn grid(ui: Allocator, children: []const *WidgetNode, opts: GridOpts) *WidgetNode {
+    const nodes = allocChildren(ui, children);
+    return alloc(ui, Grid{
         .children = nodes,
         .columns = opts.columns,
         .h_spacing = opts.h_spacing,
@@ -302,8 +302,8 @@ pub fn grid(arena: Allocator, children: []const *WidgetNode, opts: GridOpts) *Wi
 
 // ── Internal helpers ──
 
-fn allocChildren(arena: Allocator, children: []const *WidgetNode) []WidgetNode {
-    const nodes = arena.alloc(WidgetNode, children.len) catch |err| {
+fn allocChildren(ui: Allocator, children: []const *WidgetNode) []WidgetNode {
+    const nodes = ui.alloc(WidgetNode, children.len) catch |err| {
         log.fatal(.ui, "Unable to allocate children: {any}", .{err});
         @panic("UI: out of memory");
     };

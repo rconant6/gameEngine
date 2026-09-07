@@ -13,8 +13,8 @@ const log = debug.log;
 const rend = @import("renderer");
 const Colors = rend.Colors;
 const Color = rend.Color;
-const core = @import("math");
-const Memory = core.GameMemory;
+const math = @import("math");
+const Memory = @import("memory");
 
 const Hierarchy = @import("Hierarchy.zig");
 const Inspector = @import("Inspector.zig");

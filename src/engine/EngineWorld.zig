@@ -1,15 +1,11 @@
 const ecs = @import("ecs");
 pub const ActiveCamera = ecs.ActiveCamera;
-pub const Box = ecs.Box;
 pub const Camera = ecs.Camera;
 pub const CameraTracking = ecs.CameraTracking;
 pub const Collider = ecs.Collider;
-pub const ColliderShape = ecs.ColliderShape;
 pub const Destroy = ecs.Destroy;
 pub const Entity = ecs.Entity;
 pub const Lifetime = ecs.Lifetime;
-pub const OnCollision = ecs.OnCollision;
-pub const OnInput = ecs.OnInput;
 pub const Physics = ecs.Physics;
 pub const RenderLayer = ecs.RenderLayer;
 pub const Sprite = ecs.Sprite;

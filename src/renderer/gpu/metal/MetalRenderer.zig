@@ -4,22 +4,18 @@ const ArrayList = std.ArrayList;
 const math = @import("math");
 const WorldPoint = math.WorldPoint;
 const bridge = @import("metal_bridge.zig");
-const BridgeError = bridge.BridgeError;
 const mb = bridge.MetalBridge;
 const Batch = @import("../../batch.zig").IndexedBatch;
 const tess = @import("../../tess.zig");
 const LocalXTransform = tess.LocalXform;
 const ClipMap = tess.ClipMap;
-const rt = @import("../../render_types.zig");
-const DrawStyle = rt.DrawStyle;
-const Renderable = rt.Renderable;
-const RenderConfig = rt.RendererConfig;
-const RenderContext = rt.RenderContext;
-const Transform = rt.Transform;
-const col = @import("../../color.zig");
-const Color = col.Color;
-const Colors = col.Colors;
-const ShapeData = @import("registry").ShapeData;
+const visual = @import("visual");
+const Renderable = visual.Renderable;
+const Transform = visual.Transform;
+const Color = visual.Color;
+const Colors = visual.Colors;
+const ctxm = @import("../../context.zig");
+const RenderConfig = ctxm.RendererConfig;
 const log = @import("debug").log;
 
 const metal = @import("metal_types.zig");
@@ -84,7 +80,7 @@ last_frame_time: f64,
 persistent: Allocator,
 
 pub fn init(
-    p_gpa: std.mem.Allocator,
+    persistent: std.mem.Allocator,
     io: std.Io,
     config: RenderConfig,
 ) (MTLError || std.mem.Allocator.Error)!Self {
@@ -92,10 +88,10 @@ pub fn init(
     const device = try mb.createDevice();
     const queue = try mb.createCommandQueue(device);
 
-    const shader_path = try getShaderPath(p_gpa, io);
-    defer p_gpa.free(shader_path);
-    const shader_path_z = try p_gpa.dupeZ(u8, shader_path);
-    defer p_gpa.free(shader_path_z);
+    const shader_path = try getShaderPath(persistent, io);
+    defer persistent.free(shader_path);
+    const shader_path_z = try persistent.dupeZ(u8, shader_path);
+    defer persistent.free(shader_path_z);
     const library = try mb.createLibraryFromFile(device, shader_path_z);
     const vertex_fn = try mb.createFunction(library, "vertex_main");
     const fragment_shape_fn = try mb.createFunction(library, "fragment_shape");
@@ -118,7 +114,7 @@ pub fn init(
     );
 
     // CPU-side batches
-    const batch = Batch(MetalVertex, DrawKey).init(p_gpa);
+    const batch = Batch(MetalVertex, DrawKey).init(persistent);
 
     // Vertex buffers: rings of FRAMES_IN_FLIGHT
     const options = @intFromEnum(MTLResourceOptions.storageModeShared);
@@ -177,7 +173,7 @@ pub fn init(
         .frame_number = 0,
         .start_time = 0.0,
         .last_frame_time = 0.0,
-        .persistent = p_gpa,
+        .persistent = persistent,
         .xforms = .empty,
         .xform_buffers = xform_buffers,
         .submission_seq = 0,
@@ -212,7 +208,7 @@ pub fn deinit(self: *Self) void {
 
 // Narrow the engine's backend-agnostic PixelFormat to Metal's native type. The
 // only place MTLPixelFormat meets the engine enum — nothing above here sees MTL*.
-fn toMTL(f: rt.PixelFormat) MTLPixelFormat {
+fn toMTL(f: visual.PixelFormat) MTLPixelFormat {
     return switch (f) {
         .r8 => .r8Unorm,
         .rgba8 => .rgba8Unorm,
@@ -220,7 +216,7 @@ fn toMTL(f: rt.PixelFormat) MTLPixelFormat {
     };
 }
 
-pub fn createTexture(self: *Self, width: u32, height: u32, format: rt.PixelFormat) !*MTLTexture {
+pub fn createTexture(self: *Self, width: u32, height: u32, format: visual.PixelFormat) !*MTLTexture {
     return mb.createTexture(self.device, width, height, toMTL(format));
 }
 
@@ -260,13 +256,13 @@ pub fn drawTextureQuad(
     _: f32,
     _: [2]f32,
     _: ?Transform,
-    _: RenderContext,
+    _: anytype,
     _: bool,
     _: bool,
     _: Color,
 ) void {}
 
-pub fn render(self: *Self, r: Renderable, ctx: RenderContext) void {
+pub fn render(self: *Self, r: Renderable, ctx: anytype) void {
     const xform_index: u16 = if (r.transform == null) 0 else blk: {
         const idx: u16 = @intCast(self.xforms.items.len);
         self.xforms.append(

@@ -1,6 +1,6 @@
 const Entity = @import("Entity.zig");
-const core = @import("math");
-const V2 = core.V2;
+const math = @import("math");
+const V2 = math.V2;
 
 pub const TrackingMode = packed struct {
     enabled: bool = true,

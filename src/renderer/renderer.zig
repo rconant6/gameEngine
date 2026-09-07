@@ -4,24 +4,36 @@ const math = @import("math");
 pub const V2 = math.V2;
 pub const WorldPoint = math.WorldPoint;
 pub const ScreenPoint = math.ScreenPoint;
-const shapes_module = @import("shapes");
-pub const Shapes = shapes_module;
-const registry = @import("registry");
-pub const ShapeRegistry = registry.ShapeRegistry;
-pub const ShapeData = registry.ShapeData;
-pub const triangulation = @import("triangulation");
 const build_options = @import("build_options");
-const col = @import("color.zig");
-pub const Color = col.Color;
-pub const Colors = col.Colors;
-pub const ColorLibrary = col.ColorLibrary;
-pub const Hue = col.Hue;
-pub const Temperature = col.Temperature;
-pub const Saturation = col.Saturation;
-pub const Tone = col.Tone;
-pub const Family = col.Family;
-pub const TaggedColor = col.TaggedColor;
-pub const Generator = col.generators;
+
+// MARK: Vocabulary re-exports
+// These types LIVE in `visual` now — description, not execution. Re-exported
+// here so every existing `rend.Color` / `rend.Shapes` / `rend.Renderable` call
+// site keeps compiling. Consumers migrate to @import("visual") opportunistically.
+const visual = @import("visual");
+pub const Color = visual.Color;
+pub const Colors = visual.Colors;
+pub const ColorLibrary = visual.ColorLibrary;
+pub const Hue = visual.Hue;
+pub const Temperature = visual.Temperature;
+pub const Saturation = visual.Saturation;
+pub const Tone = visual.Tone;
+pub const Family = visual.Family;
+pub const TaggedColor = visual.TaggedColor;
+pub const Generator = visual.Generator;
+pub const Shapes = visual.Shapes;
+pub const triangulation = visual.triangulation;
+pub const ShapeData = visual.ShapeData;
+pub const ShapeRegistry = visual.ShapeRegistry;
+pub const CoordinateSpace = visual.CoordinateSpace;
+pub const PixelFormat = visual.PixelFormat;
+pub const DrawStyle = visual.DrawStyle;
+pub const Gradient = visual.Gradient;
+pub const Renderable = visual.Renderable;
+pub const ScreenAnchor = visual.ScreenAnchor;
+pub const Transform = visual.Transform;
+pub const getAnchorPos = visual.getAnchorPos;
+
 const batch = @import("batch.zig");
 pub const Batch = batch.IndexedBatch;
 pub const DrawCall = batch.DrawCall;
@@ -31,17 +43,9 @@ pub const LocalXform = tess.LocalXform;
 pub const tessellate = tess.tessellate;
 const text_module = @import("text.zig");
 const Font = text_module.Font;
-const rt = @import("render_types.zig");
-pub const CoordinateSpace = rt.CoordinateSpace;
-pub const PixelFormat = rt.PixelFormat;
-pub const DrawStyle = rt.DrawStyle;
-pub const Gradient = rt.Gradient;
-pub const Renderable = rt.Renderable;
-pub const RenderConfig = rt.RendererConfig;
-pub const RenderContext = rt.RenderContext;
-pub const ScreenAnchor = rt.ScreenAnchor;
-pub const Transform = rt.Transform;
-pub const getAnchorPos = rt.getAnchorPosition;
+const ctxm = @import("context.zig");
+pub const RenderConfig = ctxm.RendererConfig;
+pub const RenderContext = ctxm.RenderContext;
 const log = @import("debug").log;
 
 const MetalRenderer = if (build_options.backend == .metal)
@@ -70,12 +74,16 @@ pub const Renderer = struct {
     pub const Device = BackendImpl.Device;
     pub const Texture = BackendImpl.Texture;
 
-    pub fn render(self: *Renderer, r: Renderable, ctx: RenderContext) void {
+    /// ctx: any struct with `width: u32`, `height: u32`, `camera_loc: V2`,
+    /// `ortho_size: f32`. That shape IS the contract — no shared type required.
+    /// `RenderContext` in context.zig is one struct that satisfies it; an app is
+    /// free to pass its own with extra fields. Applies to every draw* below.
+    pub fn render(self: *Renderer, r: Renderable, ctx: anytype) void {
         self.backend.render(r, ctx);
     }
 
-    pub fn init(p_gpa: Allocator, io: std.Io, config: RenderConfig) !Renderer {
-        const backend = try BackendImpl.init(p_gpa, io, config);
+    pub fn init(persistent: Allocator, io: std.Io, config: RenderConfig) !Renderer {
+        const backend = try BackendImpl.init(persistent, io, config);
         return .{
             .backend = backend,
             .width = config.width,
@@ -134,7 +142,7 @@ pub const Renderer = struct {
         height: f32,
         origin: [2]f32,
         transform: ?Transform,
-        ctx: RenderContext,
+        ctx: anytype,
         flip_h: bool,
         flip_v: bool,
         tint: Color,
@@ -160,7 +168,7 @@ pub const Renderer = struct {
         position: WorldPoint,
         scale: f32,
         color: Color,
-        ctx: RenderContext,
+        ctx: anytype,
     ) void {
         text_module.drawText(self, font, tex, text, position, scale, color, ctx);
     }
@@ -173,7 +181,7 @@ pub const Renderer = struct {
         position: ScreenPoint,
         scale: f32,
         color: Color,
-        ctx: RenderContext,
+        ctx: anytype,
     ) void {
         text_module.drawTextScreen(self, font, tex, text, position, scale, color, ctx);
     }

@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const StringHashMap = std.StringHashMap;
-const GameMemory = @import("math").GameMemory;
+const GameMemory = @import("memory");
 const log = @import("debug").log;
 
 pub const WorldPolicy = enum {
@@ -275,10 +275,10 @@ pub const GameStateManager = struct {
         while (iter.next()) |val| {
             const value = val.value_ptr.*;
             switch (value) {
-                .string => |s| self.mem.persistentFree(s),
+                .string => |s| self.mem.persistent.free(s),
                 else => {},
             }
-            self.mem.persistentFree(val.key_ptr.*);
+            self.mem.persistent.free(val.key_ptr.*);
         }
         self.game_values.clearRetainingCapacity();
     }
@@ -462,17 +462,17 @@ pub const GameStateManager = struct {
         }
         return null;
     }
-    fn freeSubtree(allocator: Allocator, node: *GameState) void {
+    fn freeSubtree(persistent: Allocator, node: *GameState) void {
         var child = node.first_child;
         while (child) |c| {
             const next = c.next_sibling;
-            freeSubtree(allocator, c);
+            freeSubtree(persistent, c);
             child = next;
         }
-        allocator.free(node.name);
+        persistent.free(node.name);
         if (node.scene) |s| {
-            allocator.free(s);
+            persistent.free(s);
         }
-        allocator.destroy(node);
+        persistent.destroy(node);
     }
 };

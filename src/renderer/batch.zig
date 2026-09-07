@@ -19,12 +19,12 @@ pub fn IndexedBatch(comptime Vertex: type, comptime Key: type) type {
         draw_calls: std.ArrayList(DrawCall(Key)),
         persistent: Allocator, // renderer.persistent
 
-        pub fn init(gpa_p: Allocator) Self {
+        pub fn init(persistent: Allocator) Self {
             return .{
                 .vertices = .empty,
                 .draw_calls = .empty,
                 .indices = .empty,
-                .persistent = gpa_p,
+                .persistent = persistent,
             };
         }
         pub fn deinit(self: *Self) void {

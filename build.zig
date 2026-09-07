@@ -1,5 +1,4 @@
 const std = @import("std");
-const builtin = @import("builtin");
 const macos = @import("build/macos.zig");
 const linux = @import("build/linux.zig");
 const windows = @import("build/windows.zig");
@@ -20,7 +19,6 @@ pub const M = enum(u8) {
     ecs,
     action,
     component_registry,
-    shape_registry,
     collider_shape_registry,
     registry,
     scene,
@@ -33,6 +31,8 @@ pub const M = enum(u8) {
     build_options,
     triangulation,
     shapes,
+    memory,
+    visual,
 };
 
 /// Module definition: source file path + dependencies (by enum).
@@ -62,9 +62,8 @@ const module_defs = [_]ModuleDef{
         .name = "renderer",
         .path = "src/renderer/renderer.zig",
         .deps = &.{
-            .{ "math", .math },                   .{ "registry", .registry },
+            .{ "math", .math },                   .{ "visual", .visual },
             .{ "build_options", .build_options }, .{ "assets", .assets },
-            .{ "shapes", .shapes },               .{ "triangulation", .triangulation },
         },
     },
     // Assets
@@ -73,7 +72,7 @@ const module_defs = [_]ModuleDef{
         .path = "src/assets/assets.zig",
         .deps = &.{
             .{ "math", .math }, .{ "renderer", .renderer },
-            .{ "zxl", .zxl },
+            .{ "zxl", .zxl },   .{ "memory", .memory },
         },
     },
     // Platform
@@ -89,32 +88,23 @@ const module_defs = [_]ModuleDef{
         .name = "ecs",
         .path = "src/ecs/ecs.zig",
         .deps = &.{
-            .{ "math", .math },         .{ "renderer", .renderer },
-            .{ "assets", .assets },     .{ "action", .action },
-            .{ "registry", .registry }, .{ "scene", .scene },
+            .{ "math", .math },         .{ "visual", .visual },
+            .{ "action", .action },     .{ "registry", .registry },
+            .{ "scene", .scene },
         },
     },
     // Action
     .{ .name = "action", .path = "src/action/Action.zig", .deps = &.{
         .{ "math", .math },             .{ "platform", .platform },
         .{ "ecs", .ecs },               .{ "scene-format", .scene_format },
-        .{ "game_state", .game_state },
+        .{ "game_state", .game_state }, .{ "memory", .memory },
     } },
     // Registry
     .{
         .name = "component_registry",
         .path = "src/registry/component_registry.zig",
         .deps = &.{
-            .{ "scene-format", .scene_format }, .{ "ecs", .ecs },
-        },
-    },
-    // Shapes
-    .{
-        .name = "shape_registry",
-        .path = "src/registry/shape_registry.zig",
-        .deps = &.{
-            .{ "scene-format", .scene_format }, .{ "shapes", .shapes },
-            .{ "math", .math },
+            .{ "ecs", .ecs },
         },
     },
     // Collider
@@ -130,10 +120,7 @@ const module_defs = [_]ModuleDef{
         .name = "registry",
         .path = "src/registry/registry.zig",
         .deps = &.{
-            .{ "math", .math },         .{ "component_registry", .component_registry },
-            .{ "ecs", .ecs },           .{ "collider_shape_registry", .collider_shape_registry },
-            .{ "shapes", .shapes },     .{ "shape_registry", .shape_registry },
-            .{ "scene-format", .scene_format },
+            .{ "ecs", .ecs }, .{ "visual", .visual },
         },
     },
     // Scene
@@ -143,9 +130,8 @@ const module_defs = [_]ModuleDef{
         .deps = &.{
             .{ "scene-format", .scene_format }, .{ "math", .math },
             .{ "ecs", .ecs },                   .{ "assets", .assets },
-            .{ "renderer", .renderer },         .{ "build_options", .build_options },
-            .{ "registry", .registry },         .{ "platform", .platform },
-            .{ "action", .action },
+            .{ "renderer", .renderer },         .{ "platform", .platform },
+            .{ "action", .action },             .{ "visual", .visual },
         },
     },
     // UI
@@ -161,7 +147,7 @@ const module_defs = [_]ModuleDef{
         .name = "game_state",
         .path = "src/gameState/state.zig",
         .deps = &.{
-            .{ "math", .math },
+            .{ "math", .math }, .{ "memory", .memory },
         },
     },
     // Systems
@@ -170,6 +156,7 @@ const module_defs = [_]ModuleDef{
         .path = "src/systems/Systems.zig",
         .deps = &.{
             .{ "math", .math },         .{ "ecs", .ecs },
+            .{ "visual", .visual },
             .{ "renderer", .renderer }, .{ "assets", .assets },
             .{ "action", .action },     .{ "game_state", .game_state },
         },
@@ -180,7 +167,7 @@ const module_defs = [_]ModuleDef{
         .path = "src/app/app.zig",
         .deps = &.{
             .{ "platform", .platform }, .{ "renderer", .renderer },
-            .{ "math", .math },
+            .{ "math", .math },         .{ "memory", .memory },
         },
     },
     // Engine (game runtime — sits on top of app)
@@ -191,10 +178,9 @@ const module_defs = [_]ModuleDef{
             .{ "app", .app },                     .{ "math", .math },
             .{ "platform", .platform },           .{ "renderer", .renderer },
             .{ "build_options", .build_options }, .{ "assets", .assets },
-            .{ "ecs", .ecs },                     .{ "scene-format", .scene_format },
-            .{ "action", .action },               .{ "scene", .scene },
-            .{ "registry", .registry },           .{ "systems", .systems },
-            .{ "game_state", .game_state },
+            .{ "ecs", .ecs },                     .{ "action", .action },
+            .{ "scene", .scene },                 .{ "systems", .systems },
+            .{ "game_state", .game_state },       .{ "memory", .memory },
         },
     },
     // ZXL
@@ -202,7 +188,7 @@ const module_defs = [_]ModuleDef{
         .name = "zxl",
         .path = "src/zxl/zxl.zig",
         .deps = &.{
-            .{ "math", .math },
+            .{ "visual", .visual },
         },
     },
     // Generated (no source file)
@@ -210,17 +196,29 @@ const module_defs = [_]ModuleDef{
     // Triangulation (leaf: math only)
     .{
         .name = "triangulation",
-        .path = "src/renderer/triangulation.zig",
+        .path = "src/visual/triangulation.zig",
         .deps = &.{
             .{ "math", .math },
         },
     },
-    // Shapes (near-leaf: math + triangulation; debug auto-injected)
+    // Shapes (near-leaf: math + triangulation)
     .{
         .name = "shapes",
-        .path = "src/renderer/shapes.zig",
+        .path = "src/visual/shapes.zig",
         .deps = &.{
             .{ "math", .math }, .{ "triangulation", .triangulation },
+        },
+    },
+    // Memory (leaf: std only — the allocator-lifetime taxonomy)
+    .{ .name = "memory", .path = "src/memory/memory.zig", .deps = &.{} },
+    // Visual (leaf vocabulary: math ONLY — exempt from debug auto-injection
+    // below, since `debug` imports `renderer` and would re-form the cycle)
+    .{
+        .name = "visual",
+        .path = "src/visual/visual.zig",
+        .deps = &.{
+            .{ "math", .math },     .{ "triangulation", .triangulation },
+            .{ "shapes", .shapes },
         },
     },
 };
@@ -276,12 +274,15 @@ pub fn build(b: *std.Build) void {
     // Wire dependencies (debug is auto-injected into every source module)
     const debug_idx = @intFromEnum(M.debug);
     const build_options_idx = @intFromEnum(M.build_options);
+    const visual_idx = @intFromEnum(M.visual);
     inline for (module_defs, 0..) |def, i| {
         for (def.deps) |dep| {
             modules[i].addImport(dep[0], modules[@intFromEnum(dep[1])]);
         }
-        // Auto-inject debug into every source module (except debug itself and build_options)
-        if (i != debug_idx and i != build_options_idx and def.path != null) {
+        // Auto-inject debug into every source module (except debug itself,
+        // build_options, and visual — visual is vocabulary and must stay
+        // math-only; `debug` imports `renderer`, which would re-form the cycle)
+        if (i != debug_idx and i != build_options_idx and i != visual_idx and def.path != null) {
             modules[i].addImport("debug", modules[debug_idx]);
         }
     }
@@ -333,6 +334,8 @@ pub fn build(b: *std.Build) void {
         .scene,
         .scene_format,
         .engine,
+        .visual,
+        .memory,
     };
 
     // ========================================

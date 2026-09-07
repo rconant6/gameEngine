@@ -3,14 +3,13 @@ const math = @import("math");
 const V2 = math.V2;
 const registry = @import("registry");
 const ColliderData = registry.ColliderData;
-const ShapeRegistry = registry.ShapeRegistry;
-const ShapeData = registry.ShapeData;
-const rend = @import("renderer");
-const ScreenAnchor = rend.ScreenAnchor;
-const Color = rend.Color;
-const Colors = rend.Colors;
-const Shape = rend.Shape;
-const CoordinateSpace = rend.CoordinateSpace;
+// ShapeData comes from `visual` (geometry vocabulary), not the registry shim.
+const visual = @import("visual");
+const ShapeData = visual.ShapeData;
+const ScreenAnchor = visual.ScreenAnchor;
+const Color = visual.Color;
+const Colors = visual.Colors;
+const CoordinateSpace = visual.CoordinateSpace;
 const action = @import("action");
 
 // MARK: Action Components (defined in action module, re-exported for ECS use)
@@ -75,9 +74,9 @@ pub const Text = struct {
         };
     }
 
-    pub fn deinit(self: *Text, gpa: std.mem.Allocator) void {
-        if (self.text_owned) gpa.free(self.text);
-        if (self.font_owned) gpa.free(self.font_name);
+    pub fn deinit(self: *Text, persistent: std.mem.Allocator) void {
+        if (self.text_owned) persistent.free(self.text);
+        if (self.font_owned) persistent.free(self.font_name);
     }
 };
 
@@ -137,8 +136,8 @@ pub const ZxlSprite = struct {
     asset_name_owned: bool = false,
     tint: Color = Colors.WHITE,
 
-    pub fn deinit(self: *ZxlSprite, gpa: std.mem.Allocator) void {
-        if (self.asset_name_owned) gpa.free(self.asset_name);
+    pub fn deinit(self: *ZxlSprite, persistent: std.mem.Allocator) void {
+        if (self.asset_name_owned) persistent.free(self.asset_name);
     }
 };
 

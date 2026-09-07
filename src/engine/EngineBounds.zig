@@ -1,10 +1,9 @@
 const Engine = @import("../Engine.zig").Engine;
-const core = @import("math");
-const V2 = core.V2;
+const math = @import("math");
+const V2 = math.V2;
 const renderer = @import("renderer");
-const RenderContext = renderer.RenderContext;
 
-pub fn getGameBounds(ctx: RenderContext) struct { width: f32, height: f32 } {
+pub fn getGameBounds(ctx: anytype) struct { width: f32, height: f32 } {
     const aspect = @as(f32, @floatFromInt(ctx.width)) / @as(f32, @floatFromInt(ctx.height));
     return .{
         .width = 10.0 * aspect * 2.0, // Full width

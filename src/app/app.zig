@@ -3,7 +3,7 @@ const plat = @import("platform");
 const rend = @import("renderer");
 const debug = @import("debug");
 const math = @import("math");
-const Memory = math.GameMemory;
+const Memory = @import("memory");
 const Logger = debug.Logger;
 const log = debug.log;
 
@@ -30,13 +30,13 @@ pub const App = struct {
     scale_factor: f32, // physical / logical, from backingScaleFactor; sourced once at init
 
     pub fn init(
-        gpa: std.mem.Allocator,
+        backing: std.mem.Allocator,
         io: std.Io,
         env: *std.process.Environ.Map,
         config: AppConfig,
     ) !App {
-        const mem = try gpa.create(Memory);
-        mem.init(gpa);
+        const mem = try backing.create(Memory);
+        mem.init(backing);
 
         try Logger.init(mem.persistent, io);
 
@@ -98,6 +98,8 @@ pub const App = struct {
         self.window.deinit();
         plat.deinit();
         Logger.deinit();
+        // `persistent` IS the raw backing allocator (Memory.init assigns it
+        // directly). Capture it before deinit so we can free Memory itself.
         const backing = self.mem.persistent;
         self.mem.deinit();
         backing.destroy(self.mem);

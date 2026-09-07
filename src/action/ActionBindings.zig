@@ -11,11 +11,11 @@ pub fn ActionBindings(comptime TriggerType: type) type {
             return self.triggers.len > 0;
         }
 
-        pub fn deinit(self: *Self, gpa: std.mem.Allocator) void {
+        pub fn deinit(self: *Self, persistent: std.mem.Allocator) void {
             for (self.triggers) |*trigger| {
-                trigger.deinit(gpa);
+                trigger.deinit(persistent);
             }
-            gpa.free(self.triggers);
+            persistent.free(self.triggers);
         }
     };
 }

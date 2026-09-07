@@ -1,10 +1,8 @@
-const std = @import("std");
 const asset = @import("assets");
 pub const Font = asset.Font;
 const GlyphEntry = asset.GlyphEntry;
 const GlyphAtlas = asset.GlyphAtlas;
 const rend = @import("renderer.zig");
-const RenderContext = rend.RenderContext;
 const Renderer = rend.Renderer;
 const Texture = Renderer.Texture;
 const WorldPoint = rend.WorldPoint;
@@ -31,7 +29,7 @@ fn emitGlyph(
     scale: f32,
     color: Color,
     space: rend.CoordinateSpace,
-    ctx: RenderContext,
+    ctx: anytype,
 ) void {
     const wq = (e.size_px.x / cell) * scale; // cell size in em → space units
     const hq = (e.size_px.y / cell) * scale;
@@ -85,7 +83,7 @@ fn run(
     scale: f32,
     color: Color,
     space: rend.CoordinateSpace,
-    ctx: RenderContext,
+    ctx: anytype,
 ) void {
     var pen_x = pen_x0;
     for (text) |char| {
@@ -124,7 +122,7 @@ pub fn drawText(
     position: WorldPoint,
     scale: f32,
     color: Color,
-    ctx: RenderContext,
+    ctx: anytype,
 ) void {
     run(renderer, font, tex, text, position.x, position.y, scale, color, .world, ctx);
 }
@@ -137,7 +135,7 @@ pub fn drawTextScreen(
     position: ScreenPoint,
     scale: f32,
     color: Color,
-    ctx: RenderContext,
+    ctx: anytype,
 ) void {
     run(renderer, font, tex, text, position.x, position.y, scale, color, .screen, ctx);
 }

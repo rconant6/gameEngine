@@ -34,6 +34,5 @@ pub const ComponentRegistry = registry.ComponentRegistry;
 pub const ComponentData = registry.ComponentData;
 pub const ColliderRegistry = registry.ColliderRegistry;
 pub const ColliderData = registry.ColliderData;
-pub const ColliderShape = registry.ColliderShape;
 const ct = @import("CameraTracking.zig");
 pub const TrackingMode = ct.TrackingMode;

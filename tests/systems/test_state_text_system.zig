@@ -37,7 +37,7 @@ const game_state = @import("game_state");
 const GameStateManager = game_state.GameStateManager;
 
 const math = @import("math");
-const GameMemory = math.GameMemory;
+const GameMemory = @import("memory");
 
 const systems = @import("systems");
 const stateTextSystem = systems.stateTextSystem;
