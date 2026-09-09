@@ -19,8 +19,8 @@ const Font = assets.Font;
 const ui = @import("ui");
 const make = ui.make;
 
-const logical_width: i32 = 1280;
-const logical_height: i32 = 720;
+const logical_width: i32 = 1600;
+const logical_height: i32 = 1000;
 const screen_w: f32 = @floatFromInt(logical_width);
 const screen_h: f32 = @floatFromInt(logical_height);
 
@@ -75,6 +75,20 @@ pub fn main(init: std.process.Init) !void {
     defer test10.deinit();
     var test11 = ui.UIManager.init(backing);
     defer test11.deinit();
+    var test12 = ui.UIManager.init(backing);
+    defer test12.deinit();
+    var test13 = ui.UIManager.init(backing);
+    defer test13.deinit();
+
+    // Test 13's app-owned data. The widgets only ever see copies of these;
+    // the app applies the changes they report.
+    var show_grid = false;
+    var snap = true;
+    var name_buf: [64]u8 = undefined;
+    const name_seed = "player";
+    @memcpy(name_buf[0..name_seed.len], name_seed);
+    var name_len: usize = name_seed.len;
+    var speed: f32 = 1.5;
 
     while (app.isRunning()) {
         try app.beginFrame();
@@ -82,7 +96,8 @@ pub fn main(init: std.process.Init) !void {
         app.renderer.setClearColor(Colors.DARK_GRAY);
         app.renderer.clear();
 
-        if (app.kb.isPressed(.Esc)) break;
+        if (app.kb.isPressed(.Esc) and !test13.wantsKeyboard()) break;
+        const in = ui.UIInput.fromDevices(app.mouse, app.kb, app.text.slice());
 
         // ────────────────────────────────────────
         // Test 1: Single Label
@@ -191,12 +206,7 @@ pub fn main(init: std.process.Init) !void {
                 }),
             );
             test5.layoutAt(20, 280, 400, 60);
-            test5.processInput(
-                app.mouse.position.x,
-                app.mouse.position.y,
-                app.mouse.buttons.isPressed(.Left),
-                app.mouse.buttons.isReleased(.Left),
-            );
+            test5.processInput(in);
             test5.render(&app.renderer, &font, font_tex, ctx);
         }
 
@@ -245,12 +255,7 @@ pub fn main(init: std.process.Init) !void {
                 }),
             );
             test6.layoutAt(20, 370, 300, 200);
-            test6.processInput(
-                app.mouse.position.x,
-                app.mouse.position.y,
-                app.mouse.buttons.isPressed(.Left),
-                app.mouse.buttons.isReleased(.Left),
-            );
+            test6.processInput(in);
             test6.render(&app.renderer, &font, font_tex, ctx);
         }
 
@@ -367,12 +372,7 @@ pub fn main(init: std.process.Init) !void {
                 }),
             );
             test10.layoutAt(880, 280, 200, 60);
-            test10.processInput(
-                app.mouse.position.x,
-                app.mouse.position.y,
-                app.mouse.buttons.isPressed(.Left),
-                app.mouse.buttons.isReleased(.Left),
-            );
+            test10.processInput(in);
             test10.render(&app.renderer, &font, font_tex, ctx);
         }
 
@@ -431,13 +431,137 @@ pub fn main(init: std.process.Init) !void {
                 }),
             );
             test11.layoutAt(880, 360, 220, 200);
-            test11.processInput(
-                app.mouse.position.x,
-                app.mouse.position.y,
-                app.mouse.buttons.isPressed(.Left),
-                app.mouse.buttons.isReleased(.Left),
-            );
+            test11.processInput(in);
             test11.render(&app.renderer, &font, font_tex, ctx);
+        }
+
+        // ────────────────────────────────────────
+        // Test 12: ScrollView — long list in a fixed viewport
+        //
+        // Builds ALL 30 rows and hands them to ScrollView. The widget owns the
+        // offset, the culling, and the wheel — this test slices nothing and
+        // tracks no offset of its own.
+        //
+        // Expect: ~15 of 30 rows visible, wheel over the region scrolls,
+        //         content clamps at first and last row.
+        // ────────────────────────────────────────
+        test12.rebuild();
+        {
+            const a = test12.allocator();
+
+            const row_count: usize = 30;
+
+            var rows: [row_count]*ui.WidgetNode = undefined;
+            for (&rows, 0..) |*row, i| {
+                const txt = std.fmt.allocPrint(
+                    a,
+                    "Row {d} of {d}",
+                    .{ i + 1, row_count },
+                ) catch "Row ?";
+                row.* = make.label(a, txt, .{
+                    .font_scale = 16.0,
+                    .color = if (i % 2 == 0) Colors.UI_TEXT_PRIMARY else Colors.UI_TEXT_MUTED,
+                });
+            }
+
+            test12.setRoot(
+                make.panel(a, make.vstack(a, &.{
+                    make.label(a, "ScrollView", .{
+                        .font_scale = 16.0,
+                        .color = Colors.UI_TEXT_INFO,
+                    }),
+                    make.scrollView(
+                        a,
+                        "sv_rows",
+                        make.vstack(a, &rows, .{ .spacing = 2 }),
+                        .{},
+                    ),
+                }, .{ .spacing = 6 }), .{
+                    .background = Colors.CHARCOAL,
+                    .border_color = Colors.UI_TEXT_MUTED,
+                    .border_width = 1,
+                    .padding = ui.EdgeInsets.all(8),
+                }),
+            );
+            test12.layoutAt(1140, 280, 320, 340);
+            test12.processInput(in);
+            test12.render(&app.renderer, &font, font_tex, ctx);
+        }
+
+        // ────────────────────────────────────────
+        // Test 13: Checkbox + TextInput — value in, change flag out
+        //
+        // The builder passes the app's current values; widgets report intent
+        // via `changed`, and the app applies it after processInput.
+        //
+        // Expect: box or its label toggles; readout follows.
+        //         Enter / click-away commits, Esc reverts.
+        //         Backspace/Delete/Left/Right edit mid-string.
+        //         Only one field focused at a time.
+        //         speed "abc" + Enter reverts to the old number.
+        // ────────────────────────────────────────
+        test13.rebuild();
+        {
+            const a = test13.allocator();
+            const speed_txt = std.fmt.allocPrint(a, "{d}", .{speed}) catch "?";
+            const readout = std.fmt.allocPrint(
+                a,
+                "grid={} snap={} name={s} speed={d}",
+                .{ show_grid, snap, name_buf[0..name_len], speed },
+            ) catch "?";
+
+            test13.setRoot(
+                make.panel(a, make.vstack(a, &.{
+                    make.label(a, "Checkbox + TextInput", .{
+                        .font_scale = 16.0,
+                        .color = Colors.UI_TEXT_INFO,
+                    }),
+                    make.checkbox(a, "cb_grid", "Show grid", show_grid, .{}),
+                    make.checkbox(a, "cb_snap", "Snap", snap, .{}),
+                    make.hstack(a, &.{
+                        make.label(a, "name", .{ .font_scale = 16.0 }),
+                        make.textInput(a, "ti_name", name_buf[0..name_len], .{}),
+                    }, .{}),
+                    make.hstack(a, &.{
+                        make.label(a, "speed", .{ .font_scale = 16.0 }),
+                        make.textInput(a, "ti_speed", speed_txt, .{ .width = 80 }),
+                    }, .{}),
+                    make.label(a, readout, .{
+                        .font_scale = 16.0,
+                        .color = Colors.UI_TEXT_MUTED,
+                    }),
+                }, .{ .spacing = 8 }), .{
+                    .background = Colors.CHARCOAL,
+                    .border_color = Colors.UI_TEXT_MUTED,
+                    .border_width = 1,
+                    .padding = ui.EdgeInsets.all(10),
+                    .corner_radius = 8,
+                }),
+            );
+            test13.layoutAt(880, 640, 580, 300);
+            test13.processInput(in);
+
+            // Pull: apply what the user committed this frame.
+            if (test13.getState("cb_grid")) |ws| {
+                if (ws.takeChanged()) show_grid = !show_grid;
+            }
+            if (test13.getState("cb_snap")) |ws| {
+                if (ws.takeChanged()) snap = !snap;
+            }
+            if (test13.getState("ti_name")) |ws| {
+                if (ws.takeChanged()) {
+                    const txt = ws.text.slice();
+                    name_len = @min(txt.len, name_buf.len);
+                    @memcpy(name_buf[0..name_len], txt[0..name_len]);
+                }
+            }
+            if (test13.getState("ti_speed")) |ws| {
+                // Bad input keeps the old value; next layout reseeds → field reverts.
+                if (ws.takeChanged())
+                    speed = std.fmt.parseFloat(f32, ws.text.slice()) catch speed;
+            }
+
+            test13.render(&app.renderer, &font, font_tex, ctx);
         }
 
         try app.endFrame();

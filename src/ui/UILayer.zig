@@ -3,7 +3,9 @@ const Allocator = std.mem.Allocator;
 const ViewMap = std.StringArrayHashMapUnmanaged(RegionConfig);
 const WidgetNode = @import("widgets/WidgetNode.zig");
 const UIManager = @import("UIManager.zig");
-const Event = @import("event.zig").Event;
+const evt = @import("event.zig");
+const Event = evt.Event;
+const UIInput = evt.UIInput;
 const rend = @import("renderer");
 const Renderer = rend.Renderer;
 const Texture = Renderer.Texture;
@@ -50,14 +52,7 @@ pub const UILayer = struct {
         };
     }
 
-    pub fn update(
-        self: *UILayer,
-        state: ?*const anyopaque,
-        mouse_x: f32,
-        mouse_y: f32,
-        left_down: bool,
-        left_up: bool,
-    ) void {
+    pub fn update(self: *UILayer, state: ?*const anyopaque, in: UIInput) void {
         for (self.views.values()) |*view| {
             view.manager.rebuild();
             const root = view.builder(view.manager.allocator(), state);
@@ -68,10 +63,16 @@ pub const UILayer = struct {
                 view.layout.width,
                 view.layout.height,
             );
-            if (view.interactive) {
-                view.manager.processInput(mouse_x, mouse_y, left_down, left_up);
-            }
+            if (view.interactive) view.manager.processInput(in);
         }
+    }
+
+    /// True while any view has a text field being edited.
+    pub fn wantsKeyboard(self: *const UILayer) bool {
+        for (self.views.values()) |*view| {
+            if (view.manager.wantsKeyboard()) return true;
+        }
+        return false;
     }
 
     pub fn render(self: *UILayer, renderer: *Renderer, font: *const Font, tex: *Texture, rctx: anytype) void {

@@ -18,7 +18,7 @@ const WidgetData = @import("widget_registry.zig").WidgetData;
 
 const Self = @This();
 
-children: []WidgetNode,
+childs: []WidgetNode,
 spacing: f32,
 cross_axis: Alignment.Vertical,
 
@@ -29,7 +29,7 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
     var max_height: f32 = 0;
     var remaining_width = li.constraints.max_width;
 
-    for (self.children, 0..) |*child, i| {
+    for (self.childs, 0..) |*child, i| {
         if (child.widget == .Spacer) {
             spacer_count += 1;
         } else {
@@ -45,7 +45,7 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
         }
 
         // Account for spacing between children
-        if (i < self.children.len - 1) {
+        if (i < self.childs.len - 1) {
             fixed_width_total += self.spacing;
             remaining_width -= self.spacing;
         }
@@ -58,7 +58,7 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
     // ── Pass 2: assign positions left-to-right ──
     var cursor_x = li.pos.x;
 
-    for (self.children, 0..) |*child, i| {
+    for (self.childs, 0..) |*child, i| {
         if (child.widget == .Spacer) {
             // Spacer gets its flex width, full height
             _ = child.layout(.{
@@ -81,14 +81,14 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
             cursor_x += child_size.width;
         }
 
-        if (i < self.children.len - 1) {
+        if (i < self.childs.len - 1) {
             cursor_x += self.spacing;
         }
     }
 
     // ── Cross-axis alignment ──
     const stack_height = max_height;
-    for (self.children) |*child| {
+    for (self.childs) |*child| {
         const child_height = child.bounds.height;
         child.bounds.y = switch (self.cross_axis) {
             .start => li.pos.y,
@@ -106,7 +106,7 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
 }
 
 pub fn render(self: *Self, ri: RenderInfo) void {
-    for (self.children) |*child| {
+    for (self.childs) |*child| {
         child.render(.{
             .renderer = ri.renderer,
             .ctx = ri.ctx,
@@ -115,4 +115,8 @@ pub fn render(self: *Self, ri: RenderInfo) void {
             .bounds = child.bounds,
         });
     }
+}
+
+pub fn children(self: *Self) []WidgetNode {
+    return self.childs;
 }

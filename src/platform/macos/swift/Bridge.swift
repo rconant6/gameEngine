@@ -144,3 +144,11 @@ public func poll_key_event(
 
   return true
 }
+
+@MainActor
+@_cdecl("poll_text_event")
+public func poll_text_event(codepoint: UnsafeMutablePointer<UInt32>) -> Bool {
+  guard let cp = globalEventHandler.pollNextText() else { return false }
+  codepoint.pointee = cp
+  return true
+}

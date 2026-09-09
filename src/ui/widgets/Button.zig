@@ -55,6 +55,7 @@ text_info: TextBlock,
 colors: ButtonColors,
 state: ?*u16 = null,
 on_click: ?*const fn () void = null,
+corner_radius: f32 = 0,
 
 pub fn layout(self: *Self, li: LayoutInfo) Size {
     const measured_text = self.text_info.getSize(li.font);
@@ -87,6 +88,7 @@ pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
             state.setHovered(hit);
             state.setPressed(false);
         },
+        else => {},
     }
 }
 
@@ -98,16 +100,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
     const measured = ri.font.measureText(self.text_info.text, self.text_info.font_scale);
     const ascent = (ascender / per_em) * self.text_info.font_scale;
     const text_y = bounds.y + ascent + (bounds.height - measured.y) / 2;
-    const Rectangle = rend.ShapeRegistry.getShapeType("Rectangle") orelse
-        return;
-    const bg_shape = rend.ShapeRegistry.createShapeUnion(
-        Rectangle,
-        Rectangle.initFromTopLeft(
-            .{ .x = bounds.x, .y = bounds.y },
-            bounds.width,
-            bounds.height,
-        ),
-    );
+    const bg_shape = bounds.toShape(self.corner_radius);
     const state = ButtonState{ .bits = self.state orelse {
         log.err(.ui, "Invalid Button State {s}", .{self.id});
         return;

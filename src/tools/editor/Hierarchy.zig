@@ -169,5 +169,10 @@ fn buildSceneContent(
 
     if (item_count == 0) return buildEmptyState(ui_arena);
 
-    return make.vstack(ui_arena, items[0..item_count], .{ .spacing = 2 });
+    return make.scrollView(
+        ui_arena,
+        "hierarchy_scroll",
+        make.vstack(ui_arena, items[0..item_count], .{ .spacing = 2 }),
+        .{},
+    );
 }

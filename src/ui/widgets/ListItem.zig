@@ -58,6 +58,7 @@ state: ?*u16 = null,
 indent_size: u8 = 16,
 text_info: TextBlock,
 colors: ListItemColors,
+corner_radius: f32 = 0,
 
 pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
     if (event.consumed) return;
@@ -81,6 +82,7 @@ pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
             state.setHovered(hit);
             state.setPressed(false);
         },
+        else => {},
     }
 }
 
@@ -92,16 +94,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
     const measured = ri.font.measureText(self.text_info.text, self.text_info.font_scale);
     const ascent = (ascender / per_em) * self.text_info.font_scale;
     const text_y = bounds.y + ascent + (bounds.height - measured.y) / 2;
-    const Rectangle = rend.ShapeRegistry.getShapeType("Rectangle") orelse
-        return;
-    const bg_shape = rend.ShapeRegistry.createShapeUnion(
-        Rectangle,
-        Rectangle.initFromTopLeft(
-            .{ .x = bounds.x, .y = bounds.y },
-            bounds.width,
-            bounds.height,
-        ),
-    );
+    const bg_shape = bounds.toShape(self.corner_radius);
     const state = ListItemState{ .bits = self.state orelse {
         log.err(.ui, "Invalid ListItem State {s}", .{self.id});
         return;

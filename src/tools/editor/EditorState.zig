@@ -79,7 +79,7 @@ pub fn getSelectedEntity(self: *const Self) ?*EntityDeclaration {
     return null;
 }
 
-fn findEntity(decls: []const scene_fmt.Declaration, ref: EntityRef) ?*EntityDeclaration {
+fn findEntity(decls: []scene_fmt.Declaration, ref: EntityRef) ?*EntityDeclaration {
     for (decls) |*decl| {
         switch (decl.*) {
             .entity => |*e| {

@@ -2,6 +2,8 @@ const std = @import("std");
 const math = @import("math");
 const V2 = math.V2;
 const ScreenPoint = math.ScreenPoint;
+const rend = @import("renderer");
+const ShapeRegistry = rend.ShapeRegistry;
 const Self = @This();
 
 pub const zero: Self = .{ .x = 0, .y = 0, .width = 0, .height = 0 };
@@ -74,4 +76,23 @@ pub fn insetBy(self: Self, l: f32, t: f32, r: f32, b: f32) Self {
         .width = self.width - l - r,
         .height = self.height - t - b,
     };
+}
+
+/// The drawable shape for this rect. radius <= 0 is a plain Rectangle (the
+/// default look); otherwise a RoundedRect, radius clamped to half the short
+/// side so the corner arcs never invert.
+pub fn toShape(self: Self, corner_radius: f32) rend.ShapeData {
+    if (corner_radius <= 0) {
+        const R = comptime ShapeRegistry.getShapeType("Rectangle").?;
+        return ShapeRegistry.createShapeUnion(
+            R,
+            R.initFromTopLeft(self.topLeft(), self.width, self.height),
+        );
+    }
+    const r = @min(corner_radius, @min(self.width, self.height) * 0.5);
+    const RR = comptime ShapeRegistry.getShapeType("RoundedRect").?;
+    return ShapeRegistry.createShapeUnion(
+        RR,
+        RR.initFromTopLeft(self.topLeft(), self.width, self.height, r),
+    );
 }

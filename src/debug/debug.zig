@@ -25,11 +25,13 @@ const DebugManagerStub = struct {
         persistent: Allocator,
         renderer: *Renderer,
         default_font: anytype,
+        default_tex: anytype,
     ) @This() {
         _ = frame;
         _ = persistent;
         _ = renderer;
         _ = default_font;
+        _ = default_tex;
         return .{};
     }
     pub fn deinit(self: *@This()) void {
@@ -57,33 +59,43 @@ else
     DebugRendererStub;
 
 const DebugRendererStub = struct {
-    pub fn init(renderer: *Renderer, default_font: anytype) @This() {
+    pub fn init(renderer: *Renderer, default_font: anytype, default_tex: anytype) @This() {
         _ = renderer;
         _ = default_font;
+        _ = default_tex;
         return .{};
     }
+    pub fn renderArrow(self: *@This(), arrow: DebugArrow, ctx: anytype) void {
+        _ = self;
+        _ = arrow;
+        _ = ctx;
+    }
+    pub fn renderCircle(self: *@This(), circle: DebugCircle, ctx: anytype) void {
+        _ = self;
+        _ = circle;
+        _ = ctx;
+    }
+    pub fn renderLine(self: *@This(), line: DebugLine, ctx: anytype) void {
+        _ = self;
+        _ = line;
+        _ = ctx;
+    }
+    pub fn renderRect(self: *@This(), rect: DebugRect, ctx: anytype) void {
+        _ = self;
+        _ = rect;
+        _ = ctx;
+    }
+    pub fn renderText(self: *@This(), text: DebugText, ctx: anytype) void {
+        _ = self;
+        _ = text;
+        _ = ctx;
+    }
+    pub fn render(self: *@This(), data: *const DebugDraw, ctx: anytype) void {
+        _ = self;
+        _ = data;
+        _ = ctx;
+    }
 };
-pub fn renderArrow(self: *@This(), arrow: DebugArrow) void {
-    _ = self;
-    _ = arrow;
-}
-
-pub fn renderCircle(self: *@This(), circle: DebugCircle) void {
-    _ = self;
-    _ = circle;
-}
-pub fn renderLine(self: *@This(), line: DebugLine) void {
-    _ = self;
-    _ = line;
-}
-pub fn renderRect(self: *@This(), rect: DebugRect) void {
-    _ = self;
-    _ = rect;
-}
-pub fn renderText(self: *@This(), text: DebugText) void {
-    _ = self;
-    _ = text;
-}
 
 // MARK: DebugDraw
 const draw = @import("DebugDraw.zig");
@@ -145,3 +157,43 @@ const DebugDrawStub = struct {
         _ = none;
     }
 };
+
+// MARK: Stub/Impl parity
+// The stubs above are hand-written parallel copies of the real types, selected
+// by build mode. Nothing forces them to agree, and because only one side is
+// compiled per build, drift in the release stubs is invisible from a Debug
+// build -- it surfaces as an arity error at a distant call site the first time
+// someone builds release. These checks move that failure here, to the
+// definition, in every build mode.
+//
+// Rule: the stub must expose every public method the impl has, with the same
+// parameter count. Extra stub methods are allowed; a missing or wrong-arity one
+// is the drift we care about. Parameter *types* are deliberately not compared --
+// stubs legitimately widen concrete types to `anytype`.
+fn assertStubParity(comptime Impl: type, comptime Stub: type, comptime label: []const u8) void {
+    for (@typeInfo(Impl).@"struct".decls) |decl| {
+        const impl_field = @field(Impl, decl.name);
+        const impl_info = @typeInfo(@TypeOf(impl_field));
+        if (impl_info != .@"fn") continue;
+
+        if (!@hasDecl(Stub, decl.name)) {
+            @compileError(label ++ " stub is missing method '" ++ decl.name ++ "'");
+        }
+        const stub_info = @typeInfo(@TypeOf(@field(Stub, decl.name)));
+        if (stub_info != .@"fn") {
+            @compileError(label ++ " stub's '" ++ decl.name ++ "' is not a function");
+        }
+        if (impl_info.@"fn".params.len != stub_info.@"fn".params.len) {
+            @compileError(std.fmt.comptimePrint(
+                "{s} stub's '{s}' takes {d} param(s), impl takes {d}",
+                .{ label, decl.name, stub_info.@"fn".params.len, impl_info.@"fn".params.len },
+            ));
+        }
+    }
+}
+
+comptime {
+    assertStubParity(DebugManagerImpl, DebugManagerStub, "DebugManager");
+    assertStubParity(DebugRendererImpl, DebugRendererStub, "DebugRenderer");
+    assertStubParity(DebugDrawImpl, DebugDrawStub, "DebugDraw");
+}

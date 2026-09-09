@@ -94,10 +94,22 @@ pub fn buildSwiftLibrary(
     const swift_clean = b.addSystemCommand(&.{ "rm", "-rf", swift_build_dir });
     swift_build.step.dependOn(&swift_clean.step);
 
-    const lib_path = b.fmt("{s}/arm64-apple-macosx/{s}/libMacPlatform.a", .{ swift_scratch, config });
+    // SPM (Xcode 27+) emits out/Products/<Config>; the `<config>` symlink in the
+    // scratch root points at it. Replaces the old `<triple>/<config>` layout.
+    const spm_lib_path = b.fmt("{s}/{s}/libMacPlatform.a", .{ swift_scratch, config });
+
+    // The Xcode 27 Swift toolchain emits N_LBRAC (0x32) debug stabs that Zig's
+    // Mach-O parser rejects ("unexpected symbol stab type 0x32 as the first
+    // entry"). Strip local/debug symbols into a copy and link that instead --
+    // a copy, so SPM's own output stays untouched and it doesn't rebuild.
+    const lib_path = b.cache_root.join(b.allocator, &.{"libMacPlatform-stripped.a"}) catch @panic("OOM");
+    const strip_copy = b.addSystemCommand(&.{ "cp", spm_lib_path, lib_path });
+    strip_copy.step.dependOn(&swift_build.step);
+    const strip_lib = b.addSystemCommand(&.{ "xcrun", "strip", "-S", "-x", lib_path });
+    strip_lib.step.dependOn(&strip_copy.step);
 
     const install_lib = b.addInstallFile(.{ .cwd_relative = lib_path }, "lib/libMacPlatform.a");
-    install_lib.step.dependOn(&swift_build.step);
+    install_lib.step.dependOn(&strip_lib.step);
 
     // Metal shaders
     var metallib_install: ?*std.Build.Step = null;
@@ -122,7 +134,9 @@ pub fn buildSwiftLibrary(
     }
 
     return .{
-        .swift_step = &swift_build.step,
+        // Consumers link lib_path, so they must wait on the strip, not just the
+        // swift build.
+        .swift_step = &strip_lib.step,
         .lib_path = lib_path,
         .metallib_install = metallib_install,
     };
@@ -137,7 +151,9 @@ pub fn linkSwiftLibrary(
     if (target.result.os.tag != .macos) return;
     const sl = swift_lib orelse return;
 
-    exe.root_module.linkSystemLibrary("c++", .{});
+    // Link the SDK's libc++ rather than "c++", which makes Zig build its own
+    // bundled libc++ from source -- that fails against the macOS 27 SDK headers.
+    exe.root_module.linkSystemLibrary("c++.1", .{});
     exe.root_module.addObjectFile(.{ .cwd_relative = sl.lib_path });
     exe.step.dependOn(sl.swift_step);
 

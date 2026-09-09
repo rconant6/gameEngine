@@ -10,6 +10,26 @@ pub const MouseData = Mouse.MouseData;
 
 pub const GamePad = struct {};
 
+/// This frame's typed codepoints, in order. Cleared with the other per-frame
+/// input state.
+pub const TextBuffer = struct {
+    codepoints: [32]u21 = undefined, // valid in [0..len)
+    len: u8 = 0,
+
+    /// Drops past 32 — a frame with that many characters is a paste storm.
+    pub fn push(self: *TextBuffer, cp: u21) void {
+        if (self.len == self.codepoints.len) return;
+        self.codepoints[self.len] = cp;
+        self.len += 1;
+    }
+    pub fn slice(self: *const TextBuffer) []const u21 {
+        return self.codepoints[0..self.len];
+    }
+    pub fn clear(self: *TextBuffer) void {
+        self.len = 0;
+    }
+};
+
 /// InputDevice is a state management machine
 /// Tracks pressed, just_pressed, just_released for
 /// the provided InputType ie. MouseButton, KeyCode, PadButton

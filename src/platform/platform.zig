@@ -9,6 +9,7 @@ pub const KeyModifiers = id.KeyModifiers;
 pub const Mouse = id.Mouse;
 pub const MouseButton = id.MouseButton;
 pub const MouseData = id.MouseData;
+pub const TextBuffer = id.TextBuffer;
 pub const Window = PlatformImpl.Window;
 const math = @import("math");
 const V2 = math.V2;
@@ -42,6 +43,7 @@ pub fn monotonicNanos() u64 {
 
 // Shared input state — owned here, updated by pollEvent().
 var keyboard_state: Keyboard = .{};
+var text_state: TextBuffer = .{};
 var mouse_state: Mouse = .{
     .buttons = InputDevice(MouseButton){},
 };
@@ -81,11 +83,15 @@ pub const WindowConfig = struct {
 pub fn getKeyboard() *const Keyboard {
     return &keyboard_state;
 }
+pub fn getText() *const TextBuffer {
+    return &text_state;
+}
 pub fn getMouse() *const Mouse {
     return &mouse_state;
 }
 pub fn clearInputStates() void {
     keyboard_state.clearFrameStates();
+    text_state.clear();
     mouse_state.clearState();
 }
 
@@ -168,6 +174,7 @@ fn applyEventToState(event: Event) void {
     switch (event) {
         .KeyPress => |e| keyboard_state.updateState(e.key, true),
         .KeyRelease => |e| keyboard_state.updateState(e.key, false),
+        .TextInput => |e| text_state.push(e.codepoint),
         .MouseButtonPress => |e| mouse_state.buttons.updateState(e.button, true),
         .MouseButtonRelease => |e| mouse_state.buttons.updateState(e.button, false),
         .MouseMove => |e| {

@@ -204,13 +204,7 @@ pub fn main(init: std.process.Init) !void {
                 .space = .screen,
             }, ctx);
         }
-        ui_layer.update(
-            &state,
-            mouse_pos.x,
-            mouse_pos.y,
-            app.mouse.buttons.isPressed(.Left),
-            app.mouse.buttons.isReleased(.Left),
-        );
+        ui_layer.update(&state, ui.UIInput.fromDevices(app.mouse, app.kb, app.text.slice()));
 
         // Poll toolbar clicks
         const Tool = @import("tool.zig").Tool;

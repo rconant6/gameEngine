@@ -13,61 +13,6 @@ const EditorState = @import("EditorState.zig");
 const EntityRef = EditorState.EntityRef;
 const Property = scene_fmt.Property;
 
-const dummy_loc: scene_fmt.SourceLocation = .{ .line = 0, .col = 0, .len = 0 };
-
-const dummy_component: scene_fmt.ComponentDeclaration = .{
-    .generic = .{
-        .name = "Transform",
-        .properties = &.{
-            .{ .name = "position", .type_annotation = .{
-                .base_type = .vec3,
-                .is_array = false,
-            }, .value = .{
-                .vector = &.{ 1.0, 2.0, 0.0 },
-            }, .location = dummy_loc },
-            .{ .name = "rotation", .type_annotation = .{
-                .base_type = .f32,
-                .is_array = false,
-            }, .value = .{ .number = 0.0 }, .location = dummy_loc },
-            .{ .name = "scale", .type_annotation = .{
-                .base_type = .f32,
-                .is_array = false,
-            }, .value = .{ .number = 1.0 }, .location = dummy_loc },
-        },
-        .nested_blocks = null,
-        .location = dummy_loc,
-    },
-};
-
-const dummy_entity: scene_fmt.EntityDeclaration = .{
-    .name = "Player",
-    .location = dummy_loc,
-    .components = &.{
-        dummy_component,
-        .{
-            .sprite = .{
-                .name = "Sprite",
-                .shape_type = "circle",
-                .properties = &.{
-                    .{ .name = "radius", .type_annotation = .{
-                        .base_type = .f32,
-                        .is_array = false,
-                    }, .value = .{ .number = 1.0 }, .location = dummy_loc },
-                    .{ .name = "fill_color", .type_annotation = .{
-                        .base_type = .color,
-                        .is_array = false,
-                    }, .value = .{ .color = 0x00FF00 }, .location = dummy_loc },
-                    .{ .name = "visible", .type_annotation = .{
-                        .base_type = .bool,
-                        .is_array = false,
-                    }, .value = .{ .boolean = true }, .location = dummy_loc },
-                },
-                .location = dummy_loc,
-            },
-        },
-    },
-};
-
 fn buildEmptyState(
     ui_arena: std.mem.Allocator,
 ) *WidgetNode {
@@ -81,22 +26,82 @@ fn buildEmptyState(
     );
 }
 
-fn buildPropertyRow(ui_arena: Allocator, prop: Property) *WidgetNode {
+/// Stable, unique widget id for one property of one entity. Entity-qualified
+/// so a pending `changed` can never land on a newly selected entity's
+/// same-named property. main.zig's flushInspector uses the same recipe.
+pub fn propertyId(
+    buf: []u8,
+    entity_name: []const u8,
+    component_name: []const u8,
+    prop_name: []const u8,
+) ?[]const u8 {
+    return std.fmt.bufPrint(buf, "p:{s}:{s}:{s}", .{ entity_name, component_name, prop_name }) catch null;
+}
+
+/// The name a component is listed under (generic block name, or the sprite /
+/// collider block's name).
+pub fn componentName(comp: scene_fmt.ComponentDeclaration) []const u8 {
+    return switch (comp) {
+        inline else => |b| b.name,
+    };
+}
+
+pub fn componentProperties(comp: scene_fmt.ComponentDeclaration) []Property {
+    return switch (comp) {
+        inline else => |b| b.properties orelse &.{},
+    };
+}
+
+fn buildPropertyRow(
+    ui_arena: Allocator,
+    entity_name: []const u8,
+    component_name: []const u8,
+    prop: Property,
+) *WidgetNode {
     const title_txt = std.fmt.allocPrint(
         ui_arena,
         "{s}: ",
         .{prop.name},
     ) catch "XXXXXX";
     const title_label = make.label(ui_arena, title_txt, .{
-        .color = Colors.ABYSS_BLUE,
+        .color = Colors.UI_TEXT_SECONDARY,
+        .font_scale = 16,
     });
+
+    var id_buf: [256]u8 = undefined;
+    const id: ?[]const u8 = if (propertyId(&id_buf, entity_name, component_name, prop.name)) |tmp|
+        ui_arena.dupe(u8, tmp) catch null
+    else
+        null;
+
+    // Editable kinds get a typed editor; everything else stays a read-only label.
+    if (id) |wid| switch (prop.value) {
+        .boolean => |b| return make.hstack(ui_arena, &.{
+            title_label,
+            make.checkbox(ui_arena, wid, "", b, .{}),
+        }, .{}),
+        .number => |n| return make.hstack(ui_arena, &.{
+            title_label,
+            make.textInput(
+                ui_arena,
+                wid,
+                std.fmt.allocPrint(ui_arena, "{d}", .{n}) catch "???",
+                .{ .width = 90 },
+            ),
+        }, .{}),
+        .string => |str| return make.hstack(ui_arena, &.{
+            title_label,
+            make.textInput(ui_arena, wid, str, .{}),
+        }, .{}),
+        else => {},
+    };
 
     const value_txt: []const u8 = switch (prop.value) {
         .number => |n| std.fmt.allocPrint(ui_arena, "{d}", .{n}) catch "???",
         .boolean => |b| if (b) "true" else "false",
-        .string, .assetRef => |s| s,
+        .string, .assetRef => |str| str,
         .color => |c| std.fmt.allocPrint(ui_arena, "#{x:0>6}", .{c}) catch "#???????",
-        .array => |a| std.fmt.allocPrint(ui_arena, "...{d}", .{a.len}) catch "???",
+        .array => |arr| std.fmt.allocPrint(ui_arena, "...{d}", .{arr.len}) catch "???",
         .vector => |v| switch (v.len) {
             2 => std.fmt.allocPrint(
                 ui_arena,
@@ -113,7 +118,8 @@ fn buildPropertyRow(ui_arena: Allocator, prop: Property) *WidgetNode {
     };
 
     const value_label = make.label(ui_arena, value_txt, .{
-        .color = Colors.ABYSS_BLUE,
+        .color = Colors.UI_TEXT_PRIMARY,
+        .font_scale = 16,
     });
 
     return make.hstack(ui_arena, &.{ title_label, value_label }, .{});
@@ -124,19 +130,39 @@ pub fn buildTree(
     raw_state: ?*const anyopaque,
 ) *WidgetNode {
     const state: *const EditorState = @ptrCast(@alignCast(raw_state));
-    _ = state;
 
-    const bg = make.colorRect(ui_arena, Colors.ABYSS_BLUE, .{
-        .border_color = Colors.BLACK,
-        .border_width = 1,
+    const content: *WidgetNode = blk: {
+        const entity = state.getSelectedEntity() orelse break :blk buildEmptyState(ui_arena);
+
+        var rows: std.ArrayList(*WidgetNode) = .empty;
+        rows.append(ui_arena, make.label(ui_arena, entity.name, .{
+            .color = Colors.UI_TEXT_PRIMARY,
+            .font_scale = 22,
+        })) catch {};
+        for (entity.components) |comp| {
+            const comp_name = componentName(comp);
+            rows.append(ui_arena, make.hdivider(ui_arena, .{ .size = 1 })) catch {};
+            rows.append(ui_arena, make.label(ui_arena, comp_name, .{
+                .color = Colors.UI_TEXT_INFO,
+                .font_scale = 16,
+            })) catch {};
+            for (componentProperties(comp)) |prop| {
+                rows.append(
+                    ui_arena,
+                    buildPropertyRow(ui_arena, entity.name, comp_name, prop),
+                ) catch {};
+            }
+        }
+        break :blk make.scrollView(
+            ui_arena,
+            "inspector_scroll",
+            make.vstack(ui_arena, rows.items, .{ .spacing = 4 }),
+            .{},
+        );
+    };
+
+    return make.panel(ui_arena, content, .{
+        .padding = .all(8),
+        .fill = true,
     });
-    return make.vstack(ui_arena, &.{ buildPropertyRow(
-        ui_arena,
-        Property{
-            .location = .{ .col = 0, .len = 0, .line = 0 },
-            .name = "dummy",
-            .type_annotation = .{ .base_type = .f32, .is_array = false },
-            .value = .{ .number = 12.0 },
-        },
-    ), bg }, .{});
 }

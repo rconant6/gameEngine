@@ -45,6 +45,7 @@ public struct RawMouseEvent {
 
 class EventHandler {
   private var keyEventQueue: [RawKeyEvent] = []
+  private var textEventQueue: [UInt32] = []
   private var mouseEventQueue: [RawMouseEvent] = []
 
   func handleEvent(_ event: NSEvent) {
@@ -100,6 +101,20 @@ class EventHandler {
     let rawEvent = RawKeyEvent(keycode: keyCode, isDown: isDown)
 
     self.keyEventQueue.append(rawEvent)
+
+    // Typed text is a separate stream from keys. Cmd+<key> is a shortcut,
+    // not text; control chars (incl. 0x7F = mac Backspace) and AppKit's
+    // private-use range (arrows / F-keys, 0xF700-0xF8FF) already arrive as
+    // keycodes above.
+    guard isDown, !event.modifierFlags.contains(.command),
+      let chars = event.characters
+    else { return }
+    for scalar in chars.unicodeScalars
+    where scalar.value >= 0x20 && scalar.value != 0x7F
+      && !(0xF700...0xF8FF).contains(scalar.value)
+    {
+      self.textEventQueue.append(scalar.value)
+    }
   }
   func handleMouseEvent(_ event: NSEvent) {
     let loc = event.locationInWindow
@@ -136,6 +151,11 @@ class EventHandler {
     self.mouseEventQueue.remove(at: 0)
 
     return first
+  }
+
+  func pollNextText() -> UInt32? {
+    if self.textEventQueue.isEmpty { return nil }
+    return self.textEventQueue.removeFirst()
   }
 
   func pollNextKey() -> RawKeyEvent? {

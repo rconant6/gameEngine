@@ -18,9 +18,10 @@ let package = Package(
     .target(
       name: "MacPlatform",
       path: "swift",
-      resources: [
-      .process("shaders.metal")
-      ],
+      // shaders.metal is compiled by build/macos.zig into zig-out/bin/default.metallib,
+      // which is what makeDefaultLibrary() loads. Excluded so SPM doesn't also
+      // compile it into an unused resource bundle.
+      exclude: ["shaders.metal"],
       publicHeadersPath: "include",
       cSettings: [
         .headerSearchPath("include")

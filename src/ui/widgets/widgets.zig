@@ -1,4 +1,5 @@
 pub const Button = @import("Button.zig");
+pub const Checkbox = @import("Checkbox.zig");
 pub const Chicklet = @import("Chicklet.zig");
 pub const ColorRect = @import("ColorRect.zig");
 pub const Divider = @import("Divider.zig");
@@ -7,6 +8,8 @@ pub const HStack = @import("HStack.zig");
 pub const Label = @import("Label.zig");
 pub const ListItem = @import("ListItem.zig");
 pub const Panel = @import("Panel.zig");
+pub const ScrollView = @import("ScrollView.zig");
 pub const Slider = @import("Slider.zig");
 pub const Spacer = @import("Spacer.zig");
+pub const TextInput = @import("TextInput.zig");
 pub const VStack = @import("VStack.zig");

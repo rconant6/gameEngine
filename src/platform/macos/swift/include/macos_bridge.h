@@ -34,6 +34,7 @@ void set_pixel_buffer(WindowHandle window, void *pixels, uint32_t width,
 
 void poll_events();
 bool poll_key_event(uint16_t *keycode, uint8_t *isDown);
+bool poll_text_event(uint32_t *codepoint);
 bool poll_mouse_event(float *x, float *y, uint8_t *button, uint8_t *isDown,
                       float *scroll_x, float *scroll_y);
 

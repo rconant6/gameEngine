@@ -22,6 +22,7 @@ border_color: ?Color,
 border_width: f32,
 padding: EdgeInsets,
 fill: bool = false,
+corner_radius: f32 = 0,
 
 pub fn layout(self: *Self, li: LayoutInfo) Size {
     const child_constraints = li.constraints.deflate(self.padding);
@@ -47,17 +48,8 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
 }
 
 pub fn render(self: *Self, ri: RenderInfo) void {
-    const Rectangle = rend.ShapeRegistry.getShapeType("Rectangle") orelse
-        return;
     const bounds = ri.bounds;
-    const bg_shape = rend.ShapeRegistry.createShapeUnion(
-        Rectangle,
-        Rectangle.initFromTopLeft(
-            .{ .x = bounds.x, .y = bounds.y },
-            bounds.width,
-            bounds.height,
-        ),
-    );
+    const bg_shape = bounds.toShape(self.corner_radius);
     ri.renderer.render(.{
         .shape = bg_shape,
         .style = .{
@@ -75,4 +67,7 @@ pub fn render(self: *Self, ri: RenderInfo) void {
         .tex = ri.tex,
         .bounds = self.child.bounds,
     });
+}
+pub fn children(self: *Self) []WidgetNode {
+    return @as(*[1]WidgetNode, self.child);
 }

@@ -246,6 +246,12 @@ pub fn addAllTests(
             .{ "math", mod(modules, .math) },
             .{ "ui", mod(modules, .ui) },
         } },
+        .{ .name = "ui-text-state-tests", .path = "tests/ui/test_text_state.zig", .imports = &.{
+            .{ "ui", mod(modules, .ui) },
+        } },
+        .{ .name = "ui-widget-input-tests", .path = "tests/ui/test_widget_input.zig", .imports = &.{
+            .{ "ui", mod(modules, .ui) },
+        } },
     };
 
     // ========================================

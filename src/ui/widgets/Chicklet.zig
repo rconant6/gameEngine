@@ -55,6 +55,7 @@ state: ?*u16 = null,
 size: V2,
 selected: bool = false,
 on_click: ?*const fn () void = null,
+corner_radius: f32 = 0,
 
 pub fn layout(self: *Self, li: LayoutInfo) Size {
     const desired = Size{ .width = self.size.x, .height = self.size.y };
@@ -84,20 +85,12 @@ pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
             state.setPressed(false);
             state.setHovered(hit);
         },
+        else => {},
     }
 }
 pub fn render(self: *Self, ri: RenderInfo) void {
     const bounds = ri.bounds;
-    const Rectangle = rend.ShapeRegistry.getShapeType("Rectangle") orelse
-        return;
-    const bg_shape = rend.ShapeRegistry.createShapeUnion(
-        Rectangle,
-        Rectangle.initFromTopLeft(
-            .{ .x = bounds.x, .y = bounds.y },
-            bounds.width,
-            bounds.height,
-        ),
-    );
+    const bg_shape = bounds.toShape(self.corner_radius);
     const state = ChickletState{ .bits = self.state orelse {
         log.err(.ui, "Invalid Button State {s}", .{self.id});
         return;

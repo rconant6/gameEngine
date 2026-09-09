@@ -17,6 +17,7 @@ const Self = @This();
 color: Color,
 border_color: ?Color = null,
 border_width: f32 = 0,
+corner_radius: f32 = 0,
 
 pub fn layout(self: *Self, li: LayoutInfo) Size {
     _ = self;
@@ -27,17 +28,8 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
 }
 
 pub fn render(self: *Self, ri: RenderInfo) void {
-    const Rectangle = rend.ShapeRegistry.getShapeType("Rectangle") orelse
-        return;
     const bounds = ri.bounds;
-    const shape = rend.ShapeRegistry.createShapeUnion(
-        Rectangle,
-        Rectangle.initFromTopLeft(
-            .{ .x = bounds.x, .y = bounds.y },
-            bounds.width,
-            bounds.height,
-        ),
-    );
+    const shape = bounds.toShape(self.corner_radius);
     ri.renderer.render(.{
         .shape = shape,
         .style = .{

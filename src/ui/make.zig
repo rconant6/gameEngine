@@ -12,6 +12,7 @@ const Registry = @import("widgets/widget_registry.zig");
 const Rect = @import("Rect.zig");
 const widgets = @import("widgets/widgets.zig");
 const Button = widgets.Button;
+const Checkbox = widgets.Checkbox;
 const Chicklet = widgets.Chicklet;
 const ColorRect = widgets.ColorRect;
 const Divider = widgets.Divider;
@@ -20,8 +21,10 @@ const HStack = widgets.HStack;
 const Label = widgets.Label;
 const ListItem = widgets.ListItem;
 const Panel = widgets.Panel;
+const ScrollView = widgets.ScrollView;
 const Slider = widgets.Slider;
 const Spacer = widgets.Spacer;
+const TextInput = widgets.TextInput;
 const VStack = widgets.VStack;
 const TextBlock = @import("TextBlock.zig");
 const lo = @import("layout.zig");
@@ -76,6 +79,7 @@ const PanelOpts = struct {
     border_width: f32 = 1,
     padding: EdgeInsets = .all(5),
     fill: bool = false,
+    corner_radius: f32 = 0,
 };
 pub fn panel(ui: Allocator, child: *WidgetNode, opts: PanelOpts) *WidgetNode {
     return alloc(ui, Panel{
@@ -84,6 +88,7 @@ pub fn panel(ui: Allocator, child: *WidgetNode, opts: PanelOpts) *WidgetNode {
         .border_width = opts.border_width,
         .padding = opts.padding,
         .fill = opts.fill,
+        .corner_radius = opts.corner_radius,
         .child = child,
     });
 }
@@ -98,7 +103,7 @@ pub const HStackOpts = struct {
 pub fn hstack(ui: Allocator, children: []const *WidgetNode, opts: HStackOpts) *WidgetNode {
     const nodes = allocChildren(ui, children);
     return alloc(ui, HStack{
-        .children = nodes,
+        .childs = nodes,
         .spacing = opts.spacing,
         .cross_axis = opts.cross_axis,
     });
@@ -114,7 +119,7 @@ pub const VStackOpts = struct {
 pub fn vstack(ui: Allocator, children: []const *WidgetNode, opts: VStackOpts) *WidgetNode {
     const nodes = allocChildren(ui, children);
     return alloc(ui, VStack{
-        .children = nodes,
+        .childs = nodes,
         .spacing = opts.spacing,
         .cross_axis = opts.cross_axis,
     });
@@ -125,6 +130,7 @@ pub fn vstack(ui: Allocator, children: []const *WidgetNode, opts: VStackOpts) *W
 pub const ColorRectOpts = struct {
     border_color: ?Color = null,
     border_width: f32 = 0,
+    corner_radius: f32 = 0,
 };
 
 pub fn colorRect(ui: Allocator, color: Color, opts: ColorRectOpts) *WidgetNode {
@@ -132,6 +138,7 @@ pub fn colorRect(ui: Allocator, color: Color, opts: ColorRectOpts) *WidgetNode {
         .color = color,
         .border_color = opts.border_color,
         .border_width = opts.border_width,
+        .corner_radius = opts.corner_radius,
     });
 }
 
@@ -145,6 +152,7 @@ pub const ChickletOpts = struct {
     size: V2 = .{ .x = 24, .y = 24 },
     is_selected: bool = false,
     on_click: ?*const fn () void = null,
+    corner_radius: f32 = 0,
 };
 
 pub fn chicklet(ui: Allocator, name: []const u8, opts: ChickletOpts) *WidgetNode {
@@ -154,6 +162,7 @@ pub fn chicklet(ui: Allocator, name: []const u8, opts: ChickletOpts) *WidgetNode
         .selected = opts.is_selected,
         .on_click = opts.on_click,
         .size = opts.size,
+        .corner_radius = opts.corner_radius,
     });
 }
 
@@ -169,6 +178,7 @@ pub const ListItemOps = struct {
     font_scale: f32 = 24.0,
     indent: u8 = 0,
     selected: bool = false,
+    corner_radius: f32 = 0,
 };
 
 pub fn listItem(
@@ -186,6 +196,7 @@ pub fn listItem(
         .colors = opts.colors,
         .indent = opts.indent,
         .selected = opts.selected,
+        .corner_radius = opts.corner_radius,
     });
 }
 // ── Button ──
@@ -199,6 +210,7 @@ pub const ButtonOpts = struct {
     },
     font_scale: f32 = 24.0,
     on_click: ?*const fn () void = null,
+    corner_radius: f32 = 0,
 };
 
 pub fn button(
@@ -215,6 +227,7 @@ pub fn button(
         },
         .colors = opts.colors,
         .on_click = opts.on_click,
+        .corner_radius = opts.corner_radius,
     });
 }
 
@@ -293,10 +306,101 @@ pub const GridOpts = struct {
 pub fn grid(ui: Allocator, children: []const *WidgetNode, opts: GridOpts) *WidgetNode {
     const nodes = allocChildren(ui, children);
     return alloc(ui, Grid{
-        .children = nodes,
+        .childs = nodes,
         .columns = opts.columns,
         .h_spacing = opts.h_spacing,
         .v_spacing = opts.v_spacing,
+    });
+}
+
+// ── ScrollView ──
+
+pub const ScrollViewOpts = struct {
+    /// Pixels of scroll per wheel notch.
+    scroll_speed: f32 = 30,
+};
+
+/// Wraps ONE child in a scrollable viewport. The child lays out at its full
+/// natural height; ScrollView shifts it by the scroll offset and culls what
+/// falls outside the viewport. Row layout stays the child's job (usually a
+/// vstack), so any widget tree scrolls — not just uniform lists.
+pub fn scrollView(
+    ui: Allocator,
+    id: []const u8,
+    child: *WidgetNode,
+    opts: ScrollViewOpts,
+) *WidgetNode {
+    return alloc(ui, ScrollView{
+        .id = id,
+        .child = child,
+        .scroll_speed = opts.scroll_speed,
+    });
+}
+
+// ── Checkbox ──
+
+pub const CheckboxOpts = struct {
+    colors: Checkbox.CheckboxColors = .{
+        .normal = Colors.UI_BUTTON_NORMAL,
+        .hovered = Colors.UI_BUTTON_HOVER,
+        .pressed = Colors.UI_BUTTON_PRESSED,
+        .text = Colors.UI_BUTTON_TEXT,
+        .check = Colors.UI_TEXT_INFO,
+    },
+    font_scale: f32 = 16,
+    box_size: f32 = 16,
+    corner_radius: f32 = 3,
+};
+
+/// `checked` is the app's value this frame. A click sets the state's
+/// `changed` bit; the app flips its own bool (`WidgetState.takeChanged`).
+pub fn checkbox(
+    ui: Allocator,
+    id: []const u8,
+    text: []const u8,
+    checked: bool,
+    opts: CheckboxOpts,
+) *WidgetNode {
+    return alloc(ui, Checkbox{
+        .id = id,
+        .label = .{ .text = text, .font_scale = opts.font_scale },
+        .checked = checked,
+        .colors = opts.colors,
+        .box_size = opts.box_size,
+        .corner_radius = opts.corner_radius,
+    });
+}
+
+// ── TextInput ──
+
+pub const TextInputOpts = struct {
+    colors: TextInput.TextInputColors = .{
+        .normal = Colors.UI_BUTTON_NORMAL,
+        .hovered = Colors.UI_BUTTON_HOVER,
+        .focused = Colors.UI_TEXT_INFO,
+        .text = Colors.UI_TEXT_PRIMARY,
+        .caret = Colors.UI_TEXT_PRIMARY,
+    },
+    width: f32 = 160,
+    font_scale: f32 = 16,
+    corner_radius: f32 = 3,
+};
+
+/// `value` is the app's text this frame. Enter or click-away sets `changed`;
+/// the app reads `state.text.slice()` and writes it back. Esc reverts.
+pub fn textInput(
+    ui: Allocator,
+    id: []const u8,
+    value: []const u8,
+    opts: TextInputOpts,
+) *WidgetNode {
+    return alloc(ui, TextInput{
+        .id = id,
+        .value = value,
+        .colors = opts.colors,
+        .width = opts.width,
+        .font_scale = opts.font_scale,
+        .corner_radius = opts.corner_radius,
     });
 }
 

@@ -81,6 +81,10 @@ pub fn pollNextEvent() ?Event {
         }
     }
 
+    // Swift unicodeScalars are always <= 0x10FFFF, so the cast to u21 holds.
+    var cp: u32 = undefined;
+    if (poll_text_event(&cp)) return .{ .TextInput = .{ .codepoint = @intCast(cp) } };
+
     var x: f32 = undefined;
     var y: f32 = undefined;
     var scroll_x: f32 = 0;
@@ -155,4 +159,5 @@ pub fn getMousePosition(window: *Window) V2I {
 }
 
 extern fn poll_key_event(keycode: *u16, is_down: *u8) bool;
+extern fn poll_text_event(codepoint: *u32) bool;
 extern fn poll_mouse_event(x: *f32, y: *f32, scroll_x: *f32, scroll_y: *f32, button: *u8, isDown: *u8) bool;

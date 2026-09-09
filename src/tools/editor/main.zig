@@ -99,20 +99,14 @@ pub fn main(init: std.process.Init) !void {
         eng.clear(Colors.DARK_GRAY);
         eng.update(0);
 
-        if (app.kb.isPressed(.Esc)) break;
-
-        const mouse_pos = app.mouse.position;
+        // Esc cancels a text edit; only quit when no field is being edited.
+        if (app.kb.isPressed(.Esc) and !ui_layer.wantsKeyboard()) break;
 
         handleInput(&state, &app);
         drawViewport(&state, &app);
-        ui_layer.update(
-            &state,
-            mouse_pos.x,
-            mouse_pos.y,
-            app.mouse.buttons.isPressed(.Left),
-            app.mouse.buttons.isReleased(.Left),
-        );
+        ui_layer.update(&state, ui.UIInput.fromDevices(app.mouse, app.kb, app.text.slice()));
         flushHierarchySelection(&ui_layer, &state);
+        flushInspector(&ui_layer, &state);
         const ui_tex = try assets.atlasTexture(&app.renderer, &ui_font);
         ui_layer.render(&app.renderer, &ui_font, ui_tex, ctx);
 
@@ -157,6 +151,43 @@ fn flushDecls(
             },
             .scene => |s| flushDecls(ui_layer, state, s.decls, s.name),
             else => {},
+        }
+    }
+}
+
+/// Pull committed Inspector edits back into the selected entity's AST.
+/// Walks the same entity → component → property order the Inspector built,
+/// with the same id recipe.
+fn flushInspector(ui_layer: *UILayer, state: *EditorState) void {
+    const entity = state.getSelectedEntity() orelse return;
+    for (entity.components) |*comp| {
+        const comp_name = Inspector.componentName(comp.*);
+        const block_gpa = switch (comp.*) {
+            inline else => |b| b.gpa,
+        };
+        for (Inspector.componentProperties(comp.*)) |*prop| {
+            var id_buf: [256]u8 = undefined;
+            const id = Inspector.propertyId(&id_buf, entity.name, comp_name, prop.name) orelse continue;
+            const ws = ui_layer.getState("inspector", id) orelse continue;
+            if (!ws.takeChanged()) continue;
+
+            switch (prop.value) {
+                .boolean => |*b| b.* = !b.*,
+                .number => |*n| {
+                    // Bad input keeps the old value; the field reseeds from it next frame.
+                    n.* = std.fmt.parseFloat(f64, ws.text.slice()) catch continue;
+                },
+                .string => |old| {
+                    // The parser allocated these strings with the block's gpa;
+                    // replace with the same allocator so Value.deinit stays correct.
+                    const new = block_gpa.dupe(u8, ws.text.slice()) catch continue;
+                    block_gpa.free(old);
+                    prop.value = .{ .string = new };
+                },
+                else => continue,
+            }
+            state.dirty = true;
+            log.info(.application, "inspector: {s} changed", .{id});
         }
     }
 }

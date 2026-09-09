@@ -14,6 +14,7 @@ const evt = @import("event.zig");
 const Event = evt.Event;
 const EventKind = evt.EventKind;
 const MouseButton = evt.MouseButton;
+const UIInput = evt.UIInput;
 const log = @import("debug").log;
 
 const Self = @This();
@@ -46,6 +47,8 @@ pub fn init(backing_alloc: std.mem.Allocator) Self {
 pub fn deinit(self: *Self) void {
     self.font.deinit();
     self.arena.deinit();
+    var keys = self.state_map.keyIterator();
+    while (keys.next()) |k| self.persistent.free(k.*);
     self.state_map.deinit();
 }
 
@@ -58,7 +61,16 @@ pub fn getOrCreateState(
         log.err(.ui, "Failed to create state for '{s}': {any}", .{ id, err });
         return null;
     };
-    if (!state.found_existing) state.value_ptr.* = default;
+    if (!state.found_existing) {
+        // The map owns its keys: ids are often built on the frame arena
+        // (allocPrint in a builder), which `rebuild` resets every frame.
+        state.key_ptr.* = self.persistent.dupe(u8, id) catch |err| {
+            log.err(.ui, "Failed to own state id '{s}': {any}", .{ id, err });
+            self.state_map.removeByPtr(state.key_ptr);
+            return null;
+        };
+        state.value_ptr.* = default;
+    }
     return state.value_ptr;
 }
 
@@ -77,8 +89,12 @@ pub fn allocator(self: *Self) std.mem.Allocator {
     return self.arena.allocator();
 }
 
+/// Wires state here, not in processInput: the tree is rebuilt from the arena
+/// every frame (every `.state` starts null), and layout, input and render all
+/// read state. Non-interactive views never call processInput at all.
 pub fn setRoot(self: *Self, node: *WidgetNode) void {
     self.root = node;
+    wireState(self, node);
 }
 
 // TODO: update for more styling/defaults later on
@@ -129,51 +145,134 @@ pub fn render(
     root.render(render_info);
 }
 
-pub fn processInput(
-    self: *Self,
-    mouse_x: f32,
-    mouse_y: f32,
-    left_down: bool,
-    left_up: bool,
-) void {
+pub fn processInput(self: *Self, in: UIInput) void {
     const root = self.root orelse return;
 
-    // Wire state pointers for ALL widgets first, independent of events.
-    wireState(self, root);
-
-    if (left_down) {
+    if (in.left_down) {
+        // Blur = commit: unfocus every text field before the click lands; the
+        // field that was hit re-focuses itself. Works even when an earlier
+        // widget consumes the click.
+        blurAll(self);
         var event: Event = .{
             .kind = .mouse_down,
-            .mouse_x = mouse_x,
-            .mouse_y = mouse_y,
+            .mouse_x = in.mouse_x,
+            .mouse_y = in.mouse_y,
             .button = .left,
         };
         dispatchEvent(root, &event);
     }
-    if (left_up) {
+    if (in.left_up) {
         // Clear all dragging flags before dispatching mouse_up,
         // so drag never sticks (even on same-frame press+release).
         clearAllDragging(self);
         var event: Event = .{
             .kind = .mouse_up,
-            .mouse_x = mouse_x,
-            .mouse_y = mouse_y,
+            .mouse_x = in.mouse_x,
+            .mouse_y = in.mouse_y,
             .button = .left,
         };
         dispatchEvent(root, &event);
     }
+
+    if (in.scroll_delta != 0) {
+        var e: Event = .{
+            .kind = .mouse_scroll,
+            .mouse_x = in.mouse_x,
+            .mouse_y = in.mouse_y,
+            .button = null,
+            .scroll_delta = in.scroll_delta,
+        };
+        dispatchEvent(root, &e);
+    }
+
+    // Keys before text, after mouse_down: click-to-focus lands before any
+    // same-frame typing.
+    for (in.keys()) |k| {
+        var e: Event = .{
+            .kind = .key_down,
+            .mouse_x = in.mouse_x,
+            .mouse_y = in.mouse_y,
+            .button = null,
+            .key = k,
+        };
+        dispatchEvent(root, &e);
+    }
+    for (in.text) |cp| {
+        var e: Event = .{
+            .kind = .text_input,
+            .mouse_x = in.mouse_x,
+            .mouse_y = in.mouse_y,
+            .button = null,
+            .char = cp,
+        };
+        dispatchEvent(root, &e);
+    }
+
     var event: Event = .{
         .kind = .mouse_move,
-        .mouse_x = mouse_x,
-        .mouse_y = mouse_y,
+        .mouse_x = in.mouse_x,
+        .mouse_y = in.mouse_y,
         .button = null,
     };
     dispatchEvent(root, &event);
 }
 
+/// True while a text field is being edited. Hosts use it to suppress their
+/// own key shortcuts (e.g. Esc-to-quit while Esc means cancel-edit).
+pub fn wantsKeyboard(self: *const Self) bool {
+    var it = self.state_map.valueIterator();
+    while (it.next()) |ws| switch (ws.*) {
+        .text => |t| if (t.flags & WidgetState.focused != 0) return true,
+        else => {},
+    };
+    return false;
+}
+
 /// Wire state pointers on every widget so rendering always works,
 /// regardless of whether events were consumed.
+/// TWO passes, and the split is load-bearing.
+///
+/// `getOrCreateState` calls `state_map.getOrPut`, which REHASHES when the map
+/// grows — invalidating every `value_ptr` handed out earlier. Wiring pointers
+/// as we walk means the first widgets' `state` pointers dangle the moment a
+/// later insert triggers a rehash.
+///
+/// Pass 1 inserts every id (map stops growing). Pass 2 takes the pointers,
+/// which are now stable. Before the `inline else` recursion this was masked:
+/// only 4 container types recursed, so few ids were inserted and the map
+/// rarely rehashed mid-walk.
 fn wireState(self: *Self, node: *WidgetNode) void {
+    ensureState(self, node);
+    bindState(self, node);
+}
+
+/// Pass 1 — insert ids only. Discards the pointers on purpose.
+fn ensureState(self: *Self, node: *WidgetNode) void {
+    switch (node.widget) {
+        inline else => |*w| {
+            const W = @TypeOf(w.*);
+            if (@hasField(W, "id") and @hasDecl(W, "state_kind")) {
+                switch (W.state_kind) {
+                    .flags => _ = self.getOrCreateState(w.id, .{ .flags = 0 }),
+                    .value => _ = self.getOrCreateState(w.id, .{ .value = .{ .val = 0, .flags = 0 } }),
+                    .cursor => _ = self.getOrCreateState(w.id, .{ .cursor = .{} }),
+                    .text => _ = self.getOrCreateState(w.id, .{ .text = .{} }),
+                    else => {},
+                }
+            }
+        },
+    }
+    switch (node.widget) {
+        inline else => |*w| {
+            const W = @TypeOf(w.*);
+            if (@hasDecl(W, "children"))
+                for (w.children()) |*c| ensureState(self, c);
+        },
+    }
+}
+
+/// Pass 2 — take pointers. The map no longer grows, so these stay valid.
+fn bindState(self: *Self, node: *WidgetNode) void {
     switch (node.widget) {
         inline else => |*w| {
             const W = @TypeOf(w.*);
@@ -181,18 +280,19 @@ fn wireState(self: *Self, node: *WidgetNode) void {
                 const kind = W.state_kind;
                 switch (kind) {
                     .flags => {
-                        if (self.getOrCreateState(w.id, .{ .flags = 0 })) |ws| {
-                            w.state = &ws.flags;
-                        }
+                        if (self.state_map.getPtr(w.id)) |ws| w.state = &ws.flags;
                     },
                     .value => {
-                        if (self.getOrCreateState(
-                            w.id,
-                            .{ .value = .{ .val = 0, .flags = 0 } },
-                        )) |ws| {
+                        if (self.state_map.getPtr(w.id)) |ws| {
                             w.state_value = &ws.value.val;
                             w.state_flags = &ws.value.flags;
                         }
+                    },
+                    .cursor => {
+                        if (self.state_map.getPtr(w.id)) |ws| w.state = ws;
+                    },
+                    .text => {
+                        if (self.state_map.getPtr(w.id)) |ws| w.state = &ws.text;
                     },
                     else => {},
                 }
@@ -201,18 +301,24 @@ fn wireState(self: *Self, node: *WidgetNode) void {
     }
 
     switch (node.widget) {
-        .Panel => |*p| wireState(self, p.child),
-        .HStack => |*h| {
-            for (h.children) |*c| wireState(self, c);
+        inline else => |*w| {
+            const W = @TypeOf(w.*);
+            if (@hasDecl(W, "children"))
+                for (w.children()) |*c| bindState(self, c);
         },
-        .VStack => |*v| {
-            for (v.children) |*c| wireState(self, c);
-        },
-        .Grid => |*g| {
-            for (g.children) |*c| wireState(self, c);
+    }
+}
+
+/// Unfocus every text field; whatever was focused is marked `changed`.
+fn blurAll(self: *Self) void {
+    var it = self.state_map.valueIterator();
+    while (it.next()) |ws| switch (ws.*) {
+        .text => |*t| if (t.flags & WidgetState.focused != 0) {
+            t.flags &= ~WidgetState.focused;
+            t.flags |= WidgetState.changed;
         },
         else => {},
-    }
+    };
 }
 
 /// Clear the DRAGGING flag on every value-state widget.
@@ -220,7 +326,7 @@ fn clearAllDragging(self: *Self) void {
     var it = self.state_map.iterator();
     while (it.next()) |entry| {
         switch (entry.value_ptr.*) {
-            .value => |*v| v.flags &= ~@as(u16, 0x4),
+            .value => |*v| v.flags &= ~WidgetState.dragging,
             else => {},
         }
     }
@@ -231,23 +337,27 @@ fn dispatchEvent(node: *WidgetNode, event: *Event) void {
     switch (node.widget) {
         inline else => |*w| {
             const W = @TypeOf(w.*);
-            if (@hasDecl(W, "handleEvent")) {
+            if (@hasDecl(W, "handleEvent"))
                 w.handleEvent(event, node.bounds);
-            }
         },
     }
 
     switch (node.widget) {
-        .Panel => |*p| dispatchEvent(p.child, event),
-        .HStack => |*h| {
-            for (h.children) |*c| dispatchEvent(c, event);
+        inline else => |*w| {
+            const W = @TypeOf(w.*);
+            if (@hasDecl(W, "clips_children") and isPointerPress(event.kind) and
+                !node.bounds.contains(event.mousePos())) return;
+            if (@hasDecl(W, "children"))
+                for (w.children()) |*c| dispatchEvent(c, event);
         },
-        .VStack => |*v| {
-            for (v.children) |*c| dispatchEvent(c, event);
-        },
-        .Grid => |*g| {
-            for (g.children) |*c| dispatchEvent(c, event);
-        },
-        else => {},
     }
+}
+
+/// Clicks and wheel are position-targeted. mouse_move still passes so hover
+/// clears when the cursor leaves; keys/text are focus-targeted.
+fn isPointerPress(kind: EventKind) bool {
+    return switch (kind) {
+        .mouse_down, .mouse_up, .mouse_scroll => true,
+        else => false,
+    };
 }
