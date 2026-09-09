@@ -201,18 +201,25 @@ fn wireState(self: *Self, node: *WidgetNode) void {
     }
 
     switch (node.widget) {
-        .Panel => |*p| wireState(self, p.child),
-        .HStack => |*h| {
-            for (h.children) |*c| wireState(self, c);
+        inline else => |*w| {
+            const W = @TypeOf(w.*);
+            if (@hasDecl(W, "children"))
+                for (w.children()) |*c| wireState(self, c);
         },
-        .VStack => |*v| {
-            for (v.children) |*c| wireState(self, c);
-        },
-        .Grid => |*g| {
-            for (g.children) |*c| wireState(self, c);
-        },
-        else => {},
     }
+    // switch (node.widget) {
+    // .Panel => |*p| wireState(self, p.child),
+    // .HStack => |*h| {
+    //     for (h.childs) |*c| wireState(self, c);
+    // },
+    // .VStack => |*v| {
+    //     for (v.childs) |*c| wireState(self, c);
+    // },
+    // .Grid => |*g| {
+    //     for (g.childs) |*c| wireState(self, c);
+    // },
+    // else => {},
+    // }
 }
 
 /// Clear the DRAGGING flag on every value-state widget.
@@ -231,23 +238,16 @@ fn dispatchEvent(node: *WidgetNode, event: *Event) void {
     switch (node.widget) {
         inline else => |*w| {
             const W = @TypeOf(w.*);
-            if (@hasDecl(W, "handleEvent")) {
+            if (@hasDecl(W, "handleEvent"))
                 w.handleEvent(event, node.bounds);
-            }
         },
     }
 
     switch (node.widget) {
-        .Panel => |*p| dispatchEvent(p.child, event),
-        .HStack => |*h| {
-            for (h.children) |*c| dispatchEvent(c, event);
+        inline else => |*w| {
+            const W = @TypeOf(w.*);
+            if (@hasDecl(W, "children"))
+                for (w.children()) |*c| dispatchEvent(c, event);
         },
-        .VStack => |*v| {
-            for (v.children) |*c| dispatchEvent(c, event);
-        },
-        .Grid => |*g| {
-            for (g.children) |*c| dispatchEvent(c, event);
-        },
-        else => {},
     }
 }

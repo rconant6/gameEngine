@@ -76,3 +76,6 @@ pub fn render(self: *Self, ri: RenderInfo) void {
         .bounds = self.child.bounds,
     });
 }
+pub fn children(self: *Self) []WidgetNode {
+    return @as(*[1]WidgetNode, self.child);
+}

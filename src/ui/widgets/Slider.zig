@@ -100,6 +100,7 @@ pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
                 event.consume();
             }
         },
+        else => {},
     }
 }
 

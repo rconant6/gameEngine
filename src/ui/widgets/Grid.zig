@@ -17,7 +17,7 @@ const WidgetNode = @import("WidgetNode.zig");
 
 const Self = @This();
 
-children: []WidgetNode,
+childs: []WidgetNode,
 columns: u8,
 h_spacing: f32,
 v_spacing: f32,
@@ -25,12 +25,12 @@ cross_axis: ?Alignment.Horizontal = null,
 
 pub fn layout(self: *Self, li: LayoutInfo) Size {
     const cols: usize = @intCast(self.columns);
-    const rows = (self.children.len + cols - 1) / cols;
+    const rows = (self.childs.len + cols - 1) / cols;
     var max_width: f32 = 0;
     var max_height: f32 = 0;
 
     // ── Pass 1: measure fixed children, get biggest cell size ──
-    for (self.children) |*child| {
+    for (self.childs) |*child| {
         const child_info: LayoutInfo = .{
             .constraints = Constraints.loose(
                 li.constraints.max_width,
@@ -50,8 +50,8 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
         var cursor_x = li.pos.x;
         for (0..cols) |col| {
             const index = j * cols + col;
-            if (index >= self.children.len) break;
-            _ = self.children[index].layout(.{
+            if (index >= self.childs.len) break;
+            _ = self.childs[index].layout(.{
                 .constraints = .tight(max_width, max_height),
                 .pos = .{ .x = cursor_x, .y = cursor_y },
                 .font = li.font,
@@ -71,7 +71,7 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
 }
 
 pub fn render(self: *Self, ri: RenderInfo) void {
-    for (self.children) |*child| {
+    for (self.childs) |*child| {
         child.render(.{
             .renderer = ri.renderer,
             .ctx = ri.ctx,
@@ -80,4 +80,8 @@ pub fn render(self: *Self, ri: RenderInfo) void {
             .bounds = child.bounds,
         });
     }
+}
+
+pub fn children(self: *Self) []WidgetNode {
+    return self.childs;
 }

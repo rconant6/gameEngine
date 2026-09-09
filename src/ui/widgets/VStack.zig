@@ -17,7 +17,7 @@ const WidgetNode = @import("WidgetNode.zig");
 
 const Self = @This();
 
-children: []WidgetNode,
+childs: []WidgetNode,
 spacing: f32,
 cross_axis: Alignment.Horizontal,
 
@@ -28,7 +28,7 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
     var max_width: f32 = 0;
     var remaining_height = li.constraints.max_height;
 
-    for (self.children, 0..) |*child, i| {
+    for (self.childs, 0..) |*child, i| {
         if (child.widget == .Spacer) {
             spacer_count += 1;
         } else {
@@ -48,7 +48,7 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
         }
 
         // Account for spacing between children
-        if (i < self.children.len - 1) {
+        if (i < self.childs.len - 1) {
             fixed_height_total += self.spacing;
             remaining_height -= self.spacing;
         }
@@ -61,7 +61,7 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
     var cursor_y = li.pos.y;
 
     // ── Pass 2: assign positions top-to-bottom ──
-    for (self.children, 0..) |*child, i| {
+    for (self.childs, 0..) |*child, i| {
         if (child.widget == .Spacer) {
             // Spacer gets its flex width, full height
             _ = child.layout(.{
@@ -84,16 +84,16 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
             cursor_y += child_size.height;
         }
 
-        if (i < self.children.len - 1) {
+        if (i < self.childs.len - 1) {
             cursor_y += self.spacing;
         }
     }
 
     // ── Cross-axis alignment ──
     const stack_width = max_width;
-    for (self.children) |*child| {
-        const child_width = child.bounds.width;
-        child.bounds.x = switch (self.cross_axis) {
+    for (self.childs) |*c| {
+        const child_width = c.bounds.width;
+        c.bounds.x = switch (self.cross_axis) {
             .start => li.pos.x,
             .end => li.pos.x + stack_width - child_width,
             .center => li.pos.x + (stack_width - child_width) / 2,
@@ -109,13 +109,17 @@ pub fn layout(self: *Self, li: LayoutInfo) Size {
 }
 
 pub fn render(self: *Self, ri: RenderInfo) void {
-    for (self.children) |*child| {
-        child.render(.{
+    for (self.childs) |*c| {
+        c.render(.{
             .renderer = ri.renderer,
             .ctx = ri.ctx,
             .font = ri.font,
             .tex = ri.tex,
-            .bounds = child.bounds,
+            .bounds = c.bounds,
         });
     }
+}
+
+pub fn children(self: *Self) []WidgetNode {
+    return self.childs;
 }

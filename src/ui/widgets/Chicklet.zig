@@ -84,6 +84,7 @@ pub fn handleEvent(self: *Self, event: *Event, bounds: Rect) void {
             state.setPressed(false);
             state.setHovered(hit);
         },
+        else => {},
     }
 }
 pub fn render(self: *Self, ri: RenderInfo) void {

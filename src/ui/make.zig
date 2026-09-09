@@ -98,7 +98,7 @@ pub const HStackOpts = struct {
 pub fn hstack(ui: Allocator, children: []const *WidgetNode, opts: HStackOpts) *WidgetNode {
     const nodes = allocChildren(ui, children);
     return alloc(ui, HStack{
-        .children = nodes,
+        .childs = nodes,
         .spacing = opts.spacing,
         .cross_axis = opts.cross_axis,
     });
@@ -114,7 +114,7 @@ pub const VStackOpts = struct {
 pub fn vstack(ui: Allocator, children: []const *WidgetNode, opts: VStackOpts) *WidgetNode {
     const nodes = allocChildren(ui, children);
     return alloc(ui, VStack{
-        .children = nodes,
+        .childs = nodes,
         .spacing = opts.spacing,
         .cross_axis = opts.cross_axis,
     });
@@ -293,7 +293,7 @@ pub const GridOpts = struct {
 pub fn grid(ui: Allocator, children: []const *WidgetNode, opts: GridOpts) *WidgetNode {
     const nodes = allocChildren(ui, children);
     return alloc(ui, Grid{
-        .children = nodes,
+        .childs = nodes,
         .columns = opts.columns,
         .h_spacing = opts.h_spacing,
         .v_spacing = opts.v_spacing,
